@@ -1,0 +1,124 @@
+plugins {
+    id 'org.jetbrains.kotlin.multiplatform'
+    id 'kotlinx-atomicfu'
+    id 'org.jetbrains.kotlin.plugin.serialization'
+//    id 'com.android.library'
+//    id 'kotlin-android-extensions'
+}
+
+group 'com.ustadmobile.door'
+version '1.0-SNAPSHOT'
+
+repositories {
+    jcenter()
+    mavenCentral()
+}
+
+/*
+android {
+    compileSdkVersion 29
+    sourceSets.main.manifest.srcFile('src/androidMain/AndroidManifest.xml')
+    defaultConfig {
+        minSdkVersion 24
+        targetSdkVersion 29
+    }
+}
+*/
+
+kotlin {
+    //android()
+
+    jvm {
+        compilations.all {
+            kotlinOptions.jvmTarget = '1.8'
+        }
+        testRuns["test"].executionTask.configure {
+            useJUnit()
+        }
+    }
+
+    js(LEGACY) {
+        browser {
+            binaries.executable()
+            webpackTask {
+                cssSupport.enabled = true
+            }
+            runTask {
+                cssSupport.enabled = true
+            }
+            testTask {
+                useKarma {
+                    useChromeHeadless()
+                    webpackConfig.cssSupport.enabled = true
+                }
+            }
+        }
+    }
+
+    /* Targets configuration omitted. 
+    *  To find out how to configure the targets, please follow the link:
+    *  https://kotlinlang.org/docs/reference/building-mpp-with-gradle.html#setting-up-targets */
+
+    sourceSets {
+        commonMain {
+            dependencies {
+                implementation kotlin('stdlib-common')
+                implementation "io.ktor:ktor-client-core:$version_ktor"
+                implementation "io.ktor:ktor-client-json:$version_ktor"
+                implementation "com.github.aakira:napier:$version_napier"
+                implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.1.0'
+                implementation "org.kodein.di:kodein-di:$version_kodein_di"
+
+            }
+        }
+        commonTest {
+            dependencies {
+                implementation kotlin('test-common')
+                implementation kotlin('test-annotations-common')
+            }
+        }
+
+        roomAnnotations {
+
+        }
+
+        commonJvmMain {
+            dependencies {
+                compileOnly "org.nanohttpd:nanohttpd:$version_nanohttpd"
+                compileOnly "org.nanohttpd:nanohttpd-nanolets:$version_nanohttpd"
+            }
+        }
+
+//        androidMain {
+//
+//        }
+//
+//        androidTest {
+//
+//        }
+
+
+        jvmMain {
+            dependsOn roomAnnotations
+            dependsOn commonJvmMain
+            dependencies {
+                implementation "org.kodein.di:kodein-di-framework-ktor-server-jvm:$version_kodein_di"
+                compileOnly "org.xerial:sqlite-jdbc:$version_sqlite_jdbc"
+                compileOnly "io.ktor:ktor-server-core:$version_ktor"
+            }
+        }
+        jvmTest {
+            dependencies {
+                implementation kotlin('test-junit')
+            }
+        }
+        jsMain {
+            dependsOn roomAnnotations
+        }
+        jsTest {
+            dependencies {
+                implementation kotlin('test-js')
+            }
+        }
+    }
+}

@@ -1,0 +1,38 @@
+group 'com.ustadmobile.door'
+version '1.0-SNAPSHOT'
+
+
+buildscript {
+
+    ext.kotlin_version = "1.4.31"
+    ext.atomicfu_version = '0.15.1'
+
+    repositories {
+        google()
+        jcenter()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath "com.android.tools.build:gradle:4.0.0"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath "org.jetbrains.kotlinx:atomicfu-gradle-plugin:$atomicfu_version"
+        classpath "org.jetbrains.kotlin:kotlin-serialization:$kotlin_version"
+    }
+}
+
+ext {
+    version_ktor = "1.5.2"
+    version_nanohttpd = "2.3.1"
+    version_napier = "1.5.0-alpha1"
+    version_atomicfu = '0.15.1'
+    version_sqlite_jdbc = "3.32.3.2"
+    version_kodein_di = "7.4.0"
+}
+
+allprojects {
+    repositories {
+        google()
+        jcenter()
+    }
+}
