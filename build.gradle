@@ -28,6 +28,8 @@ ext {
     version_atomicfu = '0.15.1'
     version_sqlite_jdbc = "3.32.3.2"
     version_kodein_di = "7.4.0"
+    version_kotlin_mockito = "2.2.0"
+    version_mockwebserver = "4.9.0"
 }
 
 allprojects {

@@ -103,13 +103,24 @@ kotlin {
             dependsOn commonJvmMain
             dependencies {
                 implementation "org.kodein.di:kodein-di-framework-ktor-server-jvm:$version_kodein_di"
-                compileOnly "org.xerial:sqlite-jdbc:$version_sqlite_jdbc"
-                compileOnly "io.ktor:ktor-server-core:$version_ktor"
+                implementation "org.xerial:sqlite-jdbc:$version_sqlite_jdbc"
+                implementation "io.ktor:ktor-server-core:$version_ktor"
             }
         }
         jvmTest {
             dependencies {
                 implementation kotlin('test-junit')
+
+                implementation "com.nhaarman.mockitokotlin2:mockito-kotlin:$version_kotlin_mockito"
+                implementation "org.xerial:sqlite-jdbc:$version_sqlite_jdbc"
+                implementation "com.squareup.okhttp3:mockwebserver:$version_mockwebserver"
+
+                implementation "io.ktor:ktor-server-core:$version_ktor"
+                implementation "io.ktor:ktor-server-netty:$version_ktor"
+                implementation "io.ktor:ktor-jackson:$version_ktor"
+                implementation "io.ktor:ktor-gson:$version_ktor"
+                implementation "io.ktor:ktor-client-okhttp:$version_ktor"
+                implementation "io.ktor:ktor-client-gson:$version_ktor"
             }
         }
         jsMain {
