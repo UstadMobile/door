@@ -1,0 +1,90 @@
+plugins {
+    id 'org.jetbrains.kotlin.multiplatform'
+    id 'org.jetbrains.kotlin.plugin.serialization'
+    id "org.jetbrains.kotlin.kapt"
+}
+
+group rootProject.group
+version rootProject.version
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
+def platformTypeAttr = Attribute.of("org.jetbrains.kotlin.platform.type", String)
+
+afterEvaluate {
+    configurations.all { configuration ->
+        // Workaround for kapt bug with MPP dependencies
+        // https://youtrack.jetbrains.com/issue/KT-31641
+        // https://youtrack.jetbrains.com/issue/KT-33206
+        if (name.contains('kapt')) {
+            attributes.attribute(platformTypeAttr, "jvm")
+        }
+    }
+}
+
+kotlin {
+    /* Targets configuration omitted. 
+    *  To find out how to configure the targets, please follow the link:
+    *  https://kotlinlang.org/docs/reference/building-mpp-with-gradle.html#setting-up-targets */
+
+    jvm {
+        compilations.all {
+            kotlinOptions.jvmTarget = '1.8'
+        }
+        testRuns["test"].executionTask.configure {
+            useJUnit()
+        }
+    }
+
+    sourceSets {
+        commonMain {
+            kotlin.srcDir("../door-runtime/src/commonMain/resources/daos")
+
+            dependencies {
+                implementation kotlin('stdlib-common')
+                implementation project(":door-runtime")
+                compileOnly project(":room-annotations")
+
+                implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.1.0'
+                implementation "io.ktor:ktor-client-core:$version_ktor"
+                implementation "io.ktor:ktor-client-json:$version_ktor"
+                implementation "com.github.aakira:napier:$version_napier"
+                implementation "org.kodein.di:kodein-di:$version_kodein_di"
+            }
+        }
+        commonTest {
+            dependencies {
+                implementation kotlin('test-common')
+                implementation kotlin('test-annotations-common')
+            }
+        }
+
+        jvmMain {
+            dependencies {
+                implementation "io.ktor:ktor-gson:$version_ktor"
+                implementation "org.kodein.di:kodein-di-framework-ktor-server-jvm:$version_kodein_di"
+                implementation "org.xerial:sqlite-jdbc:$version_sqlite_jdbc"
+                implementation "io.ktor:ktor-server-core:$version_ktor"
+            }
+        }
+    }
+}
+
+kapt {
+    arguments {
+        arg("doordb_android_out", "$buildDir/generated/source/door-android")
+        //Uncomment lines below to allow debugging on generated source code.
+        //arg("doordb_ktor_out", "$buildDir/generated/source/doordb-jvm")
+        //arg("doordb_jvm_out", "$buildDir/generated/source/doordb-jvm")
+        arg("doordb_js_out", "$buildDir/generated/source/door-js")
+        arg("doordb_source_path", project.file("src/commonMain/kotlin"))
+        arg("doordb_migrations_out", project.file("$buildDir/generated/door-migrations"))
+    }
+}
+
+dependencies {
+    kapt project(":door-compiler")
+}

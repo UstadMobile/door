@@ -1,6 +1,5 @@
 group 'com.ustadmobile.door'
-version '1.0-SNAPSHOT'
-
+version '0.1c'
 
 buildscript {
 
@@ -30,6 +29,21 @@ ext {
     version_kodein_di = "7.4.0"
     version_kotlin_mockito = "2.2.0"
     version_mockwebserver = "4.9.0"
+    version_android_room = "2.2.6"
+    version_androidx_lifecycle = "2.3.0-alpha03"
+    version_androidx_paging = "2.1.2"
+    version_androidx_core = '1.3.0'
+    version_kotlinpoet = "1.7.2"
+    version_jsqlparser = "4.0"
+    version_apache_commons_text = "1.9"
+    version_gson = "2.8.6"
+    version_simple_jndi = "0.23.0"
+    version_apache_commons_pool2 = "2.9.0"
+    version_sqlite_jdbc = "3.34.0"
+    version_postgres_jdbc = "42.2.19"
+    version_apache_commons_dbcp2 = "2.8.0"
+    version_logback = "1.2.3"
+
 }
 
 allprojects {

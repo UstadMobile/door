@@ -2,31 +2,31 @@ plugins {
     id 'org.jetbrains.kotlin.multiplatform'
     id 'kotlinx-atomicfu'
     id 'org.jetbrains.kotlin.plugin.serialization'
-//    id 'com.android.library'
-//    id 'kotlin-android-extensions'
+    id 'com.android.library'
+    id 'kotlin-android-extensions'
+    id 'maven-publish'
 }
 
-group 'com.ustadmobile.door'
-version '1.0-SNAPSHOT'
+group rootProject.group
+version rootProject.version
 
 repositories {
     jcenter()
     mavenCentral()
 }
 
-/*
+
 android {
     compileSdkVersion 29
     sourceSets.main.manifest.srcFile('src/androidMain/AndroidManifest.xml')
     defaultConfig {
-        minSdkVersion 24
+        minSdkVersion 21
         targetSdkVersion 29
     }
 }
-*/
 
 kotlin {
-    //android()
+    android()
 
     jvm {
         compilations.all {
@@ -37,23 +37,24 @@ kotlin {
         }
     }
 
-    js(LEGACY) {
-        browser {
-            binaries.executable()
-            webpackTask {
-                cssSupport.enabled = true
-            }
-            runTask {
-                cssSupport.enabled = true
-            }
-            testTask {
-                useKarma {
-                    useChromeHeadless()
-                    webpackConfig.cssSupport.enabled = true
-                }
-            }
-        }
-    }
+    //Enable me later
+//    js(LEGACY) {
+//        browser {
+//            binaries.executable()
+//            webpackTask {
+//                cssSupport.enabled = true
+//            }
+//            runTask {
+//                cssSupport.enabled = true
+//            }
+//            testTask {
+//                useKarma {
+//                    useChromeHeadless()
+//                    webpackConfig.cssSupport.enabled = true
+//                }
+//            }
+//        }
+//    }
 
     /* Targets configuration omitted. 
     *  To find out how to configure the targets, please follow the link:
@@ -62,6 +63,7 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
+                compileOnly project(":room-annotations")
                 implementation kotlin('stdlib-common')
                 implementation "io.ktor:ktor-client-core:$version_ktor"
                 implementation "io.ktor:ktor-client-json:$version_ktor"
@@ -89,19 +91,27 @@ kotlin {
             }
         }
 
-//        androidMain {
-//
-//        }
-//
-//        androidTest {
-//
-//        }
+        androidMain {
+            dependsOn commonJvmMain
+            dependencies {
+                implementation "androidx.room:room-runtime:$version_android_room"
+                implementation "androidx.room:room-ktx:$version_android_room"
+                implementation "androidx.lifecycle:lifecycle-livedata-ktx:$version_androidx_lifecycle"
+                implementation "androidx.paging:paging-runtime:$version_androidx_paging"
+                implementation "androidx.core:core-ktx:$version_androidx_core"
+            }
+        }
+
+        androidTest {
+
+        }
 
 
         jvmMain {
             dependsOn roomAnnotations
             dependsOn commonJvmMain
             dependencies {
+                implementation project(":room-annotations")
                 implementation "org.kodein.di:kodein-di-framework-ktor-server-jvm:$version_kodein_di"
                 implementation "org.xerial:sqlite-jdbc:$version_sqlite_jdbc"
                 implementation "io.ktor:ktor-server-core:$version_ktor"
@@ -131,5 +141,20 @@ kotlin {
                 implementation kotlin('test-js')
             }
         }
+    }
+}
+
+publishing {
+    repositories {
+
+//        Taken from XmlPullParserKmp
+//        maven {
+//            name = "door-runtime"
+//            url = uri("https://maven.pkg.github.com/UstadMobile/XmlPullParserKmp")
+//            credentials {
+//                username = localProperties["gpr.user"]
+//                password = localProperties["gpr.key"]
+//            }
+//        }
     }
 }

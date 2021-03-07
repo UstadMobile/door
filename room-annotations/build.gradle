@@ -1,0 +1,57 @@
+plugins {
+    id 'org.jetbrains.kotlin.multiplatform'
+    id 'maven-publish'
+}
+
+group rootProject.group
+version rootProject.version
+
+repositories {
+    mavenCentral()
+}
+
+kotlin {
+
+    jvm {
+        compilations.all {
+            kotlinOptions.jvmTarget = '1.8'
+        }
+        testRuns["test"].executionTask.configure {
+            useJUnit()
+        }
+    }
+
+
+    /* Targets configuration omitted. 
+    *  To find out how to configure the targets, please follow the link:
+    *  https://kotlinlang.org/docs/reference/building-mpp-with-gradle.html#setting-up-targets */
+
+    sourceSets {
+        commonMain {
+            dependencies {
+                implementation kotlin('stdlib-common')
+            }
+        }
+        commonTest {
+            dependencies {
+                implementation kotlin('test-common')
+                implementation kotlin('test-annotations-common')
+            }
+        }
+    }
+}
+
+publishing {
+    repositories {
+
+//        Taken from XmlPullParserKmp
+//        maven {
+//            name = "door-runtime"
+//            url = uri("https://maven.pkg.github.com/UstadMobile/XmlPullParserKmp")
+//            credentials {
+//                username = localProperties["gpr.user"]
+//                password = localProperties["gpr.key"]
+//            }
+//        }
+    }
+}
