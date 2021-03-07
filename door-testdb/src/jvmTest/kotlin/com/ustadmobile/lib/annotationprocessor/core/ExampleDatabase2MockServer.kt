@@ -8,7 +8,7 @@ import okhttp3.mockwebserver.RecordedRequest
 class ExampleDatabase2MockDispatcher : Dispatcher() {
     override fun dispatch(request: RecordedRequest): MockResponse {
         return when {
-            request.path.startsWith("/ExampleDatabase2/ExampleDao2/insertAsyncAndGiveId")-> {
+            request.path?.startsWith("/ExampleDatabase2/ExampleDao2/insertAsyncAndGiveId") == true-> {
                 val response = MockResponse().setResponseCode(200)
                         .setHeader("Content-Type", "application/json; charset=UTF-8")
                         .setHeader("Access-Control-Allow-Origin", "*")
@@ -32,7 +32,7 @@ class ExampleDatabase2MockDispatcher : Dispatcher() {
 
 fun main(args: Array<String>) {
     val mockServer = MockWebServer()
-    mockServer.setDispatcher(ExampleDatabase2MockDispatcher())
+    mockServer.dispatcher = ExampleDatabase2MockDispatcher()
     mockServer.start(8087)
     while(true) {
         Thread.sleep(1000)
