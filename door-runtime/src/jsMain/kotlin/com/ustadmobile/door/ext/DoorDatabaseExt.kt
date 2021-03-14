@@ -14,8 +14,9 @@ fun DoorDatabase.init(dbName: String) {
         //do the setup tasks: e.g. check for data on IndexedDb, createTables, run migrations, etc.
 
         val indexedDb = js("window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB")
-        val request = indexedDb.open("UmDatabase", 1)
-        //somehow async, we would wind up with a TypedArray
+        //TODO: Check if the given indexeddb exists, or not
+        // if it does exist, load the database from the indexddb data
+        // if it does not exist, call db's createAllTables function
 
         initCompletable.complete(true)
     }
