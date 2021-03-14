@@ -21,6 +21,24 @@ kotlin {
         }
     }
 
+    js(LEGACY) {
+        browser {
+            binaries.executable()
+            webpackTask {
+                cssSupport.enabled = true
+            }
+            runTask {
+                cssSupport.enabled = true
+            }
+            testTask {
+                useKarma {
+                    useChromeHeadless()
+                    webpackConfig.cssSupport.enabled = true
+                }
+            }
+        }
+    }
+
 
     /* Targets configuration omitted. 
     *  To find out how to configure the targets, please follow the link:
@@ -37,6 +55,10 @@ kotlin {
                 implementation kotlin('test-common')
                 implementation kotlin('test-annotations-common')
             }
+        }
+
+        jsMain {
+
         }
     }
 }
