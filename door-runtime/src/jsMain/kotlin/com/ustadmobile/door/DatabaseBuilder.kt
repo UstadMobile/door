@@ -15,7 +15,7 @@ actual class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private 
     }
 
     actual fun build(): T {
-        val implClass = implementationMap[dbClass] as KClass<T>
+        val implClass = implementationMap[dbClass] as KClass
 
         val dbImpl = implClass.js.createInstance(context, dbName) as T
 
@@ -37,9 +37,7 @@ actual class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private 
             context: Any,
             dbClass: KClass<T>,
             dbName: String
-        ): DatabaseBuilder<T> {
-            TODO("Not yet implemented")
-        }
+        ): DatabaseBuilder<T> = DatabaseBuilder(context, dbClass, dbName)
 
     }
 

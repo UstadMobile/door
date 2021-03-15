@@ -17,6 +17,7 @@ fun DoorDatabase.init(dbName: String, version:Int = 1) {
         if(exists){
             loadDbFromIndexedDb(dbName, version, worker)
         }else{
+            console.log("Calling createTables")
             createAllTables()
         }
         initCompletable.complete(true)
