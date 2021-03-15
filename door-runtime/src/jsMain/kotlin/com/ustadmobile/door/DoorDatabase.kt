@@ -16,7 +16,7 @@ actual abstract class DoorDatabase actual constructor() {
 
     }
 
-    suspend fun awaitReady() {
+    private suspend fun awaitReady() {
         initCompletable.await()
     }
 
