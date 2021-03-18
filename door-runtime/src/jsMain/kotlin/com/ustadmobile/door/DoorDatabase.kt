@@ -2,13 +2,11 @@ package com.ustadmobile.door
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Runnable
-import org.w3c.dom.Worker
+import wrappers.SqliteWorkerManager
 
 actual abstract class DoorDatabase actual constructor() {
 
-    internal lateinit var worker: Worker
-
-    lateinit var dbName: String
+    internal lateinit var workerManager: SqliteWorkerManager
 
     val initCompletable = CompletableDeferred<Boolean>()
 
