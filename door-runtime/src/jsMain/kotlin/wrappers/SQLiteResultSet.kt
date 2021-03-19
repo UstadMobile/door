@@ -4,24 +4,24 @@ import com.ustadmobile.door.jdbc.ResultSet
 
 class SQLiteResultSet(private val results: Array<Any>): ResultSet {
 
-    var currentIndex = 0
+    var currentIndex = -1
 
-    var nextRow: Array<Any>? = null
+    var currentRow: Array<Any>? = null
 
     override fun next(): Boolean {
         return if(results.isNotEmpty()){
             currentIndex++
             val data = results.first().asDynamic().values
-            val hasNext = data.size < currentIndex
-            nextRow = if(hasNext) data[currentIndex] else null
-            return nextRow != null
+            val hasNext = currentIndex < data.length as Int
+            currentRow = if(hasNext) data[currentIndex] else null
+            return currentRow != null
         }else{
             false
         }
     }
 
-    override fun getString(columnIndex: Int): String {
-        return nextRow?.get(columnIndex).toString()
+    override fun getString(columnIndex: Int): String? {
+        return currentRow?.get(columnIndex)?.toString()
     }
 
     override fun close() {}

@@ -91,7 +91,7 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
 
 
     override fun getConnection(): Connection {
-        TODO("Not yet implemented")
+        return SQLiteConnectionJs(this)
     }
 
 
