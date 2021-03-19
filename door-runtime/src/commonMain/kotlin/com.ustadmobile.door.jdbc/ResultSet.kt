@@ -4,7 +4,7 @@ expect interface ResultSet {
 
     fun next(): Boolean
 
-    fun getString(index: Int): String
+    fun getString(columnIndex: Int): String
 
     fun close()
 }
