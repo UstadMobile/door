@@ -4,6 +4,9 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import org.w3c.dom.Worker
 import wrappers.IndexedDb.DATABASE_VERSION
+import wrappers.IndexedDb.DB_STORE_KEY
+import wrappers.IndexedDb.DB_STORE_NAME
+import wrappers.IndexedDb.indexedDb
 import kotlin.js.Json
 import kotlin.js.json
 
@@ -55,7 +58,7 @@ class SqliteWorkerManager(private val dbName: String,private val worker: Worker)
         }
         request.onerror = {
             exportCompletable.completeExceptionally(
-                Throwable("Error when imporing databsed from IndexedDb to SQLite DB"))
+                Throwable("Error when importing database from IndexedDb to SQLite DB"))
         }
         return exportCompletable.await()
     }
@@ -68,7 +71,6 @@ class SqliteWorkerManager(private val dbName: String,private val worker: Worker)
         val result = sendMessage(json("action" to "export"))
         val request = indexedDb.open(dbName, DATABASE_VERSION)
         request.onsuccess = { event: dynamic ->
-            console.log("on succes")
             val db = event.target.result
             val transaction = db.transaction(DB_STORE_NAME, "readwrite")
             transaction.oncomplete = {
@@ -94,11 +96,5 @@ class SqliteWorkerManager(private val dbName: String,private val worker: Worker)
         val pendingMessages = mutableMapOf<Int, CompletableDeferred<WorkerResult>>()
 
         var idCounter = 0
-
-        val indexedDb = js("window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB")
-
-        private const val DB_STORE_NAME = "um_db_store"
-
-        private const val DB_STORE_KEY = "um_db_key"
     }
 }

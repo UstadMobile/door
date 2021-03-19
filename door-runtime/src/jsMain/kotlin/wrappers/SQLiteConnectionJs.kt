@@ -1,0 +1,4 @@
+package wrappers
+
+class SQLiteConnectionJs {
+}
