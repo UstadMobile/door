@@ -1,4 +1,7 @@
 package com.ustadmobile.door.jdbc
 
-interface DataSource {
+expect interface DataSource {
+
+    fun getConnection(): Connection
+
 }

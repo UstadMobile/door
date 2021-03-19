@@ -1,4 +1,12 @@
 package com.ustadmobile.door.jdbc
 
-interface PreparedStatement {
+expect interface PreparedStatement {
+
+    fun setString(index: Int, value: String)
+
+    fun executeUpdate(): Int
+
+    fun executeQuery(): ResultSet
+
+    fun close()
 }

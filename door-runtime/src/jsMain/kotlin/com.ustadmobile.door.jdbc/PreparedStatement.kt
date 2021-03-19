@@ -9,5 +9,7 @@ actual interface PreparedStatement {
 
     actual fun executeQuery(): ResultSet
 
+    suspend fun executeQueryAsync(): ResultSet
+
     actual fun close()
 }

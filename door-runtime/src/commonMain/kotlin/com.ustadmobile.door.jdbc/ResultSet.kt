@@ -1,4 +1,10 @@
 package com.ustadmobile.door.jdbc
 
-interface ResultSet {
+expect interface ResultSet {
+
+    fun next(): Boolean
+
+    fun getString(index: Int): String
+
+    fun close()
 }

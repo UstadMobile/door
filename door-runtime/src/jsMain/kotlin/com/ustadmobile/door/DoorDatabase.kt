@@ -1,17 +1,20 @@
 package com.ustadmobile.door
 
+import com.ustadmobile.door.jdbc.Connection
+import com.ustadmobile.door.jdbc.PreparedStatement
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Runnable
-import wrappers.SqliteWorkerManager
+import wrappers.SQLiteConnectionJs
+import wrappers.SQLiteDatasourceJs
 
 actual abstract class DoorDatabase actual constructor() {
 
-    internal lateinit var workerManager: SqliteWorkerManager
+    internal lateinit var dataSource: SQLiteDatasourceJs
 
     val initCompletable = CompletableDeferred<Boolean>()
 
-    fun openConnection() {
-
+    fun openConnection() : Connection {
+        return SQLiteConnectionJs(dataSource)
     }
 
     private suspend fun awaitReady() {
@@ -32,6 +35,7 @@ actual abstract class DoorDatabase actual constructor() {
     actual abstract fun clearAllTables()
 
     actual open fun runInTransaction(runnable: Runnable) {
+
     }
 
 }

@@ -5,17 +5,17 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import org.w3c.dom.Worker
 import wrappers.IndexedDb.checkIfExists
-import wrappers.SqliteWorkerManager
+import wrappers.SQLiteDatasourceJs
 
 /**
  * Init work that will only really be done for the real database implementation class (not the repo, syncreadonlywrapper, etc)
  */
 fun DoorDatabase.init(dbName: String) {
-    workerManager = SqliteWorkerManager(dbName, Worker("./worker.sql-wasm.js"))
+    dataSource = SQLiteDatasourceJs(dbName, Worker("./worker.sql-wasm.js"))
     GlobalScope.launch {
         val exists = checkIfExists(dbName)
         if(exists){
-            workerManager.loadDbFromIndexedDb()
+            dataSource.loadDbFromIndexedDb()
         }else{
             createAllTables()
         }

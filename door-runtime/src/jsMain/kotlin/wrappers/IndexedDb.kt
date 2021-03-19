@@ -19,7 +19,7 @@ object IndexedDb{
         }
         request.onerror = {
             checkCompletable.completeExceptionally(
-                Throwable("Something wrong happen when checking if DB exists"))
+                Throwable("Error when opening database"))
         }
         request.onsuccess = { event: dynamic ->
             val db = event.target.result
@@ -29,13 +29,13 @@ object IndexedDb{
             }
             store.onerror = {
                 checkCompletable.completeExceptionally(
-                    Throwable("Something wrong happen when querying for database from $DB_STORE_NAME"))
+                    Throwable("Error when querying for database from $DB_STORE_NAME"))
             }
         }
         return checkCompletable.await()
     }
 
-    private val indexedDb = js("window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB")
+    val indexedDb = js("window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB")
 
     const val DB_STORE_NAME = "um_db_store"
 

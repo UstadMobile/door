@@ -1,4 +1,6 @@
 package wrappers
+import com.ustadmobile.door.jdbc.Connection
+import com.ustadmobile.door.jdbc.DataSource
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -13,7 +15,7 @@ import kotlin.js.json
 /**
  * Class responsible to manage all SQLite worker tasks
  */
-class SqliteWorkerManager(private val dbName: String,private val worker: Worker) {
+class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker) : DataSource{
 
     /**
      * Execute SQL task by sending a message via Worker
@@ -88,7 +90,9 @@ class SqliteWorkerManager(private val dbName: String,private val worker: Worker)
     }
 
 
-
+    override fun getConnection(): Connection {
+        TODO("Not yet implemented")
+    }
 
 
     companion object {
