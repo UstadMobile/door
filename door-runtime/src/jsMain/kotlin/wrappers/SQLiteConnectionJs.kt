@@ -12,7 +12,8 @@ class SQLiteConnectionJs(val datasource: SQLiteDatasourceJs):Connection {
 
     override fun prepareStatement(param: String?): PreparedStatement {
         return SQLitePreparedStatementJs(this).apply {
-            statement = param
+            sqlStatement = param
+            params = arrayOf()
         }
     }
 
