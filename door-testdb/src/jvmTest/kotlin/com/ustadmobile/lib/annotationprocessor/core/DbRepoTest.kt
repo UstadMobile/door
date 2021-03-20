@@ -576,7 +576,7 @@ class DbRepoTest {
             serverRepo.exampleSyncableDao().insert(this)
         }
 
-        verify(mockUpdateNotificationManager, timeout(5000 )).onNewUpdateNotifications(
+        verify(mockUpdateNotificationManager, timeout(5000 ).atLeastOnce()).onNewUpdateNotifications(
                 argWhere { it.any { it.pnTableId ==  42 && it.pnDeviceId == 57} })
     }
 

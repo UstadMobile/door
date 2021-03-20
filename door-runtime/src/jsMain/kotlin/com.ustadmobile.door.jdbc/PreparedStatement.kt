@@ -3,11 +3,11 @@ package com.ustadmobile.door.jdbc
 actual interface PreparedStatement {
 
 
-    actual fun setString(index: Int, value: String?)
+    actual fun setString(index: Int, value: String)
 
-    actual fun setInt(index: Int, value: Int?)
+    actual fun setInt(index: Int, value: Int)
 
-    actual fun setLong(index: Int, value: Long?)
+    actual fun setLong(index: Int, value: Long)
 
     actual fun executeUpdate(): Int
 

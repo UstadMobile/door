@@ -20,15 +20,15 @@ class SQLitePreparedStatementJs(private val connection: SQLiteConnectionJs): Pre
         return result.results?.let { SQLiteResultSet(it) } as ResultSet
     }
 
-    override fun setString(index: Int, value: String?) {
+    override fun setString(index: Int, value: String) {
         addParam(index, value)
     }
 
-    override fun setInt(index: Int, value: Int?) {
+    override fun setInt(index: Int, value: Int) {
         addParam(index, value)
     }
 
-    override fun setLong(index: Int, value: Long?) {
+    override fun setLong(index: Int, value: Long) {
         addParam(index, value)
     }
 

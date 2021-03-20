@@ -9,9 +9,9 @@ abstract class ExampleDaoJs(private val database: DoorDatabase) {
     suspend fun insertAsync(entity: ExampleJsEntity){
         val connection = database.openConnection()
         val statement = connection.prepareStatement("INSERT INTO ExampleEntity VALUES (?,?)")
-        statement.setLong(1, entity.uid)
-        statement.setString(2,entity.name)
-        statement.executeUpdate()
+        entity.uid?.let { statement.setLong(1, it) }
+        entity.name?.let { statement.setString(2, it) }
+        statement.executeUpdateAsync()
         connection.commit()
         connection.close()
     }
@@ -22,7 +22,7 @@ abstract class ExampleDaoJs(private val database: DoorDatabase) {
         makeQueryParams(entities).forEachIndexed { index, param ->
             statement.setString(index + 1,param.toString())
         }
-        statement.executeUpdate()
+        statement.executeUpdateAsync()
         connection.commit()
         connection.close()
     }
@@ -42,11 +42,11 @@ abstract class ExampleDaoJs(private val database: DoorDatabase) {
         return params.toTypedArray()
     }
 
-    fun findByUid(mUid: Long): ExampleJsEntity?{
+    suspend fun findByUid(mUid: Long): ExampleJsEntity?{
         val connection = database.openConnection()
         val statement = connection.prepareStatement("SELECT * FROM ExampleEntity WHERE uid = ?")
         statement.setLong(1, mUid)
-        val resultSet = statement.executeQuery()
+        val resultSet = statement.executeQueryAsync()
         if(resultSet.next()) {
             return ExampleJsEntity().apply {
                 uid = resultSet.getString(0)?.toLong()
@@ -59,7 +59,7 @@ abstract class ExampleDaoJs(private val database: DoorDatabase) {
     suspend fun findAll(): List<ExampleJsEntity> {
         val connection = database.openConnection()
         val statement = connection.prepareStatement("SELECT * FROM ExampleJsEntity")
-        val resultSet = statement.executeQuery()
+        val resultSet = statement.executeQueryAsync()
         val result = mutableListOf<ExampleJsEntity>()
         while(resultSet.next()) {
             result.add(ExampleJsEntity().apply {
