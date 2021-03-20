@@ -15,16 +15,29 @@ actual class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private 
     }
 
     actual fun build(): T {
+        val path = webWorkerPath
+        if(webWorkerPath == null){
+            throw Exception("Set web worker path before building your Database")
+        }
         val implClass = implementationMap[dbClass] as KClass<T>
         val dbImpl = implClass.js.createInstance(context, dbName) as T
-        dbImpl.init(dbName)
+        if(path != null){
+            dbImpl.init(dbName, path)
+        }
         return dbImpl
+    }
+
+    fun webWorker(path: String): DatabaseBuilder<T>{
+        webWorkerPath = path
+        return this
     }
 
 
     actual companion object {
 
         private val implementationMap = mutableMapOf<KClass<*>, KClass<*>>()
+
+        internal var webWorkerPath: String? = null
 
         fun <T> registerImplementation(dbClass: KClass<*>, implClass: KClass<*>) {
             implementationMap[dbClass] = implClass

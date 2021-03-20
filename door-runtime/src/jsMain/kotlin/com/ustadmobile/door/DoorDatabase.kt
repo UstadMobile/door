@@ -9,6 +9,8 @@ actual abstract class DoorDatabase actual constructor() {
 
     internal lateinit var dataSource: SQLiteDatasourceJs
 
+    internal lateinit var webWorkerPath: String
+
     val initCompletable = CompletableDeferred<Boolean>()
 
     fun openConnection() : Connection {

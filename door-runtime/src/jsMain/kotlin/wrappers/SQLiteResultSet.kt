@@ -24,6 +24,9 @@ class SQLiteResultSet(private val results: Array<Any>): ResultSet {
         return currentRow?.get(columnIndex)?.toString()
     }
 
-    override fun close() {}
+    override fun close() {
+        currentRow = null
+        currentIndex = -1
+    }
 
 }

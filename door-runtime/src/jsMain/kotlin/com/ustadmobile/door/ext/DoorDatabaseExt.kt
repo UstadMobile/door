@@ -10,8 +10,8 @@ import wrappers.SQLiteDatasourceJs
 /**
  * Init work that will only really be done for the real database implementation class (not the repo, syncreadonlywrapper, etc)
  */
-fun DoorDatabase.init(dbName: String) {
-    dataSource = SQLiteDatasourceJs(dbName, Worker("./worker.sql-wasm.js"))
+fun DoorDatabase.init(dbName: String, webWorkerPath: String) {
+    dataSource = SQLiteDatasourceJs(dbName, Worker(webWorkerPath))
     GlobalScope.launch {
         val exists = checkIfExists(dbName)
         if(exists){
