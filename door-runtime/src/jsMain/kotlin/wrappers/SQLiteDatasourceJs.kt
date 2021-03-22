@@ -17,19 +17,24 @@ import kotlin.js.json
  */
 class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker) : DataSource{
 
-    /**
-     * Execute SQL task by sending a message via Worker
-     * @param message message to be sent for SQLJs to execute
-     */
-    suspend fun sendMessage(message: Json): WorkerResult {
+    private val pendingMessages = mutableMapOf<Int, CompletableDeferred<WorkerResult>>()
+
+    init {
         worker.onmessage = { it: dynamic ->
-            val pendingCompletable = pendingMessages[it.data["id"].toString().toInt()]
+            val pendingCompletable = pendingMessages.remove(it.data["id"].toString().toInt())
             if(pendingCompletable != null){
                 pendingCompletable.complete(
                     WorkerResult(it.data["id"], it.data["results"], it.data["ready"], it.data["buffer"])
                 )
             }
         }
+    }
+
+    /**
+     * Execute SQL task by sending a message via Worker
+     * @param message message to be sent for SQLJs to execute
+     */
+    suspend fun sendMessage(message: Json): WorkerResult {
         val completable = CompletableDeferred<WorkerResult>()
         val actionId = ++idCounter
         pendingMessages[actionId] = completable
@@ -96,9 +101,6 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
 
 
     companion object {
-
-        val pendingMessages = mutableMapOf<Int, CompletableDeferred<WorkerResult>>()
-
         var idCounter = 0
     }
 }

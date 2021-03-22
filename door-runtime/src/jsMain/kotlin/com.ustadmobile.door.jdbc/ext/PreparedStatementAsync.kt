@@ -5,5 +5,5 @@ import com.ustadmobile.door.jdbc.ResultSet
 
 
 actual suspend fun PreparedStatement.executeQueryAsync(): ResultSet {
-    return executeQueryAsync()
+    return executeQueryAsyncInt()
 }

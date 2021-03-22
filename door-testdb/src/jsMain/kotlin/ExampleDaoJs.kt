@@ -1,7 +1,6 @@
 import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.Query
 import com.ustadmobile.door.DoorDatabase
+import com.ustadmobile.door.jdbc.ext.executeQueryAsync
 
 @Dao
 abstract class ExampleDaoJs(private val database: DoorDatabase) {
@@ -49,8 +48,8 @@ abstract class ExampleDaoJs(private val database: DoorDatabase) {
         val resultSet = statement.executeQueryAsync()
         if(resultSet.next()) {
             return ExampleJsEntity().apply {
-                uid = resultSet.getString(0)?.toLong()
-                name = resultSet.getString(1)
+                uid = resultSet.getString("uid")?.toLong()
+                name = resultSet.getString("name")
             }
         }
         return null
@@ -63,8 +62,8 @@ abstract class ExampleDaoJs(private val database: DoorDatabase) {
         val result = mutableListOf<ExampleJsEntity>()
         while(resultSet.next()) {
             result.add(ExampleJsEntity().apply {
-                uid = resultSet.getString(0)?.toLong()
-                name = resultSet.getString(1)
+                uid = resultSet.getString("uid")?.toLong()
+                name = resultSet.getString("name")
             })
         }
         return result

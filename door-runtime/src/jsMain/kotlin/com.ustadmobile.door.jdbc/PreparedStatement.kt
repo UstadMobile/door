@@ -15,7 +15,7 @@ actual interface PreparedStatement {
 
     actual fun executeQuery(): ResultSet
 
-    suspend fun executeQueryAsync(): ResultSet
+    suspend fun executeQueryAsyncInt(): ResultSet
 
     actual fun close()
 }

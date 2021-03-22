@@ -4,7 +4,7 @@ actual interface ResultSet {
 
     actual fun next(): Boolean
 
-    actual fun getString(columnIndex: Int): String?
+    actual fun getString(columnName: String): String?
 
     actual fun close()
 }
