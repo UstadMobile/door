@@ -3,12 +3,12 @@ import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.jdbc.ext.executeQueryAsync
 
 @Dao
-abstract class ExampleDaoJs(private val database: DoorDatabase) {
+class ExampleDaoJs(private val database: DoorDatabase) {
 
     suspend fun insertAsync(entity: ExampleJsEntity){
         val connection = database.openConnection()
         val statement = connection.prepareStatement("INSERT INTO ExampleEntity VALUES (?,?)")
-        entity.uid?.let { statement.setLong(1, it) }
+        statement.setLong(1, entity.uid)
         entity.name?.let { statement.setString(2, it) }
         statement.executeUpdateAsync()
         connection.commit()
@@ -48,7 +48,7 @@ abstract class ExampleDaoJs(private val database: DoorDatabase) {
         val resultSet = statement.executeQueryAsync()
         if(resultSet.next()) {
             return ExampleJsEntity().apply {
-                uid = resultSet.getLong("uid")
+                uid = resultSet.getLong("uid") ?: 0
                 name = resultSet.getString("name")
             }
         }
@@ -62,7 +62,7 @@ abstract class ExampleDaoJs(private val database: DoorDatabase) {
         val result = mutableListOf<ExampleJsEntity>()
         while(resultSet.next()) {
             result.add(ExampleJsEntity().apply {
-                uid = resultSet.getLong("uid")
+                uid = resultSet.getLong("uid")?:0
                 name = resultSet.getString("name")
             })
         }
