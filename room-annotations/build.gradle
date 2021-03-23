@@ -43,15 +43,13 @@ kotlin {
 
 publishing {
     repositories {
-
-//        Taken from XmlPullParserKmp
-//        maven {
-//            name = "door-runtime"
-//            url = uri("https://maven.pkg.github.com/UstadMobile/XmlPullParserKmp")
-//            credentials {
-//                username = localProperties["gpr.user"]
-//                password = localProperties["gpr.key"]
-//            }
-//        }
+        maven {
+            name = project.name
+            url = uri("https://maven.pkg.github.com/UstadMobile/door")
+            credentials {
+                username = project.hasProperty("user") ? project.getProperty("user"): ""
+                password = project.hasProperty("key") ? project.getProperty("key"): ""
+            }
+        }
     }
 }
