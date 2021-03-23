@@ -71,3 +71,20 @@ suspend fun <T: DoorDatabase, R> T.onDbThenRepoWithTimeout(timeMillis: Long, blo
         return block(this, null)
     }
 }
+
+
+/**
+ * Where the receiver is a repository, this will provide a pair of the original database object
+ * and the repository. If the receiver is not a database, and IllegalArgumentException will be
+ * thrown
+ *
+ * @return Pair of the database and repository
+ * @throws IllegalArgumentException if the receiver is not actually the repository
+ */
+@Suppress("UNCHECKED_CAST")
+fun <T: DoorDatabase> T.requireDbAndRepo(): Pair<T, T> {
+    val repo = this as? DoorDatabaseRepository
+        ?: throw IllegalStateException("Must use repo for addFileToContainer")
+    val db = repo.db as T
+    return Pair(db, this)
+}

@@ -746,7 +746,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     "${daoTypeEl.simpleName}_$SUFFIX_JDBC_KT")
 
             dbImplType.addProperty(PropertySpec.builder("_${daoTypeEl.simpleName}",
-                    daoImplClassName).delegate("lazy { %T(this) }", daoImplClassName).build())
+                    daoImplClassName).delegate("lazy·{·%T(this)·}", daoImplClassName).build())
 
             if(subEl.simpleName.startsWith("get")) {
                 //must be overriden using a val
