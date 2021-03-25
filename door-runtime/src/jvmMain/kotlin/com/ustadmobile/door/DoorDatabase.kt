@@ -2,7 +2,6 @@ package com.ustadmobile.door
 
 import com.github.aakira.napier.Napier
 import com.ustadmobile.door.ext.DoorTag.Companion.LOG_TAG
-import com.ustadmobile.door.ext.concurrentSafeListOf
 import com.ustadmobile.door.util.systemTimeInMillis
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -13,7 +12,7 @@ import java.sql.Statement
 import java.util.regex.Pattern
 import javax.sql.DataSource
 
-actual abstract class DoorDatabase actual constructor(): DoorDatabaseEventListener(){
+actual abstract class DoorDatabase actual constructor(): DoorDatabaseChangeListener(){
 
     protected lateinit var dataSource: DataSource
 

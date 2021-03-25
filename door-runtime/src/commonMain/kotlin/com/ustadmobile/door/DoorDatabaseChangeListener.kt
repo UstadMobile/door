@@ -2,7 +2,7 @@ package com.ustadmobile.door
 
 import com.ustadmobile.door.ext.concurrentSafeListOf
 
-abstract class DoorDatabaseEventListener {
+abstract class DoorDatabaseChangeListener {
 
     val changeListeners = concurrentSafeListOf<ChangeListenerRequest>()
 

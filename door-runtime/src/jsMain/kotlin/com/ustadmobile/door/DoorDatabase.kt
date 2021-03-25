@@ -5,7 +5,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Runnable
 import wrappers.SQLiteDatasourceJs
 
-actual abstract class DoorDatabase actual constructor(): DoorDatabaseEventListener() {
+actual abstract class DoorDatabase actual constructor(): DoorDatabaseChangeListener() {
 
     internal lateinit var dataSource: SQLiteDatasourceJs
 

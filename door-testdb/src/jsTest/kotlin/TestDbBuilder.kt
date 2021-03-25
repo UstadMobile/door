@@ -11,7 +11,7 @@ class TestDbBuilder {
     fun setup(){
         DatabaseBuilder.registerImplementation<ExampleDatabaseJs>(ExampleDatabaseJs::class, ExampleDatabaseJs_Impl::class)
         databaseJs =  DatabaseBuilder.databaseBuilder(Any(), ExampleDatabaseJs::class, "jsDb")
-            .webWorker("worker.sql-wasm.js")
+            .webWorker("./worker.sql-wasm.js")
             .build()
         databaseJs.clearAllTables()
     }
