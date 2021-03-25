@@ -1,10 +1,13 @@
 package com.ustadmobile.door
 
+import com.ustadmobile.door.ext.concurrentSafeListOf
+import kotlinx.atomicfu.atomic
+
 actual abstract class DoorLiveData<T> {
 
-    private val valueRef = mutableMapOf<String,T>()
+    private val value = atomic<T?>(null)
 
-    private val activeObservers = mutableListOf<DoorObserver<in T>>()
+    private val activeObservers = concurrentSafeListOf<DoorObserver<in T>>()
 
     private var active: Boolean = false
 
@@ -15,7 +18,7 @@ actual abstract class DoorLiveData<T> {
     actual constructor()
 
     constructor(value: T) {
-        this.valueRef[VALUE_REF] = value
+        this.value.value = value
         initialValueLoaded = true
     }
 
@@ -40,7 +43,7 @@ actual abstract class DoorLiveData<T> {
         }
 
         if(initialValueLoaded) {
-            valueRef[VALUE_REF]?.let { observer.onChanged(it) }
+            value.value?.let { observer.onChanged(it) }
         }
     }
 
@@ -74,7 +77,7 @@ actual abstract class DoorLiveData<T> {
 
 
 
-    actual open fun getValue(): T?  = valueRef[VALUE_REF]
+    actual open fun getValue(): T?  = value.value
 
     protected open fun onActive() {
 
@@ -85,14 +88,10 @@ actual abstract class DoorLiveData<T> {
     }
 
     protected fun postValue(value: T) {
-        valueRef[VALUE_REF] = value
+        this.value.value = value
         initialValueLoaded = true
         activeObservers.forEach { it.onChanged(value) }
     }
 
     actual open fun hasActiveObservers(): Boolean = activeObservers.isNotEmpty()
-
-    companion object {
-        const val VALUE_REF = "value_ref"
-    }
 }

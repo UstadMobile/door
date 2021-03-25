@@ -12,9 +12,7 @@ actual class SimpleDoorQuery actual constructor(private val sql: String, overrid
     }
 
 
-    override fun bindToPreparedStmt(stmt: PreparedStatement, db: DoorDatabase, con: Connection) {
-        TODO("Not yet implemented")
-    }
+    override fun bindToPreparedStmt(stmt: PreparedStatement, db: DoorDatabase, con: Connection) {}
 
 
 }

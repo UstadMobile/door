@@ -5,13 +5,15 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Runnable
 import wrappers.SQLiteDatasourceJs
 
-actual abstract class DoorDatabase actual constructor() {
+actual abstract class DoorDatabase actual constructor(): DoorDatabaseEventListener() {
 
     internal lateinit var dataSource: SQLiteDatasourceJs
 
     internal lateinit var webWorkerPath: String
 
     abstract val dbVersion: Int
+
+
 
     val initCompletable = CompletableDeferred<Boolean>()
 
@@ -31,7 +33,14 @@ actual abstract class DoorDatabase actual constructor() {
     actual abstract fun clearAllTables()
 
     actual open fun runInTransaction(runnable: Runnable) {
-
+        runnable.run()
     }
 
+    override fun addChangeListener(changeListenerRequest: ChangeListenerRequest) = this.apply {
+        changeListeners.add(changeListenerRequest)
+    }
+
+    override fun removeChangeListener(changeListenerRequest: ChangeListenerRequest)= this.apply {
+        changeListeners.remove(changeListenerRequest)
+    }
 }

@@ -1,9 +1,6 @@
 package com.ustadmobile.door.jdbc
 
-import com.ustadmobile.door.jdbc.types.BigDecimal
-import com.ustadmobile.door.jdbc.types.Date
-import com.ustadmobile.door.jdbc.types.Time
-import com.ustadmobile.door.jdbc.types.TimeStamp
+import com.ustadmobile.door.jdbc.types.*
 
 actual interface PreparedStatement {
 
@@ -34,6 +31,8 @@ actual interface PreparedStatement {
     actual fun setTimestamp(index: Int, value: TimeStamp)
 
     actual fun setObject(index: Int, value: Any)
+
+    fun setArray(index: Int, value: Array<Any>)
 
     actual fun executeUpdate(): Int
 

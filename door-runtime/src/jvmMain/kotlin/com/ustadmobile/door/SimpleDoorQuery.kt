@@ -1,8 +1,7 @@
 package com.ustadmobile.door
 
-import java.lang.IllegalArgumentException
-import java.sql.Connection
-import java.sql.PreparedStatement
+import com.ustadmobile.door.jdbc.Connection
+import com.ustadmobile.door.jdbc.PreparedStatement
 
 actual class SimpleDoorQuery actual constructor(private val sql: String, override val values: Array<out Any?>?) : DoorQuery {
 

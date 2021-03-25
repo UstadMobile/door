@@ -2,6 +2,7 @@ package com.ustadmobile.door
 
 import com.github.aakira.napier.Napier
 import com.ustadmobile.door.ext.DoorTag.Companion.LOG_TAG
+import com.ustadmobile.door.ext.concurrentSafeListOf
 import com.ustadmobile.door.util.systemTimeInMillis
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -9,11 +10,10 @@ import java.sql.Connection
 import java.sql.ResultSet
 import java.sql.SQLException
 import java.sql.Statement
-import java.util.concurrent.CopyOnWriteArrayList
 import java.util.regex.Pattern
 import javax.sql.DataSource
 
-actual abstract class DoorDatabase actual constructor(){
+actual abstract class DoorDatabase actual constructor(): DoorDatabaseEventListener(){
 
     protected lateinit var dataSource: DataSource
 
@@ -61,19 +61,6 @@ actual abstract class DoorDatabase actual constructor(){
 
 
     }
-
-    /**
-     * A request to listen for changes. This is used by LiveData and other items. The onChange
-     * function will be run when a table is changed.
-     *
-     * @param tableNames A list (case sensitive) of the table names on which this listener should be invoked.
-     * An empty list will result in the onChange method always being called
-     *
-     * @param onChange A function that will be executed when after a change has happened on a table.
-     */
-    data class ChangeListenerRequest(val tableNames: List<String>, val onChange: (List<String>) -> Unit)
-
-    val changeListeners = CopyOnWriteArrayList<ChangeListenerRequest>() as MutableList<ChangeListenerRequest>
 
     val tableNames: List<String> by lazy {
         val delegatedDatabaseVal = sourceDatabase
@@ -160,11 +147,11 @@ actual abstract class DoorDatabase actual constructor(){
         runnable.run()
     }
 
-    open fun addChangeListener(changeListenerRequest: ChangeListenerRequest) = effectiveDatabase.apply {
+    override fun addChangeListener(changeListenerRequest: ChangeListenerRequest) = effectiveDatabase.apply {
         changeListeners.add(changeListenerRequest)
     }
 
-    open fun removeChangeListener(changeListenerRequest: ChangeListenerRequest) = effectiveDatabase.apply {
+    override fun removeChangeListener(changeListenerRequest: ChangeListenerRequest) = effectiveDatabase.apply {
         changeListeners.remove(changeListenerRequest)
     }
 

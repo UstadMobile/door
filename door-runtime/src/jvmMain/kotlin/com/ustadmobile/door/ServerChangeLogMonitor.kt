@@ -32,13 +32,13 @@ class ServerChangeLogMonitor(database: DoorDatabase, private val repo: DoorDatab
 
     private val dispatchJob: AtomicReference<Job?> = AtomicReference(null)
 
-    private val changeListenerRequest: DoorDatabase.ChangeListenerRequest
+    private val changeListenerRequest: ChangeListenerRequest
 
     private val logPrefix: String = "[ServerChangeLogMonitor@${this.doorIdentityHashCode}]"
 
     init {
         Napier.d("$logPrefix init", tag = DoorTag.LOG_TAG)
-        changeListenerRequest = DoorDatabase.ChangeListenerRequest(listOf(), this::onTablesChanged)
+        changeListenerRequest = ChangeListenerRequest(listOf(), this::onTablesChanged)
         db.addChangeListener(changeListenerRequest)
 
         GlobalScope.launch {

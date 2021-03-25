@@ -56,6 +56,10 @@ class SQLitePreparedStatementJs(private val connection: SQLiteConnectionJs): Pre
         addParam(index, value)
     }
 
+    override fun setArray(index: Int, value: Array<Any>) {
+        addParam(index, value)
+    }
+
     override fun setInt(index: Int, value: Int) {
         addParam(index, value)
     }

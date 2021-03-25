@@ -1,23 +1,20 @@
 package com.ustadmobile.door
 
 import com.nhaarman.mockitokotlin2.*
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import org.junit.Assert
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
-class DoorLiveDataJdbcImplTest {
+class DoorLiveDataImplTest {
 
     @Test
     fun givenEmptyLiveData_whenActive_shouldCallFetchFnAndAddChangeListener() {
         val mockDb = mock<DoorDatabase>()
         val fetchFnCount = AtomicInteger()
         val fetchCountdownLatch = CountDownLatch(1)
-        val liveDataJdbc = DoorLiveDataJdbcImpl<Int>(mockDb, listOf("magic")) {
+        val liveDataJdbc = DoorLiveDataImpl<Int>(mockDb, listOf("magic")) {
             fetchFnCount.incrementAndGet()
             fetchCountdownLatch.countDown()
             42
@@ -33,7 +30,7 @@ class DoorLiveDataJdbcImplTest {
     fun givenEmptyLiveData_whenInactive_shouldRemoveChangeListener() {
         val mockDb = mock<DoorDatabase>()
         val fetchFnCount = AtomicInteger()
-        val liveDataJdbc = DoorLiveDataJdbcImpl<Int>(mockDb, listOf("magic")) {
+        val liveDataJdbc = DoorLiveDataImpl<Int>(mockDb, listOf("magic")) {
             fetchFnCount.incrementAndGet()
             42
         }
