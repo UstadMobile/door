@@ -1,5 +1,8 @@
 package com.ustadmobile.door.util
 
+import kotlin.js.Date
+
+
 actual fun systemTimeInMillis(): Long {
-    TODO("Not yet implemented")
+    return Date().getTime().toLong()
 }

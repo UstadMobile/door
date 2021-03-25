@@ -6,18 +6,14 @@ import kotlin.reflect.KClass
 
 actual class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private var dbClass: KClass<T>, private var dbName: String){
 
-    actual fun addCallback(callback: DoorDatabaseCallback): DatabaseBuilder<T> {
-        TODO("Not yet implemented")
-    }
+    private val callbacks = mutableListOf<DoorDatabaseCallback>()
 
-    actual fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
-        TODO("Not yet implemented")
-    }
+    private val migrationList = mutableListOf<DoorMigration>()
 
     actual fun build(): T {
         val path = webWorkerPath
         if(webWorkerPath == null){
-            throw Exception("Set web worker path before building your Database")
+            throw Exception("Set WebWorker path before building your Database")
         }
         val implClass = implementationMap[dbClass] as KClass<T>
         val dbImpl = implClass.js.createInstance(context, dbName) as T
@@ -29,6 +25,16 @@ actual class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private 
 
     fun webWorker(path: String): DatabaseBuilder<T>{
         webWorkerPath = path
+        return this
+    }
+
+    actual fun addCallback(callback: DoorDatabaseCallback) : DatabaseBuilder<T>{
+        callbacks.add(callback)
+        return this
+    }
+
+    actual fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
+        migrationList.addAll(migrations)
         return this
     }
 

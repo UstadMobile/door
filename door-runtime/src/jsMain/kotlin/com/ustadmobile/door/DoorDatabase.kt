@@ -11,9 +11,12 @@ actual abstract class DoorDatabase actual constructor() {
 
     internal lateinit var webWorkerPath: String
 
+    abstract val dbVersion: Int
+
     val initCompletable = CompletableDeferred<Boolean>()
 
-    fun openConnection() : Connection {
+    suspend fun openConnection() : Connection {
+        awaitReady()
         return dataSource.getConnection()
     }
 
@@ -24,13 +27,6 @@ actual abstract class DoorDatabase actual constructor() {
     open suspend fun createAllTables() {
         //Generated code will actually run this
     }
-
-    suspend fun doSomeQuery(sql: String) {
-        awaitReady()
-
-        //do the query
-    }
-
 
     actual abstract fun clearAllTables()
 

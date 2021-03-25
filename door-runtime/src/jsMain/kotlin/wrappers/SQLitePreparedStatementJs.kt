@@ -2,6 +2,7 @@ package wrappers
 
 import com.ustadmobile.door.jdbc.PreparedStatement
 import com.ustadmobile.door.jdbc.ResultSet
+import com.ustadmobile.door.jdbc.types.Date
 import kotlin.js.json
 
 class SQLitePreparedStatementJs(private val connection: SQLiteConnectionJs): PreparedStatement {
@@ -39,7 +40,7 @@ class SQLitePreparedStatementJs(private val connection: SQLiteConnectionJs): Pre
         addParam(index, value)
     }
 
-    override fun setDate(index: Int, value: Any) {
+    override fun setDate(index: Int, value: Date) {
         addParam(index, value)
     }
 

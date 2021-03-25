@@ -32,6 +32,7 @@ kotlin {
         compilations.all {
             kotlinOptions.jvmTarget = '1.8'
         }
+
         testRuns["test"].executionTask.configure {
             useJUnit()
         }
@@ -106,10 +107,15 @@ kotlin {
 
         }
 
+        commonJvmJs {
+
+        }
+
 
         jvmMain {
             dependsOn roomAnnotations
             dependsOn commonJvmMain
+            dependsOn commonJvmJs
             dependencies {
                 implementation project(":room-annotations")
                 implementation "org.kodein.di:kodein-di-framework-ktor-server-jvm:$version_kodein_di"
@@ -137,6 +143,7 @@ kotlin {
 
         jsMain {
             dependsOn roomAnnotations
+            dependsOn commonJvmJs
         }
 
         jsTest {

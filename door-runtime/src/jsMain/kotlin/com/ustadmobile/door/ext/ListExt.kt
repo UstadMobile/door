@@ -5,5 +5,5 @@ package com.ustadmobile.door.ext
  * simply a normal list (as Javascript is single threaded). On Android/JVM this is CopyOnWriteArrayList
  */
 actual fun <T> concurrentSafeListOf(vararg items: T): MutableList<T> {
-    TODO("Not yet implemented")
+    return mutableListOf<T>()
 }

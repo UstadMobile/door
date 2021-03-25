@@ -1,5 +1,10 @@
 package com.ustadmobile.door.jdbc
 
+import com.ustadmobile.door.jdbc.types.BigDecimal
+import com.ustadmobile.door.jdbc.types.Date
+import com.ustadmobile.door.jdbc.types.Time
+import com.ustadmobile.door.jdbc.types.TimeStamp
+
 expect interface PreparedStatement {
 
     fun setBoolean(index: Int, value: Boolean)
@@ -16,17 +21,17 @@ expect interface PreparedStatement {
 
     fun setDouble(index: Int, value: Double)
 
-    fun setBigDecimal(index: Int, value: Any)
+    fun setBigDecimal(index: Int, value: BigDecimal)
 
     fun setString(index: Int, value: String)
 
     fun setBytes(index: Int, value: ByteArray)
 
-    fun setDate(index: Int, value: Any)
+    fun setDate(index: Int, value: Date)
 
-    fun setTime(index: Int, value: Any)
+    fun setTime(index: Int, value: Time)
 
-    fun setTimestamp(index: Int, value: Any)
+    fun setTimestamp(index: Int, value: TimeStamp)
 
     fun setObject(index: Int, value: Any)
 

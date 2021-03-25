@@ -1,7 +1,7 @@
 package com.ustadmobile.door
 
-import java.sql.Connection
-import java.sql.PreparedStatement
+import com.ustadmobile.door.jdbc.Connection
+import com.ustadmobile.door.jdbc.PreparedStatement
 
 actual interface DoorQuery {
 

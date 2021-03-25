@@ -1,6 +1,10 @@
 package wrappers
 
 import com.ustadmobile.door.jdbc.ResultSet
+import com.ustadmobile.door.jdbc.types.BigDecimal
+import com.ustadmobile.door.jdbc.types.Date
+import com.ustadmobile.door.jdbc.types.Time
+import com.ustadmobile.door.jdbc.types.TimeStamp
 import io.ktor.utils.io.core.*
 
 class SQLiteResultSet(private val results: Array<Any>): ResultSet {
@@ -32,39 +36,35 @@ class SQLiteResultSet(private val results: Array<Any>): ResultSet {
         return null
     }
 
-    override fun getBoolean(columnName: String): Boolean? {
-        val value = getValue(columnName)
-        if(value != null){
-            return value.toString().toBoolean()
-        }
-        return null
+    override fun getBoolean(columnName: String): Boolean {
+        return getValue(columnName).toString().toBoolean()
     }
 
-    override fun getByte(columnName: String): Byte? {
-        return getValue(columnName).toString().toByteOrNull()
+    override fun getByte(columnName: String): Byte {
+        return getValue(columnName).toString().toByte()
     }
 
-    override fun getShort(columnName: String): Short? {
-        return getValue(columnName).toString().toShortOrNull()
+    override fun getShort(columnName: String): Short {
+        return getValue(columnName).toString().toShort()
     }
 
-    override fun getInt(columnName: String): Int? {
-        return getValue(columnName).toString().toIntOrNull()
+    override fun getInt(columnName: String): Int {
+        return getValue(columnName).toString().toInt()
     }
 
-    override fun getFloat(columnName: String): Float? {
-        return getValue(columnName).toString().toFloatOrNull()
+    override fun getFloat(columnName: String): Float {
+        return getValue(columnName).toString().toFloat()
     }
 
-    override fun getLong(columnName: String): Long? {
-        return getValue(columnName).toString().toLongOrNull()
+    override fun getLong(columnName: String): Long {
+        return getValue(columnName).toString().toLong()
     }
 
-    override fun getDouble(columnName: String): Double? {
-       return getValue(columnName).toString().toDoubleOrNull()
+    override fun getDouble(columnName: String): Double {
+       return getValue(columnName).toString().toDouble()
     }
 
-    override fun getBigDecimal(columnName: String): Any? {
+    override fun getBigDecimal(columnName: String): BigDecimal? {
         return getValue(columnName)
     }
 
@@ -76,15 +76,16 @@ class SQLiteResultSet(private val results: Array<Any>): ResultSet {
         return null
     }
 
-    override fun getDate(columnName: String): Any? {
-        return getValue(columnName)
+
+    override fun getDate(columnName: String): Date? {
+        return Date(getValue(columnName).toString())
     }
 
-    override fun getTime(columnName: String): Any? {
+    override fun getTime(columnName: String): Time? {
        return getValue(columnName)
     }
 
-    override fun getTimestamp(columnName: String): Any? {
+    override fun getTimestamp(columnName: String): TimeStamp? {
         return getValue(columnName)
     }
 
