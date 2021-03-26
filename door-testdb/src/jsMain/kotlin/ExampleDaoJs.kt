@@ -48,10 +48,12 @@ class ExampleDaoJs(private val database: DoorDatabase) {
         val resultSet = statement.executeQueryAsync()
         if(resultSet.next()) {
             return ExampleJsEntity().apply {
-                uid = resultSet.getLong("uid") ?: 0
+                uid = resultSet.getLong("uid")
                 name = resultSet.getString("name")
             }
         }
+        statement.close()
+        resultSet.close()
         return null
     }
 
@@ -62,10 +64,12 @@ class ExampleDaoJs(private val database: DoorDatabase) {
         val result = mutableListOf<ExampleJsEntity>()
         while(resultSet.next()) {
             result.add(ExampleJsEntity().apply {
-                uid = resultSet.getLong("uid")?:0
+                uid = resultSet.getLong("uid")
                 name = resultSet.getString("name")
             })
         }
+        statement.close()
+        resultSet.close()
         return result
     }
 }

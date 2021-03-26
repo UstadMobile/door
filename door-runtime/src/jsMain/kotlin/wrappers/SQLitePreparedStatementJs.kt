@@ -17,7 +17,7 @@ class SQLitePreparedStatementJs(private val connection: SQLiteConnectionJs): Pre
         }
         val result = connection.datasource.sendMessage(
             json("action" to "exec", "sql" to sqlStatement, "params" to params))
-        return result.results?.let { SQLiteResultSet(it) } as ResultSet
+        return result.results?.let { SQLiteResultSet(it) } ?: SQLiteResultSet(arrayOf())
     }
 
     override fun setBoolean(index: Int, value: Boolean) {
