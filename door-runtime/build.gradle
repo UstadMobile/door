@@ -149,12 +149,7 @@ kotlin {
 publishing {
     repositories {
         maven {
-            name = project.name
-            url = uri("https://maven.pkg.github.com/UstadMobile/door")
-            credentials {
-                username = project.hasProperty("user") ? project.getProperty("user"): ""
-                password = project.hasProperty("key") ? project.getProperty("key"): ""
-            }
+            url rootProject.ext.localProperties["repo.dir"]
         }
     }
 }

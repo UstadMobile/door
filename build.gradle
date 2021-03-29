@@ -1,6 +1,11 @@
 group 'com.ustadmobile.door'
 version '0.0.3'
 
+ext.localProperties = new Properties()
+if(project.file("local.properties").exists()) {
+    ext.localProperties.load(new FileInputStream(project.file("local.properties")))
+}
+
 buildscript {
 
     ext.kotlin_version = "1.4.31"
