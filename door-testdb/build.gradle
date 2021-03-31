@@ -41,17 +41,9 @@ kotlin {
 
     js(LEGACY) {
         browser {
-            binaries.executable()
-            webpackTask {
-                cssSupport.enabled = true
-            }
-            runTask {
-                cssSupport.enabled = true
-            }
             testTask {
                 useKarma {
-                    //useChromeHeadless()
-                    useChrome()
+                    useChromeHeadless() //change to useChrome to run the actual browser
                     webpackConfig.cssSupport.enabled = true
                 }
             }

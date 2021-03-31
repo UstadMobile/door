@@ -45,25 +45,23 @@ kotlin {
         }
     }
 
-    //Enable me later
-//    js(LEGACY) {
-//        browser {
-//            binaries.executable()
-//            webpackTask {
-//                cssSupport.enabled = true
-//            }
-//            runTask {
-//                cssSupport.enabled = true
-//            }
-//            testTask {
-//                useKarma {
-//                    useChromeHeadless()
-//                    webpackConfig.cssSupport.enabled = true
-//                }
-//            }
-//        }
-//    }
-
+    js(LEGACY) {
+        browser {
+            binaries.executable()
+            webpackTask {
+                cssSupport.enabled = true
+            }
+            runTask {
+                cssSupport.enabled = true
+            }
+            testTask {
+                useKarma {
+                    useChromeHeadless()
+                    webpackConfig.cssSupport.enabled = true
+                }
+            }
+        }
+    }
     /* Targets configuration omitted. 
     *  To find out how to configure the targets, please follow the link:
     *  https://kotlinlang.org/docs/reference/building-mpp-with-gradle.html#setting-up-targets */
@@ -114,10 +112,16 @@ kotlin {
 
         }
 
+        commonJvmJs {
+
+        }
+
 
         jvmMain {
             dependsOn roomAnnotations
             dependsOn commonJvmMain
+            dependsOn commonJvmJs
+
             dependencies {
                 implementation project(":room-annotations")
                 implementation "org.kodein.di:kodein-di-framework-ktor-server-jvm:$version_kodein_di"
@@ -143,6 +147,7 @@ kotlin {
         }
         jsMain {
             dependsOn roomAnnotations
+            dependsOn commonJvmJs
         }
         jsTest {
             dependencies {

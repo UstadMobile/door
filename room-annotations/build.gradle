@@ -21,6 +21,17 @@ kotlin {
         }
     }
 
+    js(LEGACY) {
+        browser {
+            testTask {
+                useKarma {
+                    useChromeHeadless() //change to useChrome to run the actual browser
+                    webpackConfig.cssSupport.enabled = true
+                }
+            }
+        }
+    }
+
 
     /* Targets configuration omitted. 
     *  To find out how to configure the targets, please follow the link:
