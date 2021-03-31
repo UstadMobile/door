@@ -54,17 +54,18 @@ dependencies {
 
 
 publishing {
+
     publications {
         maven(MavenPublication) {
-            groupId rootProject.group
-            artifactId project.name
-            version rootProject.version
+            artifactId = project.name
+
+            from components.java
         }
     }
 
     repositories {
         maven {
-            url rootProject.ext.localProperties['repo.dir']
+            url rootProject.ext.localProperties["repo.dir"]
         }
     }
 }

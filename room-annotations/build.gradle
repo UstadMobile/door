@@ -21,24 +21,6 @@ kotlin {
         }
     }
 
-    js(LEGACY) {
-        browser {
-            binaries.executable()
-            webpackTask {
-                cssSupport.enabled = true
-            }
-            runTask {
-                cssSupport.enabled = true
-            }
-            testTask {
-                useKarma {
-                    useChromeHeadless()
-                    webpackConfig.cssSupport.enabled = true
-                }
-            }
-        }
-    }
-
 
     /* Targets configuration omitted. 
     *  To find out how to configure the targets, please follow the link:
@@ -56,25 +38,13 @@ kotlin {
                 implementation kotlin('test-annotations-common')
             }
         }
-
-        jsMain {
-
-        }
     }
 }
 
 publishing {
-    publications {
-        maven(MavenPublication) {
-            groupId rootProject.group
-            artifactId project.name
-            version rootProject.version
-        }
-    }
-
     repositories {
         maven {
-            url rootProject.ext.localProperties['repo.dir']
+            url rootProject.ext.localProperties["repo.dir"]
         }
     }
 }

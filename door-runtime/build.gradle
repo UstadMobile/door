@@ -17,11 +17,17 @@ repositories {
 
 
 android {
-    compileSdkVersion 29
+    compileSdkVersion 30
     sourceSets.main.manifest.srcFile('src/androidMain/AndroidManifest.xml')
     defaultConfig {
         minSdkVersion 21
-        targetSdkVersion 29
+        targetSdkVersion 30
+    }
+
+    buildTypes {
+        release {
+            consumerProguardFiles 'proguard-rules.pro'
+        }
     }
 }
 
@@ -34,29 +40,29 @@ kotlin {
         compilations.all {
             kotlinOptions.jvmTarget = '1.8'
         }
-
         testRuns["test"].executionTask.configure {
             useJUnit()
         }
     }
 
-    js(LEGACY) {
-        browser {
-            binaries.executable()
-            webpackTask {
-                cssSupport.enabled = true
-            }
-            runTask {
-                cssSupport.enabled = true
-            }
-            testTask {
-                useKarma {
-                    useChromeHeadless()
-                    webpackConfig.cssSupport.enabled = true
-                }
-            }
-        }
-    }
+    //Enable me later
+//    js(LEGACY) {
+//        browser {
+//            binaries.executable()
+//            webpackTask {
+//                cssSupport.enabled = true
+//            }
+//            runTask {
+//                cssSupport.enabled = true
+//            }
+//            testTask {
+//                useKarma {
+//                    useChromeHeadless()
+//                    webpackConfig.cssSupport.enabled = true
+//                }
+//            }
+//        }
+//    }
 
     /* Targets configuration omitted. 
     *  To find out how to configure the targets, please follow the link:
@@ -75,7 +81,6 @@ kotlin {
 
             }
         }
-
         commonTest {
             dependencies {
                 implementation kotlin('test-common')
@@ -109,15 +114,10 @@ kotlin {
 
         }
 
-        commonJvmJs {
-
-        }
-
 
         jvmMain {
             dependsOn roomAnnotations
             dependsOn commonJvmMain
-            dependsOn commonJvmJs
             dependencies {
                 implementation project(":room-annotations")
                 implementation "org.kodein.di:kodein-di-framework-ktor-server-jvm:$version_kodein_di"
@@ -125,7 +125,6 @@ kotlin {
                 implementation "io.ktor:ktor-server-core:$version_ktor"
             }
         }
-
         jvmTest {
             dependencies {
                 implementation kotlin('test-junit')
@@ -142,12 +141,9 @@ kotlin {
                 implementation "io.ktor:ktor-client-gson:$version_ktor"
             }
         }
-
         jsMain {
             dependsOn roomAnnotations
-            dependsOn commonJvmJs
         }
-
         jsTest {
             dependencies {
                 implementation kotlin('test-js')
@@ -157,17 +153,9 @@ kotlin {
 }
 
 publishing {
-    publications {
-        maven(MavenPublication) {
-            groupId rootProject.group
-            artifactId project.name
-            version rootProject.version
-        }
-    }
-
     repositories {
         maven {
-            url rootProject.ext.localProperties['repo.dir']
+            url rootProject.ext.localProperties["repo.dir"]
         }
     }
 }

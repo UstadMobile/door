@@ -1,5 +1,10 @@
 group 'com.ustadmobile.door'
-version '0.0.4-local'
+version '0.0.4'
+
+ext.localProperties = new Properties()
+if(project.file("local.properties").exists()) {
+    ext.localProperties.load(new FileInputStream(project.file("local.properties")))
+}
 
 buildscript {
 
@@ -13,7 +18,7 @@ buildscript {
     }
 
     dependencies {
-        classpath "com.android.tools.build:gradle:4.0.0"
+        classpath "com.android.tools.build:gradle:4.0.2"
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
         classpath "org.jetbrains.kotlinx:atomicfu-gradle-plugin:$atomicfu_version"
         classpath "org.jetbrains.kotlin:kotlin-serialization:$kotlin_version"
@@ -30,9 +35,9 @@ ext {
     version_kotlin_mockito = "2.2.0"
     version_mockwebserver = "4.9.0"
     version_android_room = "2.2.6"
-    version_androidx_lifecycle = "2.3.0-alpha03"
+    version_androidx_lifecycle = "2.3.0"
     version_androidx_paging = "2.1.2"
-    version_androidx_core = '1.3.0'
+    version_androidx_core = '1.3.2'
     version_kotlinpoet = "1.7.2"
     version_jsqlparser = "4.0"
     version_apache_commons_text = "1.9"
@@ -44,11 +49,6 @@ ext {
     version_apache_commons_dbcp2 = "2.8.0"
     version_logback = "1.2.3"
 
-}
-
-ext.localProperties = new Properties()
-if(project.file("local.properties").exists()) {
-    ext.localProperties.load(new FileInputStream(project.file("local.properties")))
 }
 
 allprojects {
