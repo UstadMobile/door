@@ -54,23 +54,17 @@ dependencies {
 
 
 publishing {
-
     publications {
         maven(MavenPublication) {
-            artifactId = project.name
-
-            from components.java
+            groupId rootProject.group
+            artifactId project.name
+            version rootProject.version
         }
     }
 
     repositories {
         maven {
-            name = project.name
-            url = uri("https://maven.pkg.github.com/UstadMobile/door")
-            credentials {
-                username = project.hasProperty("user") ? project.getProperty("user"): ""
-                password = project.hasProperty("key") ? project.getProperty("key"): ""
-            }
+            url rootProject.ext.localProperties['repo.dir']
         }
     }
 }
