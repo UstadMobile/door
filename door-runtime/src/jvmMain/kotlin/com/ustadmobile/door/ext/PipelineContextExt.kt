@@ -15,8 +15,9 @@ import org.kodein.type.TypeToken
  *
  * This is used by generated code in Ktor routes.
  */
-fun <T: DoorDatabase> PipelineContext<Unit, ApplicationCall>.unwrappedDbOnCall(typeToken: TypeToken<T>): T{
-    val db = di().on(call).direct.Instance(typeToken, tag = DoorTag.TAG_DB)
+@Suppress("UNCHECKED_CAST")
+fun <T: DoorDatabase> PipelineContext<Unit, ApplicationCall>.unwrappedDbOnCall(typeToken: TypeToken<T>, tag: Int = DoorTag.TAG_DB): T{
+    val db = di().on(call).direct.Instance(typeToken, tag = tag)
     return if(db is DoorDatabaseSyncableReadOnlyWrapper) {
         db.realDatabase as T
     }else {

@@ -266,7 +266,7 @@ class DbRepoTest {
 
 
     @Test
-    fun givenEntityCreatedOnServer_whenRepoSyncCalled_thenShouldBePresentOnClient() {
+    fun givenEntityCreatedOnServer_whenRepoSyncCalled_thenShouldBePresentOnClientAndTriggerSyncListener() {
         setupClientAndServerDb(ServerUpdateNotificationManagerImpl())
         val serverDb = this.serverDb!!
         val clientDb = this.clientDb!!
@@ -286,6 +286,8 @@ class DbRepoTest {
             val clientRepo = clientDb.asRepository(Any(), "http://localhost:8089/",
                     "token", httpClient, useClientSyncManager = true)
                     .asConnectedRepository()
+            val syncListener = mock<SyncListener<ExampleSyncableEntity>>{ }
+            (clientRepo as DoorDatabaseRepository).addSyncListener(ExampleSyncableEntity::class, syncListener)
 
             //Wait for the entity to land on the client
             clientDb.waitUntil(10000, listOf("ExampleSyncableEntity")) {
@@ -301,6 +303,11 @@ class DbRepoTest {
             Assert.assertNotNull("Entity is in client database after sync",
                     clientDb.exampleSyncableDao().findByUid(exampleSyncableEntity.esUid))
 
+            verify(syncListener, timeout(5000)).onEntitiesReceived(argWhere { it.entitiesReceived.any {
+                it.esUid == exampleSyncableEntity.esUid
+            } })
+
+
             val updateNotificationList = serverDb.updateNotificationTestDao().getUpdateNotificationsForDevice(clientId)
             Napier.d("UpdateNotificationList=${updateNotificationList.joinToString {"${it.pnDeviceId - it.pnTableId}" } }")
             //TODO: the remaining line is flaky only when run with all other tests, not when it is run on it's own.
@@ -312,14 +319,17 @@ class DbRepoTest {
     }
 
     @Test
-    fun givenEntityCreatedOnClient_whenRepoSyncCalled_thenShouldBePresentOnServer() {
+    fun givenEntityCreatedOnClient_whenClientSyncManagerEnabled_thenShouldBePresentOnServerAndTriggerSyncListener() {
         setupClientAndServerDb()
         val serverDb = this.serverDb!!
         val clientDb = this.clientDb!!
+        val entityListener = mock<SyncListener<ExampleSyncableEntity>> {}
+        (serverRepo as DoorDatabaseRepository).addSyncListener(ExampleSyncableEntity::class, entityListener)
+
         val clientRepo = clientDb.asRepository(Any(),"http://localhost:8089/",
                 "token", httpClient, useClientSyncManager = true).asConnectedRepository()
+        val exampleSyncableEntity = ExampleSyncableEntity(esNumber = 42)
         runBlocking {
-            val exampleSyncableEntity = ExampleSyncableEntity(esNumber = 42)
             exampleSyncableEntity.esUid = clientRepo.exampleSyncableDao().insert(exampleSyncableEntity)
 
             serverDb.waitUntil(5000, listOf("ExampleSyncableEntity")) {
@@ -329,6 +339,10 @@ class DbRepoTest {
             Assert.assertNotNull("Entity is in client database after sync",
                     serverDb.exampleSyncableDao().findByUid(exampleSyncableEntity.esUid))
         }
+
+        verify(entityListener, timeout(5000)).onEntitiesReceived(argWhere { it.entitiesReceived.any {
+            it.esUid == exampleSyncableEntity.esUid }
+        })
     }
 
     @Test

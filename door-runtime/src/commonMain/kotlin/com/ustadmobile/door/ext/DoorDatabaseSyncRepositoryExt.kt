@@ -116,6 +116,8 @@ suspend inline fun <reified T:Any, reified K: Any> DoorDatabaseSyncRepository.sy
             downloadAttachments(newEntities.mapNotNull { entityToEntityWithAttachmentFn(it) })
 
             storeEntitiesFn(newEntities)
+            handleSyncEntitiesReceived(T::class, newEntities)
+
             val entityAcks = entityToAckFn(newEntities, true)
 
             Napier.d("DAONAME=$daoName / ${this::class.simpleName}")

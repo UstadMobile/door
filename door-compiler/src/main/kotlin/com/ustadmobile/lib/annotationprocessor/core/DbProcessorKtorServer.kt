@@ -4,6 +4,7 @@ import androidx.paging.DataSource
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Database
+import androidx.room.Insert
 import com.google.gson.Gson
 import com.squareup.kotlinpoet.*
 import io.ktor.http.HttpStatusCode
@@ -179,6 +180,11 @@ fun TypeSpec.Builder.addNanoHttpdDaoFun(daoFunSpec: FunSpec, daoClassName: Class
                 addParameter("_syncHelper", daoClassName.withSuffix("_SyncHelper"))
                 addParameter("_ktorHelperDao", daoClassName.withSuffix(SUFFIX_KTOR_HELPER))
             }
+
+            //If the dao function is a syncable insert, we need to repo as well so we can trigger the synclistener
+            .applyIf(daoFunSpec.isSyncableInsert(processingEnv)) {
+                addParameter("_repo", DoorDatabase::class)
+            }
             .addCode(CodeBlock.builder()
                     .apply {
                         if(daoFunSpec.isQueryWithSyncableResults(processingEnv)) {
@@ -238,6 +244,8 @@ fun TypeSpec.Builder.addNanoHttpdResponderFun(methodName: String, daoClassName: 
                     .add("val _call = %T(_uriResource, _urlParams, _session)\n", NanoHttpdCall::class)
                     .add("val _db: %T by _di.%M(_call).%M(_typeToken, tag = %T.TAG_DB)\n", DoorDatabase::class,
                             DI_ON_MEMBER, DI_INSTANCE_TYPETOKEN_MEMBER, DoorTag::class)
+                    .add("val _repo: %T by _di.%M(_call).%M(_typeToken, tag = %T.TAG_REPO)\n", DoorDatabase::class,
+                            DI_ON_MEMBER, DI_INSTANCE_TYPETOKEN_MEMBER, DoorTag::class)
                     .add("val _dao = _daoProvider.getDao(_db)\n")
                     .add("val _gson : %T by _di.%M()\n", Gson::class, DI_INSTANCE_MEMBER)
                     .applyIf(daoTypeSpec.daoSyncableEntitiesInSelectResults(processingEnv).isNotEmpty()) {
@@ -254,7 +262,12 @@ fun TypeSpec.Builder.addNanoHttpdResponderFun(methodName: String, daoClassName: 
                         }else {
                             beginControlFlow("return when(_fnName)")
                             daoFunsToRespond.forEach {
-                                add("%S -> ${it.name}($daoParamNames)\n", it.name)
+                                var fnParamNames = daoParamNames
+                                //The repo is only required for syncable insert functions
+                                if(it.isSyncableInsert(processingEnv))
+                                    fnParamNames += ", _repo"
+
+                                add("%S -> ${it.name}($fnParamNames)\n", it.name)
                             }
                             add("else -> ").addNanoHttpdReturnNotFound().add("\n")
                             endControlFlow()
@@ -283,11 +296,20 @@ fun CodeBlock.Builder.addKtorDaoMethodCode(daoFunSpec: FunSpec, processingEnv: P
         GET_MEMBER
     }
 
+
     beginControlFlow("%M(%S)", memberFn, daoFunSpec.name)
             .addRequestDi()
             .add("val _dao = _daoFn(_db)\n")
             .add("val _gson: %T by _di.%M()\n", Gson::class, DI_INSTANCE_MEMBER)
 
+    //When there are syncable entities being inserted over the http server, we need to call the repo's
+    // handleSyncEntitiesReceived to trigger event listeners
+    if(daoFunSpec.isSyncableInsert(processingEnv)) {
+        add("val _repo: %T = %M(_typeToken, tag = %T.TAG_REPO)\n",
+            TypeVariableName.invoke("T"),
+            MemberName("com.ustadmobile.door.ext", "unwrappedDbOnCall"),
+            DoorTag::class)
+    }
 
     if(daoFunSpec.isQueryWithSyncableResults(processingEnv)) {
         addKtorRouteSelectCodeBlock(daoFunSpec, processingEnv, SERVER_TYPE_KTOR)
@@ -435,10 +457,10 @@ fun CodeBlock.Builder.addHttpServerPassToDaoCodeBlock(daoMethod: FunSpec,
                             serverType = serverType)
                     .add("\n")
 
-            val effectiveResetChangeSeqNum = resetChangeSequenceNumbers ?:
-                (param.type.unwrapListOrArrayComponentType() as? ClassName)?.entityHasSyncableEntityTypes(processingEnv) ?: false
-            if(effectiveResetChangeSeqNum == true) {
-
+            val isSyncableEntity = (param.type.unwrapListOrArrayComponentType() as? ClassName)
+                ?.entityHasSyncableEntityTypes(processingEnv) ?: false
+            val effectiveResetChangeSeqNum = resetChangeSequenceNumbers ?: isSyncableEntity
+            if(effectiveResetChangeSeqNum) {
                 val syncableEntityInfo = SyncableEntityInfo(param.type.asComponentClassNameIfList(),
                         processingEnv)
 
@@ -469,6 +491,22 @@ fun CodeBlock.Builder.addHttpServerPassToDaoCodeBlock(daoMethod: FunSpec,
     add(getVarsCodeBlock.build())
     add(beforeDaoCallCode)
     add(callCodeBlock.build())
+
+    //If this function is an insert function for a syncable entity, this means we have incoming sync activity. We
+    // need to call handleSyncEntitiesReceived on the repo so that SyncListener events are triggered
+    if(daoMethod.isSyncableInsert(processingEnv)) {
+        val param = daoMethod.parameters.first()
+        add("(_repo·as·%T).handleSyncEntitiesReceived(%T::class, ",
+            DoorDatabaseRepository::class,
+            param.type.asComponentClassNameIfList())
+        if(param.type.isListOrArray()) {
+            add("__${param.name}")
+        }else {
+            add("listOf(__${param.name})")
+        }
+        add(")\n")
+    }
+
     add(afterDaoCallCode)
     if(addRespondCall) {
         addRespondCall(respondResultType, "_result", serverType)

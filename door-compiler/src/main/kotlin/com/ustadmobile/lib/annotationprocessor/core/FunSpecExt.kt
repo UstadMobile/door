@@ -123,3 +123,10 @@ fun FunSpec.Builder.removeAbstractModifier(): FunSpec.Builder {
     return this
 }
 
+/**
+ * Shorthand to determine if this FunSpec represents an insert function where the entity is syncable
+ */
+fun FunSpec.isSyncableInsert(processingEnv: ProcessingEnvironment): Boolean {
+    return hasAnnotation(Insert::class.java) &&
+            (entityParamComponentType as? ClassName)?.entityHasSyncableEntityTypes(processingEnv) ?: false
+}
