@@ -12,6 +12,8 @@ import com.ustadmobile.door.TableChangeListener
 import javax.annotation.processing.ProcessingEnvironment
 import javax.lang.model.element.TypeElement
 import androidx.room.Query
+import kotlin.reflect.KClass
+import com.ustadmobile.door.SyncListener
 
 /**
  * Add a method or property that overrides the given accessor. The ExecutableElement could be a
@@ -102,6 +104,30 @@ internal fun TypeSpec.Builder.addRepositoryHelperDelegateCalls(delegatePropName:
             .addCode("$delegatePropName.handleTableChanged(tableName)\n")
             .build())
 
+    val syncListenerTypeVar = TypeVariableName.Companion.invoke("T", Any::class)
+    addFunction(FunSpec.builder("addSyncListener")
+            .addModifiers(KModifier.OVERRIDE)
+            .addTypeVariable(syncListenerTypeVar)
+            .addParameter("entityClass", KClass::class.asClassName().parameterizedBy(syncListenerTypeVar))
+            .addParameter("listener", SyncListener::class.asClassName().parameterizedBy(syncListenerTypeVar))
+            .addCode("$delegatePropName.addSyncListener(entityClass, listener)\n")
+            .build())
+
+    addFunction(FunSpec.builder("removeSyncListener")
+        .addModifiers(KModifier.OVERRIDE)
+        .addTypeVariable(syncListenerTypeVar)
+        .addParameter("entityClass", KClass::class.asClassName().parameterizedBy(syncListenerTypeVar))
+        .addParameter("listener", SyncListener::class.asClassName().parameterizedBy(syncListenerTypeVar))
+        .addCode("$delegatePropName.removeSyncListener(entityClass, listener)\n")
+        .build())
+
+    addFunction(FunSpec.builder("handleSyncEntitiesReceived")
+        .addModifiers(KModifier.OVERRIDE)
+        .addTypeVariable(syncListenerTypeVar)
+        .addParameter("entityClass", KClass::class.asClassName().parameterizedBy(syncListenerTypeVar))
+        .addParameter("entitiesIncoming", List::class.asClassName().parameterizedBy(syncListenerTypeVar))
+        .addCode("$delegatePropName.handleSyncEntitiesReceived(entityClass, entitiesIncoming)\n")
+        .build())
 
 
     return this

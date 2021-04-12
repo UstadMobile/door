@@ -100,9 +100,14 @@ class RepositoryHelper(private val coroutineDispatcher: CoroutineDispatcher = do
         syncListeners.getOrPut(entityClass) { mutableListOf<SyncListener<out Any>>() }.add(listener)
     }
 
+    fun <T: Any> removeSyncListener(entityClass: KClass<T>, listener: SyncListener<T>) {
+        syncListeners.get(entityClass)?.remove(listener)
+    }
+
     fun <T: Any> handleSyncEntitiesReceived(entityClass: KClass<T>, entities: List<T>)  {
+        val event = SyncEntitiesReceivedEvent(entityClass, entities)
         (syncListeners.get(entityClass) as? List<SyncListener<T>>)?.forEach {
-            it.onEntitiesReceived(entities)
+            it.onEntitiesReceived(event)
         }
     }
 

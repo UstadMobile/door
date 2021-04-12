@@ -95,6 +95,19 @@ interface DoorDatabaseRepository {
 
     fun handleTableChanged(tableName: String)
 
+    /**
+     * Add a listener that will be called when entities are received from another device.
+     */
+    fun <T : Any> addSyncListener(entityClass: KClass<T>, syncListener: SyncListener<T>)
+
+    fun <T: Any> removeSyncListener(entityClass: KClass<T>, syncListener: SyncListener<T>)
+
+    /**
+     * This function is called by generated code to trigger the SyncListener onSyncEntitiesReceived event. It should
+     * NOT be called manually.
+     */
+    fun <T: Any> handleSyncEntitiesReceived(entityClass: KClass<T>, entitiesIncoming: List<T>)
+
     companion object {
 
         const val STATUS_CONNECTED = 1

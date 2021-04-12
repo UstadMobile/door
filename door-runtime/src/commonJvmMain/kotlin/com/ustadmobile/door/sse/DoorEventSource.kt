@@ -40,6 +40,7 @@ actual class DoorEventSource actual constructor(var url: String, var listener: D
             try {
                 Napier.d("$logPrefix Connect to server side events from: $url", tag = DoorTag.LOG_TAG)
                 urlConnection = URL(url).openConnection() as HttpURLConnection
+                urlConnection.setRequestProperty("connection", "close")
                 urlConnection.connectTimeout = CONNECT_TIMEOUT
                 urlConnection.readTimeout = READ_TIMEOUT
 
