@@ -7,6 +7,7 @@ import com.google.gson.Gson
 import com.nhaarman.mockitokotlin2.*
 import com.ustadmobile.door.*
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.STATUS_CONNECTED
+import com.ustadmobile.door.RepositoryConfig.Companion.repositoryConfig
 import db2.AccessGrant
 import db2.ExampleDatabase2
 import db2.ExampleDatabase2_KtorRoute
@@ -41,10 +42,9 @@ import org.sqlite.SQLiteDataSource
 import java.io.File
 import javax.sql.DataSource
 import kotlin.test.assertEquals
-import java.net.URI
-import java.nio.file.Paths
 import com.ustadmobile.door.attachments.retrieveAttachment
 import com.ustadmobile.door.ext.*
+import okhttp3.OkHttpClient
 
 
 class DbRepoTest {
@@ -60,6 +60,8 @@ class DbRepoTest {
     var server: ApplicationEngine? = null
 
     lateinit var httpClient: HttpClient
+
+    private lateinit var okHttpClient: OkHttpClient
 
     lateinit var tmpAttachmentsDir: File
 
@@ -106,7 +108,7 @@ class DbRepoTest {
         //install(CallLogging)
     }
 
-    fun setupClientAndServerDb(updateNotificationManager: ServerUpdateNotificationManager = mockUpdateNotificationManager) {
+    fun setupClientAndServerDb(updateManager: ServerUpdateNotificationManager = mockUpdateNotificationManager) {
         try {
             val virtualHostScope = TestDbRoute.VirtualHostScope()
             serverDi = DI {
@@ -119,13 +121,23 @@ class DbRepoTest {
 
                 bind<ExampleDatabase2>(tag = DoorTag.TAG_REPO) with scoped(virtualHostScope).singleton {
                     val db: ExampleDatabase2 = instance(tag = DoorTag.TAG_DB)
-                    val repo = db.asRepository(Any(), "http://localhost/", "", httpClient,
-                            tmpServerAttachmentsDir.absolutePath, updateNotificationManager)
+                    val repo = db.asRepository(repositoryConfig(Any(), "http://localhost", httpClient, okHttpClient) {
+                        attachmentsDir = tmpAttachmentsDir.absolutePath
+                        updateNotificationManager = updateManager
+                    })
                     ServerChangeLogMonitor(db, repo as DoorDatabaseRepository)
                     repo
                 }
 
                 bind<Gson>() with singleton { Gson() }
+
+                bind<HttpClient>() with singleton {
+                    httpClient
+                }
+
+                bind<OkHttpClient>() with singleton {
+                    okHttpClient
+                }
 
                 bind<String>(tag = DoorTag.TAG_ATTACHMENT_DIR) with scoped(virtualHostScope).singleton {
                     tmpServerAttachmentsDir.absolutePath
@@ -138,7 +150,7 @@ class DbRepoTest {
                 }
 
                 bind<ServerUpdateNotificationManager>() with scoped(virtualHostScope).singleton {
-                    updateNotificationManager
+                    updateManager
                 }
 
                 registerContextTranslator { call: ApplicationCall -> "localhost" }
@@ -168,8 +180,13 @@ class DbRepoTest {
 
     @Before
     fun createHttpClient(){
+        okHttpClient = OkHttpClient.Builder().build()
+
         httpClient = HttpClient(OkHttp) {
             install(JsonFeature)
+            engine {
+                preconfigured = okHttpClient
+            }
         }
     }
 
@@ -195,9 +212,8 @@ class DbRepoTest {
 
         val db = DatabaseBuilder.databaseBuilder(Any(), ExampleDatabase2::class, "db1").build()
         db.clearAllTables()
-        val dbRepo = db.asRepository(Any(), mockServer.url("/").toString(),
-                "", httpClient, null)
-                .asConnectedRepository()
+        val dbRepo = db.asRepository(repositoryConfig(Any(), mockServer.url("/").toString(),
+            httpClient, okHttpClient)).asConnectedRepository()
 
         val clientNodeId = (dbRepo as DoorDatabaseSyncRepository).clientId
         val repo = dbRepo.exampleSyncableDao()
@@ -224,9 +240,8 @@ class DbRepoTest {
         val exampleSyncableEntity = ExampleSyncableEntity(esNumber = 42)
         exampleSyncableEntity.esUid = serverRepo!!.exampleSyncableDao().insert(exampleSyncableEntity)
 
-        val clientRepo = clientDb!!.asRepository(Any(),
-                "http://localhost:8089/", "token", httpClient)
-                .asConnectedRepository()
+        val clientRepo = clientDb!!.asRepository(repositoryConfig(Any(), "http://localhost:8089/",
+                httpClient, okHttpClient)).asConnectedRepository()
 
         val entityFromServer = clientRepo.exampleSyncableDao().findByUid(exampleSyncableEntity.esUid)
         Assert.assertNotNull("Entity came back from server using repository", entityFromServer)
@@ -243,9 +258,8 @@ class DbRepoTest {
         val exampleSyncableEntity = ExampleSyncableEntity(esNumber = 42)
         exampleSyncableEntity.esUid = serverRepo.exampleSyncableDao().insert(exampleSyncableEntity)
 
-        val clientRepo = clientDb.asRepository<ExampleDatabase2>(Any(), "http://localhost:8089/",
-                "token", httpClient)
-                .asConnectedRepository<ExampleDatabase2>()
+        val clientRepo = clientDb.asRepository(repositoryConfig(Any(), "http://localhost:8089/",
+            httpClient, okHttpClient)).asConnectedRepository()
 
         val entityFromServerBeforeChange = clientRepo.exampleSyncableDao()
                 .findByUid(exampleSyncableEntity.esUid)
@@ -282,10 +296,10 @@ class DbRepoTest {
 
             serverRepo.exampleSyncableDao().insert(exampleSyncableEntity)
 
-
-            val clientRepo = clientDb.asRepository(Any(), "http://localhost:8089/",
-                    "token", httpClient, useClientSyncManager = true)
-                    .asConnectedRepository()
+            val clientRepo = clientDb.asRepository(repositoryConfig(Any(), "http://localhost:8089/",
+                httpClient, okHttpClient) {
+                    useClientSyncManager = true
+            }).asConnectedRepository()
             val syncListener = mock<SyncListener<ExampleSyncableEntity>>{ }
             (clientRepo as DoorDatabaseRepository).addSyncListener(ExampleSyncableEntity::class, syncListener)
 
@@ -326,8 +340,10 @@ class DbRepoTest {
         val entityListener = mock<SyncListener<ExampleSyncableEntity>> {}
         (serverRepo as DoorDatabaseRepository).addSyncListener(ExampleSyncableEntity::class, entityListener)
 
-        val clientRepo = clientDb.asRepository(Any(),"http://localhost:8089/",
-                "token", httpClient, useClientSyncManager = true).asConnectedRepository()
+        val clientRepo = clientDb.asRepository(repositoryConfig(Any(), "http://localhost:8089/",
+                httpClient, okHttpClient) {
+            useClientSyncManager = true
+        }).asConnectedRepository()
         val exampleSyncableEntity = ExampleSyncableEntity(esNumber = 42)
         runBlocking {
             exampleSyncableEntity.esUid = clientRepo.exampleSyncableDao().insert(exampleSyncableEntity)
@@ -350,8 +366,11 @@ class DbRepoTest {
         setupClientAndServerDb()
         val serverDb = this.serverDb!!
         val clientDb = this.clientDb!!
-        val clientRepo = clientDb.asRepository(Any(),"http://localhost:8089/",
-                "token", httpClient, useClientSyncManager = true).asConnectedRepository()
+        val clientRepo = clientDb.asRepository(repositoryConfig(Any(), "http://localhost:8089/",
+                httpClient, okHttpClient) {
+            useClientSyncManager = true
+        }).asConnectedRepository()
+
         val entityName = "سلام"
 
         runBlocking {
@@ -376,8 +395,10 @@ class DbRepoTest {
         setupClientAndServerDb()
         val serverDb = this.serverDb!!
         val clientDb = this.clientDb!!
-        val clientRepo = clientDb.asRepository<ExampleDatabase2>(Any(),"http://localhost:8089/",
-                "token", httpClient).asConnectedRepository<ExampleDatabase2>()
+        val clientRepo = clientDb.asRepository(repositoryConfig(Any(), "http://localhost:8089/",
+                httpClient, okHttpClient) {
+            useClientSyncManager = true
+        }).asConnectedRepository()
 
         val entityName = "سلام"
 
@@ -396,8 +417,10 @@ class DbRepoTest {
         setupClientAndServerDb(ServerUpdateNotificationManagerImpl())
         val serverDb = this.serverDb!!
         val clientDb = this.clientDb!!
-        val clientRepo = clientDb.asRepository(Any(), "http://localhost:8089/",
-                "token", httpClient, useClientSyncManager = true).asConnectedRepository()
+        val clientRepo = clientDb.asRepository(repositoryConfig(Any(), "http://localhost:8089/",
+                httpClient, okHttpClient) {
+            useClientSyncManager = true
+        }).asConnectedRepository()
         runBlocking {
             Napier.i("=====Create Initial Entity on client======")
             val exampleSyncableEntity = ExampleSyncableEntity(esUid = 420, esNumber = 42)
@@ -448,9 +471,10 @@ class DbRepoTest {
         setupClientAndServerDb(ServerUpdateNotificationManagerImpl())
         val serverDb = this.serverDb!!
         val clientDb = this.clientDb!!
-        val clientRepo = clientDb.asRepository<ExampleDatabase2>(Any(),
-                "http://localhost:8089/", "token",
-                httpClient, useClientSyncManager = true).asConnectedRepository<ExampleDatabase2>()
+        val clientRepo = clientDb.asRepository(repositoryConfig(Any(), "http://localhost:8089/",
+                httpClient, okHttpClient) {
+            useClientSyncManager = true
+        }).asConnectedRepository()
         runBlocking {
             val exampleSyncableEntity = ExampleSyncableEntity(esNumber = 42)
             exampleSyncableEntity.esUid = serverRepo.exampleSyncableDao().insert(exampleSyncableEntity)
@@ -489,8 +513,10 @@ class DbRepoTest {
         setupClientAndServerDb()
         val serverDb = this.serverDb!!
         val clientDb = this.clientDb!!
-        val clientRepo = clientDb.asRepository<ExampleDatabase2>(Any(), "http://localhost:8089/", "token",
-                httpClient).asConnectedRepository<ExampleDatabase2>()
+        val clientRepo = clientDb.asRepository(repositoryConfig(Any(), "http://localhost:8089/",
+                httpClient, okHttpClient) {
+            useClientSyncManager = true
+        }).asConnectedRepository()
         val e1 = ExampleSyncableEntity(esNumber = 42)
         var e2 = ExampleSyncableEntity(esNumber = 43)
         e1.esUid = serverRepo.exampleSyncableDao().insert(e1)
@@ -509,8 +535,10 @@ class DbRepoTest {
         setupClientAndServerDb(ServerUpdateNotificationManagerImpl())
         val serverDb = this.serverDb!!
         val clientDb = this.clientDb!!
-        val clientRepo = clientDb.asRepository(Any(),"http://localhost:8089/",
-                "token", httpClient, useClientSyncManager = true).asConnectedRepository()
+        val clientRepo = clientDb.asRepository(repositoryConfig(Any(), "http://localhost:8089/",
+                httpClient, okHttpClient) {
+            useClientSyncManager = true
+        }).asConnectedRepository()
 
         runBlocking {
             //1. Create a blank entity. Insert it.
@@ -604,8 +632,10 @@ class DbRepoTest {
         val serverDb: ExampleDatabase2 by serverDi.on("localhost").instance(tag = DoorTag.TAG_DB)
 
         val clientDb = this.clientDb!!
-        val clientRepo = clientDb.asRepository(Any(),"http://localhost:8089/",
-                "token", httpClient).asConnectedRepository<ExampleDatabase2>()
+        val clientRepo = clientDb.asRepository(repositoryConfig(Any(), "http://localhost:8089/",
+                httpClient, okHttpClient) {
+            useClientSyncManager = true
+        }).asConnectedRepository()
 
         val clientSyncManager = ClientSyncManager(clientRepo as DoorDatabaseSyncRepository,
             2, STATUS_CONNECTED, httpClient)
@@ -659,9 +689,10 @@ class DbRepoTest {
         val clientDb = this.clientDb!!
 
         //TODO: This should be closed to be sure that it does not interfere with the next test etc.
-        val clientRepo = clientDb.asRepository(Any(), "http://localhost:8089/",
-                "token", httpClient, useClientSyncManager = true)
-                .asConnectedRepository()
+        val clientRepo = clientDb.asRepository(repositoryConfig(Any(), "http://localhost:8089/",
+                httpClient, okHttpClient) {
+            useClientSyncManager = true
+        }).asConnectedRepository()
 
         Napier.i("==== Waiting for entity to arrive on client =====")
 
@@ -688,13 +719,15 @@ class DbRepoTest {
         Napier.i("==== Initializing client =====")
 
         //TODO: This should be closed to be sure that it does not interfere with the next test etc.
-        val clientRepo1 = clientDb.asRepository(Any(), "http://localhost:8089/",
-                "token", httpClient, useClientSyncManager = true)
-                .asConnectedRepository()
+        val clientRepo1 = clientDb.asRepository(repositoryConfig(Any(), "http://localhost:8089/",
+                httpClient, okHttpClient) {
+            useClientSyncManager = true
+        }).asConnectedRepository()
 
-        val clientRepo2 = clientDb2.asRepository(Any(), "http://localhost:8089/",
-                "token", httpClient, useClientSyncManager = true)
-                .asConnectedRepository()
+        val clientRepo2 = clientDb2.asRepository(repositoryConfig(Any(), "http://localhost:8089/",
+                httpClient, okHttpClient) {
+            useClientSyncManager = true
+        }).asConnectedRepository()
 
         //make access grants so that the notification will be dispatched
         listOf(clientRepo1, clientRepo2).forEach { repo ->
@@ -762,9 +795,10 @@ class DbRepoTest {
         val clientDb = this.clientDb!!
 
         //TODO: This should be closed to be sure that it does not interfere with the next test etc.
-        val clientRepo = clientDb.asRepository(Any(), "http://localhost:8089/",
-                "token", httpClient, useClientSyncManager = true)
-                .asConnectedRepository()
+        val clientRepo = clientDb.asRepository(repositoryConfig(Any(), "http://localhost:8089/",
+                httpClient, okHttpClient) {
+            useClientSyncManager = true
+        }).asConnectedRepository()
 
         Napier.i("==== Waiting for entity to arrive on client =====")
 
@@ -795,9 +829,11 @@ class DbRepoTest {
     @Test
     fun givenEntityWithAttachmentUri_whenInserted_thenAttachmentIsStored() {
         setupClientAndServerDb()
-        val clientRepo = clientDb!!.asRepository(Any(),
-                "http://localhost:8089/", "token", httpClient, tmpAttachmentsDir.absolutePath)
-                .asConnectedRepository()
+        val clientRepo = clientDb!!.asRepository(
+                repositoryConfig(Any(), "http://localhost:8089/", httpClient, okHttpClient) {
+
+                attachmentsDir = tmpAttachmentsDir.absolutePath
+        }).asConnectedRepository()
 
         val destFile = temporaryFolder.newFile()
         this::class.java.getResourceAsStream("/testfile1.png").writeToFile(destFile)
@@ -810,7 +846,7 @@ class DbRepoTest {
         val storedUri = runBlocking {
             (clientRepo as DoorDatabaseRepository).retrieveAttachment(attachmentEntity.eaAttachmentUri!!)
         }
-        val storedFile = storedUri.toFile()//   Paths.get(URI(storedUri)).toFile()
+        val storedFile = storedUri.toFile()
 
         Assert.assertTrue("Stored entity exists", storedFile.exists())
     }
@@ -818,9 +854,10 @@ class DbRepoTest {
     @Test
     fun givenEntityWithAttachmentsUri_whenInsertedThenUpdated_thenOldAttachmentIsDeleted() {
         setupClientAndServerDb()
-        val clientRepo = clientDb!!.asRepository(Any(),
-                "http://localhost:8089/", "token", httpClient, tmpAttachmentsDir.absolutePath)
-                .asConnectedRepository()
+        val clientRepo = clientDb!!.asRepository(repositoryConfig(Any(), "http://localhost:8089/",
+            httpClient, okHttpClient) {
+            attachmentsDir = tmpAttachmentsDir.absolutePath
+        }).asConnectedRepository()
 
         val destFile = temporaryFolder.newFile()
         this::class.java.getResourceAsStream("/testfile1.png").writeToFile(destFile)
@@ -853,11 +890,11 @@ class DbRepoTest {
         val destFile = temporaryFolder.newFile()
         this::class.java.getResourceAsStream("/testfile1.png").writeToFile(destFile)
 
-        val clientRepo = clientDb.asRepository(Any(), "http://localhost:8089/",
-                "token", httpClient, attachmentsDir = tmpAttachmentsDir.absolutePath,
-                useClientSyncManager = true)
-                .asConnectedRepository()
-
+        val clientRepo = clientDb.asRepository(repositoryConfig(Any(), "http://localhost:8089/",
+            httpClient, okHttpClient) {
+            useClientSyncManager = true
+            attachmentsDir = tmpAttachmentsDir.absolutePath
+        })
 
         val attachmentEntity = ExampleAttachmentEntity().apply {
             eaAttachmentUri = destFile.toURI().toString()
@@ -895,10 +932,11 @@ class DbRepoTest {
             eaUid  = serverRepo.exampleAttachmentDao().insert(this)
         }
 
-        val clientRepo = clientDb.asRepository(Any(), "http://localhost:8089/",
-                "token", httpClient, attachmentsDir = tmpAttachmentsDir.absolutePath,
-                useClientSyncManager = true)
-                .asConnectedRepository()
+        val clientRepo = clientDb.asRepository(repositoryConfig(Any(), "http://localhost:8089/",
+            httpClient, okHttpClient) {
+            useClientSyncManager = true
+            attachmentsDir = tmpAttachmentsDir.absolutePath
+        }).asConnectedRepository()
 
         runBlocking {
             clientDb.waitUntil(10000, listOf("ExampleAttachmentEntity")) {
@@ -935,10 +973,11 @@ class DbRepoTest {
         serverRepo.exampleSyncableDao().insertList(syncableEntityList)
         val allEntitiesOnServer = serverDb!!.exampleSyncableDao().findAll()
 
-        val clientRepo = clientDb.asRepository(Any(), "http://localhost:8089/",
-                "token", httpClient, attachmentsDir = tmpAttachmentsDir.absolutePath,
-                useClientSyncManager = true)
-                .asConnectedRepository()
+        val clientRepo = clientDb.asRepository(repositoryConfig(Any(), "http://localhost:8089/",
+            httpClient, okHttpClient) {
+            useClientSyncManager = true
+            attachmentsDir = tmpAttachmentsDir.absolutePath
+        }).asConnectedRepository()
 
         runBlocking {
             clientDb.waitUntil(10000, listOf("ExampleSyncableEntity")) {
@@ -970,10 +1009,12 @@ class DbRepoTest {
         }
 
 
-        val clientRepo = clientDb.asRepository(Any(), "http://localhost:8089/",
-                "token", httpClient, attachmentsDir = tmpAttachmentsDir.absolutePath,
-                useClientSyncManager = true)
-                .asConnectedRepository()
+        val clientRepo = clientDb.asRepository(repositoryConfig(Any(),"http://localhost:8089/",
+                httpClient, okHttpClient) {
+            useClientSyncManager = true
+            attachmentsDir = tmpAttachmentsDir.absolutePath
+        }).asConnectedRepository()
+
 
         clientRepo.exampleSyncableDao().insertList(syncableEntityList)
 

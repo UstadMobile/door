@@ -121,7 +121,7 @@ suspend inline fun <reified T:Any, reified K: Any> DoorDatabaseSyncRepository.sy
             val entityAcks = entityToAckFn(newEntities, true)
 
             Napier.d("DAONAME=$daoName / ${this::class.simpleName}")
-            httpClient.postEntityAck(entityAcks, endpoint,
+            config.httpClient.postEntityAck(entityAcks, config.endpoint,
                     "$dbPath/${daoName}/_ack${T::class.simpleName}Received", this)
             entitiesReceived += newEntities.size
         }
@@ -140,9 +140,9 @@ suspend inline fun <reified T:Any, reified K: Any> DoorDatabaseSyncRepository.sy
                 uploadAttachment(it)
             }
 
-            httpClient.post<Unit> {
+            config.httpClient.post<Unit> {
                 url {
-                    takeFrom(endpoint)
+                    takeFrom(config.endpoint)
                     encodedPath = "$encodedPath$dbPath/$daoName/_replace${entityName}"
                 }
 

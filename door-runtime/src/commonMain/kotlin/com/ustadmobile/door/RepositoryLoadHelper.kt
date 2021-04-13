@@ -192,7 +192,7 @@ class RepositoryLoadHelper<T>(val repository: DoorDatabaseRepository,
                     }
 
                     endpointToUse = if(mirrorToUse == null) {
-                        repository.endpoint
+                        repository.config.endpoint
                     }else {
                         mirrorToUse.endpointUrl
                     }

@@ -49,7 +49,7 @@ actual suspend fun DoorDatabaseRepository.storeAttachment(entityWithAttachment: 
 }
 
 actual suspend fun DoorDatabaseRepository.retrieveAttachment(attachmentUri: String): DoorUri {
-    val attachmentDirVal = attachmentsDir ?: throw IllegalStateException("No attachments dir!")
+    val attachmentDirVal = config.attachmentsDir ?: throw IllegalStateException("No attachments dir!")
     val file = File(attachmentDirVal, attachmentUri.substringAfter("door-attachment://"))
     return DoorUri(file.toURI())
 }

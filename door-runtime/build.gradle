@@ -107,6 +107,8 @@ kotlin {
                 implementation "androidx.lifecycle:lifecycle-livedata-ktx:$version_androidx_lifecycle"
                 implementation "androidx.paging:paging-runtime:$version_androidx_paging"
                 implementation "androidx.core:core-ktx:$version_androidx_core"
+                implementation "com.squareup.okhttp3:okhttp:$version_okhttp"
+                implementation "com.squareup.okhttp3:okhttp-sse:$version_okhttp"
             }
         }
 
@@ -123,6 +125,9 @@ kotlin {
                 implementation "org.kodein.di:kodein-di-framework-ktor-server-jvm:$version_kodein_di"
                 implementation "org.xerial:sqlite-jdbc:$version_sqlite_jdbc"
                 implementation "io.ktor:ktor-server-core:$version_ktor"
+                implementation "com.squareup.okhttp3:okhttp:$version_okhttp"
+                implementation "com.squareup.okhttp3:okhttp-sse:$version_okhttp"
+
             }
         }
         jvmTest {

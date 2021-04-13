@@ -18,7 +18,7 @@ import java.net.HttpURLConnection
 
 
 fun DoorDatabaseRepository.requireAttachmentDirFile(): File {
-    return attachmentsDir?.let { File(it) }
+    return config.attachmentsDir?.let { File(it) }
             ?: throw IllegalStateException("requireAttachmentDirFile called on repository with null attachment dir")
 }
 
@@ -32,10 +32,10 @@ actual suspend fun DoorDatabaseRepository.uploadAttachment(entityWithAttachment:
             ?: throw IllegalArgumentException("uploadAttachment: Entity attachment must not be null")
 
     val attachmentFile = File(requireAttachmentDirFile(), attachmentUri.substringAfter(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX))
-    val endpointUrl = URL(URL(this.endpoint), "$dbPath/attachments/upload")
+    val endpointUrl = URL(URL(config.endpoint), "$dbPath/attachments/upload")
 
     //val inputFile = Paths.get(systemUri).toFile()
-    httpClient.post<Unit>(endpointUrl.toString()) {
+    config.httpClient.post<Unit>(endpointUrl.toString()) {
         dbVersionHeader(db)
         parameter("md5", attachmentMd5)
         parameter("uri", attachmentUri)
@@ -55,7 +55,7 @@ actual suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<E
             val destFile = File(requireAttachmentDirFile(), destPath)
 
             if(!destFile.exists()) {
-                val url = URL(URL(endpoint),
+                val url = URL(URL(config.endpoint),
                         "$dbPath/attachments/download?uri=${URLEncoder.encode(attachmentUri, "UTF-8")}")
 
                 destFile.parentFile.takeIf { !it.exists() }?.mkdirs()

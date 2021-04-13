@@ -1,25 +1,10 @@
 package com.ustadmobile.door
 
-import com.ustadmobile.door.attachments.AttachmentFilter
-import io.ktor.client.HttpClient
-import java.io.File
 import kotlin.reflect.KClass
 
-actual inline fun <reified  T: SyncableDoorDatabase> T.asRepository(context: Any,
-                                                                    endpoint: String,
-                                                                    accessToken: String,
-                                                                    httpClient: HttpClient,
-                                                                    attachmentsDir: String?,
-                                                                    updateNotificationManager: ServerUpdateNotificationManager?,
-                                                                    useClientSyncManager: Boolean,
-                                                                    attachmentFilters: List<AttachmentFilter>): T {
+actual inline fun <reified  T: SyncableDoorDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T {
     val dbClass = T::class
     val repoImplClass = Class.forName("${dbClass.qualifiedName}_Repo") as Class<T>
-    val attachmentsDirToUse = if(attachmentsDir != null){
-        attachmentsDir
-    }else {
-        File("attachments").absolutePath //TODO: look this up from JNDI
-    }
 
     val dbUnwrapped = if(this is DoorDatabaseSyncableReadOnlyWrapper) {
         this.unwrap(dbClass)
@@ -28,12 +13,8 @@ actual inline fun <reified  T: SyncableDoorDatabase> T.asRepository(context: Any
     }
 
     val repo = repoImplClass
-            .getConstructor(Any::class.java, dbClass.java, dbClass.java, String::class.java,
-                    String::class.java, HttpClient::class.java,
-                    String::class.java, ServerUpdateNotificationManager::class.java,
-                    Boolean::class.javaPrimitiveType, List::class.java)
-            .newInstance(context, dbUnwrapped, this, endpoint, accessToken, httpClient, attachmentsDirToUse,
-                    updateNotificationManager, useClientSyncManager, attachmentFilters)
+            .getConstructor(dbClass.java, dbClass.java, RepositoryConfig::class.java)
+            .newInstance(this, dbUnwrapped, repositoryConfig)
     return repo
 }
 

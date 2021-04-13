@@ -1,7 +1,5 @@
 package com.ustadmobile.door
 
-import com.ustadmobile.door.attachments.AttachmentFilter
-import io.ktor.client.HttpClient
 import kotlin.reflect.KClass
 
 interface SyncableDoorDatabase {
@@ -22,14 +20,7 @@ interface SyncableDoorDatabase {
  * @param useClientSyncManager if true, the underlying repository will automatically create a
  * ClientSyncManager and connect to server sent events to receive immediate updates.
  */
-expect inline fun <reified  T: SyncableDoorDatabase> T.asRepository(context: Any,
-                                                                 endpoint: String,
-                                                                 accessToken: String,
-                                                                 httpClient: HttpClient,
-                                                                 attachmentsDir: String? = null,
-                                                                 updateNotificationManager: ServerUpdateNotificationManager? = null,
-                                                                 useClientSyncManager: Boolean  = false,
-                                                                 attachmentFilters: List<AttachmentFilter> = listOf()): T
+expect inline fun <reified  T: SyncableDoorDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T
 
 expect fun <T: SyncableDoorDatabase> T.wrap(dbClass: KClass<T>): T
 
