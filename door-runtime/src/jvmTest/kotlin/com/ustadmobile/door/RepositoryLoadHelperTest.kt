@@ -29,8 +29,12 @@ class RepositoryLoadHelperTest  {
 
     @Test
     fun givenLoadSuccessful_whenDoRequestCalledAgain_thenShouldNotLoadAgain() {
+        val mockConfig = mock<RepositoryConfig> {
+            on { endpoint }.thenReturn("http://localhost:8089/")
+        }
         val mockRepository = mock<DoorDatabaseRepository> {
             on {connectivityStatus}.thenReturn(DoorDatabaseRepository.STATUS_CONNECTED)
+            on { config }.thenReturn(mockConfig)
         }
 
         val invocationCount = AtomicInteger()
@@ -69,8 +73,12 @@ class RepositoryLoadHelperTest  {
 
     @Test
     fun givenLoadSuccessful_whenDoRequestCalledAgainLoadAgainParamSet_thenShouldLoadAgain() {
+        val mockRepoConfig = mock<RepositoryConfig> {
+            on { endpoint }.thenReturn("http://localhost:8089/")
+        }
         val mockRepository = mock<DoorDatabaseRepository> {
             on {connectivityStatus}.thenReturn(DoorDatabaseRepository.STATUS_CONNECTED)
+            on { config }.thenReturn(mockRepoConfig)
         }
 
         val countDownLatch2 = CountDownLatch(2)
@@ -157,7 +165,11 @@ class RepositoryLoadHelperTest  {
     @Test
     fun givenLoadUnsuccessfulWithNoConnectivityAndIsObserved_whenConnectivityResumed_thenShouldLoadAgain() {
         val currentConnectivityStatus = AtomicInteger(DoorDatabaseRepository.STATUS_DISCONNECTED)
+        val mockRepoConfig = mock<RepositoryConfig> {
+            on { endpoint }.thenReturn("http://localhost:8089/")
+        }
         val mockRepository = mock<DoorDatabaseRepository> {
+            on { config }.thenReturn(mockRepoConfig)
             on {connectivityStatus}.thenAnswer {
                 invocation -> currentConnectivityStatus.get()
             }
@@ -225,8 +237,12 @@ class RepositoryLoadHelperTest  {
     @Test
     fun givenLoadUnsuccessful_whenObservedAgainAndConnectivityAvailable_thenShouldLoadAgain() {
         val currentConnectivityStatus = AtomicInteger(DoorDatabaseRepository.STATUS_DISCONNECTED)
+        val mockRepoConfig = mock<RepositoryConfig> {
+            on { endpoint }.thenReturn("http://localhost:8089/")
+        }
         val mockRepository = mock<DoorDatabaseRepository> {
             on {connectivityStatus}.thenAnswer { invocation -> currentConnectivityStatus.get() }
+            on { config }.thenReturn(mockRepoConfig)
             onBlocking { activeMirrors() }.thenReturn(listOf())
         }
 
@@ -397,9 +413,12 @@ class RepositoryLoadHelperTest  {
     fun givenConnectivityAvailableAndMirrorAvailable_whenDoRequestCalled_thenWillUseMainEndpoint() {
         val mockCloudEndpoint = "http://cloudserver/endpoint"
         val mockMirrorEndpoint = "http://localhost:2000/proxy"
+        val mockConfig = mock<RepositoryConfig> {
+            on { endpoint }.thenReturn(mockCloudEndpoint)
+        }
         val mockRepository = mock<DoorDatabaseRepository> {
             on {connectivityStatus}.thenReturn(DoorDatabaseRepository.STATUS_CONNECTED)
-            on {endpoint}.thenReturn(mockCloudEndpoint)
+            on { config }.thenReturn(mockConfig)
             onBlocking { activeMirrors() }.thenReturn(listOf(MirrorEndpoint(1, mockMirrorEndpoint, 100)))
         }
 
@@ -438,9 +457,12 @@ class RepositoryLoadHelperTest  {
     fun givenNoConnectivityAvailableAndMirrorAvailable_whenDoRequestCalled_thenWillUseMirror() {
         val mockCloudEndpoint = "http://cloudserver/endpoint"
         val mockMirrorEndpoint = "http://localhost:2000/proxy"
+        val mockConfig = mock<RepositoryConfig> {
+            on { endpoint }.thenReturn(mockCloudEndpoint)
+        }
         val mockRepository = mock<DoorDatabaseRepository> {
             on {connectivityStatus}.thenReturn(DoorDatabaseRepository.STATUS_DISCONNECTED)
-            on {endpoint}.thenReturn(mockCloudEndpoint)
+            on {config}.thenReturn(mockConfig)
             onBlocking { activeMirrors() }.thenReturn(listOf(MirrorEndpoint(1, mockMirrorEndpoint, 100)))
         }
 
@@ -481,9 +503,12 @@ class RepositoryLoadHelperTest  {
 
         val currentConnectivityStatus = AtomicInteger(DoorDatabaseRepository.STATUS_DISCONNECTED)
         val currentActiveMirrorList = mutableListOf<MirrorEndpoint>()
+        val mockConfig = mock<RepositoryConfig> {
+            on { endpoint }.thenReturn(mockCloudEndpoint)
+        }
         val mockRepository = mock<DoorDatabaseRepository> {
             on {connectivityStatus}.thenAnswer { invocation -> currentConnectivityStatus.get() }
-            on {endpoint}.thenReturn(mockCloudEndpoint)
+            on { config }.thenReturn(mockConfig)
             onBlocking { activeMirrors() }.thenAnswer { invocation -> currentActiveMirrorList }
         }
 
@@ -550,9 +575,12 @@ class RepositoryLoadHelperTest  {
 
         val currentConnectivityStatus = AtomicInteger(DoorDatabaseRepository.STATUS_DISCONNECTED)
         val currentActiveMirrorList = mutableListOf<MirrorEndpoint>()
+        val mockConfig = mock<RepositoryConfig> {
+            on { endpoint }.thenReturn(mockCloudEndpoint)
+        }
         val mockRepository = mock<DoorDatabaseRepository> {
             on {connectivityStatus}.thenAnswer { invocation -> currentConnectivityStatus.get() }
-            on {endpoint}.thenReturn(mockCloudEndpoint)
+            on { config }.thenReturn(mockConfig)
             onBlocking { activeMirrors() }.thenAnswer { invocation -> currentActiveMirrorList }
         }
 

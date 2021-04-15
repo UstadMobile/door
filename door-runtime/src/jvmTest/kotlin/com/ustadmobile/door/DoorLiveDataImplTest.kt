@@ -35,7 +35,9 @@ class DoorLiveDataImplTest {
             42
         }
 
-        val mockObserver = mock<DoorObserver<Int>>()
+        val mockObserver = mock<DoorObserver<Int>> {
+
+        }
         liveDataJdbc.observeForever(mockObserver)
         liveDataJdbc.removeObserver(mockObserver)
 

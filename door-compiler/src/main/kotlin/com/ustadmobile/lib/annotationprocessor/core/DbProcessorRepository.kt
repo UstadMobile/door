@@ -95,72 +95,47 @@ fun FileSpec.Builder.addDbRepoType(dbTypeElement: TypeElement,
                             "ClassName")
                     .build())
             .primaryConstructor(FunSpec.constructorBuilder()
-                .addParameter(ParameterSpec.builder("context", Any::class)
-                        .addModifiers(KModifier.OVERRIDE)
-                        .build())
-                .addParameter(ParameterSpec.builder("_db", dbTypeElement.asClassName() ).build())
-                .addParameter(ParameterSpec.builder("db", dbTypeElement.asClassName()).build())
-                .addParameter(ParameterSpec.builder("_endpoint",
-                        String::class.asClassName()).build())
-                .addParameter("_accessToken", String::class)
-                .addParameter(ParameterSpec.builder("_httpClient",
-                        HttpClient::class.asClassName()).build())
-                .addParameter(ParameterSpec.builder("attachmentsDir",
-                        String::class)
-                        .addModifiers(KModifier.OVERRIDE)
-                        .build())
-                .addParameter("_updateNotificationManager",
-                        ServerUpdateNotificationManager::class.asClassName().copy(nullable = true))
-                .addParameter("_useClientSyncManager", Boolean::class)
-                .addParameter(ParameterSpec.builder("attachmentFilters",
-                            List::class.parameterizedBy(AttachmentFilter::class))
-                        .addModifiers(KModifier.OVERRIDE)
-                        .build())
+                .addParameter("db", dbTypeElement.asClassName())
+                .addParameter("dbUnwrapped", dbTypeElement.asClassName())
+                .addParameter("config", RepositoryConfig::class)
                 .build())
-            .addProperty(PropertySpec.builder("context", Any::class)
+            .addProperty(PropertySpec.builder("config", RepositoryConfig::class)
                     .addModifiers(KModifier.OVERRIDE)
-                    .initializer("context")
+                    .initializer("config")
+                    .build())
+            .addProperty(PropertySpec.builder("context", Any::class)
+                    .getter(FunSpec.getterBuilder()
+                            .addCode("return config.context\n")
+                            .build())
                     .build())
             .addProperty(PropertySpec.builder("_db", dbTypeElement.asClassName())
-                    .initializer("_db").build())
+                    .addModifiers(KModifier.PRIVATE)
+                    .initializer("dbUnwrapped")
+                    .build())
             .addProperty(PropertySpec.builder("db",
                     dbTypeElement.asClassName()).initializer("db")
                     .addModifiers(KModifier.OVERRIDE)
                     .build())
             .addProperty(PropertySpec.builder("_endpoint",
-                    String::class.asClassName()).initializer("_endpoint").build())
-            .addProperty(PropertySpec.builder("_accessToken", String::class)
-                    .initializer("_accessToken").build())
-            .addProperty(PropertySpec.builder("_httpClient",
-                    HttpClient::class.asClassName()).initializer("_httpClient").build())
-            .addProperty(PropertySpec.builder("endpoint", String::class)
-                    .getter(FunSpec.getterBuilder().addCode("return _endpoint\n").build())
-                    .addModifiers(KModifier.OVERRIDE)
+                    String::class.asClassName())
+                    .addModifiers(KModifier.PRIVATE)
+                    .getter(FunSpec.getterBuilder()
+                            .addCode("return config.endpoint")
+                            .build())
                     .build())
-            .addProperty(PropertySpec.builder("auth", String::class)
-                .getter(FunSpec.getterBuilder().addCode("return _accessToken\n").build())
-                .addModifiers(KModifier.OVERRIDE)
-                .build())
+            .addProperty(PropertySpec.builder("_httpClient",
+                    HttpClient::class.asClassName())
+                    .getter(FunSpec.getterBuilder()
+                            .addCode("return config.httpClient\n")
+                            .build())
+                    .build())
             .addProperty(PropertySpec.builder("dbPath", String::class)
                     .getter(FunSpec.getterBuilder().addCode("return ${DbProcessorRepository.DB_NAME_VAR}\n").build())
                     .addModifiers(KModifier.OVERRIDE)
                     .build())
-            .addProperty(PropertySpec.builder("httpClient", HttpClient::class)
-                    .getter(FunSpec.getterBuilder().addCode("return _httpClient\n").build())
-                    .addModifiers(KModifier.OVERRIDE)
-                    .build())
-            .addProperty(PropertySpec.builder("attachmentsDir", String::class)
-                    .initializer("attachmentsDir")
-                    .build())
             .addProperty(PropertySpec.builder("_updateNotificationManager",
                     ServerUpdateNotificationManager::class.asClassName().copy(nullable = true))
-                    .initializer("_updateNotificationManager")
-                    .build())
-            .addProperty(PropertySpec.builder("attachmentFilters",
-                        List::class.parameterizedBy(AttachmentFilter::class))
-                    .mutable(false)
-                    .addModifiers(KModifier.OVERRIDE)
-                    .initializer("attachmentFilters")
+                    .initializer("config.updateNotificationManager")
                     .build())
             .addProperty(PropertySpec.builder("_repositoryHelper", RepositoryHelper::class)
                     .initializer("%T(%M(%S))", RepositoryHelper::class,
@@ -169,8 +144,8 @@ fun FileSpec.Builder.addDbRepoType(dbTypeElement: TypeElement,
                     .build())
             .addProperty(PropertySpec.builder("_clientSyncManager",
                     ClientSyncManager::class.asClassName().copy(nullable = true))
-                    .initializer(CodeBlock.builder().beginControlFlow("if(_useClientSyncManager)")
-                            .add("%T(this, _db.%M(), _repositoryHelper.connectivityStatus, httpClient)\n",
+                    .initializer(CodeBlock.builder().beginControlFlow("if(config.useClientSyncManager)")
+                            .add("%T(this, _db.%M(), _repositoryHelper.connectivityStatus, config.httpClient)\n",
                                     ClientSyncManager::class, MemberName("com.ustadmobile.door.ext", "dbSchemaVersion"))
                             .nextControlFlow("else")
                             .add("null\n")
@@ -281,7 +256,7 @@ fun FileSpec.Builder.addDbRepoType(dbTypeElement: TypeElement,
                             dbTypeElement.asClassNameWithSuffix("$SUFFIX_SYNCDAO_ABSTRACT$SUFFIX_REPOSITORY2"))
                         .delegate(CodeBlock.builder().beginControlFlow("lazy")
                                 .add("%T(_db, this, _syncDao, _httpClient, _clientIdFn, _endpoint," +
-                                        " ${DbProcessorRepository.DB_NAME_VAR}, attachmentsDir," +
+                                        " ${DbProcessorRepository.DB_NAME_VAR}, config.attachmentsDir," +
                                         " _syncDao) ",
                                         dbTypeElement
                                                 .asClassNameWithSuffix("$SUFFIX_SYNCDAO_ABSTRACT$SUFFIX_REPOSITORY2"))
@@ -425,7 +400,7 @@ private fun TypeSpec.Builder.addRepoDbDaoAccessor(daoGetter: ExecutableElement,
                 daoTypeEl.asClassNameWithSuffix(SUFFIX_REPOSITORY2))
             .delegate(CodeBlock.builder().beginControlFlow("lazy")
                     .add("%T(_db, this, _db.%L, _httpClient, _clientIdFn, _endpoint, ${DbProcessorRepository.DB_NAME_VAR}, " +
-                            "attachmentsDir $syncDaoParam) ",
+                            "config.attachmentsDir $syncDaoParam) ",
                             daoTypeEl.asClassNameWithSuffix(SUFFIX_REPOSITORY2),
                             daoGetter.makeAccessorCodeBlock())
                     .endControlFlow()

@@ -10,28 +10,15 @@ import kotlin.reflect.KClass
  */
 interface DoorDatabaseRepository {
 
-    val endpoint: String
-
-    val auth: String
+    val config: RepositoryConfig
 
     val dbPath: String
-
-    val httpClient: HttpClient
-
-    val attachmentsDir: String?
-
-    val context: Any
 
     /**
      * This provides access to the underlying database for this repository. It must be wrapped with
      * The SyncableReadOnlyWrapper if this is a syncable database.
      */
     val db: DoorDatabase
-
-    /**
-     * A list of filters that will be applied to attachments.
-     */
-    val attachmentFilters: List<AttachmentFilter>
 
     suspend fun addMirror(mirrorEndpoint: String, initialPriority: Int): Int
 

@@ -18,13 +18,13 @@ suspend fun DoorDatabaseRepository.filterAttachment(entityWithAttachment: Entity
         it.mkdirs()
     }
 
-    return attachmentFilters.fold(entityWithAttachment) {lastVal : EntityWithAttachment, filter->
-        filter.filter(lastVal, tmpDir.absolutePath, context)
+    return config.attachmentFilters.fold(entityWithAttachment) {lastVal : EntityWithAttachment, filter->
+        filter.filter(lastVal, tmpDir.absolutePath, config.context)
     }
 }
 
 actual suspend fun DoorDatabaseRepository.storeAttachment(entityWithAttachment: EntityWithAttachment) {
-    val androidContext = context as Context
+    val androidContext = config.context as Context
     if(entityWithAttachment.attachmentUri?.startsWith(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX) == true)
         return //already stored
 

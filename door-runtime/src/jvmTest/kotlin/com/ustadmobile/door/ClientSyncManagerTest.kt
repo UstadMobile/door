@@ -4,6 +4,7 @@ import com.github.aakira.napier.DebugAntilog
 import com.github.aakira.napier.Napier
 import com.nhaarman.mockitokotlin2.*
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.STATUS_CONNECTED
+import com.ustadmobile.door.RepositoryConfig.Companion.repositoryConfig
 import com.ustadmobile.door.daos.ISyncHelperEntitiesDao
 import com.ustadmobile.door.entities.TableSyncStatus
 import com.ustadmobile.door.entities.UpdateNotification
@@ -30,17 +31,37 @@ import com.ustadmobile.door.ktor.respondUpdateNotificationReceived
 import com.ustadmobile.door.ktor.respondUpdateNotifications
 import io.ktor.application.call
 import io.ktor.application.install
+import io.ktor.client.engine.okhttp.*
+import io.ktor.client.features.json.*
 import io.ktor.routing.get
 import io.ktor.routing.routing
+import okhttp3.OkHttpClient
+import org.junit.After
 import org.junit.Before
 
 
 class ClientSyncManagerTest {
 
+    lateinit var okHttpClient: OkHttpClient
+
+    lateinit var httpClient: HttpClient
+
     @Before
     fun setup() {
         Napier.takeLogarithm()
         Napier.base(DebugAntilog())
+        okHttpClient = OkHttpClient()
+        httpClient = HttpClient(OkHttp) {
+            install(JsonFeature)
+            engine {
+                preconfigured = okHttpClient
+            }
+        }
+    }
+
+    @After
+    fun tearDown() {
+        httpClient.close()
     }
 
     @Test
@@ -56,9 +77,16 @@ class ClientSyncManagerTest {
                 }
             }
         }
+
+        val mockConfig = mock<RepositoryConfig> {
+            on { endpoint }.thenReturn("http://localhost:8089/")
+            on { okHttpClient }.thenReturn(okHttpClient)
+        }
+
         val mockRepo = mock<DoorDatabaseSyncRepository> {
             on { tableIdMap }.thenReturn(mapOf("Example" to exampleTableId))
             on { syncHelperEntitiesDao}.thenReturn(mockSyncHelperEntitiesDao)
+            on { config }.thenReturn(mockConfig)
         }
 
         val clientSyncManager = ClientSyncManager(mockRepo, 2, STATUS_CONNECTED,
@@ -95,9 +123,11 @@ class ClientSyncManagerTest {
             on { findTablesToSync() }.thenReturn(listOf())
         }
 
+        val repoConfig = repositoryConfig(Any(), "http://localhost:8089/", httpClient, okHttpClient)
+
         val mockRepo = mock<DoorDatabaseSyncRepository>() {
             on { tableIdMap }.thenReturn(mapOf("Example" to exampleTableId))
-            on { endpoint }.thenReturn("http://localhost:8089/")
+            on { config }.thenReturn(repoConfig)
             on { clientId }.thenReturn(57)
             on { syncHelperEntitiesDao }.thenReturn(mockSyncHelperEntitiesDao)
             on { dbPath }.thenReturn("ExampleDatabase")

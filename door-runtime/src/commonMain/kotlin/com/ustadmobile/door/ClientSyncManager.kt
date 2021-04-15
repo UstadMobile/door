@@ -123,9 +123,9 @@ class ClientSyncManager(val repo: DoorDatabaseSyncRepository, val dbVersion: Int
             if(eventSource.value != null)
                 return
 
-            val url = "${repo.endpoint}$endpointSuffixUpdates?deviceId=${repo.clientId}&$HEADER_DBVERSION=$dbVersion"
+            val url = "${repo.config.endpoint}$endpointSuffixUpdates?deviceId=${repo.clientId}&$HEADER_DBVERSION=$dbVersion"
             Napier.v("$logPrefix subscribing to updates from $url", tag = LOG_TAG)
-            eventSource.value = DoorEventSource(url,
+            eventSource.value = DoorEventSource(repo.config, url,
                     object : DoorEventListener {
                 override fun onOpen() {
 
@@ -144,7 +144,7 @@ class ClientSyncManager(val repo: DoorDatabaseSyncRepository, val dbVersion: Int
                             repo.syncHelperEntitiesDao.updateTableSyncStatusLastChanged(tableId,
                                     systemTimeInMillis())
                             invalidate()
-                            httpClient.get<Unit>("${repo.endpoint}$endpointSuffixAck?" +
+                            httpClient.get<Unit>("${repo.config.endpoint}$endpointSuffixAck?" +
                                     "deviceId=${repo.clientId}&$HEADER_DBVERSION=$dbVersion&tableId=$tableId&lastModTimestamp=$lastModified")
                         }
                     }

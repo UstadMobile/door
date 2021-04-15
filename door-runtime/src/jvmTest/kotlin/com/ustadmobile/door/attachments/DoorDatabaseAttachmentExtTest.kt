@@ -3,6 +3,7 @@ package com.ustadmobile.door.attachments
 import com.nhaarman.mockitokotlin2.mock
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.DummyEntityWithAttachment
+import com.ustadmobile.door.RepositoryConfig
 import com.ustadmobile.door.ext.hexStringToByteArray
 import com.ustadmobile.door.ext.md5Sum
 import com.ustadmobile.door.ext.toFile
@@ -33,14 +34,12 @@ class DoorDatabaseAttachmentExtTest {
         attachmentPath = tempDir.newFile().absolutePath
         this::class.java.getResourceAsStream("/test-resources/cat-pic0.jpg").writeToFile(File(attachmentPath))
 
+        val mockConfig = mock<RepositoryConfig> {
+            on { attachmentsDir }.thenReturn(tempDir.newFolder().absolutePath)
+            on { context }.thenReturn(Any())
+        }
         repo = mock {
-            on {
-                attachmentsDir
-            }.thenReturn(tempDir.newFolder().absolutePath)
-
-            on {
-                context
-            }.thenReturn(Any())
+            on { config }.thenReturn(mockConfig)
         }
     }
 

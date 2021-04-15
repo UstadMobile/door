@@ -11,6 +11,7 @@ import com.ustadmobile.door.sse.DoorEventListener
 import com.ustadmobile.door.sse.DoorEventSource
 import com.ustadmobile.door.sse.DoorServerSentEvent
 import io.ktor.application.call
+import io.ktor.client.features.*
 import io.ktor.response.respondTextWriter
 import io.ktor.routing.get
 import io.ktor.routing.routing
@@ -20,9 +21,24 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
+import org.junit.After
+import org.junit.Before
 import org.junit.Test
 
 class DoorEventSourceTest {
+
+    private lateinit var okHttpClient: OkHttpClient
+
+    @Before
+    fun setup() {
+        okHttpClient = OkHttpClient.Builder().build()
+    }
+
+    @After
+    fun tearDown() {
+        okHttpClient.dispatcher.executorService.shutdown()
+    }
 
     @Test
     fun givenEventSourceCreated_whenEventSent_thenOnMessageIsCalled() {
@@ -56,7 +72,11 @@ class DoorEventSourceTest {
 
         val eventListener = mock<DoorEventListener> {}
 
-        val eventSource = DoorEventSource("http://localhost:8094/subscribe", eventListener)
+        val mockRepoConfig = mock<RepositoryConfig> {
+            on { okHttpClient }.thenReturn(okHttpClient)
+        }
+
+        val eventSource = DoorEventSource(mockRepoConfig, "http://localhost:8094/subscribe", eventListener)
         eventChannel.offer(DoorServerSentEvent("42", "UPDATE", "Hello World"))
         verify(eventListener, timeout(5000)).onMessage(argWhere { it.id == "42" })
 

@@ -41,7 +41,7 @@ fun DoorDatabase.resolveAttachmentAndroidUri(attachmentUri: String): Uri {
     val thisRepo = this as? DoorDatabaseRepository
             ?: throw IllegalArgumentException("resolveAttachmentAndroidUri must be used on the repository, not the database!")
 
-    val attachmentsDir = thisRepo.attachmentsDir
+    val attachmentsDir = thisRepo.config.attachmentsDir
             ?: throw IllegalArgumentException("Repo has a null attachments directory! Cannot resolve Uris.")
 
     if(attachmentUri.startsWith(DOOR_ATTACHMENT_URI_PREFIX)) {
