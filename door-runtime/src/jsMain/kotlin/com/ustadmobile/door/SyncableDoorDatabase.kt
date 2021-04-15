@@ -24,15 +24,6 @@ actual fun <T : SyncableDoorDatabase> T.unwrap(dbClass: KClass<T>): T {
  * @param useClientSyncManager if true, the underlying repository will automatically create a
  * ClientSyncManager and connect to server sent events to receive immediate updates.
  */
-actual inline fun <reified T : SyncableDoorDatabase> T.asRepository(
-    context: Any,
-    endpoint: String,
-    accessToken: String,
-    httpClient: HttpClient,
-    attachmentsDir: String?,
-    updateNotificationManager: ServerUpdateNotificationManager?,
-    useClientSyncManager: Boolean,
-    attachmentFilters: List<AttachmentFilter>
-): T {
+actual inline fun <reified T : SyncableDoorDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T {
     TODO("Not yet implemented")
 }
