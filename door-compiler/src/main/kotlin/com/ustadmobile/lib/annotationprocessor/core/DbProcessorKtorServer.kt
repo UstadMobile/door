@@ -19,7 +19,6 @@ import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Compan
 import fi.iki.elonen.NanoHTTPD
 import fi.iki.elonen.router.RouterNanoHTTPD
 import java.util.*
-import com.ustadmobile.door.annotation.MinSyncVersion
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.CODEBLOCK_KTOR_NO_CONTENT_RESPOND
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.CODEBLOCK_NANOHTTPD_NO_CONTENT_RESPONSE
@@ -32,8 +31,6 @@ import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Compan
 import org.kodein.di.DI
 import java.lang.IllegalArgumentException
 import javax.annotation.processing.ProcessingEnvironment
-import com.ustadmobile.door.annotation.MasterChangeSeqNum
-import com.ustadmobile.door.annotation.LocalChangeSeqNum
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_ANDROID_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorJdbcKotlin.Companion.SUFFIX_JDBC_KT
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SUFFIX_KTOR_HELPER_LOCAL
@@ -41,12 +38,12 @@ import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Compan
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SUFFIX_NANOHTTPD_URIRESPONDER
 import kotlin.reflect.KClass
 import com.ustadmobile.door.AbstractDoorUriResponder
+import com.ustadmobile.door.annotation.*
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SUFFIX_KTOR_ROUTE
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SUFFIX_NANOHTTPD_ADDURIMAPPING
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorSync.Companion.SUFFIX_SYNCDAO_ABSTRACT
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorSync.Companion.SUFFIX_SYNCDAO_IMPL
 import javax.annotation.processing.RoundEnvironment
-import com.ustadmobile.door.annotation.SyncableLimitParam
 
 fun CodeBlock.Builder.addNanoHttpdResponse(varName: String, addNonNullOperator: Boolean = false,
                                            applyToResponseCodeBlock: CodeBlock? = null)
@@ -967,14 +964,16 @@ class DbProcessorKtorServer: AbstractDbProcessor() {
 
     override fun process(annotations: MutableSet<out TypeElement>?, roundEnv: RoundEnvironment): Boolean {
         roundEnv.getElementsAnnotatedWith(Database::class.java).map { it as TypeElement}.forEach {dbTypeEl ->
-            FileSpec.builder(dbTypeEl.packageName, "${dbTypeEl.simpleName}$SUFFIX_KTOR_ROUTE")
-                    .addDbKtorRouteFunction(dbTypeEl, processingEnv)
-                    .build()
-                    .writeToDirsFromArg(OPTION_KTOR_OUTPUT)
-            FileSpec.builder(dbTypeEl.packageName, "${dbTypeEl.simpleName}$SUFFIX_NANOHTTPD_ADDURIMAPPING")
-                    .addDbNanoHttpdMapperFunction(dbTypeEl, true, processingEnv)
-                    .build()
-                    .writeToDirsFromArg(OPTION_ANDROID_OUTPUT)
+            if(dbTypeEl.dbEnclosedDaos(processingEnv).any { it.hasAnnotation(Repository::class.java) }) {
+                FileSpec.builder(dbTypeEl.packageName, "${dbTypeEl.simpleName}$SUFFIX_KTOR_ROUTE")
+                        .addDbKtorRouteFunction(dbTypeEl, processingEnv)
+                        .build()
+                        .writeToDirsFromArg(OPTION_KTOR_OUTPUT)
+                FileSpec.builder(dbTypeEl.packageName, "${dbTypeEl.simpleName}$SUFFIX_NANOHTTPD_ADDURIMAPPING")
+                        .addDbNanoHttpdMapperFunction(dbTypeEl, true, processingEnv)
+                        .build()
+                        .writeToDirsFromArg(OPTION_ANDROID_OUTPUT)
+            }
         }
 
 

@@ -1044,6 +1044,12 @@ class DbProcessorRepository: AbstractDbProcessor() {
 
 
         for(dbTypeEl in dbs) {
+            val hasRepos = (dbTypeEl as TypeElement).dbEnclosedDaos(processingEnv)
+                    .any { it.hasAnnotation(Repository::class.java) }
+
+            if(!hasRepos)
+                continue //This database has no repositories - skip it
+
             FileSpec.builder(dbTypeEl.packageName, "${dbTypeEl.simpleName}$SUFFIX_REPOSITORY2")
                     .addDbRepoType(dbTypeEl as TypeElement, processingEnv,
                         syncDaoMode = REPO_SYNCABLE_DAO_CONSTRUCT, addDbVersionProp = true)
