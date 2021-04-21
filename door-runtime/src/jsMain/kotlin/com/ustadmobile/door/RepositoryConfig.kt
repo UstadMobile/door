@@ -7,20 +7,11 @@ import io.ktor.client.*
  * Contains the configuration for a repository. It is created via a platform-specific builder that may have additional
  * dependencies on specific platforms.
  */
-actual class RepositoryConfig {
-    actual val context: Any
-        get() = TODO("Not yet implemented")
-    actual val endpoint: String
-        get() = TODO("Not yet implemented")
-    actual val httpClient: HttpClient
-        get() = TODO("Not yet implemented")
-    actual val attachmentsDir: String
-        get() = TODO("Not yet implemented")
-    actual val updateNotificationManager: ServerUpdateNotificationManager?
-        get() = TODO("Not yet implemented")
-    actual val useClientSyncManager: Boolean
-        get() = TODO("Not yet implemented")
-    actual val attachmentFilters: List<AttachmentFilter>
-        get() = TODO("Not yet implemented")
+actual class RepositoryConfig internal constructor(actual val context: Any, actual val endpoint: String,
+                                                   actual val httpClient: HttpClient,
+                                                   actual val attachmentsDir: String,
+                                                   actual val updateNotificationManager: ServerUpdateNotificationManager?,
+                                                   actual val useClientSyncManager: Boolean,
+                                                   actual val attachmentFilters: List<AttachmentFilter>){
 
 }
