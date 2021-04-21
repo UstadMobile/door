@@ -14,4 +14,30 @@ actual class RepositoryConfig internal constructor(actual val context: Any, actu
                                                    actual val useClientSyncManager: Boolean,
                                                    actual val attachmentFilters: List<AttachmentFilter>){
 
+    companion object {
+
+        class Builder internal constructor(val context: Any, val endpoint: String, val httpClient: HttpClient) {
+
+            var attachmentsDir: String? = null
+
+            var updateNotificationManager: ServerUpdateNotificationManager? = null
+
+            var useClientSyncManager: Boolean = false
+
+            val attachmentFilters = mutableListOf<AttachmentFilter>()
+
+            fun build() : RepositoryConfig{
+                val effectiveAttachmentDir = attachmentsDir ?: defaultAttachmentDir(context, endpoint)
+                return RepositoryConfig(context, endpoint, httpClient, effectiveAttachmentDir,
+                    updateNotificationManager, useClientSyncManager, attachmentFilters.toList())
+            }
+
+        }
+
+        fun repositoryConfig(context: Any, endpoint: String, httpClient: HttpClient, okHttpClient: HttpClient, block: Builder.() -> Unit = {}) : RepositoryConfig {
+            val builder = Builder(context, endpoint, httpClient)
+            block(builder)
+            return builder.build()
+        }
+    }
 }
