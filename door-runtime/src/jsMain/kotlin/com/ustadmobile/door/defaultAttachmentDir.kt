@@ -5,5 +5,5 @@ package com.ustadmobile.door
  * set a value explicitly on the repoconfig builder
  */
 actual fun defaultAttachmentDir(context: Any, endpointUrl: String): String {
-    TODO("Not yet implemented")
+    return "./"
 }

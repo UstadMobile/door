@@ -20,7 +20,7 @@ actual class RepositoryConfig internal constructor(actual val context: Any, actu
 
             var attachmentsDir: String? = null
 
-            var updateNotificationManager: ServerUpdateNotificationManager? = null
+            private var updateNotificationManager: ServerUpdateNotificationManager? = null
 
             var useClientSyncManager: Boolean = false
 
@@ -34,7 +34,7 @@ actual class RepositoryConfig internal constructor(actual val context: Any, actu
 
         }
 
-        fun repositoryConfig(context: Any, endpoint: String, httpClient: HttpClient, okHttpClient: HttpClient, block: Builder.() -> Unit = {}) : RepositoryConfig {
+        fun repositoryConfig(context: Any, endpoint: String, httpClient: HttpClient, block: Builder.() -> Unit = {}) : RepositoryConfig {
             val builder = Builder(context, endpoint, httpClient)
             block(builder)
             return builder.build()

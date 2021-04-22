@@ -49,6 +49,18 @@ kotlin {
                 implementation kotlin('test-annotations-common')
             }
         }
+
+        commonJvmMain{}
+
+        androidMain {
+            dependsOn commonJvmMain
+        }
+
+        jvmMain {
+            dependsOn commonJvmMain
+        }
+
+        jsMain {}
     }
 }
 
