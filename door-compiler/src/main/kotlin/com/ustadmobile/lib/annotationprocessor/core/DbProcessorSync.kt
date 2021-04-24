@@ -539,6 +539,9 @@ class DbProcessorSync: AbstractDbProcessor() {
                 }
 
         for(dbTypeEl in dbs) {
+            if(!dbTypeEl.isDbSyncable(processingEnv))
+                continue
+
             val syncDaoType = dbTypeEl.toSyncDaoTypeSpec(processingEnv)
             val syncDaoClassName = dbTypeEl.asClassNameWithSuffix(SUFFIX_SYNCDAO_ABSTRACT)
             FileSpec.builder(dbTypeEl.packageName, "$dbTypeEl$SUFFIX_SYNCDAO_ABSTRACT")

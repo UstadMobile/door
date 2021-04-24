@@ -920,16 +920,18 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             }
         }
 
-        dropFunSpec.beginControlFlow("when(jdbcDbType)")
-        DoorDbType.SUPPORTED_TYPES.forEach {
-            dropFunSpec.beginControlFlow("$it -> ")
-                    .addCode(generateInsertNodeIdFun(dbTypeElement, it, "_stmt.executeUpdate", processingEnv,
-                            isUpdate = true))
-                    .endControlFlow()
+        if(dbTypeElement.isDbSyncable(processingEnv)) {
+            dropFunSpec.beginControlFlow("when(jdbcDbType)")
+            DoorDbType.SUPPORTED_TYPES.forEach {
+                dropFunSpec.beginControlFlow("$it -> ")
+                        .addCode(generateInsertNodeIdFun(dbTypeElement, it, "_stmt.executeUpdate", processingEnv,
+                                isUpdate = true))
+                        .endControlFlow()
+            }
+            dropFunSpec.endControlFlow()
+            dropFunSpec.addCode(CodeBlock.builder().addInsertTableSyncStatuses(dbTypeElement,
+                    "_stmt.executeUpdate",processingEnv).build())
         }
-        dropFunSpec.endControlFlow()
-        dropFunSpec.addCode(CodeBlock.builder().addInsertTableSyncStatuses(dbTypeElement,
-                "_stmt.executeUpdate",processingEnv).build())
 
         dropFunSpec.nextControlFlow("finally")
                 .addCode("_stmt?.close()\n")
