@@ -111,4 +111,12 @@ abstract class ExampleDao2 {
     @RawQuery
     abstract fun rawQueryWithArrParam(query: DoorQuery): List<ExampleEntity2>
 
+    @Query("""
+   INSERT INTO ExampleEntity2(uid, name, someNumber)
+        SELECT (uid + 1) AS uid, name AS name, (someNumber * 2) AS someNumber
+          FROM ExampleEntity2
+         WHERE uid = :uid 
+    """)
+    abstract fun insertFromSelectQuery(uid: Int)
+
 }

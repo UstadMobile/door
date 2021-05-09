@@ -82,5 +82,13 @@ abstract class ExampleSyncableDao {
     @Query("SELECT * FROM UpdateNotification")
     abstract fun findAllUpdateNotifications(): List<UpdateNotification>
 
+    @Query("""
+   INSERT INTO ExampleSyncableEntity (esUid, esLcsn, esMcsn, esLcb, esNumber, esName, publik)
+        SELECT (esUid * 5) AS esUid, 0 AS esLcsn, 0 AS esMcsn, 0 AS esLcb, 42 AS esNumber, :name AS esName, 
+               :publik AS publik 
+          FROM ExampleSyncableEntity
+         WHERE esName = :name
+    """)
+    abstract fun insertFromSelectQuery(name: String?, publik: Int)
 
 }
