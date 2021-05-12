@@ -644,12 +644,18 @@ internal fun isSyncableDb(dbTypeEl: TypeElement, processingEnv: ProcessingEnviro
  *
  */
 fun findEntityModifiedByQuery(querySql: String, allKnownEntityNames: List<String>): String? {
-    val stmtSplit = querySql.trim().split(Regex("\\s+"), limit = 4)
-    val tableModified = if(stmtSplit[0].equals("UPDATE", ignoreCase = true)) {
+    //Split the statement up. There might be a statement like
+    // INSERT INTO TableName(fieldName)
+    // Therefor the regex will split by space or open bracket
+    val stmtSplit = querySql.trim().split(Regex("(\\s|\\()+"), limit = 4)
+    val sqlKeyword = stmtSplit[0].toUpperCase(Locale.ROOT)
+    val tableModified = if(sqlKeyword == "UPDATE") {
         stmtSplit[1] // in case it is an update statement, will be the second word (e.g. update tablename)
-    }else if(stmtSplit[0].equals("DELETE", ignoreCase = true)){
+    }else if(sqlKeyword == "DELETE"){
         stmtSplit[2] // in case it is a delete statement, will be the third word (e.g. delete from tablename)
-    }else {
+    }else if(sqlKeyword == "INSERT" || sqlKeyword == "REPLACE") {
+        stmtSplit[2] //in case it is an INSERT INTO or REPLACE INTO statement, will be the third word (e.g. INSERT INTO tablename)
+    } else {
         null
     }
 
@@ -868,9 +874,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
             null
         }
 
-        val isUpdateOrDelete = querySql != null
-                && (querySql.trim().startsWith("update", ignoreCase = true)
-                || querySql.trim().startsWith("delete", ignoreCase = true))
+        val isUpdateOrDelete = querySql != null && querySql.isSQLAModifyingQuery()
 
         val codeBlock = CodeBlock.builder()
 

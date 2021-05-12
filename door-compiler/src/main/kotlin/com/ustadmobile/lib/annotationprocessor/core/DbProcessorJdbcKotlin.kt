@@ -998,10 +998,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
 
         val querySql = daoMethod.getAnnotation(Query::class.java)?.value
 
-        if(querySql != null
-                && !querySql.trim().startsWith("UPDATE", ignoreCase = true)
-                && !querySql.trim().startsWith("DELETE", ignoreCase = true)
-                && resultType == UNIT) {
+        if(querySql?.isSQLAModifyingQuery() == false && resultType == UNIT) {
             logMessage(Diagnostic.Kind.ERROR, "Query method running SELECT must have a return type")
             return funSpec.build()
         }
