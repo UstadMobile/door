@@ -45,7 +45,7 @@ kotlin {
         }
     }
 
-    js(LEGACY) {
+    js {
         browser {
             binaries.executable()
             webpackTask {
