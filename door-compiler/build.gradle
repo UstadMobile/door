@@ -48,7 +48,7 @@ dependencies {
     implementation "ch.qos.logback:logback-classic:$version_logback"
     implementation "org.kodein.di:kodein-di:$version_kodein_di"
     implementation "org.kodein.di:kodein-di-framework-ktor-server-jvm:$version_kodein_di"
-    implementation "com.github.aakira:napier-jvm:$version_napier"
+    implementation "io.github.aakira:napier-jvm:$version_napier"
 
 }
 

@@ -1,5 +1,5 @@
 group 'com.ustadmobile.door'
-version '0.0.15'
+version '0.0.16'
 
 ext.localProperties = new Properties()
 if(project.file("local.properties").exists()) {
@@ -8,8 +8,8 @@ if(project.file("local.properties").exists()) {
 
 buildscript {
 
-    ext.kotlin_version = "1.4.32"
-    ext.atomicfu_version = '0.15.2'
+    ext.kotlin_version = "1.5.0"
+    ext.atomicfu_version = '0.16.1'
 
     repositories {
         google()
@@ -26,16 +26,17 @@ buildscript {
 }
 
 ext {
-    version_ktor = "1.5.3"
+    version_kotlin = "1.5.0"
+    version_ktor = "1.5.4"
     version_nanohttpd = "2.3.1"
-    version_napier = "1.5.0-alpha1"
-    version_atomicfu = '0.15.1'
-    version_sqlite_jdbc = "3.32.3.2"
-    version_kodein_di = "7.4.0"
-    version_kotlin_mockito = "2.2.0"
+    version_napier = "1.5.0"
+    version_atomicfu = '0.16.1'
+    version_sqlite_jdbc = "3.34.0"
+    version_kodein_di = "7.5.0"
+    version_kotlin_mockito = "3.2.0"
     version_mockwebserver = "4.9.0"
-    version_android_room = "2.2.6"
-    version_androidx_lifecycle = "2.3.0"
+    version_android_room = "2.3.0"
+    version_androidx_lifecycle = "2.3.1"
     version_androidx_paging = "2.1.2"
     version_androidx_core = '1.3.2'
     version_kotlinpoet = "1.7.2"
@@ -45,10 +46,11 @@ ext {
     version_simple_jndi = "0.23.0"
     version_apache_commons_pool2 = "2.9.0"
     version_sqlite_jdbc = "3.34.0"
-    version_postgres_jdbc = "42.2.19"
+    version_postgres_jdbc = "42.2.20"
     version_apache_commons_dbcp2 = "2.8.0"
     version_logback = "1.2.3"
     version_okhttp = "4.9.0"
+    version_kotlinx_serialization = "1.2.1"
 
 }
 

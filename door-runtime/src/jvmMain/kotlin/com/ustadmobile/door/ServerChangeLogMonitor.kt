@@ -1,6 +1,6 @@
 package com.ustadmobile.door
 
-import com.github.aakira.napier.Napier
+import io.github.aakira.napier.Napier
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.doorIdentityHashCode
 import kotlinx.coroutines.*

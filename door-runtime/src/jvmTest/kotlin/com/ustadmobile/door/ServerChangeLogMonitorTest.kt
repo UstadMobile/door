@@ -1,6 +1,6 @@
 package com.ustadmobile.door
 
-import com.nhaarman.mockitokotlin2.*
+import org.mockito.kotlin.*
 import org.junit.Before
 import org.junit.Test
 

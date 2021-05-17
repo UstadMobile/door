@@ -1,10 +1,9 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import com.github.aakira.napier.DebugAntilog
-import com.github.aakira.napier.LogLevel
-import com.github.aakira.napier.Napier
+import io.github.aakira.napier.DebugAntilog
+import io.github.aakira.napier.Napier
 import com.google.gson.Gson
-import com.nhaarman.mockitokotlin2.*
+import org.mockito.kotlin.*
 import com.ustadmobile.door.*
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.STATUS_CONNECTED
 import com.ustadmobile.door.RepositoryConfig.Companion.repositoryConfig
@@ -81,7 +80,7 @@ class DbRepoTest {
         tmpServerAttachmentsDir = temporaryFolder.newFolder("testserverattachments")
         mockUpdateNotificationManager = mock {}
 
-        if(!Napier.isEnable(LogLevel.DEBUG, null)) {
+        if(!Napier.isEnable(Napier.Level.DEBUG, null)) {
             Napier.base(DebugAntilog())
         }
 

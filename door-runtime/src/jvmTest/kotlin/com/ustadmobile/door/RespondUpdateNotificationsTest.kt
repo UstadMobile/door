@@ -1,9 +1,9 @@
 package com.ustadmobile.door
 
-import com.github.aakira.napier.DebugAntilog
-import com.github.aakira.napier.Napier
-import com.nhaarman.mockitokotlin2.any
-import com.nhaarman.mockitokotlin2.mock
+import io.github.aakira.napier.DebugAntilog
+import io.github.aakira.napier.Napier
+import org.mockito.kotlin.any
+import org.mockito.kotlin.mock
 import com.ustadmobile.door.daos.ISyncHelperEntitiesDao
 import com.ustadmobile.door.entities.UpdateNotification
 import com.ustadmobile.door.ktor.respondUpdateNotifications

@@ -1,12 +1,11 @@
 package com.ustadmobile.door
 
-import com.github.aakira.napier.DebugAntilog
-import com.github.aakira.napier.LogLevel
-import com.github.aakira.napier.Napier
-import com.nhaarman.mockitokotlin2.argWhere
-import com.nhaarman.mockitokotlin2.mock
-import com.nhaarman.mockitokotlin2.timeout
-import com.nhaarman.mockitokotlin2.verify
+import io.github.aakira.napier.DebugAntilog
+import io.github.aakira.napier.Napier
+import org.mockito.kotlin.argWhere
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.timeout
+import org.mockito.kotlin.verify
 import com.ustadmobile.door.sse.DoorEventListener
 import com.ustadmobile.door.sse.DoorEventSource
 import com.ustadmobile.door.sse.DoorServerSentEvent
@@ -42,7 +41,7 @@ class DoorEventSourceTest {
 
     @Test
     fun givenEventSourceCreated_whenEventSent_thenOnMessageIsCalled() {
-        if(!Napier.isEnable(LogLevel.DEBUG, null)) {
+        if(!Napier.isEnable(Napier.Level.DEBUG, null)) {
             Napier.base(DebugAntilog())
         }
 

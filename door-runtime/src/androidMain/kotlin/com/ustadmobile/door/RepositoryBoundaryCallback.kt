@@ -1,7 +1,7 @@
 package com.ustadmobile.door
 
 import androidx.paging.PagedList
-import com.github.aakira.napier.Napier
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.*
 import java.util.concurrent.atomic.AtomicInteger
 

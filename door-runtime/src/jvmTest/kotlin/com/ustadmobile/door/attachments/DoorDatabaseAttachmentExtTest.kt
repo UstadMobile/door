@@ -1,6 +1,6 @@
 package com.ustadmobile.door.attachments
 
-import com.nhaarman.mockitokotlin2.mock
+import org.mockito.kotlin.mock
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.DummyEntityWithAttachment
 import com.ustadmobile.door.RepositoryConfig

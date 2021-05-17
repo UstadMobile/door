@@ -69,7 +69,7 @@ actual class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private 
 
             while(currentDbVersion < doorDb.dbVersion) {
                 val nextMigration = migrationList.filter { it.startVersion == currentDbVersion}
-                        .maxBy { it.endVersion }
+                        .maxByOrNull { it.endVersion }
                 if(nextMigration != null) {
                     nextMigration.migrate(doorDb.sqlDatabaseImpl)
                     currentDbVersion = nextMigration.endVersion

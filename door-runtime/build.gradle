@@ -73,8 +73,8 @@ kotlin {
                 implementation kotlin('stdlib-common')
                 implementation "io.ktor:ktor-client-core:$version_ktor"
                 implementation "io.ktor:ktor-client-json:$version_ktor"
-                implementation "com.github.aakira:napier:$version_napier"
-                implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.1.0'
+                implementation "io.github.aakira:napier:$version_napier"
+                implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
                 implementation "org.kodein.di:kodein-di:$version_kodein_di"
 
             }
@@ -131,14 +131,14 @@ kotlin {
                 implementation "io.ktor:ktor-server-core:$version_ktor"
                 implementation "com.squareup.okhttp3:okhttp:$version_okhttp"
                 implementation "com.squareup.okhttp3:okhttp-sse:$version_okhttp"
-
+                implementation "org.jetbrains.kotlin:kotlin-reflect:$version_kotlin"
             }
         }
         jvmTest {
             dependencies {
                 implementation kotlin('test-junit')
 
-                implementation "com.nhaarman.mockitokotlin2:mockito-kotlin:$version_kotlin_mockito"
+                implementation "org.mockito.kotlin:mockito-kotlin:$version_kotlin_mockito"
                 implementation "org.xerial:sqlite-jdbc:$version_sqlite_jdbc"
                 implementation "com.squareup.okhttp3:mockwebserver:$version_mockwebserver"
 

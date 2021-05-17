@@ -1,8 +1,9 @@
 package com.ustadmobile.door
 
-import com.github.aakira.napier.Napier
+
 import com.ustadmobile.door.ext.DoorTag.Companion.LOG_TAG
 import com.ustadmobile.door.util.systemTimeInMillis
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import java.sql.Connection
