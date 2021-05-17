@@ -3,7 +3,7 @@
 
 package com.ustadmobile.door.ext
 
-import com.github.aakira.napier.Napier
+import io.github.aakira.napier.Napier
 import com.ustadmobile.door.*
 import com.ustadmobile.door.attachments.EntityWithAttachment
 import com.ustadmobile.door.attachments.downloadAttachments

@@ -48,10 +48,10 @@ kotlin {
                 implementation project(":door-runtime")
                 compileOnly project(":room-annotations")
 
-                implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.1.0'
+                implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
                 implementation "io.ktor:ktor-client-core:$version_ktor"
                 implementation "io.ktor:ktor-client-json:$version_ktor"
-                implementation "com.github.aakira:napier:$version_napier"
+                implementation "io.github.aakira:napier:$version_napier"
                 implementation "org.kodein.di:kodein-di:$version_kodein_di"
             }
         }
@@ -76,7 +76,7 @@ kotlin {
                 implementation kotlin('test-junit')
                 implementation "io.ktor:ktor-server-netty:$version_ktor"
                 implementation "com.squareup.okhttp3:mockwebserver:$version_mockwebserver"
-                implementation "com.nhaarman.mockitokotlin2:mockito-kotlin:$version_kotlin_mockito"
+                implementation "org.mockito.kotlin:mockito-kotlin:$version_kotlin_mockito"
                 implementation "io.ktor:ktor-client-okhttp:$version_ktor"
                 implementation "io.ktor:ktor-client-gson:$version_ktor"
                 implementation "com.github.h-thurow:simple-jndi:$version_simple_jndi"

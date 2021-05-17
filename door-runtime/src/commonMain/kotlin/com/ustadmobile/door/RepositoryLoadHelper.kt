@@ -1,6 +1,6 @@
 package com.ustadmobile.door
 
-import com.github.aakira.napier.Napier
+import io.github.aakira.napier.Napier
 import com.ustadmobile.door.util.systemTimeInMillis
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.*
@@ -170,7 +170,7 @@ class RepositoryLoadHelper<T>(val repository: DoorDatabaseRepository,
                         null as MirrorEndpoint? //use the main endpoint
                     }else {
                         repository.activeMirrors().filter { it.mirrorId !in mirrorsTried }
-                                .maxBy { it.priority }
+                                .maxByOrNull { it.priority }
                     }
 
                     if(!isConnected && mirrorToUse == null) {

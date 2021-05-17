@@ -1,6 +1,6 @@
 package com.ustadmobile.door.ktor
 
-import com.github.aakira.napier.Napier
+import io.github.aakira.napier.Napier
 import com.ustadmobile.door.DoorDatabaseSyncRepository
 import com.ustadmobile.door.UpdateNotificationListener
 import com.ustadmobile.door.ServerUpdateNotificationManager

@@ -8,7 +8,7 @@ import java.util.WeakHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ConcurrentHashMap
 import java.lang.ref.WeakReference
-import com.github.aakira.napier.Napier
+import io.github.aakira.napier.Napier
 import kotlin.reflect.KClass
 
 /**

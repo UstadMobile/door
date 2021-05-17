@@ -1,7 +1,7 @@
 package com.ustadmobile.door.sse
 
 import com.ustadmobile.door.ext.doorIdentityHashCode
-import com.github.aakira.napier.Napier
+import io.github.aakira.napier.Napier
 import com.ustadmobile.door.RepositoryConfig
 import com.ustadmobile.door.ext.DoorTag
 import okhttp3.OkHttpClient

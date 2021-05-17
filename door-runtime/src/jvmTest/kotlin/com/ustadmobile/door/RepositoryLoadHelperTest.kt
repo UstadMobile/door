@@ -1,8 +1,8 @@
 package com.ustadmobile.door
 
-import com.github.aakira.napier.DebugAntilog
-import com.github.aakira.napier.Napier
-import com.nhaarman.mockitokotlin2.*
+import io.github.aakira.napier.DebugAntilog
+import io.github.aakira.napier.Napier
+import org.mockito.kotlin.*
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.STATUS_CONNECTED
 import com.ustadmobile.door.RepositoryLoadHelper.Companion.STATUS_FAILED_NOCONNECTIVITYORPEERS
 import com.ustadmobile.door.RepositoryLoadHelper.Companion.STATUS_LOADED_WITHDATA

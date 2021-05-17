@@ -1,7 +1,7 @@
 package com.ustadmobile.door.ext
 
 import androidx.room.RoomDatabase
-import com.github.aakira.napier.Napier
+import io.github.aakira.napier.Napier
 import com.ustadmobile.door.DoorSyncCallback
 
 /**
