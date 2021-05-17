@@ -68,6 +68,7 @@ kotlin {
                 implementation "org.kodein.di:kodein-di-framework-ktor-server-jvm:$version_kodein_di"
                 implementation "org.xerial:sqlite-jdbc:$version_sqlite_jdbc"
                 implementation "io.ktor:ktor-server-core:$version_ktor"
+                implementation "org.jetbrains.kotlin:kotlin-reflect:$version_kotlin"
             }
         }
 

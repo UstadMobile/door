@@ -1,5 +1,5 @@
 group 'com.ustadmobile.door'
-version '0.0.11'
+version '0.0.12'
 
 ext.localProperties = new Properties()
 if(project.file("local.properties").exists()) {
@@ -26,6 +26,7 @@ buildscript {
 }
 
 ext {
+    version_kotlin = "1.5.0"
     version_ktor = "1.5.4"
     version_nanohttpd = "2.3.1"
     version_napier = "1.5.0"
