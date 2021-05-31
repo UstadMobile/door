@@ -1,5 +1,5 @@
 group 'com.ustadmobile.door'
-version '0.0.12'
+version '0.0.13'
 
 ext.localProperties = new Properties()
 if(project.file("local.properties").exists()) {
@@ -13,7 +13,6 @@ buildscript {
 
     repositories {
         google()
-        jcenter()
         mavenCentral()
     }
 
@@ -57,6 +56,5 @@ ext {
 allprojects {
     repositories {
         google()
-        jcenter()
     }
 }
