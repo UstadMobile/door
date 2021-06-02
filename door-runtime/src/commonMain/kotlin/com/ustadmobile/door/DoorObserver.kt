@@ -1,6 +1,6 @@
 package com.ustadmobile.door
 
-expect interface DoorObserver<T> {
+expect fun interface DoorObserver<T> {
 
     fun onChanged(t: T)
 
