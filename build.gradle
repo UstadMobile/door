@@ -1,5 +1,5 @@
-group 'com.ustadmobile.door-js'
-version '0.0.14'
+group 'com.ustadmobile.door'
+version '0.0.14-js'
 ext.localProperties = new Properties()
 if(project.file("local.properties").exists()) {
     ext.localProperties.load(new FileInputStream(project.file("local.properties")))
