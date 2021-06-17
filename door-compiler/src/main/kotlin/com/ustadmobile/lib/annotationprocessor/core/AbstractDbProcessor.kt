@@ -763,9 +763,8 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         var commaNeeded = false
         for (fieldEl in getEntityFieldElements(entitySpec, true)) {
             sql += """${if(commaNeeded) "," else " "} ${fieldEl.name} """
-            val pkAutoGenerate = fieldEl.annotations
-                    .firstOrNull { it.className == PrimaryKey::class.asClassName() }
-                    ?.members?.findBooleanMemberValue("autoGenerate") ?: false
+            val pkAnnotation = fieldEl.annotations.firstOrNull { it.className == PrimaryKey::class.asClassName() }
+            val pkAutoGenerate = pkAnnotation?.members?.findBooleanMemberValue("autoGenerate") ?: false
             if(pkAutoGenerate) {
                 when(dbType) {
                     DoorDbType.SQLITE -> sql += " INTEGER "
@@ -773,6 +772,9 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                 }
             }else {
                 sql += " ${fieldEl.type.toSqlType(dbType)} "
+                if(pkAnnotation == null && fieldEl.type != String::class.asTypeName()) {
+                    sql += " NOT NULL DEFAULT 0 "
+                }
             }
 
             if(fieldEl.annotations.any { it.className == PrimaryKey::class.asClassName()} ) {
