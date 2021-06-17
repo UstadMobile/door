@@ -1,7 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core.migrations
 
 import com.squareup.kotlinpoet.*
-import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.DoorMigration
 import com.ustadmobile.door.DoorSqlDatabase
 import javax.annotation.processing.ProcessingEnvironment
@@ -120,7 +119,7 @@ private fun TypeSpec.Builder.addSyncPushMigrationFunction(dbTypeElement: TypeEle
 
                             val syncableEntityInfo = SyncableEntityInfo(
                                     syncableEntity.asClassName(), processingEnv)
-                            addSyncableEntityFunctionPostgres("database.execSQL",
+                            addSyncableEntityFunctionAndTriggerPostgres("database.execSQL",
                                     syncableEntityInfo)
                             addRecreateTrkIndexes(syncableEntity.simpleName.toString())
                         }

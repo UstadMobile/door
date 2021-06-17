@@ -800,9 +800,9 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                 "index_${tableName}_${it.value.joinToString(separator = "_", postfix = "", prefix = "")}"
             }
 
-            codeBlock.add("$execSqlFnName(%S)\n", """CREATE 
-                |${if(it.unique){ "UNIQUE" } else { "" } } INDEX $indexName 
-                |ON $tableName (${it.value.joinToString()})""".trimMargin())
+            codeBlock.add("$execSqlFnName(%S)\n", "CREATE " +
+                 (if(it.unique) "UNIQUE" else "" ) +" INDEX $indexName" +
+                 " ON $tableName (${it.value.joinToString()})")
         }
 
         return codeBlock.build()
@@ -825,12 +825,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                         "CREATE SEQUENCE IF NOT EXISTS ${syncableEntityInfo.syncableEntity.simpleName}_${it}csn_seq")
                 }
 
-                codeBlock.addSyncableEntityFunctionPostgres(execSqlFn, syncableEntityInfo)
-                    .add("$execSqlFn(%S)\n", """CREATE TRIGGER inccsn_${syncableEntityInfo.tableId}_trig 
-                            |AFTER UPDATE OR INSERT ON ${syncableEntityInfo.syncableEntity.simpleName} 
-                            |FOR EACH ROW WHEN (pg_trigger_depth() = 0) 
-                            |EXECUTE PROCEDURE inccsn_${syncableEntityInfo.tableId}_fn()
-                        """.trimMargin())
+                codeBlock.addSyncableEntityFunctionAndTriggerPostgres(execSqlFn, syncableEntityInfo)
             }
         }
 
