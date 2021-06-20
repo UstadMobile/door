@@ -763,9 +763,8 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         var commaNeeded = false
         for (fieldEl in getEntityFieldElements(entitySpec, true)) {
             sql += """${if(commaNeeded) "," else " "} ${fieldEl.name} """
-            val pkAutoGenerate = fieldEl.annotations
-                    .firstOrNull { it.className == PrimaryKey::class.asClassName() }
-                    ?.members?.findBooleanMemberValue("autoGenerate") ?: false
+            val pkAnnotation = fieldEl.annotations.firstOrNull { it.className == PrimaryKey::class.asClassName() }
+            val pkAutoGenerate = pkAnnotation?.members?.findBooleanMemberValue("autoGenerate") ?: false
             if(pkAutoGenerate) {
                 when(dbType) {
                     DoorDbType.SQLITE -> sql += " INTEGER "
@@ -773,6 +772,9 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                 }
             }else {
                 sql += " ${fieldEl.type.toSqlType(dbType)} "
+                if(pkAnnotation == null && fieldEl.type != String::class.asTypeName()) {
+                    sql += " NOT NULL DEFAULT 0 "
+                }
             }
 
             if(fieldEl.annotations.any { it.className == PrimaryKey::class.asClassName()} ) {
@@ -800,9 +802,9 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                 "index_${tableName}_${it.value.joinToString(separator = "_", postfix = "", prefix = "")}"
             }
 
-            codeBlock.add("$execSqlFnName(%S)\n", """CREATE 
-                |${if(it.unique){ "UNIQUE" } else { "" } } INDEX $indexName 
-                |ON $tableName (${it.value.joinToString()})""".trimMargin())
+            codeBlock.add("$execSqlFnName(%S)\n", "CREATE " +
+                 (if(it.unique) "UNIQUE" else "" ) +" INDEX $indexName" +
+                 " ON $tableName (${it.value.joinToString()})")
         }
 
         return codeBlock.build()
@@ -825,12 +827,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                         "CREATE SEQUENCE IF NOT EXISTS ${syncableEntityInfo.syncableEntity.simpleName}_${it}csn_seq")
                 }
 
-                codeBlock.addSyncableEntityFunctionPostgres(execSqlFn, syncableEntityInfo)
-                    .add("$execSqlFn(%S)\n", """CREATE TRIGGER inccsn_${syncableEntityInfo.tableId}_trig 
-                            |AFTER UPDATE OR INSERT ON ${syncableEntityInfo.syncableEntity.simpleName} 
-                            |FOR EACH ROW WHEN (pg_trigger_depth() = 0) 
-                            |EXECUTE PROCEDURE inccsn_${syncableEntityInfo.tableId}_fn()
-                        """.trimMargin())
+                codeBlock.addSyncableEntityFunctionAndTriggerPostgres(execSqlFn, syncableEntityInfo)
             }
         }
 
