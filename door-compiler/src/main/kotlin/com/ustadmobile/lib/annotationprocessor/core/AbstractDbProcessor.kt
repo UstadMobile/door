@@ -758,6 +758,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         messager = p0.messager
     }
 
+    //In reality this is only used for the TRK entities
     protected fun makeCreateTableStatement(entitySpec: TypeSpec, dbType: Int): String {
         var sql = "CREATE TABLE IF NOT EXISTS ${entitySpec.name} ("
         var commaNeeded = false
@@ -771,9 +772,10 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                     DoorDbType.POSTGRES -> sql += (if(fieldEl.type == LONG) { " BIGSERIAL " } else { " SERIAL " })
                 }
             }else {
-                sql += " ${fieldEl.type.toSqlType(dbType)} "
+                val sqlType = fieldEl.type.toSqlType(dbType)
+                sql += " $sqlType "
                 if(pkAnnotation == null && fieldEl.type != String::class.asTypeName()) {
-                    sql += " NOT NULL DEFAULT 0 "
+                    sql += " NOT NULL DEFAULT  ${sqlType.sqlTypeDefaultValue(dbType)} "
                 }
             }
 
