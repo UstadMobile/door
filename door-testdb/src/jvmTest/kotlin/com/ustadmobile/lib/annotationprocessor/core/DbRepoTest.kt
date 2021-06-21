@@ -43,6 +43,7 @@ import javax.sql.DataSource
 import kotlin.test.assertEquals
 import com.ustadmobile.door.attachments.retrieveAttachment
 import com.ustadmobile.door.ext.*
+import com.ustadmobile.door.util.NodeIdAuthCache
 import okhttp3.OkHttpClient
 import java.util.*
 import kotlin.random.Random
@@ -129,6 +130,10 @@ class DbRepoTest {
                     })
                     ServerChangeLogMonitor(db, repo as DoorDatabaseRepository)
                     repo
+                }
+
+                bind<NodeIdAuthCache>() with scoped(virtualHostScope).singleton {
+                    NodeIdAuthCache(instance<ExampleDatabase2>(tag = DoorTag.TAG_REPO) as DoorDatabaseSyncRepository)
                 }
 
                 bind<Gson>() with singleton { Gson() }

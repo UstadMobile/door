@@ -3,7 +3,6 @@ package com.ustadmobile.lib.annotationprocessor.core
 import androidx.room.ColumnInfo
 import com.squareup.kotlinpoet.*
 import io.ktor.client.request.forms.*
-import io.ktor.client.statement.*
 import io.ktor.content.*
 import io.ktor.http.*
 import javax.annotation.processing.ProcessingEnvironment
@@ -276,16 +275,16 @@ internal fun CodeBlock.Builder.addReplaceSqliteChangeSeqNums(execSqlFn: String,
  * @param daoName The name of the DAO to which funSpec belongs
  */
 internal fun CodeBlock.Builder.addKtorRequestForFunction(
-                                                   funSpec: FunSpec,
-                                                   httpClientVarName: String = "_httpClient",
-                                                   httpEndpointVarName: String = "_endpoint",
-                                                   dbPathVarName: String,
-                                                   daoName: String,
-                                                   useKotlinxListSerialization: Boolean = false,
-                                                   kotlinxSerializationJsonVarName: String = "",
-                                                   useMultipartPartsVarName: String? = null,
-                                                   addDbVersionParamName: String? = "_db",
-                                                   addClientIdHeaderVar: String? = null): CodeBlock.Builder {
+    funSpec: FunSpec,
+    httpClientVarName: String = "_httpClient",
+    httpEndpointVarName: String = "_endpoint",
+    dbPathVarName: String,
+    daoName: String,
+    useKotlinxListSerialization: Boolean = false,
+    kotlinxSerializationJsonVarName: String = "",
+    useMultipartPartsVarName: String? = null,
+    addNodeIdAndVersionRepoVarName: String? = "_repo",
+    addClientIdHeaderVar: String? = null): CodeBlock.Builder {
 
     //Begin creation of the HttpStatement call that will set the URL, parameters, etc.
     val nonQueryParams =  funSpec.parameters.filter { !it.type.isHttpQueryQueryParam() }
@@ -314,9 +313,9 @@ internal fun CodeBlock.Builder.addKtorRequestForFunction(
     add("encodedPath = \"\${encodedPath}\${$dbPathVarName}/%L/%L\"\n", daoName, funSpec.name)
     endControlFlow()
 
-    if(addDbVersionParamName != null) {
-        add("%M($addDbVersionParamName)\n",
-                MemberName("com.ustadmobile.door.ext", "dbVersionHeader"))
+    if(addNodeIdAndVersionRepoVarName != null) {
+        add("%M($addNodeIdAndVersionRepoVarName)\n",
+                MemberName("com.ustadmobile.door.ext", "doorNodeAndVersionHeaders"))
     }
 
     if(addClientIdHeaderVar != null) {

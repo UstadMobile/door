@@ -57,7 +57,7 @@ suspend fun HttpClient.postEntityAck(ackList: List<EntityAck>, endpoint: String,
             takeFrom(endpoint)
             encodedPath = "$encodedPath$path"
         }
-        dbVersionHeader(repo as DoorDatabase)
+        doorNodeAndVersionHeaders(repo)
 
         if(repo is DoorDatabaseSyncRepository) {
             header("x-nid", repo.clientId)
