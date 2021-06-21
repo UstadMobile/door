@@ -8,4 +8,6 @@ object DoorConstants {
 
     val HEADER_DBVERSION = "door-dbversion"
 
+    val HEADER_NODE = "door-node"
+
 }

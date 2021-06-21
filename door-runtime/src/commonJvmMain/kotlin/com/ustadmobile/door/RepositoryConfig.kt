@@ -6,6 +6,7 @@ import okhttp3.OkHttpClient
 
 actual class RepositoryConfig internal constructor(actual val context: Any,
                                                    actual val endpoint: String,
+                                                   actual val auth: String,
                                                    actual val httpClient: HttpClient,
                                                    val okHttpClient: OkHttpClient,
                                                    actual val attachmentsDir: String,
@@ -15,8 +16,8 @@ actual class RepositoryConfig internal constructor(actual val context: Any,
 
     companion object {
 
-        class Builder internal constructor(val context: Any, val endpoint: String, val httpClient: HttpClient,
-                                           val okHttpClient: OkHttpClient) {
+        class Builder internal constructor(val context: Any, val endpoint: String, val auth: String,
+                                           val httpClient: HttpClient, val okHttpClient: OkHttpClient) {
 
             var attachmentsDir: String? = null
 
@@ -28,14 +29,20 @@ actual class RepositoryConfig internal constructor(actual val context: Any,
 
             fun build() : RepositoryConfig{
                 val effectiveAttachmentDir = attachmentsDir ?: defaultAttachmentDir(context, endpoint)
-                return RepositoryConfig(context, endpoint, httpClient, okHttpClient, effectiveAttachmentDir,
+                return RepositoryConfig(context, endpoint, auth, httpClient, okHttpClient, effectiveAttachmentDir,
                         updateNotificationManager, useClientSyncManager, attachmentFilters.toList())
             }
 
         }
 
-        fun repositoryConfig(context: Any, endpoint: String, httpClient: HttpClient, okHttpClient: OkHttpClient, block: Builder.() -> Unit = {}) : RepositoryConfig {
-            val builder = Builder(context, endpoint, httpClient, okHttpClient)
+        fun repositoryConfig(context: Any,
+                             endpoint: String,
+                             auth: String,
+                             httpClient: HttpClient,
+                             okHttpClient: OkHttpClient,
+                             block: Builder.() -> Unit = {}
+        ) : RepositoryConfig {
+            val builder = Builder(context, endpoint, auth, httpClient, okHttpClient)
             block(builder)
             return builder.build()
         }
