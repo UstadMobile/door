@@ -23,6 +23,8 @@ expect class RepositoryConfig {
 
     val attachmentFilters: List<AttachmentFilter>
 
+    val nodeId: Int
+
     /**
      * Random auth string known only to the repository server and the device
      */
