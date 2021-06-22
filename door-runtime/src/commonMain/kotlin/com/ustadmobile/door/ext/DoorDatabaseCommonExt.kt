@@ -1,10 +1,9 @@
 package com.ustadmobile.door.ext
 
-import com.ustadmobile.door.DoorDatabase
-import com.ustadmobile.door.DoorDatabaseRepository
-import com.ustadmobile.door.SyncableDoorDatabase
+import com.ustadmobile.door.*
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
+import kotlin.reflect.KClass
 
 /**
  * Extension property that will be true if this database is both syncable and the primary (eg. server)
@@ -88,3 +87,31 @@ fun <T: DoorDatabase> T.requireDbAndRepo(): Pair<T, T> {
     val db = repo.db as T
     return Pair(db, this)
 }
+
+/**
+ * Shorthand extension function for use in tests where clearAllTables is needed
+ * to reset between test runs.
+ *
+ * After clearing all the table data, the sync tables (e.g. TableSyncStatus,
+ * The nodeId on SyncNode, etc) need to be setup again.
+ */
+fun DoorDatabase.clearAllTablesAndResetSync(nodeId: Int, isPrimary: Boolean = false) {
+    clearAllTables()
+    val metadata = this::class.doorDatabaseMetadata()
+    DoorSyncableDatabaseCallback2(nodeId, metadata.syncableTableIdMap, isPrimary)
+        .initSyncTables( forceReset = true)  {
+            this.execSql(it)
+        }
+}
+
+/**
+ * Shorthand to get the Syncable Table Id map using the DoorDatabaseMetadata
+ */
+val DoorDatabase.syncableTableIdMap: Map<String, Int>
+    get() = this::class.doorDatabaseMetadata().syncableTableIdMap
+
+/**
+ * Shorthand to get the Syncable Table Id map using the DoorDatabaseMetadata
+ */
+val <T: DoorDatabase> KClass<T>.syncableTableIdMap: Map<String, Int>
+    get() = doorDatabaseMetadata().syncableTableIdMap

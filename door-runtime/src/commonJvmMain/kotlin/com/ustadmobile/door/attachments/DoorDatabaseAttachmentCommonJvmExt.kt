@@ -31,7 +31,8 @@ actual suspend fun DoorDatabaseRepository.uploadAttachment(entityWithAttachment:
     val attachmentMd5 = entityWithAttachment.attachmentMd5
             ?: throw IllegalArgumentException("uploadAttachment: Entity attachment must not be null")
 
-    val attachmentFile = File(requireAttachmentDirFile(), attachmentUri.substringAfter(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX))
+    val attachmentFile = File(requireAttachmentDirFile(),
+        attachmentUri.substringAfter(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX))
     val endpointUrl = URL(URL(config.endpoint), "$dbPath/attachments/upload")
 
     //val inputFile = Paths.get(systemUri).toFile()
