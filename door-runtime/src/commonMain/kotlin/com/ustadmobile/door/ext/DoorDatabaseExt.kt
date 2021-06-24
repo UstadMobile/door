@@ -16,10 +16,14 @@ expect fun DoorDatabase.dbSchemaVersion(): Int
 expect suspend inline fun <T: DoorDatabase, R> T.doorWithTransaction(crossinline block: suspend(T) -> R): R
 
 /**
- * Multiplatform wrapper function that will execute raw SQL
+ * Multiplatform wrapper function that will execute raw SQL statements in a
+ * batch.
+ *
  * Does not return any results. Will throw an exception in the event of
  * malformed SQL.
+ *
+ * The name deliberately lower cases sql to avoid name clashes
  */
-expect fun DoorDatabase.execSql(sql: String)
+expect fun DoorDatabase.execSqlBatch(vararg sqlStatements: String)
 
 expect fun <T: DoorDatabase> KClass<T>.doorDatabaseMetadata(): DoorDatabaseMetadata<T>

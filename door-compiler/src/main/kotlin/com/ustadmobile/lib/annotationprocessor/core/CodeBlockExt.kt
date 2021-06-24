@@ -57,33 +57,6 @@ fun CodeBlock.Builder.beginIfNotNullOrEmptyControlFlow(varName: String, isList: 
     return this
 }
 
-/**
- * Generate insert statements that will insert the TableSyncStatus entities required for each syncable
- * entity on the database in place.
- *
- * e.g.
- * _stmt.executeUpdate("INSERT INTO TableSyncstatus(tsTableId, tsLastChanged, tsLastSynced) VALUES (42, ${systemTimeInMillis(), 0)")")
- * _stmt.executeUpdate("INSERT INTO TableSyncstatus(tsTableId, tsLastChanged, tsLastSynced) VALUES (43, ${systemTimeInMillis(), 0)")")
- * ...
- *
- * @param dbType TypeElement of the database itself
- * @param execSqlFunName the name of the function that must be called to execute SQL
- * @param processingEnv the processing environment
- *
- * @return the same CodeBlock.Builder
- */
-fun CodeBlock.Builder.addInsertTableSyncStatuses(dbType: TypeElement,
-                                               execSqlFunName: String = "_stmt.executeUpdate",
-                                               processingEnv: ProcessingEnvironment) : CodeBlock.Builder{
-
-    syncableEntityTypesOnDb(dbType, processingEnv).forEach {
-        val syncableEntityInfo = SyncableEntityInfo(it.asClassName(), processingEnv)
-        addInsertTableSyncStatus(syncableEntityInfo, execSqlFunName, processingEnv)
-    }
-
-    return this
-}
-
 fun CodeBlock.Builder.addInsertTableSyncStatus(syncableEntityInfo: SyncableEntityInfo,
                                                execSqlFunName: String = "_stmt.executeUpdate",
                                                processingEnv: ProcessingEnvironment): CodeBlock.Builder {

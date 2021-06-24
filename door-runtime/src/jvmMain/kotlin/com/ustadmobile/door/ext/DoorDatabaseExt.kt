@@ -17,19 +17,8 @@ actual suspend inline fun <T: DoorDatabase, R> T.doorWithTransaction(crossinline
     return block(this)
 }
 
-actual fun DoorDatabase.execSql(sql: String) {
-    var connection: Connection? = null
-    var statement: Statement? = null
-    try {
-        connection = openConnection()
-        statement = connection.createStatement()
-        statement.executeUpdate(sql)
-    }catch(e: SQLException) {
-        throw e
-    }finally {
-        statement?.close()
-        connection?.close()
-    }
+actual fun DoorDatabase.execSqlBatch(vararg sqlStatements: String) {
+    execSQLBatch(*sqlStatements)
 }
 
 private val metadataCache = mutableMapOf<KClass<*>, DoorDatabaseMetadata<*>>()

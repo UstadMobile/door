@@ -1,6 +1,6 @@
 package com.ustadmobile.door
 
-import com.ustadmobile.door.ext.execSql
+import com.ustadmobile.door.ext.execSqlBatch
 import com.ustadmobile.door.util.systemTimeInMillis
 
 /**
@@ -9,30 +9,28 @@ import com.ustadmobile.door.util.systemTimeInMillis
  */
 class DoorSyncableDatabaseCallback2(val nodeId: Int, val tableMap: Map<String, Int>, val primary: Boolean): DoorDatabaseCallback {
 
-    fun setSyncNode(execSqlFn: (String) -> Unit) {
-        execSqlFn("""
+    fun setSyncNode(execSqlFn: (Array<String>) -> Unit) {
+        execSqlFn(arrayOf("DELETE FROM SyncNode",
+            """
             INSERT INTO SyncNode(nodeClientId, master)
                     VALUES ($nodeId, ${if(primary) 1 else 0}) 
-            """)
+            """))
     }
 
-    fun initSyncTables(forceReset: Boolean, execSqlFn: (String) -> Unit) {
+    fun initSyncTables(forceReset: Boolean, execSqlFn: (Array<String>) -> Unit) {
         val onConflictPrefix = if(forceReset) {
             " OR REPLACE  "
         }else {
             " OR IGNORE "
         }
 
-        tableMap.entries.forEach { tableEntry ->
-            execSqlFn("""INSERT $onConflictPrefix INTO TableSyncStatus(tsTableId, tsLastChanged, tsLastSynced) 
-                                VALUES(${tableEntry.value}, ${systemTimeInMillis()}, 0)""")
+        execSqlFn(tableMap.entries.flatMap { tableEntry ->
+            listOf("""INSERT $onConflictPrefix INTO TableSyncStatus(tsTableId, tsLastChanged, tsLastSynced) 
+                                VALUES(${tableEntry.value}, ${systemTimeInMillis()}, 0)""",
+                """INSERT $onConflictPrefix INTO SqliteChangeSeqNums(sCsnTableId, sCsnNextLocal, sCsnNextPrimary)
+                          VALUES (${tableEntry.value}, 1, 1)""")
+        }.toTypedArray())
 
-            execSqlFn("""
-                INSERT $onConflictPrefix INTO SqliteChangeSeqNums(sCsnTableId, sCsnNextLocal, sCsnNextPrimary)
-                       VALUES (${tableEntry.value}, 1, 1)
-                       
-            """)
-        }
 
         if(forceReset)
             setSyncNode(execSqlFn)
@@ -43,19 +41,19 @@ class DoorSyncableDatabaseCallback2(val nodeId: Int, val tableMap: Map<String, I
      *
      */
     fun initSyncTables(db: DoorSqlDatabase, forceReset: Boolean = false) {
-        initSyncTables(forceReset) { sql ->
-            db.execSQL(sql)
+        initSyncTables(forceReset) { sqlStatements ->
+            db.execSqlBatch(sqlStatements)
         }
     }
 
     fun initSyncTables(repo: DoorDatabaseRepository, forceReset: Boolean) {
-        initSyncTables(forceReset) { sql ->
-            repo.db.execSql(sql)
+        initSyncTables(forceReset) { sqlStatements ->
+            repo.db.execSqlBatch(*sqlStatements)
         }
     }
 
     override fun onCreate(db: DoorSqlDatabase) {
-        setSyncNode { db.execSQL(it) }
+        setSyncNode { db.execSqlBatch(it) }
         initSyncTables(db, false)
     }
 

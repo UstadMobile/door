@@ -66,6 +66,10 @@ actual fun <T: DoorDatabase> KClass<T>.doorDatabaseMetadata(): DoorDatabaseMetad
     } as DoorDatabaseMetadata<T>
 }
 
-actual fun DoorDatabase.execSql(sql: String) {
-    this.query(sql, arrayOf())
+actual fun DoorDatabase.execSqlBatch(vararg sqlStatements: String) {
+    runInTransaction {
+        sqlStatements.forEach {
+            this.query(it, arrayOf())
+        }
+    }
 }
