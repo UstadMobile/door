@@ -5,6 +5,7 @@ import com.ustadmobile.door.ext.concurrentSafeMapOf
 /**
  * Implementation similar to Android's MediatorLiveData
  */
+@Suppress("unused")
 open class DoorMediatorLiveData<T> : DoorMutableLiveData<T>() {
 
     private class Source<T>(
