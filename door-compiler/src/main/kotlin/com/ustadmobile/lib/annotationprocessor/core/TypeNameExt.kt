@@ -37,6 +37,17 @@ internal fun TypeName.toSqlType(dbType: Int = 0) = when {
     else -> "ERR_UNSUPPORTED_TPYE-$this"
 }
 
+/**
+ * Given a string of the SQL column type, get the default value (0 for numbers, null for strings, false for boolean)
+ */
+internal fun String.sqlTypeDefaultValue(dbType: Int) = this.trim().uppercase().let {
+    when {
+        it == "BOOL" -> "false"
+        it == "TEXT" -> "null"
+        else -> "0"
+    }
+}
+
 internal fun TypeName.isDataSourceFactory(paramTypeFilter: (List<TypeName>) -> Boolean = {true}) = this is ParameterizedTypeName
         && this.rawType == DataSource.Factory::class.asClassName() && paramTypeFilter(this.typeArguments)
 

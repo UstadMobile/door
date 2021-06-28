@@ -26,7 +26,6 @@ import com.ustadmobile.lib.annotationprocessor.core.DbProcessorSync.Companion.SU
 import kotlinx.coroutines.GlobalScope
 import java.util.*
 import javax.annotation.processing.ProcessingEnvironment
-import com.ustadmobile.door.attachments.AttachmentFilter
 
 /**
  * Where this TypeElement represents a Database class, this is the property name which should be
@@ -46,7 +45,7 @@ private val TypeElement.abstractSyncDaoClassName: ClassName
  * Generate the table id map of entity names (strings) to the table id as per the syncableentity
  * annotation
  */
-private fun TypeSpec.Builder.addTableIdMapProperty(dbTypeElement: TypeElement, processingEnv: ProcessingEnvironment) : TypeSpec.Builder {
+fun TypeSpec.Builder.addTableIdMapProperty(dbTypeElement: TypeElement, processingEnv: ProcessingEnvironment) : TypeSpec.Builder {
     addProperty(PropertySpec.builder("TABLE_ID_MAP",
             Map::class.asClassName().parameterizedBy(String::class.asClassName(), INT))
             .initializer(CodeBlock.builder()
@@ -237,15 +236,8 @@ fun FileSpec.Builder.addDbRepoType(dbTypeElement: TypeElement,
                             .addCode("return _syncHelperEntitiesDao")
                             .build())
                     .build())
-                addProperty(PropertySpec.builder("_clientId", INT)
-                        .delegate("lazy { _syncHelperEntitiesDao.findSyncNodeClientId() }").build())
-                addProperty(PropertySpec.builder("_clientIdFn",
-                        LambdaTypeName.get(parameters = *arrayOf(DoorDatabase::class.asClassName()),
-                                returnType = Int::class.asClassName()))
-                        .initializer("{ _db -> _clientId  }")
-                        .build())
                 addProperty(PropertySpec.builder("clientId", INT)
-                        .getter(FunSpec.getterBuilder().addCode("return _clientId").build())
+                        .getter(FunSpec.getterBuilder().addCode("return config.nodeId\n").build())
                         .addModifiers(KModifier.OVERRIDE)
                         .build())
                 addProperty(PropertySpec.builder("master", BOOLEAN)
@@ -255,7 +247,7 @@ fun FileSpec.Builder.addDbRepoType(dbTypeElement: TypeElement,
                 addProperty(PropertySpec.builder(dbTypeElement.syncDaoPropName,
                             dbTypeElement.asClassNameWithSuffix("$SUFFIX_SYNCDAO_ABSTRACT$SUFFIX_REPOSITORY2"))
                         .delegate(CodeBlock.builder().beginControlFlow("lazy")
-                                .add("%T(_db, this, _syncDao, _httpClient, _clientIdFn, _endpoint," +
+                                .add("%T(_db, this, _syncDao, _httpClient, clientId, _endpoint," +
                                         " ${DbProcessorRepository.DB_NAME_VAR}, config.attachmentsDir," +
                                         " _syncDao) ",
                                         dbTypeElement
@@ -316,7 +308,7 @@ fun FileSpec.Builder.addEntityWithAttachmentAdapterType(entityWithAttachment: Ty
     processingEnv: ProcessingEnvironment) : FileSpec.Builder {
     val attachmentInfo = EntityAttachmentInfo(entityWithAttachment)
     val nullableStringClassName = String::class.asClassName().copy(nullable = true)
-    addType(TypeSpec.classBuilder("${entityWithAttachment.simpleName}${DbProcessorRepository.SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER}")
+    addType(TypeSpec.classBuilder("${entityWithAttachment.simpleName}${SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER}")
             .addModifiers(KModifier.INLINE)
             .addSuperinterface(EntityWithAttachment::class)
             .primaryConstructor(
@@ -399,7 +391,7 @@ private fun TypeSpec.Builder.addRepoDbDaoAccessor(daoGetter: ExecutableElement,
     addProperty(PropertySpec.builder("_${daoTypeEl.simpleName}",
                 daoTypeEl.asClassNameWithSuffix(SUFFIX_REPOSITORY2))
             .delegate(CodeBlock.builder().beginControlFlow("lazy")
-                    .add("%T(_db, this, _db.%L, _httpClient, _clientIdFn, _endpoint, ${DbProcessorRepository.DB_NAME_VAR}, " +
+                    .add("%T(_db, this, _db.%L, _httpClient, clientId, _endpoint, ${DbProcessorRepository.DB_NAME_VAR}, " +
                             "config.attachmentsDir $syncDaoParam) ",
                             daoTypeEl.asClassNameWithSuffix(SUFFIX_REPOSITORY2),
                             daoGetter.makeAccessorCodeBlock())
@@ -445,8 +437,6 @@ fun FileSpec.Builder.addDaoRepoType(daoTypeSpec: TypeSpec,
                                     isAlwaysSqlite: Boolean = false,
                                     extraConstructorParams: List<ParameterSpec> = listOf(),
                                     syncHelperClassName: ClassName = daoClassName.withSuffix("_SyncHelper")): FileSpec.Builder {
-    val idGetterLambdaType = LambdaTypeName.get(
-            parameters = *arrayOf(DoorDatabase::class.asClassName()), returnType = Int::class.asClassName())
 
     addType(TypeSpec.classBuilder("${daoTypeSpec.name}$SUFFIX_REPOSITORY2")
             .addProperty(PropertySpec.builder("_db", DoorDatabase::class)
@@ -458,11 +448,7 @@ fun FileSpec.Builder.addDaoRepoType(daoTypeSpec: TypeSpec,
             .addProperty(PropertySpec.builder("_httpClient",
                     HttpClient::class).initializer("_httpClient").build())
             .addProperty(PropertySpec.builder("_clientId", Int::class)
-                    .getter(FunSpec.getterBuilder().addCode("return _clientIdFn(_db)\n")
-                            .build())
-                    .build())
-            .addProperty(PropertySpec.builder("_clientIdFn",
-                    idGetterLambdaType).initializer("_clientIdFn").build())
+                    .initializer("_clientId").build())
             .addProperty(PropertySpec.builder("_endpoint", String::class)
                     .initializer("_endpoint").build())
             .addProperty(PropertySpec.builder("_dbPath", String::class)
@@ -485,7 +471,7 @@ fun FileSpec.Builder.addDaoRepoType(daoTypeSpec: TypeSpec,
                     .addParameter("_repo", DoorDatabaseRepository::class)
                     .addParameter("_dao", daoClassName)
                     .addParameter("_httpClient", HttpClient::class)
-                    .addParameter("_clientIdFn", idGetterLambdaType)
+                    .addParameter("_clientId", Int::class)
                     .addParameter("_endpoint", String::class)
                     .addParameter("_dbPath", String::class)
                     .addParameter("_attachmentsDir", String::class)
@@ -500,7 +486,7 @@ fun FileSpec.Builder.addDaoRepoType(daoTypeSpec: TypeSpec,
             .applyIf(pagingBoundaryCallbackEnabled &&
                     daoTypeSpec.isDaoWithSyncableEntitiesInSelectResults(processingEnv)) {
                 addProperty(PropertySpec.builder(
-                        DbProcessorRepository.DATASOURCEFACTORY_TO_BOUNDARYCALLBACK_VARNAME,
+                        DATASOURCEFACTORY_TO_BOUNDARYCALLBACK_VARNAME,
                         DbProcessorRepository.BOUNDARY_CALLBACK_MAP_CLASSNAME)
                         .initializer("%T()", WeakHashMap::class)
                         .build())
@@ -515,7 +501,7 @@ fun FileSpec.Builder.addDaoRepoType(daoTypeSpec: TypeSpec,
                                 DataSource.Factory::class.asClassName().parameterizedBy(INT,
                                         TypeVariableName("T")))
                         .addModifiers(KModifier.OVERRIDE)
-                        .returns(DbProcessorRepository.BOUNDARY_CALLBACK_CLASSNAME
+                        .returns(BOUNDARY_CALLBACK_CLASSNAME
                                 .parameterizedBy(TypeVariableName("T")).copy(nullable = true))
                         .addCode("return ${DbProcessorRepository.DATASOURCEFACTORY_TO_BOUNDARYCALLBACK_VARNAME}[dataSource] as %T\n",
                                 DbProcessorRepository.BOUNDARY_CALLBACK_CLASSNAME

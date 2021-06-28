@@ -33,6 +33,12 @@ import com.ustadmobile.door.annotation.QueryLiveTables
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorSync.Companion.TRACKER_SUFFIX
 import kotlin.RuntimeException
 import com.ustadmobile.door.annotation.PgOnConflict
+import com.ustadmobile.door.ext.DoorDatabaseMetadata
+import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
+import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_ANDROID_OUTPUT
+import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JVM_DIRS
+import com.ustadmobile.lib.annotationprocessor.core.DbProcessorRepository.Companion.SUFFIX_REPOSITORY2
+import kotlin.reflect.KClass
 
 val QUERY_SINGULAR_TYPES = listOf(INT, LONG, SHORT, BYTE, BOOLEAN, FLOAT, DOUBLE,
         String::class.asTypeName(), String::class.asTypeName().copy(nullable = true))
@@ -318,6 +324,31 @@ fun getQueryNamedParameters(querySql: String): List<String> {
     return namedParams
 }
 
+/**
+ * Generate the DatabaseMetadata object for the given database.
+ */
+fun FileSpec.Builder.addDatabaseMetadataType(dbTypeElement: TypeElement, processingEnv: ProcessingEnvironment): FileSpec.Builder {
+    addType(TypeSpec.classBuilder("${dbTypeElement.simpleName}$SUFFIX_DOOR_METADATA")
+        .superclass(DoorDatabaseMetadata::class.asClassName().parameterizedBy(dbTypeElement.asClassName()))
+        .addProperty(PropertySpec.builder("dbClass", KClass::class.asClassName().parameterizedBy(dbTypeElement.asClassName()))
+            .addModifiers(KModifier.OVERRIDE)
+            .getter(FunSpec.getterBuilder()
+                .addCode("return %T::class\n", dbTypeElement)
+                .build())
+            .build())
+        .addProperty(PropertySpec.builder("syncableTableIdMap", Map::class.parameterizedBy(String::class, Int::class))
+            .addModifiers(KModifier.OVERRIDE)
+            .getter(FunSpec.getterBuilder()
+                .addCode("return TABLE_ID_MAP\n", dbTypeElement.asClassNameWithSuffix(SUFFIX_REPOSITORY2))
+                .build())
+            .build())
+        .addType(TypeSpec.companionObjectBuilder()
+            .addTableIdMapProperty(dbTypeElement, processingEnv)
+            .build())
+        .build())
+
+    return this
+}
 
 /**
  * This class represents a POKO object in the result. It is a tree like structure (e.g. each item
@@ -579,61 +610,6 @@ fun fieldsOnEntity(entityType: TypeElement) = entityType.enclosedElements.filter
 internal val masterDbVals = mapOf(DoorDbType.SQLITE to listOf("0", "1"),
         DoorDbType.POSTGRES to listOf("false", "true"))
 
-internal fun generateInsertNodeIdFun(dbType: TypeElement, jdbcDbType: Int,
-                                     execSqlFunName: String = "_stmt.executeUpdate",
-                                     processingEnv: ProcessingEnvironment,
-                                     isUpdate: Boolean = false): CodeBlock {
-    val codeBlock = CodeBlock.builder()
-    codeBlock.add("val _nodeId = %T.nextInt(1, %T.MAX_VALUE)\n",
-            Random::class, Int::class)
-            .add("println(\"Setting SyncNode nodeClientId = \$_nodeId\")\n")
-            .add("$execSqlFunName(\"INSERT·INTO·SyncNode(nodeClientId,master)·VALUES")
-
-    when(jdbcDbType) {
-        DoorDbType.SQLITE -> codeBlock.add("·(\$_nodeId,\${if(master)·1·else·0})")
-        DoorDbType.POSTGRES -> codeBlock.add("·(\$_nodeId,\$master)")
-    }
-
-    codeBlock.add("\")\n")
-
-
-    syncableEntityTypesOnDb(dbType, processingEnv).forEach {
-        val syncableEntityInfo = SyncableEntityInfo(it.asClassName(), processingEnv)
-        if(jdbcDbType == DoorDbType.SQLITE) {
-            if(isUpdate) {
-                codeBlock.add("$execSqlFunName(%S)\n",
-                        "UPDATE sqlite_sequence SET seq = ((SELECT nodeClientId FROM SyncNode) << 32) WHERE name = '${it.simpleName}'")
-            }else {
-                codeBlock.add("$execSqlFunName(%S)\n",
-                        "INSERT OR REPLACE INTO sqlite_sequence(name,seq) VALUES('${it.simpleName}', ((SELECT nodeClientId FROM SyncNode) << 32)) ")
-            }
-            codeBlock.addReplaceSqliteChangeSeqNums(execSqlFunName, syncableEntityInfo)
-        }else if(jdbcDbType == DoorDbType.POSTGRES){
-            codeBlock.add("$execSqlFunName(\"ALTER·SEQUENCE·" +
-                    "${it.simpleName}_${syncableEntityInfo.entityPkField.name}_seq·RESTART·WITH·\${_nodeId·shl·32}\")\n")
-        }
-    }
-
-    return codeBlock.build()
-}
-
-/**
- * Generate insert statements that will put the TableSyncStatus entities required for each
- * syncable entity on the database in place.
- */
-internal fun generateInsertTableSyncStatusCodeBlock(dbType: TypeElement,
-                                         execSqlFunName: String = "_stmt.executeUpdate",
-                                         processingEnv: ProcessingEnvironment): CodeBlock {
-    val codeBlock = CodeBlock.builder()
-    syncableEntityTypesOnDb(dbType, processingEnv).forEach {
-        val syncableEntityInfo = SyncableEntityInfo(it.asClassName(), processingEnv)
-        codeBlock.add("$execSqlFunName(\"INSERT·INTO·TableSyncStatus(tsTableId,·tsLastChanged,·tsLastSynced)·" +
-                    "VALUES(${syncableEntityInfo.tableId},·\${systemTimeInMillis()},·0)\")\n")
-    }
-
-    return codeBlock.build()
-}
-
 
 /**
  * Determine if the result type is nullable. Any single result entity object or String result can be
@@ -657,7 +633,11 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
 
         for(dbTypeEl in dbs) {
             val dbFileSpec = generateDbImplClass(dbTypeEl as TypeElement)
-            writeFileSpecToOutputDirs(dbFileSpec, AnnotationProcessorWrapper.OPTION_JVM_DIRS)
+            writeFileSpecToOutputDirs(dbFileSpec, OPTION_JVM_DIRS)
+            FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + DoorDatabaseMetadata.SUFFIX_DOOR_METADATA)
+                .addDatabaseMetadataType(dbTypeEl, processingEnv)
+                .build()
+                .writeToDirsFromArg(listOf(OPTION_JVM_DIRS, OPTION_ANDROID_OUTPUT))
         }
 
 
@@ -666,7 +646,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         for(daoElement in daos) {
             val daoTypeEl = daoElement as TypeElement
             val daoFileSpec = generateDaoImplClass(daoTypeEl)
-            writeFileSpecToOutputDirs(daoFileSpec, AnnotationProcessorWrapper.OPTION_JVM_DIRS)
+            writeFileSpecToOutputDirs(daoFileSpec, OPTION_JVM_DIRS)
         }
 
         return true
@@ -849,20 +829,12 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 codeBlock.add("//End: Create table ${entityType.simpleName} for $dbTypeName\n\n")
             }
 
-            if(dbTypeIsSyncable){
-                codeBlock.add(generateInsertNodeIdFun(dbTypeElement, dbProductType, "_stmt.executeUpdate",
-                        processingEnv))
-            }
-
             codeBlock.endControlFlow()
         }
 
 
         codeBlock.endControlFlow() //end when
-                .apply {
-                    takeIf { dbTypeIsSyncable }?.addInsertTableSyncStatuses(dbTypeElement,
-                            "_stmt.executeUpdate", processingEnv)
-                }.nextControlFlow("catch(e: %T)", Exception::class)
+                .nextControlFlow("catch(e: %T)", Exception::class)
                 .add("e.printStackTrace()\n")
                 .add("throw %T(%S, e)\n", RuntimeException::class, "Exception creating tables")
                 .nextControlFlow("finally")
@@ -918,19 +890,6 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             if(entityType.getAnnotation(SyncableEntity::class.java) != null){
                 dropFunSpec.addCode("_stmt!!.executeUpdate(%S)\n", "DELETE FROM ${entityType.simpleName}$TRACKER_SUFFIX")
             }
-        }
-
-        if(dbTypeElement.isDbSyncable(processingEnv)) {
-            dropFunSpec.beginControlFlow("when(jdbcDbType)")
-            DoorDbType.SUPPORTED_TYPES.forEach {
-                dropFunSpec.beginControlFlow("$it -> ")
-                        .addCode(generateInsertNodeIdFun(dbTypeElement, it, "_stmt.executeUpdate", processingEnv,
-                                isUpdate = true))
-                        .endControlFlow()
-            }
-            dropFunSpec.endControlFlow()
-            dropFunSpec.addCode(CodeBlock.builder().addInsertTableSyncStatuses(dbTypeElement,
-                    "_stmt.executeUpdate",processingEnv).build())
         }
 
         dropFunSpec.nextControlFlow("finally")

@@ -1,7 +1,7 @@
 package com.ustadmobile.door.daos
 
-import androidx.room.Insert
 import com.ustadmobile.door.SyncResult
+import com.ustadmobile.door.entities.DoorNode
 import com.ustadmobile.door.entities.TableSyncStatus
 import com.ustadmobile.door.entities.UpdateNotification
 import com.ustadmobile.door.entities.ZombieAttachmentData
@@ -90,6 +90,17 @@ interface ISyncHelperEntitiesDao {
      * been deleted from the disk. This will remove it from the table.
      */
     suspend fun deleteZombieAttachments(zombieList: List<ZombieAttachmentData>)
+
+    /**
+     * Get the auth string for the given DoorNode
+     * @param nodeId
+     */
+    suspend fun getDoorNodeAuth(nodeId: Int): String?
+
+    /**
+     * Add a new DoorNode
+     */
+    suspend fun addDoorNode(doorNode: DoorNode)
 
 
 }

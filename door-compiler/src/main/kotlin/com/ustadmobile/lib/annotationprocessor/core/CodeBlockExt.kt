@@ -3,7 +3,6 @@ package com.ustadmobile.lib.annotationprocessor.core
 import androidx.room.ColumnInfo
 import com.squareup.kotlinpoet.*
 import io.ktor.client.request.forms.*
-import io.ktor.client.statement.*
 import io.ktor.content.*
 import io.ktor.http.*
 import javax.annotation.processing.ProcessingEnvironment
@@ -53,33 +52,6 @@ fun CodeBlock.Builder.beginIfNotNullOrEmptyControlFlow(varName: String, isList: 
         beginControlFlow("if(!$varName.isEmpty())")
     }else {
         beginControlFlow("if($varName != null)")
-    }
-
-    return this
-}
-
-/**
- * Generate insert statements that will insert the TableSyncStatus entities required for each syncable
- * entity on the database in place.
- *
- * e.g.
- * _stmt.executeUpdate("INSERT INTO TableSyncstatus(tsTableId, tsLastChanged, tsLastSynced) VALUES (42, ${systemTimeInMillis(), 0)")")
- * _stmt.executeUpdate("INSERT INTO TableSyncstatus(tsTableId, tsLastChanged, tsLastSynced) VALUES (43, ${systemTimeInMillis(), 0)")")
- * ...
- *
- * @param dbType TypeElement of the database itself
- * @param execSqlFunName the name of the function that must be called to execute SQL
- * @param processingEnv the processing environment
- *
- * @return the same CodeBlock.Builder
- */
-fun CodeBlock.Builder.addInsertTableSyncStatuses(dbType: TypeElement,
-                                               execSqlFunName: String = "_stmt.executeUpdate",
-                                               processingEnv: ProcessingEnvironment) : CodeBlock.Builder{
-
-    syncableEntityTypesOnDb(dbType, processingEnv).forEach {
-        val syncableEntityInfo = SyncableEntityInfo(it.asClassName(), processingEnv)
-        addInsertTableSyncStatus(syncableEntityInfo, execSqlFunName, processingEnv)
     }
 
     return this
@@ -276,16 +248,16 @@ internal fun CodeBlock.Builder.addReplaceSqliteChangeSeqNums(execSqlFn: String,
  * @param daoName The name of the DAO to which funSpec belongs
  */
 internal fun CodeBlock.Builder.addKtorRequestForFunction(
-                                                   funSpec: FunSpec,
-                                                   httpClientVarName: String = "_httpClient",
-                                                   httpEndpointVarName: String = "_endpoint",
-                                                   dbPathVarName: String,
-                                                   daoName: String,
-                                                   useKotlinxListSerialization: Boolean = false,
-                                                   kotlinxSerializationJsonVarName: String = "",
-                                                   useMultipartPartsVarName: String? = null,
-                                                   addDbVersionParamName: String? = "_db",
-                                                   addClientIdHeaderVar: String? = null): CodeBlock.Builder {
+    funSpec: FunSpec,
+    httpClientVarName: String = "_httpClient",
+    httpEndpointVarName: String = "_endpoint",
+    dbPathVarName: String,
+    daoName: String,
+    useKotlinxListSerialization: Boolean = false,
+    kotlinxSerializationJsonVarName: String = "",
+    useMultipartPartsVarName: String? = null,
+    addNodeIdAndVersionRepoVarName: String? = "_repo",
+    addClientIdHeaderVar: String? = null): CodeBlock.Builder {
 
     //Begin creation of the HttpStatement call that will set the URL, parameters, etc.
     val nonQueryParams =  funSpec.parameters.filter { !it.type.isHttpQueryQueryParam() }
@@ -314,9 +286,9 @@ internal fun CodeBlock.Builder.addKtorRequestForFunction(
     add("encodedPath = \"\${encodedPath}\${$dbPathVarName}/%L/%L\"\n", daoName, funSpec.name)
     endControlFlow()
 
-    if(addDbVersionParamName != null) {
-        add("%M($addDbVersionParamName)\n",
-                MemberName("com.ustadmobile.door.ext", "dbVersionHeader"))
+    if(addNodeIdAndVersionRepoVarName != null) {
+        add("%M($addNodeIdAndVersionRepoVarName)\n",
+                MemberName("com.ustadmobile.door.ext", "doorNodeAndVersionHeaders"))
     }
 
     if(addClientIdHeaderVar != null) {

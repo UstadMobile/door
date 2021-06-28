@@ -2,10 +2,12 @@ package com.ustadmobile.door
 
 import io.github.aakira.napier.Napier
 import com.ustadmobile.door.DoorConstants.HEADER_DBVERSION
+import com.ustadmobile.door.DoorConstants.HEADER_NODE
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.STATUS_CONNECTED
 import com.ustadmobile.door.ext.DoorTag.Companion.LOG_TAG
 import com.ustadmobile.door.ext.concurrentSafeListOf
 import com.ustadmobile.door.ext.doorIdentityHashCode
+import com.ustadmobile.door.ext.toUrlQueryString
 import com.ustadmobile.door.sse.DoorEventListener
 import com.ustadmobile.door.sse.DoorEventSource
 import com.ustadmobile.door.sse.DoorServerSentEvent
@@ -123,7 +125,13 @@ class ClientSyncManager(val repo: DoorDatabaseSyncRepository, val dbVersion: Int
             if(eventSource.value != null)
                 return
 
-            val url = "${repo.config.endpoint}$endpointSuffixUpdates?deviceId=${repo.clientId}&$HEADER_DBVERSION=$dbVersion"
+            val queryParams = mapOf("deviceId" to repo.clientId.toString(),
+                HEADER_DBVERSION to dbVersion.toString(),
+                HEADER_NODE to "${repo.clientId}/${repo.config.auth}"
+            )
+
+            val url = "${repo.config.endpoint}$endpointSuffixUpdates?${queryParams.toUrlQueryString()}"
+
             Napier.v("$logPrefix subscribing to updates from $url", tag = LOG_TAG)
             eventSource.value = DoorEventSource(repo.config, url,
                     object : DoorEventListener {

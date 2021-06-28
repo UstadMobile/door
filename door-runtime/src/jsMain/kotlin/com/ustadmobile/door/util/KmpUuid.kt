@@ -4,6 +4,8 @@ import kotlin.js.Date
 
 actual fun randomUuid(): KmpUuid = KmpUuid(0L,0L)
 
+//timestamp is used by js code
+@Suppress("UNUSED_VARIABLE")
 actual class KmpUuid actual constructor(mostSigBits: Long, leastSigBits: Long) {
     actual override fun toString(): String {
         var timeStamp = Date().getTime()

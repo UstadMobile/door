@@ -8,6 +8,8 @@ import kotlinx.coroutines.launch
 import org.w3c.dom.Worker
 import wrappers.IndexedDb
 import wrappers.SQLiteDatasourceJs
+import kotlin.js.json
+import kotlin.reflect.KClass
 
 /**
  * Get the database type that is running on the given database (DoorDbType.SQLITE Or DoorDbType.POSTGRES)
@@ -43,4 +45,32 @@ fun DoorDatabase.init(dbName: String, webWorkerPath: String) {
         }
         initCompletable.complete(true)
     }
+}
+
+/**
+ * Multiplatform wrapper function that will execute raw SQL statements in a
+ * batch.
+ *
+ * Does not return any results. Will throw an exception in the event of
+ * malformed SQL.
+ *
+ * The name deliberately lower cases sql to avoid name clashes
+ */
+actual fun DoorDatabase.execSqlBatch(vararg sqlStatements: String) {
+    val connection = dataSource.getConnection()
+    connection.setAutoCommit(false)
+    sqlStatements.forEach {
+        GlobalScope.launch {
+            val statement = connection.prepareStatement(it)
+            statement.executeUpdateAsync()
+            statement.close()
+        }
+    }
+    connection.commit()
+    connection.setAutoCommit(true)
+    connection.close()
+}
+
+actual fun <T : DoorDatabase> KClass<T>.doorDatabaseMetadata(): DoorDatabaseMetadata<T> {
+    TODO("Not yet implemented")
 }

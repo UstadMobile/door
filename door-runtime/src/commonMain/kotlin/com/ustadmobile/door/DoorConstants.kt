@@ -8,4 +8,9 @@ object DoorConstants {
 
     val HEADER_DBVERSION = "door-dbversion"
 
+    /**
+     * Header that should contain the node id and auth in the form of nodeId/auth e.g. 1234/secret
+     */
+    val HEADER_NODE = "door-node"
+
 }

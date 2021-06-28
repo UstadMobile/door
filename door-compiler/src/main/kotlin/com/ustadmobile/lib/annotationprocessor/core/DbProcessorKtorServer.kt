@@ -840,6 +840,10 @@ fun FileSpec.Builder.addDbKtorRouteFunction(dbTypeEl: TypeElement,
                                             "addDbVersionCheckIntercept"))
                         }
 
+                        if(dbTypeEl.getAnnotation(DoorNodeIdAuthRequired::class.java) != null) {
+                            add("%M()\n", MemberName("com.ustadmobile.door.ktor", "addNodeIdAndAuthCheckInterceptor"))
+                        }
+
                         add("val _typeToken: %T<%T> = %M()\n", org.kodein.type.TypeToken::class.java,
                                 dbTypeEl, DbProcessorKtorServer.DI_ERASED_MEMBER)
                     }.applyIf(dbTypeEl.isDbSyncable(processingEnv)) {

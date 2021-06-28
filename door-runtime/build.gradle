@@ -49,6 +49,7 @@ kotlin {
             testTask {
                 useKarma {
                     useChromeHeadless()
+                    webpackConfig.cssSupport.enabled = true
                 }
             }
         }
@@ -144,6 +145,9 @@ kotlin {
         jsMain {
             dependsOn roomAnnotations
             dependsOn commonJvmJs
+            dependencies {
+                implementation "org.jetbrains.kotlin-wrappers:kotlin-extensions:$version_kotlin_extensions"
+            }
         }
         jsTest {
             dependencies {

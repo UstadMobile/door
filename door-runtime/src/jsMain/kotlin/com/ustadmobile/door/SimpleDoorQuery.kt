@@ -3,8 +3,8 @@ package com.ustadmobile.door
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.PreparedStatement
 
-actual class SimpleDoorQuery actual constructor(private val sql: String, override val values: Array<out Any?>?) :
-    DoorQuery {
+actual class SimpleDoorQuery actual constructor(private val sql: String, override val values: Array<out Any?>?) : DoorQuery {
+
     override fun getSql() = sql
 
     override fun getArgCount(): Int {
@@ -12,7 +12,9 @@ actual class SimpleDoorQuery actual constructor(private val sql: String, overrid
     }
 
 
-    override fun bindToPreparedStmt(stmt: PreparedStatement, db: DoorDatabase, con: Connection) {}
+    override fun bindToPreparedStmt(stmt: PreparedStatement, db: DoorDatabase, con: Connection) {
+        TODO("Not yet implemented")
+    }
 
 
 }

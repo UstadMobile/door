@@ -5,7 +5,7 @@ import io.ktor.client.HttpClient
 import kotlin.reflect.KClass
 
 /**
- * Common interface that is implemented by any DAO repository. Can be used to get info including
+ * Common interface that is implemented by any repository. Can be used to get info including
  * the active endpoint, auth, database path and the http client.
  */
 interface DoorDatabaseRepository {
