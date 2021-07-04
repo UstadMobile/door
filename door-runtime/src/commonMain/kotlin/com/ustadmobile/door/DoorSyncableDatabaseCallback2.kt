@@ -1,5 +1,6 @@
 package com.ustadmobile.door
 
+import com.ustadmobile.door.ext.dbType
 import com.ustadmobile.door.ext.execSqlBatch
 import com.ustadmobile.door.util.systemTimeInMillis
 
@@ -9,31 +10,51 @@ import com.ustadmobile.door.util.systemTimeInMillis
  */
 class DoorSyncableDatabaseCallback2(val nodeId: Int, val tableMap: Map<String, Int>, val primary: Boolean): DoorDatabaseCallback {
 
-    fun setSyncNode(execSqlFn: (Array<String>) -> Unit) {
+    private fun setSyncNode(dbType: Int, execSqlFn: (Array<String>) -> Unit) {
+        val primaryStr = if(dbType == DoorDbType.SQLITE) {
+            if(primary) "1" else "0"
+        }else {
+            primary.toString()
+        }
+
         execSqlFn(arrayOf("DELETE FROM SyncNode",
             """
             INSERT INTO SyncNode(nodeClientId, master)
-                    VALUES ($nodeId, ${if(primary) 1 else 0}) 
+                    VALUES ($nodeId, $primaryStr) 
             """))
     }
 
-    fun initSyncTables(forceReset: Boolean, execSqlFn: (Array<String>) -> Unit) {
-        val onConflictPrefix = if(forceReset) {
-            " OR REPLACE  "
+    fun initSyncTables(dbType: Int, forceReset: Boolean, execSqlFn: (Array<String>) -> Unit) {
+        val timeNow = systemTimeInMillis()
+
+        if(dbType == DoorDbType.SQLITE) {
+            val onConflictPrefix = if(forceReset) {
+                " OR REPLACE  "
+            }else {
+                " OR IGNORE "
+            }
+
+            execSqlFn(tableMap.entries.flatMap { tableEntry ->
+                listOf("""INSERT $onConflictPrefix INTO TableSyncStatus(tsTableId, tsLastChanged, tsLastSynced) 
+                                VALUES(${tableEntry.value}, $timeNow, 0)""",
+                    """INSERT $onConflictPrefix INTO SqliteChangeSeqNums(sCsnTableId, sCsnNextLocal, sCsnNextPrimary)
+                          VALUES (${tableEntry.value}, 1, 1)""")
+            }.toTypedArray())
         }else {
-            " OR IGNORE "
+            execSqlFn(tableMap.entries.flatMap { tableEntry ->
+                listOf("""
+                    INSERT INTO TableSyncStatus(tsTableId, tsLastChanged, tsLastSynced)
+                           VALUES(${tableEntry.value}, $timeNow, 0)
+                           ON CONFLICT(tsTableId)
+                              DO UPDATE
+                                 SET tsLastChanged = excluded.tsLastChanged,
+                                     tsLastSynced = excluded.tsLastSynced
+                    """)
+            }.toTypedArray())
         }
 
-        execSqlFn(tableMap.entries.flatMap { tableEntry ->
-            listOf("""INSERT $onConflictPrefix INTO TableSyncStatus(tsTableId, tsLastChanged, tsLastSynced) 
-                                VALUES(${tableEntry.value}, ${systemTimeInMillis()}, 0)""",
-                """INSERT $onConflictPrefix INTO SqliteChangeSeqNums(sCsnTableId, sCsnNextLocal, sCsnNextPrimary)
-                          VALUES (${tableEntry.value}, 1, 1)""")
-        }.toTypedArray())
-
-
         if(forceReset)
-            setSyncNode(execSqlFn)
+            setSyncNode(dbType, execSqlFn)
 
     }
 
@@ -41,19 +62,19 @@ class DoorSyncableDatabaseCallback2(val nodeId: Int, val tableMap: Map<String, I
      *
      */
     fun initSyncTables(db: DoorSqlDatabase, forceReset: Boolean = false) {
-        initSyncTables(forceReset) { sqlStatements ->
+        initSyncTables(db.dbType(), forceReset) { sqlStatements ->
             db.execSqlBatch(sqlStatements)
         }
     }
 
     fun initSyncTables(repo: DoorDatabaseRepository, forceReset: Boolean) {
-        initSyncTables(forceReset) { sqlStatements ->
+        initSyncTables(repo.db.dbType(), forceReset) { sqlStatements ->
             repo.db.execSqlBatch(*sqlStatements)
         }
     }
 
     override fun onCreate(db: DoorSqlDatabase) {
-        setSyncNode { db.execSqlBatch(it) }
+        setSyncNode(db.dbType()) { db.execSqlBatch(it) }
         initSyncTables(db, false)
     }
 

@@ -99,7 +99,7 @@ fun DoorDatabase.clearAllTablesAndResetSync(nodeId: Int, isPrimary: Boolean = fa
     clearAllTables()
     val metadata = this::class.doorDatabaseMetadata()
     DoorSyncableDatabaseCallback2(nodeId, metadata.syncableTableIdMap, isPrimary)
-        .initSyncTables( forceReset = true)  {
+        .initSyncTables(dbType(), forceReset = true)  {
             this.execSqlBatch(*it)
         }
 }
