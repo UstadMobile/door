@@ -39,6 +39,16 @@ kotlin {
         }
     }
 
+    js(LEGACY) {
+        browser {
+            testTask {
+                useKarma {
+                    useChromeHeadless() //change to useChrome to run the actual browser
+                }
+            }
+        }
+    }
+
     sourceSets {
         commonMain {
             kotlin.srcDir("../door-runtime/src/commonMain/resources/daos")
@@ -85,6 +95,14 @@ kotlin {
                 implementation "org.apache.commons:commons-dbcp2:$version_apache_commons_dbcp2"
                 implementation "org.xerial:sqlite-jdbc:$version_sqlite_jdbc"
                 implementation "org.postgresql:postgresql:$version_postgres_jdbc"
+            }
+        }
+
+        jsMain {}
+
+        jsTest {
+            dependencies {
+                implementation kotlin('test-js')
             }
         }
     }

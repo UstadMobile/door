@@ -1,13 +1,13 @@
 package com.ustadmobile.door
 
-import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.atomic.AtomicReference
+import com.ustadmobile.door.ext.concurrentSafeListOf
+import kotlinx.atomicfu.atomic
 
 actual abstract class DoorLiveData<T> {
 
-    val value = AtomicReference<T>()
+    private val value = atomic<T?>(null)
 
-    private val activeObservers = CopyOnWriteArrayList<DoorObserver<in T>>()
+    private val activeObservers = concurrentSafeListOf<DoorObserver<in T>>()
 
     private var active: Boolean = false
 
@@ -18,7 +18,7 @@ actual abstract class DoorLiveData<T> {
     actual constructor()
 
     constructor(value: T) {
-        this.value.set(value)
+        this.value.value = value
         initialValueLoaded = true
     }
 
@@ -43,7 +43,7 @@ actual abstract class DoorLiveData<T> {
         }
 
         if(initialValueLoaded) {
-            observer.onChanged(value.get())
+            value.value?.let { observer.onChanged(it) }
         }
     }
 
@@ -77,7 +77,7 @@ actual abstract class DoorLiveData<T> {
 
 
 
-    actual open fun getValue(): T?  = value.get()
+    actual open fun getValue(): T?  = value.value
 
     protected open fun onActive() {
 
@@ -88,7 +88,7 @@ actual abstract class DoorLiveData<T> {
     }
 
     protected fun postValue(value: T) {
-        this.value.set(value)
+        this.value.value = value
         initialValueLoaded = true
         activeObservers.forEach { it.onChanged(value) }
     }

@@ -2,14 +2,11 @@ package com.ustadmobile.door
 
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.atomic.AtomicReference
 
-class DoorLiveDataJdbcImpl<T>(val db: DoorDatabase, val tableNames: List<String>,
-                                       val fetchFn: () -> T): DoorLiveData<T>() {
+class DoorLiveDataImpl<T>(val db: DoorDatabase, val tableNames: List<String>,
+                          val fetchFn: suspend () -> T): DoorLiveData<T>() {
 
-    private val dbChangeListenerRequest = DoorDatabase.ChangeListenerRequest(tableNames) {
+    private val dbChangeListenerRequest = ChangeListenerRequest(tableNames) {
         update()
     }
 
