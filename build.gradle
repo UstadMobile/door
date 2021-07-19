@@ -1,5 +1,5 @@
 group 'com.ustadmobile.door'
-version '0.0.22'
+version '0.0.23'
 
 ext.localProperties = new Properties()
 if(project.file("local.properties").exists()) {
@@ -8,8 +8,8 @@ if(project.file("local.properties").exists()) {
 
 buildscript {
 
-    ext.kotlin_version = "1.5.10"
-    ext.atomicfu_version = '0.16.1'
+    ext.kotlin_version = "1.5.21"
+    ext.atomicfu_version = '0.16.2'
 
     repositories {
         google()
@@ -25,11 +25,11 @@ buildscript {
 }
 
 ext {
-    version_kotlin = "1.5.10"
-    version_ktor = "1.6.0"
+    version_kotlin = "1.5.21"
+    version_ktor = "1.6.1"
     version_nanohttpd = "2.3.1"
     version_napier = "1.5.0"
-    version_atomicfu = '0.16.1'
+    version_atomicfu = '0.16.2'
     version_sqlite_jdbc = "3.34.0"
     version_kodein_di = "7.6.0"
     version_kotlin_mockito = "3.2.0"
@@ -49,7 +49,7 @@ ext {
     version_apache_commons_dbcp2 = "2.8.0"
     version_logback = "1.2.3"
     version_okhttp = "4.9.0"
-    version_kotlinx_serialization = "1.2.1"
+    version_kotlinx_serialization = "1.2.2"
 
 }
 
