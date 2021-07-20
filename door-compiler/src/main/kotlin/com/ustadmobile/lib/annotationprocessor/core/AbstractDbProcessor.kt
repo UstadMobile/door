@@ -745,14 +745,6 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         return this
     }
 
-    /**
-     * Used to determine if a DAO method returns a DataSource.Factory with a syncable entity type
-     * (e.g. should have a boundary callback)
-     */
-    protected val daoMethodSyncableDataSourceFactoryFilter = { returnTypeArgs : List<TypeName> ->
-        returnTypeArgs.any { it is ClassName && findSyncableEntities(it, processingEnv).isNotEmpty() }
-    }
-
     override fun init(p0: ProcessingEnvironment) {
         super.init(p0)
         messager = p0.messager
@@ -812,28 +804,32 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         return codeBlock.build()
     }
 
-    protected fun generateSyncTriggersCodeBlock(entityClass: ClassName, execSqlFn: String, dbType: Int): CodeBlock {
-        val codeBlock = CodeBlock.builder()
+    /**
+     * Add code that will create the triggers needed for syncable entities
+     */
+    protected fun CodeBlock.Builder.addSyncableEntityTriggers(
+        entityClass: ClassName,
+        execSqlFn: String,
+        dbType: Int
+    ): CodeBlock.Builder {
         val syncableEntityInfo = SyncableEntityInfo(entityClass, processingEnv)
         when(dbType){
             DoorDbType.SQLITE -> {
-                codeBlock.addSyncableEntityInsertTriggersSqlite(execSqlFn, syncableEntityInfo)
-                codeBlock.addSyncableEntityUpdateTriggersSqlite(execSqlFn, syncableEntityInfo)
-
-
+                addSyncableEntityInsertTriggersSqlite(execSqlFn, syncableEntityInfo)
+                addSyncableEntityUpdateTriggersSqlite(execSqlFn, syncableEntityInfo)
             }
 
             DoorDbType.POSTGRES -> {
                 listOf("m", "l").forEach {
-                    codeBlock.add("$execSqlFn(%S)\n",
+                    add("$execSqlFn(%S)\n",
                         "CREATE SEQUENCE IF NOT EXISTS ${syncableEntityInfo.syncableEntity.simpleName}_${it}csn_seq")
                 }
 
-                codeBlock.addSyncableEntityFunctionAndTriggerPostgres(execSqlFn, syncableEntityInfo)
+                addSyncableEntityFunctionAndTriggerPostgres(execSqlFn, syncableEntityInfo)
             }
         }
 
-        return codeBlock.build()
+        return this
     }
 
 
@@ -950,7 +946,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                             .endControlFlow()
                             .add(")\n")
                 }else {
-                    codeBlock.add("_stmt.set${getPreparedStatementSetterGetterTypeName(paramType.javaToKotlinType())}(${paramIndex++}, " +
+                    codeBlock.add("_stmt.set${paramType.javaToKotlinType().preparedStatementSetterGetterTypeName}(${paramIndex++}, " +
                             "${it})\n")
                 }
             }
@@ -1020,7 +1016,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                 }
 
                 if(QUERY_SINGULAR_TYPES.contains(entityType)) {
-                    codeBlock.add("val $entityVarName = _resultSet.get${getPreparedStatementSetterGetterTypeName(entityType)}(1)\n")
+                    codeBlock.add("val $entityVarName = _resultSet.get${entityType.preparedStatementSetterGetterTypeName}(1)\n")
                 }else {
                     codeBlock.add(resultEntityField!!.createSetterCodeBlock(rawQuery = rawQueryVarName != null,
                             colIndexVarName = "_columnIndexMap"))
@@ -1092,7 +1088,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
             entityTypeSpec.propertySpecs.forEach { prop ->
                 fieldNames.add(prop.name)
                 val pkAnnotation = prop.annotations.firstOrNull { it.className == PrimaryKey::class.asClassName() }
-                val setterMethodName = getPreparedStatementSetterGetterTypeName(prop.type)
+                val setterMethodName = prop.type.preparedStatementSetterGetterTypeName
                 if(pkAnnotation != null && pkAnnotation.members.findBooleanMemberValue("autoGenerate") ?: false) {
                     parameterHolders.add("\${when(_db.jdbcDbType) { DoorDbType.POSTGRES -> " +
                             "\"COALESCE(?,nextval('${entityTypeSpec.name}_${prop.name}_seq'))\" else -> \"?\"} }")

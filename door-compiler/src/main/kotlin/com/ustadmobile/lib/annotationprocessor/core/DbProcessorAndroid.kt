@@ -214,8 +214,8 @@ class DbProcessorAndroid: AbstractDbProcessor() {
         val codeBlock = CodeBlock.builder()
 
         syncableEntityTypesOnDb(dbTypeEl, processingEnv).forEach {
-            codeBlock.add(generateSyncTriggersCodeBlock(it.asClassName(), "db.execSQL",
-                    DoorDbType.SQLITE))
+            codeBlock.addSyncableEntityTriggers(it.asClassName(), "db.execSQL",
+                DoorDbType.SQLITE)
         }
 
         dbTypeEl.allEntitiesWithAttachments(processingEnv).forEach {
