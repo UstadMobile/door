@@ -211,3 +211,28 @@ fun TypeName.defaultTypeValueCode(): CodeBlock {
 
     return codeBlock.build()
 }
+
+/**
+ * Get the name of the function that would be used to set this kind of parameter on a PreparedStatement
+ * e.g. setInt, setDouble, setBoolean etc.
+ */
+val TypeName.preparedStatementSetterGetterTypeName: String
+    get() = when(this.javaToKotlinType()) {
+            INT ->  "Int"
+            BYTE -> "Byte"
+            LONG ->  "Long"
+            FLOAT -> "Float"
+            DOUBLE -> "Double"
+            BOOLEAN -> "Boolean"
+            String::class.asTypeName() ->  "String"
+            String::class.asTypeName().copy(nullable = true)  -> "String"
+            else -> {
+                if(this.javaToKotlinType().isListOrArray()) {
+                    "Array"
+                }else {
+                     "UNKNOWN"
+                }
+            }
+        }
+
+fun TypeName.isArrayType(): Boolean = (this is ParameterizedTypeName && this.rawType.canonicalName == "kotlin.Array")

@@ -127,6 +127,18 @@ fun ExecutableElement.asFunSpecConvertedToKotlinTypes(enclosing: DeclaredType,
     return funSpec
 }
 
+fun ExecutableElement.asFunSpecConvertedToKotlinTypesForDaoFun(
+    enclosing: DeclaredType,
+    processingEnv: ProcessingEnvironment
+) : FunSpec.Builder {
+    val resolvedType = processingEnv.typeUtils.asMemberOf(enclosing, this) as ExecutableType
+    val returnTypeName = resolvedType.suspendedSafeReturnType
+
+    return asFunSpecConvertedToKotlinTypes(enclosing, processingEnv,
+        forceNullableReturn = returnTypeName.isNullableAsSelectReturnResult,
+        forceNullableParameterTypeArgs = returnTypeName.isNullableParameterTypeAsSelectReturnResult)
+}
+
 fun ExecutableElement.asOverridingFunSpecConvertedToKotlinTypes(enclosing: DeclaredType,
                                                                 processingEnv: ProcessingEnvironment,
                                                                 forceNullableReturn: Boolean = false,
@@ -134,4 +146,10 @@ fun ExecutableElement.asOverridingFunSpecConvertedToKotlinTypes(enclosing: Decla
     return asFunSpecConvertedToKotlinTypes(enclosing, processingEnv, forceNullableReturn,
             forceNullableParameterTypeArgs, ignoreAbstract = true)
             .addModifiers(KModifier.OVERRIDE)
+}
+
+fun <A:Annotation> ExecutableElement.hasAnyAnnotation(
+    vararg annotationsClasses: Class<out A>
+) : Boolean {
+    return annotationsClasses.any { this.hasAnnotation(it) }
 }
