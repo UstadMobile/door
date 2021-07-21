@@ -645,7 +645,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
 
                 addCode(CodeBlock.builder()
                     .beginControlFlow("val _result = %T<%T>(_db, listOf(%L)) ",
-                        DoorLiveDataJdbcImpl::class.asClassName(),
+                        DoorLiveDataImpl::class.asClassName(),
                         resultType.copy(nullable = isNullableResultType(resultType)),
                         tablesToWatch.map {"\"$it\""}.joinToString())
                     .addJdbcQueryCode(resultType, queryVarsMap, querySql,

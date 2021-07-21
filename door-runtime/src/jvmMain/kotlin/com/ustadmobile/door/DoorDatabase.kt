@@ -58,6 +58,8 @@ actual abstract class DoorDatabase actual constructor(){
 
     }
 
+    val changeListeners = CopyOnWriteArrayList<ChangeListenerRequest>() as MutableList<ChangeListenerRequest>
+
     val tableNames: List<String> by lazy {
         val delegatedDatabaseVal = sourceDatabase
         if(delegatedDatabaseVal != null) {
@@ -132,11 +134,11 @@ actual abstract class DoorDatabase actual constructor(){
         runnable.run()
     }
 
-    override fun addChangeListener(changeListenerRequest: ChangeListenerRequest) = effectiveDatabase.apply {
+    open fun addChangeListener(changeListenerRequest: ChangeListenerRequest) = effectiveDatabase.apply {
         changeListeners.add(changeListenerRequest)
     }
 
-    override fun removeChangeListener(changeListenerRequest: ChangeListenerRequest) = effectiveDatabase.apply {
+    open fun removeChangeListener(changeListenerRequest: ChangeListenerRequest) = effectiveDatabase.apply {
         changeListeners.remove(changeListenerRequest)
     }
 
