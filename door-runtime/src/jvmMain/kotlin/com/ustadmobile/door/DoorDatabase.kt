@@ -3,14 +3,12 @@ package com.ustadmobile.door
 
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import java.sql.Connection
-import java.sql.ResultSet
-import java.sql.SQLException
-import java.sql.Statement
+import java.sql.*
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.regex.Pattern
 import javax.sql.DataSource
 
+@Suppress("unused") //Some functions are used by generated code
 actual abstract class DoorDatabase actual constructor(){
 
     protected lateinit var dataSource: DataSource
@@ -184,6 +182,38 @@ actual abstract class DoorDatabase actual constructor(){
         }finally {
             statement?.close()
             connection?.autoCommit = true
+            connection?.close()
+        }
+    }
+
+    /**
+     * Wrapper that will prepare a Statement, execute a code block, and return the code block result
+     */
+    fun <R> prepareAndUseStatement(sql: String, block: (PreparedStatement) -> R) : R {
+        var connection: Connection? = null
+        var stmt: PreparedStatement? = null
+        try {
+            connection = openConnection()
+            stmt = connection.prepareStatement(sql)
+            return block(stmt)
+        }finally {
+            stmt?.close()
+            connection?.close()
+        }
+    }
+
+    /**
+     * Suspended wrapper that will prepare a Statement, execute a code block, and return the code block result
+     */
+    suspend fun <R> prepareAndUseStatementAsync(sql: String, block: suspend (PreparedStatement) -> R) : R {
+        var connection: Connection? = null
+        var stmt: PreparedStatement? = null
+        try {
+            connection = openConnection()
+            stmt = connection.prepareStatement(sql)
+            return block(stmt)
+        }finally {
+            stmt?.close()
             connection?.close()
         }
     }

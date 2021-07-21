@@ -759,13 +759,11 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .applyIf(funSpec.hasReturnType) {
                     add("var _result = %L\n", funSpec.returnType?.defaultTypeValueCode())
                 }
-                .add("var _con = null as %T?\n", Connection::class)
-                .add("var _stmt = null as %T?\n", PreparedStatement::class)
-                .beginControlFlow("try")
-                .add("_con = _db.openConnection()!!\n")
-                .add("_stmt = _con.prepareStatement(%S)!!\n", sqlStmt)
+                .add("val _sql = %S\n", sqlStmt)
+                .beginControlFlow("_db.prepareAndUseStatement".withSuffixIf("Async")  { funSpec.isSuspended } +"(_sql)")
+                .add(" _stmt ->\n")
                 .applyIf(firstParam.type.isListOrArray()) {
-                    add("_con.autoCommit = false\n")
+                    add("_stmt.connection.autoCommit = false\n")
                         .beginControlFlow("for(_entity in ${firstParam.name})")
                     entityVarName = "_entity"
                 }
@@ -786,17 +784,11 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 }
                 .applyIf(firstParam.type.isListOrArray()) {
                     endControlFlow()
-                    add("_con.commit()\n")
+                    add("_stmt.connection.commit()\n")
                 }
                 .apply {
-                    nextControlFlow("catch(_e: %T)", SQLException::class)
-                        .add("_e.printStackTrace()\n")
-                        .add("throw %T(_e)\n", RuntimeException::class)
-                        .nextControlFlow("finally")
-                        .add("_stmt?.close()\n")
-                        .add("_con?.close()\n")
-                        .endControlFlow()
-                        .add("_db.handleTableChanged(listOf(%S))\n", entityTypeEl.simpleName)
+                    endControlFlow()
+                    add("_db.handleTableChanged(listOf(%S))\n", entityTypeEl.simpleName)
                 }
                 .applyIf(funSpec.hasReturnType) {
                     add("return _result")
