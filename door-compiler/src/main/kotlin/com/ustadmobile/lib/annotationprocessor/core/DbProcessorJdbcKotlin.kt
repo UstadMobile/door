@@ -823,6 +823,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
 
         addFunction(funSpec.toBuilder()
             .removeAbstractModifier()
+            .removeAnnotations()
             .addModifiers(KModifier.OVERRIDE)
             .addCode(CodeBlock.builder()
                 .addDaoJdbcInsertCodeBlock(funSpec.parameters.first(),
@@ -836,6 +837,129 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         return this
     }
 
+    /**
+     * Genetes an EntityInsertAdapter for use with JDBC code
+     */
+    fun TypeSpec.Builder.addDaoJdbcEntityInsertAdapter(
+        entityTypeSpec: TypeSpec,
+        entityClassName: ClassName,
+        propertyName: String,
+        upsertMode: Boolean,
+        supportedDbTypes: List<Int>,
+        pgOnConflict: String? = null
+    ) : TypeSpec.Builder {
+        val entityFields = entityTypeSpec.entityFields(getAutoIncLast = false)
+        val pkField = entityFields.first { it.annotations.any { it.typeName == PrimaryKey::class.asClassName() } }
+        val insertAdapterSpec = TypeSpec.anonymousClassBuilder()
+            .superclass(EntityInsertionAdapter::class.asClassName().parameterizedBy(entityClassName))
+            .addSuperclassConstructorParameter("_db.jdbcDbType")
+            .addFunction(FunSpec.builder("makeSql")
+                .addParameter("returnsId", BOOLEAN)
+                .addModifiers(KModifier.OVERRIDE)
+                .addCode(CodeBlock.builder()
+                    .apply {
+                        if(supportedDbTypes.size != 1) {
+                            beginControlFlow("return when(dbType)")
+                        }else{
+                            add("return ")
+                        }
+                    }
+                    .applyIf(supportedDbTypes.size != 1 && DoorDbType.SQLITE in supportedDbTypes) {
+                        beginControlFlow("%T.SQLITE ->", DoorDbType::class)
+                    }
+                    .applyIf(DoorDbType.SQLITE in supportedDbTypes) {
+                        var insertSql = "INSERT "
+                        if(upsertMode)
+                            insertSql += "OR REPLACE "
+                        insertSql += "INTO ${entityTypeSpec.name} (${entityFields.joinToString { it.name }}) "
+                        insertSql += "VALUES(${entityFields.joinToString { "?" }})"
+                        add("%S", insertSql)
+                    }
+                    .applyIf(supportedDbTypes.size != 1 && DoorDbType.SQLITE in supportedDbTypes) {
+                        add("\n")
+                        endControlFlow()
+                    }
+                    .applyIf(supportedDbTypes.size != 1 && DoorDbType.POSTGRES in supportedDbTypes) {
+                        beginControlFlow("%T.POSTGRES -> ", DoorDbType::class)
+                    }
+                    .applyIf(DoorDbType.POSTGRES in supportedDbTypes) {
+                        var insertSql = "INSERT "
+                        insertSql += "INTO ${entityTypeSpec.name} (${entityFields.joinToString { it.name }}) "
+                        insertSql += "VALUES("
+                        insertSql += entityFields.joinToString { prop ->
+                            if(prop.annotations.any { it.typeName == PrimaryKey::class.asClassName() &&
+                                        it.members.findBooleanMemberValue("autoGenerate") == true }) {
+                                "COALESCE(?,nextval('${entityTypeSpec.name}_${prop.name}_seq'))"
+                            }else {
+                                "?"
+                            }
+                        }
+                        insertSql += ")"
+
+                        when {
+                            pgOnConflict != null -> {
+                                insertSql += pgOnConflict.replace(" ", "·")
+                            }
+                            upsertMode -> {
+                                insertSql += " ON CONFLICT (${pkField.name}) DO UPDATE SET "
+                                insertSql += entityFields.filter { !it.annotations.any { it.typeName == PrimaryKey::class.asTypeName() } }
+                                    .joinToString(separator = ",") {
+                                        "${it.name}·=·excluded.${it.name}"
+                                    }
+                            }
+                        }
+                        add("%S", insertSql)
+                    }
+                    .applyIf(supportedDbTypes.size != 1 && DoorDbType.POSTGRES in supportedDbTypes) {
+                        add("\n")
+                        endControlFlow()
+                    }
+                    .apply {
+                        if(supportedDbTypes.size != 1) {
+                            beginControlFlow("else ->")
+                            add("throw %T(%S)\n", IllegalArgumentException::class, "Unsupported db type")
+                            endControlFlow()
+                            endControlFlow()
+                        }else {
+                            add("\n")
+                        }
+                    }
+                    .build())
+                .build())
+            .addFunction(FunSpec.builder("bindPreparedStmtToEntity")
+                .addModifiers(KModifier.OVERRIDE)
+                .addParameter("stmt", PreparedStatement::class)
+                .addParameter("entity", entityClassName)
+                .addCode(CodeBlock.builder()
+                    .apply {
+                        entityFields.forEachIndexed { index, field ->
+                            if(field.isEntityAutoGenPrimaryKey) {
+                                beginControlFlow("if(entity.${field.name} == %L)",
+                                    field.type.defaultTypeValueCode())
+                                add("stmt.setObject(%L, null)\n", index + 1)
+                                nextControlFlow("else")
+                            }
+                            add("stmt.set${field.type.preparedStatementSetterGetterTypeName}(%L, entity.%L)\n",
+                                index + 1, field.name)
+                            if(field.isEntityAutoGenPrimaryKey) {
+                                endControlFlow()
+                            }
+                        }
+                    }
+                    .build())
+                .build())
+
+        addProperty(PropertySpec.builder(propertyName,
+                EntityInsertionAdapter::class.asClassName().parameterizedBy(entityClassName))
+                .initializer("%L", insertAdapterSpec.build())
+                .build())
+
+
+
+
+        return this
+    }
+
     fun CodeBlock.Builder.addDaoJdbcInsertCodeBlock(
         parameterSpec: ParameterSpec,
         returnType: TypeName,
@@ -843,88 +967,18 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         daoTypeBuilder: TypeSpec.Builder,
         upsertMode: Boolean = false,
         addReturnStmt: Boolean = true,
-        pgOnConflict: String? = null
+        pgOnConflict: String? = null,
+        supportedDbTypes: List<Int> = DoorDbType.SUPPORTED_TYPES
     ): CodeBlock.Builder {
         val paramType = parameterSpec.type
-        val entityClassName = paramType.asComponentClassNameIfList()
+        val entityClassName = paramType.unwrapListOrArrayComponentType() as ClassName
 
         val pgOnConflictHash = pgOnConflict?.hashCode()?.let { Math.abs(it) }?.toString() ?: ""
         val entityInserterPropName = "_insertAdapter${entityTypeSpec.name}_${if(upsertMode) "upsert" else ""}$pgOnConflictHash"
         if(!daoTypeBuilder.propertySpecs.any { it.name == entityInserterPropName }) {
-            val fieldNames = mutableListOf<String>()
-            val parameterHolders = mutableListOf<String>()
-
-            val bindCodeBlock = CodeBlock.builder()
-            var fieldIndex = 1
-            val pkProp = entityTypeSpec.propertySpecs
-                .first { it.annotations.any { it.className == PrimaryKey::class.asClassName()} }
-
-            entityTypeSpec.propertySpecs.forEach { prop ->
-                fieldNames.add(prop.name)
-                val pkAnnotation = prop.annotations.firstOrNull { it.className == PrimaryKey::class.asClassName() }
-                val setterMethodName = prop.type.preparedStatementSetterGetterTypeName
-                if(pkAnnotation != null && pkAnnotation.members.findBooleanMemberValue("autoGenerate") ?: false) {
-                    parameterHolders.add("\${when(_db.jdbcDbType) { DoorDbType.POSTGRES -> " +
-                            "\"COALESCE(?,nextval('${entityTypeSpec.name}_${prop.name}_seq'))\" else -> \"?\"} }")
-                    bindCodeBlock.add("when(entity.${prop.name}){ ${defaultVal(prop.type)} " +
-                            "-> stmt.setObject(${fieldIndex}, null) " +
-                            "else -> stmt.set$setterMethodName(${fieldIndex++}, entity.${prop.name})  }\n")
-                }else {
-                    parameterHolders.add("?")
-                    bindCodeBlock.add("stmt.set$setterMethodName(${fieldIndex++}, entity.${prop.name})\n")
-                }
-            }
-
-            val statementClause = if(upsertMode) {
-                "\${when(_db.jdbcDbType) { DoorDbType.SQLITE -> \"INSERT·OR·REPLACE\" else -> \"INSERT\"} }"
-            }else {
-                "INSERT"
-            }
-
-            val upsertSuffix = if(upsertMode) {
-                val nonPkFields = entityTypeSpec.propertySpecs
-                    .filter { ! it.annotations.any { it.className == PrimaryKey::class.asClassName() } }
-                val nonPkFieldPairs = nonPkFields.map { "${it.name}·=·excluded.${it.name}" }
-                val pkField = entityTypeSpec.propertySpecs
-                    .firstOrNull { it.annotations.any { it.className == PrimaryKey::class.asClassName()}}
-                val pgOnConflictVal = pgOnConflict?.replace(" ", "·") ?: "ON·CONFLICT·(${pkField?.name})·" +
-                "DO·UPDATE·SET·${nonPkFieldPairs.joinToString(separator = ",·")}"
-                "\${when(_db.jdbcDbType){ DoorDbType.POSTGRES -> \"$pgOnConflictVal\" " +
-                        "else -> \"·\" } } "
-            } else {
-                ""
-            }
-
-            val autoGenerateSuffix = " \${when{ _db.jdbcDbType == DoorDbType.POSTGRES && returnsId -> " +
-                    "\"·RETURNING·${pkProp.name}·\"  else -> \"\"} } "
-
-            val sql = """
-                $statementClause INTO ${entityTypeSpec.name} (${fieldNames.joinToString()})
-                VALUES (${parameterHolders.joinToString()})
-                $upsertSuffix
-                $autoGenerateSuffix
-                """.trimIndent()
-
-            val insertAdapterSpec = TypeSpec.anonymousClassBuilder()
-                .superclass(EntityInsertionAdapter::class.asClassName().parameterizedBy(entityClassName))
-                .addSuperclassConstructorParameter("_db.jdbcDbType")
-                .addFunction(FunSpec.builder("makeSql")
-                    .addParameter("returnsId", BOOLEAN)
-                    .addModifiers(KModifier.OVERRIDE)
-                    .addCode("return \"\"\"%L\"\"\"", sql).build())
-                .addFunction(FunSpec.builder("bindPreparedStmtToEntity")
-                    .addModifiers(KModifier.OVERRIDE)
-                    .addParameter("stmt", PreparedStatement::class)
-                    .addParameter("entity", entityClassName)
-                    .addCode(bindCodeBlock.build()).build())
-
-            daoTypeBuilder.addProperty(PropertySpec.builder(entityInserterPropName,
-                EntityInsertionAdapter::class.asClassName().parameterizedBy(entityClassName))
-                .initializer("%L", insertAdapterSpec.build())
-                .build())
+            daoTypeBuilder.addDaoJdbcEntityInsertAdapter(entityTypeSpec, entityClassName, entityInserterPropName,
+                upsertMode, supportedDbTypes, pgOnConflict)
         }
-
-
 
         if(returnType != UNIT) {
             add("val _retVal = ")
