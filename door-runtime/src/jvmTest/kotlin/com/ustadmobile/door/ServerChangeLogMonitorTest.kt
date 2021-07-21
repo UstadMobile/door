@@ -35,7 +35,7 @@ class ServerChangeLogMonitorTest {
         changeLogMonitor.onTablesChanged(listOf("Test"))
         changeLogMonitor.onTablesChanged(listOf("Test"))
 
-        Thread.sleep(400)
+        Thread.sleep(500)
         verifyBlocking(mockRepo, timeout(2000).times(1)) {
             dispatchUpdateNotifications(42)
         }

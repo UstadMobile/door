@@ -2,7 +2,9 @@ package com.ustadmobile.door
 
 import com.ustadmobile.door.jdbc.Connection
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Runnable
+import kotlinx.coroutines.launch
 import wrappers.SQLiteDatasourceJs
 
 actual abstract class DoorDatabase actual constructor(): DoorDatabaseChangeListener() {
@@ -12,8 +14,6 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseChangeListe
     internal lateinit var webWorkerPath: String
 
     abstract val dbVersion: Int
-
-
 
     val initCompletable = CompletableDeferred<Boolean>()
 

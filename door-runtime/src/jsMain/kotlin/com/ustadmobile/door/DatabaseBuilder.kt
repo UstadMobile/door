@@ -56,6 +56,4 @@ actual class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private 
         ): DatabaseBuilder<T> = DatabaseBuilder(context, dbClass, dbName)
 
     }
-
-
 }

@@ -44,15 +44,8 @@ kotlin {
         }
     }
 
-    js {
+    js(LEGACY) {
         browser {
-            binaries.executable()
-            webpackTask {
-                cssSupport.enabled = true
-            }
-            runTask {
-                cssSupport.enabled = true
-            }
             testTask {
                 useKarma {
                     useChromeHeadless()
@@ -152,6 +145,9 @@ kotlin {
         jsMain {
             dependsOn roomAnnotations
             dependsOn commonJvmJs
+            dependencies {
+                implementation "org.jetbrains.kotlin-wrappers:kotlin-extensions:$version_kotlin_extensions"
+            }
         }
         jsTest {
             dependencies {
