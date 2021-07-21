@@ -123,6 +123,11 @@ fun FunSpec.Builder.removeAbstractModifier(): FunSpec.Builder {
     return this
 }
 
+fun FunSpec.Builder.removeAnnotations(): FunSpec.Builder {
+    annotations.clear()
+    return this
+}
+
 /**
  * Shorthand to determine if this FunSpec represents an insert function where the entity is syncable
  */

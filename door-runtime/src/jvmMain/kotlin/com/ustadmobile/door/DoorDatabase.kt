@@ -1,19 +1,15 @@
 package com.ustadmobile.door
 
 
-import com.ustadmobile.door.ext.DoorTag.Companion.LOG_TAG
-import com.ustadmobile.door.util.systemTimeInMillis
-import io.github.aakira.napier.Napier
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import java.sql.Connection
-import java.sql.ResultSet
-import java.sql.SQLException
-import java.sql.Statement
+import java.sql.*
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.regex.Pattern
 import javax.sql.DataSource
 
-actual abstract class DoorDatabase actual constructor(): DoorDatabaseChangeListener(){
+@Suppress("unused") //Some functions are used by generated code
+actual abstract class DoorDatabase actual constructor(){
 
     protected lateinit var dataSource: DataSource
 
@@ -87,24 +83,13 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseChangeListe
     }
 
     inner class DoorSqlDatabaseImpl : DoorSqlDatabase {
+
         override fun execSQL(sql: String) {
-            var dbConnection = null as Connection?
-            var stmt = null as Statement?
-            try {
-                Napier.d("execSQL: $sql\n", tag = LOG_TAG)
-                val startTime = systemTimeInMillis()
-                dbConnection = openConnection()
-                stmt = dbConnection.createStatement()
-                stmt.executeUpdate(sql)
-                Napier.d("execSQL complete in ${systemTimeInMillis() - startTime}ms")
-            } catch (sqle: SQLException) {
-                Napier.e("Exception running execSQL")
-                sqle.printStackTrace()
-                throw sqle
-            } finally {
-                stmt?.close()
-                dbConnection?.close()
-            }
+            this@DoorDatabase.execSQLBatch(sql)
+        }
+
+        override fun execSQLBatch(statements: Array<String>) {
+            this@DoorDatabase.execSQLBatch(*statements)
         }
 
         val jdbcDbType: Int
@@ -161,6 +146,104 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseChangeListe
             changeListeners.filter { it.tableNames.isEmpty() || it.tableNames.any { changeTableNames.contains(it) } }.forEach {
                 it.onChange.invoke(changeTableNames)
             }
+        }
+    }
+
+    /**
+     * Execute a batch of SQL Statements in a transaction. This is generally much faster
+     * than executing statements individually.
+     */
+    fun execSQLBatch(vararg sqlStatements: String) {
+        var connection: Connection? = null
+        var statement: Statement? = null
+        try {
+            connection = openConnection()
+            connection.autoCommit = false
+            statement = connection.createStatement()
+            sqlStatements.forEach { sql ->
+                statement.executeUpdate(sql)
+            }
+            connection.commit()
+        }catch(e: SQLException) {
+            throw e
+        }finally {
+            statement?.close()
+            connection?.autoCommit = true
+            connection?.close()
+        }
+    }
+
+    /**
+     * Convenience extension function that will create a prepared statement. It will
+     * use builtin support for arrays if required and available, or fallback to using
+     * PreparedStatementArrayProxy otherwise.
+     */
+    protected fun Connection.prepareStatement(stmtConfig: PreparedStatementConfig) : PreparedStatement {
+        return when {
+            !stmtConfig.hasListParams -> prepareStatement(stmtConfig.sql)
+            jdbcArraySupported -> prepareStatement(adjustQueryWithSelectInParam(stmtConfig.sql))
+            else -> PreparedStatementArrayProxy(stmtConfig.sql, this)
+        } ?: throw IllegalStateException("Null statement")
+    }
+
+    /**
+     * Suspended wrapper that will prepare a Statement, execute a code block, and return the code block result
+     */
+    fun <R> prepareAndUseStatement(
+        sql: String,
+        block: (PreparedStatement) -> R
+    ) = prepareAndUseStatement(PreparedStatementConfig(sql), block)
+
+    /**
+     * Wrapper that will prepare a Statement, execute a code block, and return the code block result
+     */
+    fun <R> prepareAndUseStatement(stmtConfig: PreparedStatementConfig, block: (PreparedStatement) -> R) : R {
+        var connection: Connection? = null
+        var stmt: PreparedStatement? = null
+        try {
+            connection = openConnection()
+            stmt = connection.prepareStatement(stmtConfig)
+            return block(stmt)
+        }finally {
+            stmt?.close()
+            connection?.close()
+        }
+    }
+
+    /**
+     * Suspended wrapper that will prepare a Statement, execute a code block, and return the code block result
+     */
+    suspend fun <R> prepareAndUseStatementAsync(
+        sql: String,
+        block: suspend (PreparedStatement) -> R
+    ) = prepareAndUseStatementAsync(PreparedStatementConfig(sql), block)
+
+    /**
+     * Suspended wrapper that will prepare a Statement, execute a code block, and return the code block result
+     */
+    suspend fun <R> prepareAndUseStatementAsync(stmtConfig: PreparedStatementConfig, block: suspend (PreparedStatement) -> R) : R {
+        var connection: Connection? = null
+        var stmt: PreparedStatement? = null
+        try {
+            connection = openConnection()
+            stmt = connection.prepareStatement(stmtConfig)
+
+            return block(stmt)
+        }finally {
+            stmt?.close()
+            connection?.close()
+        }
+    }
+
+    /**
+     * Wrapper for Connection.createArrayOf. If the underlying database supports jdbc arrays, that support will be
+     * used. Otherwise the PreparedStatementArrayProxy type will be used
+     */
+    fun createArrayOf(connection: Connection, arrayType: String, objects: Array<out Any?>): java.sql.Array {
+        return if(jdbcArraySupported) {
+            connection.createArrayOf(arrayType, objects)
+        }else {
+            PreparedStatementArrayProxy.createArrayOf(arrayType, objects)
         }
     }
 

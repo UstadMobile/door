@@ -34,7 +34,7 @@ class TestDbBuilderKtKt {
             val observerFn = object : DoorObserver<List<ExampleEntity2>?> {
                 override fun onChanged(t: List<ExampleEntity2>?) {
                     if(t?.size == 1) {
-                        channel.offer(t)
+                        channel.trySend(t)
                     }
                 }
             }

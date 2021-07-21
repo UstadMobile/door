@@ -488,9 +488,10 @@ class DbProcessorSync: AbstractDbProcessor() {
     fun TypeSpec.Builder.addJdbcQueryFun(queryFunSpec: FunSpec): TypeSpec.Builder {
         addFunction(queryFunSpec.toBuilder()
                 .removeAbstractModifier()
-                .addCode(generateQueryCodeBlock(queryFunSpec.returnType ?: UNIT,
+                .addCode(CodeBlock.builder().addJdbcQueryCode(queryFunSpec.returnType ?: UNIT,
                     queryFunSpec.parameters.map { it.name to it.type}.toMap(),
-                        queryFunSpec.daoQuerySql(), null, null))
+                        queryFunSpec.daoQuerySql(), null, null,
+                        suspended = queryFunSpec.isSuspended).build())
                 .applyIf(queryFunSpec.hasReturnType) {
                     addCode("return _result\n")
                 }
@@ -522,7 +523,7 @@ class DbProcessorSync: AbstractDbProcessor() {
 
         //For all databases that are being compiled now, find those entities that require tracker entities
         // to be generated. Filter out any for which the entity was already generated.
-        dbs.flatMap { entityTypesOnDb(it as TypeElement, processingEnv) }
+        dbs.flatMap { entityTypesOnDb(it, processingEnv) }
                 .filter { it.getAnnotation(SyncableEntity::class.java) != null
                         && processingEnv.elementUtils
                         .getTypeElement("${it.asClassName().packageName}.${it.simpleName}$TRACKER_SUFFIX") == null}

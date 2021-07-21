@@ -37,6 +37,17 @@ internal fun TypeName.toSqlType(dbType: Int = 0) = when {
     else -> "ERR_UNSUPPORTED_TPYE-$this"
 }
 
+/**
+ * Given a string of the SQL column type, get the default value (0 for numbers, null for strings, false for boolean)
+ */
+internal fun String.sqlTypeDefaultValue(dbType: Int) = this.trim().uppercase().let {
+    when {
+        it == "BOOL" -> "false"
+        it == "TEXT" -> "null"
+        else -> "0"
+    }
+}
+
 internal fun TypeName.isDataSourceFactory(paramTypeFilter: (List<TypeName>) -> Boolean = {true}) = this is ParameterizedTypeName
         && this.rawType == DataSource.Factory::class.asClassName() && paramTypeFilter(this.typeArguments)
 
@@ -200,3 +211,28 @@ fun TypeName.defaultTypeValueCode(): CodeBlock {
 
     return codeBlock.build()
 }
+
+/**
+ * Get the name of the function that would be used to set this kind of parameter on a PreparedStatement
+ * e.g. setInt, setDouble, setBoolean etc.
+ */
+val TypeName.preparedStatementSetterGetterTypeName: String
+    get() = when(this.javaToKotlinType()) {
+            INT ->  "Int"
+            BYTE -> "Byte"
+            LONG ->  "Long"
+            FLOAT -> "Float"
+            DOUBLE -> "Double"
+            BOOLEAN -> "Boolean"
+            String::class.asTypeName() ->  "String"
+            String::class.asTypeName().copy(nullable = true)  -> "String"
+            else -> {
+                if(this.javaToKotlinType().isListOrArray()) {
+                    "Array"
+                }else {
+                     "UNKNOWN"
+                }
+            }
+        }
+
+fun TypeName.isArrayType(): Boolean = (this is ParameterizedTypeName && this.rawType.canonicalName == "kotlin.Array")

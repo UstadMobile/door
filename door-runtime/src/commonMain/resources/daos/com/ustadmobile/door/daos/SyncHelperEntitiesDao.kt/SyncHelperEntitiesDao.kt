@@ -4,6 +4,7 @@ import androidx.room.*
 import com.ustadmobile.door.ClientSyncManager
 import com.ustadmobile.door.SyncResult
 import com.ustadmobile.door.annotation.PgOnConflict
+import com.ustadmobile.door.entities.DoorNode
 import com.ustadmobile.door.entities.TableSyncStatus
 import com.ustadmobile.door.entities.UpdateNotification
 import com.ustadmobile.door.entities.ZombieAttachmentData
@@ -99,5 +100,16 @@ abstract class SyncHelperEntitiesDao : ISyncHelperEntitiesDao {
 
     @Delete
     abstract override suspend fun deleteZombieAttachments(zombieList: List<ZombieAttachmentData>)
+
+    @Query("""
+        SELECT auth
+          FROM DoorNode
+         WHERE nodeId = :nodeId 
+    """)
+    abstract override suspend fun getDoorNodeAuth(nodeId: Int): String?
+
+    @Insert
+    abstract override suspend fun addDoorNode(doorNode: DoorNode)
+
 
 }

@@ -292,3 +292,14 @@ val TypeElement.entityHasAttachments: Boolean
     get() = hasAnnotation(Entity::class.java) &&
             enclosedElementsWithAnnotation(AttachmentUri::class.java, ElementKind.FIELD).isNotEmpty()
 
+
+val TypeElement.entityPrimaryKey: Element?
+    get() = enclosedElements.firstOrNull {
+        it.kind == ElementKind.FIELD && it.hasAnnotation(PrimaryKey::class.java)
+    }
+
+val TypeElement.entityFields: List<Element>
+    get() = enclosedElements.filter {
+        it.kind == ElementKind.FIELD && it.simpleName.toString() != "Companion"
+                && !it.modifiers.contains(Modifier.STATIC)
+    }

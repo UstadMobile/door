@@ -38,6 +38,8 @@ import io.ktor.routing.routing
 import okhttp3.OkHttpClient
 import org.junit.After
 import org.junit.Before
+import java.util.*
+import kotlin.random.Random
 
 
 class ClientSyncManagerTest {
@@ -123,7 +125,8 @@ class ClientSyncManagerTest {
             on { findTablesToSync() }.thenReturn(listOf())
         }
 
-        val repoConfig = repositoryConfig(Any(), "http://localhost:8089/", httpClient, okHttpClient)
+        val repoConfig = repositoryConfig(Any(), "http://localhost:8089/", Random.nextInt(),
+            UUID.randomUUID().toString(), httpClient, okHttpClient)
 
         val mockRepo = mock<DoorDatabaseSyncRepository>() {
             on { tableIdMap }.thenReturn(mapOf("Example" to exampleTableId))

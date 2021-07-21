@@ -3,12 +3,13 @@ package com.ustadmobile.lib.annotationprocessor.core
 import androidx.room.ColumnInfo
 import com.squareup.kotlinpoet.*
 import io.ktor.client.request.forms.*
-import io.ktor.client.statement.*
 import io.ktor.content.*
 import io.ktor.http.*
 import javax.annotation.processing.ProcessingEnvironment
 import javax.lang.model.element.TypeElement
 import androidx.room.PrimaryKey
+import com.ustadmobile.door.util.DoorSqlGenerator
+
 /**
  * Generate a delegation style function call, e.g.
  * varName.callMethod(param1, param2, param3)
@@ -51,33 +52,6 @@ fun CodeBlock.Builder.beginIfNotNullOrEmptyControlFlow(varName: String, isList: 
         beginControlFlow("if(!$varName.isEmpty())")
     }else {
         beginControlFlow("if($varName != null)")
-    }
-
-    return this
-}
-
-/**
- * Generate insert statements that will insert the TableSyncStatus entities required for each syncable
- * entity on the database in place.
- *
- * e.g.
- * _stmt.executeUpdate("INSERT INTO TableSyncstatus(tsTableId, tsLastChanged, tsLastSynced) VALUES (42, ${systemTimeInMillis(), 0)")")
- * _stmt.executeUpdate("INSERT INTO TableSyncstatus(tsTableId, tsLastChanged, tsLastSynced) VALUES (43, ${systemTimeInMillis(), 0)")")
- * ...
- *
- * @param dbType TypeElement of the database itself
- * @param execSqlFunName the name of the function that must be called to execute SQL
- * @param processingEnv the processing environment
- *
- * @return the same CodeBlock.Builder
- */
-fun CodeBlock.Builder.addInsertTableSyncStatuses(dbType: TypeElement,
-                                               execSqlFunName: String = "_stmt.executeUpdate",
-                                               processingEnv: ProcessingEnvironment) : CodeBlock.Builder{
-
-    syncableEntityTypesOnDb(dbType, processingEnv).forEach {
-        val syncableEntityInfo = SyncableEntityInfo(it.asClassName(), processingEnv)
-        addInsertTableSyncStatus(syncableEntityInfo, execSqlFunName, processingEnv)
     }
 
     return this
@@ -183,62 +157,23 @@ fun CodeBlock.Builder.addSyncableEntityInsertTriggersSqlite(execSqlFn: String, s
     val pkFieldName = syncableEntityInfo.entityPkField.name
     val tableId = syncableEntityInfo.tableId
 
-    add("$execSqlFn(%S)\n", """
-            CREATE TRIGGER INS_LOC_${syncableEntityInfo.tableId}
-            AFTER INSERT ON $entityName
-            FOR EACH ROW WHEN (((SELECT CAST(master AS INTEGER) FROM SyncNode) = 0) AND
-                NEW.$localCsnFieldName = 0)
-            BEGIN
-                UPDATE $entityName
-                SET $primaryCsnFieldName = (SELECT sCsnNextPrimary FROM SqliteChangeSeqNums WHERE sCsnTableId = $tableId)
-                WHERE $pkFieldName = NEW.$pkFieldName;
-                
-                UPDATE SqliteChangeSeqNums
-                SET sCsnNextPrimary = sCsnNextPrimary + 1
-                WHERE sCsnTableId = $tableId;
-            END
-        """.trimIndent())
-
-    add("$execSqlFn(%S)\n", """
-            CREATE TRIGGER INS_PRI_${syncableEntityInfo.tableId}
-            AFTER INSERT ON $entityName
-            FOR EACH ROW WHEN (((SELECT CAST(master AS INTEGER) FROM SyncNode) = 1) AND
-                NEW.$primaryCsnFieldName = 0)
-            BEGIN
-                UPDATE $entityName
-                SET $primaryCsnFieldName = (SELECT sCsnNextPrimary FROM SqliteChangeSeqNums WHERE sCsnTableId = $tableId)
-                WHERE $pkFieldName = NEW.$pkFieldName;
-                
-                UPDATE SqliteChangeSeqNums
-                SET sCsnNextPrimary = sCsnNextPrimary + 1
-                WHERE sCsnTableId = $tableId;
-                
-                ${syncableEntityInfo.sqliteChangeLogInsertSql};
-            END
-        """.trimIndent())
+    beginControlFlow("%T.generateSyncableEntityInsertTriggersSqlite(%S, %L, %S, %S, %S).forEach",
+        DoorSqlGenerator::class, entityName, tableId, pkFieldName, localCsnFieldName,
+        primaryCsnFieldName)
+    add("$execSqlFn(it)\n")
+    endControlFlow()
 
     return this
 }
 
-fun CodeBlock.Builder.addSyncableEntityFunctionPostgres(execSqlFn: String, syncableEntityInfo: SyncableEntityInfo) : CodeBlock.Builder {
-    add("$execSqlFn(%S)\n", """CREATE OR REPLACE FUNCTION 
-                    | inccsn_${syncableEntityInfo.tableId}_fn() RETURNS trigger AS $$
-                    | BEGIN  
-                    | UPDATE ${syncableEntityInfo.syncableEntity.simpleName} SET ${syncableEntityInfo.entityLocalCsnField.name} =
-                    | (SELECT CASE WHEN (SELECT master FROM SyncNode) THEN NEW.${syncableEntityInfo.entityLocalCsnField.name} 
-                    | ELSE NEXTVAL('${syncableEntityInfo.syncableEntity.simpleName}_lcsn_seq') END),
-                    | ${syncableEntityInfo.entityMasterCsnField.name} = 
-                    | (SELECT CASE WHEN (SELECT master FROM SyncNode) 
-                    | THEN NEXTVAL('${syncableEntityInfo.syncableEntity.simpleName}_mcsn_seq') 
-                    | ELSE NEW.${syncableEntityInfo.entityMasterCsnField.name} END)
-                    | WHERE ${syncableEntityInfo.entityPkField.name} = NEW.${syncableEntityInfo.entityPkField.name};
-                    | INSERT INTO ChangeLog(chTableId, chEntityPk, dispatched, chTime) 
-                    | SELECT ${syncableEntityInfo.tableId}, NEW.${syncableEntityInfo.entityPkField.name}, false, cast(extract(epoch from now()) * 1000 AS BIGINT)
-                    | WHERE COALESCE((SELECT master From SyncNode LIMIT 1), false);
-                    | RETURN null;
-                    | END $$
-                    | LANGUAGE plpgsql
-                """.trimMargin())
+fun CodeBlock.Builder.addSyncableEntityFunctionAndTriggerPostgres(execSqlFn: String, syncableEntityInfo: SyncableEntityInfo) : CodeBlock.Builder {
+    beginControlFlow("%T.generateSyncableEntityFunctionAndTriggerPostgres(entityName = %S, tableId = %L, pkFieldName = %S, " +
+            "localCsnFieldName = %S, primaryCsnFieldName = %S).forEach",
+        DoorSqlGenerator::class, syncableEntityInfo.syncableEntity.simpleName, syncableEntityInfo.tableId,
+        syncableEntityInfo.entityPkField.name, syncableEntityInfo.entityLocalCsnField.name,
+        syncableEntityInfo.entityMasterCsnField.name)
+    add("$execSqlFn(it)\n")
+    endControlFlow()
 
     return this
 }
@@ -259,41 +194,10 @@ fun CodeBlock.Builder.addSyncableEntityUpdateTriggersSqlite(execSqlFn: String, s
     val pkFieldName = syncableEntityInfo.entityPkField.name
     val tableId = syncableEntityInfo.tableId
 
-    add("$execSqlFn(%S)\n", """
-            CREATE TRIGGER UPD_LOC_$tableId
-            AFTER UPDATE ON $entityName
-            FOR EACH ROW WHEN (((SELECT CAST(master AS INTEGER) FROM SyncNode) = 0)
-                AND (NEW.$localCsnFieldName == OLD.$localCsnFieldName OR
-                    NEW.$localCsnFieldName == 0))
-            BEGIN
-                UPDATE $entityName
-                SET $localCsnFieldName = (SELECT sCsnNextLocal FROM SqliteChangeSeqNums WHERE sCsnTableId = $tableId) 
-                WHERE $pkFieldName = NEW.$pkFieldName;
-                
-                UPDATE SqliteChangeSeqNums 
-                SET sCsnNextLocal = sCsnNextLocal + 1
-                WHERE sCsnTableId = $tableId;
-            END
-        """.trimIndent())
-
-    add("$execSqlFn(%S)\n", """
-            CREATE TRIGGER UPD_PRI_$tableId
-            AFTER UPDATE ON $entityName
-            FOR EACH ROW WHEN (((SELECT CAST(master AS INTEGER) FROM SyncNode) = 1)
-                AND (NEW.$primaryCsnFieldName == OLD.$primaryCsnFieldName OR
-                    NEW.$primaryCsnFieldName == 0))
-            BEGIN
-                UPDATE $entityName
-                SET $primaryCsnFieldName = (SELECT sCsnNextPrimary FROM SqliteChangeSeqNums WHERE sCsnTableId = $tableId)
-                WHERE $pkFieldName = NEW.$pkFieldName;
-                
-                UPDATE SqliteChangeSeqNums
-                SET sCsnNextPrimary = sCsnNextPrimary + 1
-                WHERE sCsnTableId = $tableId;
-                
-                ${syncableEntityInfo.sqliteChangeLogInsertSql};
-            END
-        """.trimIndent())
+    beginControlFlow("%T.generateSyncableEntityUpdateTriggersSqlite(%S, %L, %S, %S, %S).forEach",
+        DoorSqlGenerator::class, entityName, tableId, pkFieldName, localCsnFieldName, primaryCsnFieldName)
+    add("$execSqlFn(it)\n")
+    endControlFlow()
 
     return this
 }
@@ -344,16 +248,16 @@ internal fun CodeBlock.Builder.addReplaceSqliteChangeSeqNums(execSqlFn: String,
  * @param daoName The name of the DAO to which funSpec belongs
  */
 internal fun CodeBlock.Builder.addKtorRequestForFunction(
-                                                   funSpec: FunSpec,
-                                                   httpClientVarName: String = "_httpClient",
-                                                   httpEndpointVarName: String = "_endpoint",
-                                                   dbPathVarName: String,
-                                                   daoName: String,
-                                                   useKotlinxListSerialization: Boolean = false,
-                                                   kotlinxSerializationJsonVarName: String = "",
-                                                   useMultipartPartsVarName: String? = null,
-                                                   addDbVersionParamName: String? = "_db",
-                                                   addClientIdHeaderVar: String? = null): CodeBlock.Builder {
+    funSpec: FunSpec,
+    httpClientVarName: String = "_httpClient",
+    httpEndpointVarName: String = "_endpoint",
+    dbPathVarName: String,
+    daoName: String,
+    useKotlinxListSerialization: Boolean = false,
+    kotlinxSerializationJsonVarName: String = "",
+    useMultipartPartsVarName: String? = null,
+    addNodeIdAndVersionRepoVarName: String? = "_repo",
+    addClientIdHeaderVar: String? = null): CodeBlock.Builder {
 
     //Begin creation of the HttpStatement call that will set the URL, parameters, etc.
     val nonQueryParams =  funSpec.parameters.filter { !it.type.isHttpQueryQueryParam() }
@@ -382,9 +286,9 @@ internal fun CodeBlock.Builder.addKtorRequestForFunction(
     add("encodedPath = \"\${encodedPath}\${$dbPathVarName}/%L/%L\"\n", daoName, funSpec.name)
     endControlFlow()
 
-    if(addDbVersionParamName != null) {
-        add("%M($addDbVersionParamName)\n",
-                MemberName("com.ustadmobile.door.ext", "dbVersionHeader"))
+    if(addNodeIdAndVersionRepoVarName != null) {
+        add("%M($addNodeIdAndVersionRepoVarName)\n",
+                MemberName("com.ustadmobile.door.ext", "doorNodeAndVersionHeaders"))
     }
 
     if(addClientIdHeaderVar != null) {

@@ -31,28 +31,6 @@ import io.ktor.http.Headers
 //here in a comment because it sometimes gets removed by 'optimization of parameters'
 // import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 
-fun isUpdateDeleteOrInsertMethod(methodEl: Element)
-        = listOf(Update::class.java, Delete::class.java, Insert::class.java).any { methodEl.getAnnotation(it) != null }
-
-fun isUpdateDeleteOrInsertMethod(funSpec: FunSpec) =
-        funSpec.annotations.any { it.className in listOf(Insert::class.asClassName(),
-                    Delete::class.asClassName(), Update::class.asClassName())}
-
-
-fun isModifyingQueryMethod(methodEl: Element) : Boolean {
-    if(isUpdateDeleteOrInsertMethod(methodEl)) {
-        return true
-    }
-
-    val queryAnnotation = methodEl.getAnnotation(Query::class.java)
-    val queryTrimmed = queryAnnotation?.value?.trim()
-    if(queryTrimmed != null && (queryTrimmed.startsWith("UPDATE", ignoreCase = true)
-            || queryTrimmed.startsWith("DELETE", ignoreCase = true))){
-        return true
-    }
-
-    return false
-}
 
 val SQL_NUMERIC_TYPES = listOf(BYTE, SHORT, INT, LONG, FLOAT, DOUBLE)
 
@@ -153,42 +131,12 @@ fun daosOnDb(dbType: ClassName, processingEnv: ProcessingEnvironment, excludeDbS
 fun syncableEntityTypesOnDb(dbType: TypeElement, processingEnv: ProcessingEnvironment) =
         entityTypesOnDb(dbType, processingEnv).filter { it.getAnnotation(SyncableEntity::class.java) != null}
 
-/**
- * Get a list of all entity result types (e.g. entity types that are returned by query functions)
- * on a DAO where the entity type (or any of it's embedded types) has a given annotation.
- *
- * @param daoClass the DAO class to search on
- * @param annotationClass the annotation to look for on an entity (or it's embedded fields)
- * @param processingEnv annotation processing environment
- *
- * @return a list of all entities that have the given annotation
- */
-fun queryResultTypesWithAnnotationOnDao(daoClass: ClassName, annotationClass: Class<out Annotation>,
-                                processingEnv: ProcessingEnvironment): List<ClassName> {
-    val daoType = processingEnv.elementUtils.getTypeElement(daoClass.canonicalName)
-    val entitiesWithAnnotationOnDao = mutableSetOf<ClassName>()
-    daoType.enclosedElements.filter { it.getAnnotation(Query::class.java) != null}.forEach {methodEl ->
-        //TODO: Add rest accessible methods
-        val querySql = methodEl.getAnnotation(Query::class.java).value.toLowerCase(Locale.ROOT).trim()
-        if(!(querySql.startsWith("update") || querySql.startsWith("delete"))) {
-            val methodResolved = processingEnv.typeUtils
-                    .asMemberOf(daoType.asType() as DeclaredType, methodEl) as ExecutableType
-            val returnType = resolveReturnTypeIfSuspended(methodResolved)
-            val entityType = resolveEntityFromResultType(resolveQueryResultType(returnType))
-            entitiesWithAnnotationOnDao.addAll(findEntitiesWithAnnotation(entityType as ClassName,
-                    annotationClass, processingEnv).values)
-        }
-    }
-
-    return entitiesWithAnnotationOnDao.toList()
-}
-
 fun syncableEntitiesOnDao(daoClass: ClassName, processingEnv: ProcessingEnvironment): List<ClassName> {
     val daoType = processingEnv.elementUtils.getTypeElement(daoClass.canonicalName)
     val syncableEntitiesOnDao = mutableSetOf<ClassName>()
     daoType.enclosedElements.filter { it.getAnnotation(Query::class.java) != null}.forEach {methodEl ->
         //TODO: Add rest accessible methods
-        val querySql = methodEl.getAnnotation(Query::class.java).value.toLowerCase(Locale.ROOT).trim()
+        val querySql = methodEl.getAnnotation(Query::class.java).value.lowercase().trim()
         if(!(querySql.startsWith("update") || querySql.startsWith("delete"))) {
             val methodResolved = processingEnv.typeUtils
                     .asMemberOf(daoType.asType() as DeclaredType, methodEl) as ExecutableType
@@ -339,7 +287,6 @@ internal val CLIENT_HTTPSTMT_RECEIVE_MEMBER_NAME = MemberName("io.ktor.client.ca
  * will not automatically handle .receive<List<Entity>>
  * @param kotlinxSerializationJsonVarName if useKotlinxListSerialization, thne this is the variable
  * name that will be used to access the Json object to serialize or deserialize.
- * @param isPrimary if true, we will use the primary change sequence number when inserting tracker
  * entities. If false, we will use the local change sequence number.
  *
  * REPLACE WITH CodeBlockExt.addKtorRequestForFunction
@@ -357,7 +304,7 @@ internal fun generateKtorRequestCodeBlockForMethod(httpEndpointVarName: String =
                                                    useKotlinxListSerialization: Boolean = false,
                                                    kotlinxSerializationJsonVarName: String = "",
                                                    useMultipartPartsVarName: String? = null,
-                                                   addDbVersionParamName: String? = "_db"): CodeBlock {
+                                                   addVersionAndNodeIdArg: String? = "_repo"): CodeBlock {
 
     //Begin creation of the HttpStatement call that will set the URL, parameters, etc.
     val nonQueryParams = getHttpBodyParams(params)
@@ -373,8 +320,8 @@ internal fun generateKtorRequestCodeBlockForMethod(httpEndpointVarName: String =
 
 
 
-    codeBlock.takeIf { addDbVersionParamName != null }?.add("%M($addDbVersionParamName)\n",
-            MemberName("com.ustadmobile.door.ext", "dbVersionHeader"))
+    codeBlock.takeIf { addVersionAndNodeIdArg != null }?.add("%M($addVersionAndNodeIdArg)\n",
+            MemberName("com.ustadmobile.door.ext", "doorNodeAndVersionHeaders"))
 
     params.filter { isQueryParam(it.type) }.forEach {
         val paramType = it.type
@@ -470,81 +417,6 @@ internal fun generateKtorRequestCodeBlockForMethod(httpEndpointVarName: String =
     codeBlock.add("val $httpResultVarName = ")
     codeBlock.add(receiveCodeBlock)
 
-
-    return codeBlock.build()
-}
-
-/**
- * Generate a CodeBlock that will use a synchelper DAO to insert sync status tracker entities
- * e.g. _syncHelper._replaceSyncEntityTracker(_result.map { SyncEntityTracker(...) })
- */
-fun generateReplaceSyncableEntitiesTrackerCodeBlock(resultVarName: String, resultType: TypeName,
-                                                    syncHelperDaoVarName: String = "_syncHelper",
-                                                    clientIdVarName: String = "__clientId",
-                                                    reqIdVarName: String = "_reqId",
-                                                    isPrimaryDb: Boolean = true,
-                                                    processingEnv: ProcessingEnvironment): CodeBlock {
-    val codeBlock = CodeBlock.builder()
-    val resultComponentType = resolveEntityFromResultType(resultType)
-    if(resultComponentType !is ClassName)
-        return codeBlock.build()
-
-    val syncableEntitiesList = findSyncableEntities(resultComponentType, processingEnv)
-
-    syncableEntitiesList.forEach {
-        val sEntityInfo = SyncableEntityInfo(it.value, processingEnv)
-
-        val isListOrArrayResult = resultType.isListOrArray()
-        var wrapperFnName = Pair("", "")
-        var varName = ""
-        if(isListOrArrayResult) {
-            var prefix = resultVarName
-            it.key.forEach {embedVarName ->
-                prefix += "\n.map { it!!.$embedVarName }\n.filter { it != null }"
-            }
-            wrapperFnName = Pair("$prefix\n.map {", "}")
-            varName = "it!!"
-        }else {
-            var accessorName = resultVarName
-            it.key.forEach {embedVarName ->
-                accessorName += "?.$embedVarName"
-            }
-
-            varName = "_se${sEntityInfo.syncableEntity.simpleName}"
-            codeBlock.add("val $varName = $accessorName\n")
-
-            wrapperFnName = Pair("listOf(", ")")
-        }
-
-
-        if(!isListOrArrayResult) {
-            codeBlock.beginControlFlow("if($varName != null)")
-        }
-
-        val entityCsnField = sEntityInfo.entityMasterCsnField
-        val entityCsnSuffix = if(entityCsnField.type != INT) {
-            ".toInt()"
-        }else {
-            ""
-        }
-
-        val csnField = if(isPrimaryDb) {
-            sEntityInfo.entityMasterCsnField
-        }else {
-            sEntityInfo.entityLocalCsnField
-        }
-
-        codeBlock.add("""$syncHelperDaoVarName._replace${sEntityInfo.tracker.simpleName}( ${wrapperFnName.first} %T(
-                             |${sEntityInfo.trackerPkField.name} = $varName.${sEntityInfo.entityPkField.name},
-                             |${sEntityInfo.trackerDestField.name} = $clientIdVarName,
-                             |${sEntityInfo.trackerCsnField.name} = $varName.${csnField.name}$entityCsnSuffix,
-                             |${sEntityInfo.trackerReqIdField.name} = $reqIdVarName
-                             |) ${wrapperFnName.second} )
-                             |""".trimMargin(), sEntityInfo.tracker)
-        if(!isListOrArrayResult) {
-            codeBlock.endControlFlow()
-        }
-    }
 
     return codeBlock.build()
 }
@@ -745,34 +617,30 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         return this
     }
 
-    /**
-     * Used to determine if a DAO method returns a DataSource.Factory with a syncable entity type
-     * (e.g. should have a boundary callback)
-     */
-    protected val daoMethodSyncableDataSourceFactoryFilter = { returnTypeArgs : List<TypeName> ->
-        returnTypeArgs.any { it is ClassName && findSyncableEntities(it, processingEnv).isNotEmpty() }
-    }
-
     override fun init(p0: ProcessingEnvironment) {
         super.init(p0)
         messager = p0.messager
     }
 
+    //In reality this is only used for the TRK entities
     protected fun makeCreateTableStatement(entitySpec: TypeSpec, dbType: Int): String {
         var sql = "CREATE TABLE IF NOT EXISTS ${entitySpec.name} ("
         var commaNeeded = false
         for (fieldEl in getEntityFieldElements(entitySpec, true)) {
             sql += """${if(commaNeeded) "," else " "} ${fieldEl.name} """
-            val pkAutoGenerate = fieldEl.annotations
-                    .firstOrNull { it.className == PrimaryKey::class.asClassName() }
-                    ?.members?.findBooleanMemberValue("autoGenerate") ?: false
+            val pkAnnotation = fieldEl.annotations.firstOrNull { it.className == PrimaryKey::class.asClassName() }
+            val pkAutoGenerate = pkAnnotation?.members?.findBooleanMemberValue("autoGenerate") ?: false
             if(pkAutoGenerate) {
                 when(dbType) {
                     DoorDbType.SQLITE -> sql += " INTEGER "
                     DoorDbType.POSTGRES -> sql += (if(fieldEl.type == LONG) { " BIGSERIAL " } else { " SERIAL " })
                 }
             }else {
-                sql += " ${fieldEl.type.toSqlType(dbType)} "
+                val sqlType = fieldEl.type.toSqlType(dbType)
+                sql += " $sqlType "
+                if(pkAnnotation == null && fieldEl.type != String::class.asTypeName()) {
+                    sql += " NOT NULL DEFAULT  ${sqlType.sqlTypeDefaultValue(dbType)} "
+                }
             }
 
             if(fieldEl.annotations.any { it.className == PrimaryKey::class.asClassName()} ) {
@@ -800,41 +668,40 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                 "index_${tableName}_${it.value.joinToString(separator = "_", postfix = "", prefix = "")}"
             }
 
-            codeBlock.add("$execSqlFnName(%S)\n", """CREATE 
-                |${if(it.unique){ "UNIQUE" } else { "" } } INDEX $indexName 
-                |ON $tableName (${it.value.joinToString()})""".trimMargin())
+            codeBlock.add("$execSqlFnName(%S)\n", "CREATE " +
+                 (if(it.unique) "UNIQUE" else "" ) +" INDEX $indexName" +
+                 " ON $tableName (${it.value.joinToString()})")
         }
 
         return codeBlock.build()
     }
 
-    protected fun generateSyncTriggersCodeBlock(entityClass: ClassName, execSqlFn: String, dbType: Int): CodeBlock {
-        val codeBlock = CodeBlock.builder()
+    /**
+     * Add code that will create the triggers needed for syncable entities
+     */
+    protected fun CodeBlock.Builder.addSyncableEntityTriggers(
+        entityClass: ClassName,
+        execSqlFn: String,
+        dbType: Int
+    ): CodeBlock.Builder {
         val syncableEntityInfo = SyncableEntityInfo(entityClass, processingEnv)
         when(dbType){
             DoorDbType.SQLITE -> {
-                codeBlock.addSyncableEntityInsertTriggersSqlite(execSqlFn, syncableEntityInfo)
-                codeBlock.addSyncableEntityUpdateTriggersSqlite(execSqlFn, syncableEntityInfo)
-
-
+                addSyncableEntityInsertTriggersSqlite(execSqlFn, syncableEntityInfo)
+                addSyncableEntityUpdateTriggersSqlite(execSqlFn, syncableEntityInfo)
             }
 
             DoorDbType.POSTGRES -> {
                 listOf("m", "l").forEach {
-                    codeBlock.add("$execSqlFn(%S)\n",
+                    add("$execSqlFn(%S)\n",
                         "CREATE SEQUENCE IF NOT EXISTS ${syncableEntityInfo.syncableEntity.simpleName}_${it}csn_seq")
                 }
 
-                codeBlock.addSyncableEntityFunctionPostgres(execSqlFn, syncableEntityInfo)
-                    .add("$execSqlFn(%S)\n", """CREATE TRIGGER inccsn_${syncableEntityInfo.tableId}_trig 
-                            |AFTER UPDATE OR INSERT ON ${syncableEntityInfo.syncableEntity.simpleName} 
-                            |FOR EACH ROW WHEN (pg_trigger_depth() = 0) 
-                            |EXECUTE PROCEDURE inccsn_${syncableEntityInfo.tableId}_fn()
-                        """.trimMargin())
+                addSyncableEntityFunctionAndTriggerPostgres(execSqlFn, syncableEntityInfo)
             }
         }
 
-        return codeBlock.build()
+        return this
     }
 
 
@@ -852,9 +719,16 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
      * with any wrapping (e.g. LiveData) removed.
      */
     //TODO: Check for invalid combos. Cannot have querySql and rawQueryVarName as null. Cannot have rawquery doing update
-    fun generateQueryCodeBlock(returnType: TypeName, queryVars: Map<String, TypeName>, querySql: String?,
-                               enclosing: TypeElement?, method: ExecutableElement?,
-                               resultVarName: String = "_result", rawQueryVarName: String? = null): CodeBlock {
+    fun CodeBlock.Builder.addJdbcQueryCode(
+        returnType: TypeName,
+        queryVars: Map<String, TypeName>,
+        querySql: String?,
+        enclosing: TypeElement?,
+        method: ExecutableElement?,
+        resultVarName: String = "_result",
+        rawQueryVarName: String? = null,
+        suspended: Boolean = false
+    ): CodeBlock.Builder {
         // The result, with any wrapper (e.g. LiveData or DataSource.Factory) removed
         val resultType = resolveQueryResultType(returnType)
 
@@ -876,7 +750,6 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
 
         val isUpdateOrDelete = querySql != null && querySql.isSQLAModifyingQuery()
 
-        val codeBlock = CodeBlock.builder()
 
         var preparedStatementSql = querySql
         var execStmtSql = querySql
@@ -899,38 +772,23 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         }
 
         if(resultType != UNIT)
-            codeBlock.add("var $resultVarName = ${defaultVal(resultType)}\n")
-
-        codeBlock.add("var _conToClose = null as %T?\n", Connection::class)
-                .add("var _stmtToClose = null as %T?\n", PreparedStatement::class)
-                .add("var _resultSetToClose = null as %T?\n", ResultSet::class)
-                .beginControlFlow("try")
-                .add("val _con = _db.openConnection()\n")
-                .add("_conToClose = _con\n")
+            add("var $resultVarName = ${defaultVal(resultType)}\n")
 
         if(rawQueryVarName == null) {
             if(queryVars.any { it.value.javaToKotlinType().isListOrArray() }) {
-                codeBlock.beginControlFlow("val _stmt = if(_db!!.jdbcArraySupported)")
-                        .add("_con.prepareStatement(_db.adjustQueryWithSelectInParam(%S))!!\n", preparedStatementSql)
-                        .nextControlFlow("else")
-                        .add("%T(%S, _con) as %T\n", PreparedStatementArrayProxy::class, preparedStatementSql,
-                                PreparedStatement::class)
-                        .endControlFlow()
+                add("val _stmtConfig = %T(%S, hasListParams = true)\n", PreparedStatementConfig::class,
+                    preparedStatementSql)
             }else {
-                codeBlock.add("val _stmt = _con.prepareStatement(%S)\n", preparedStatementSql)
+                add("val _stmtConfig = %T(%S)\n", PreparedStatementConfig::class, preparedStatementSql)
             }
         }else {
-            codeBlock.beginControlFlow("val _stmt = if(!_db!!.jdbcArraySupported && ($rawQueryVarName.values?.asList()?.any { it is List<*> || (it?.javaClass?.isArray ?: false)} ?: false))")
-                    .add("%T(_db.adjustQueryWithSelectInParam($rawQueryVarName.getSql()), _con) as %T\n",
-                            PreparedStatementArrayProxy::class, PreparedStatement::class)
-                    .nextControlFlow("else")
-                    .add("_con.prepareStatement(_db.adjustQueryWithSelectInParam($rawQueryVarName.getSql()))\n")
-                    .endControlFlow()
+            add("val _stmtConfig = %T($rawQueryVarName.getSql(), hasListParams = $rawQueryVarName.%M())\n",
+                PreparedStatementConfig::class, MemberName("com.ustadmobile.door.ext", "hasListOrArrayParams"))
         }
 
 
-        codeBlock.add("_stmtToClose = _stmt\n")
-
+        beginControlFlow("_db.prepareAndUseStatement".withSuffixIf("Async") { suspended } + "(_stmtConfig)")
+        add("_stmt ->\n")
 
         if(querySql != null) {
             var paramIndex = 1
@@ -942,16 +800,10 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                 }else if(paramType.javaToKotlinType().isListOrArray()) {
                     //val con = null as Connection
                     val arrayTypeName = sqlArrayComponentTypeOf(paramType.javaToKotlinType())
-                    codeBlock.add("_stmt.setArray(${paramIndex++}, ")
-                            .beginControlFlow("if(_db!!.jdbcArraySupported) ")
-                            .add("_con!!.createArrayOf(%S, %L.toTypedArray())\n", arrayTypeName, it)
-                            .nextControlFlow("else")
-                            .add("%T.createArrayOf(%S, %L.toTypedArray())\n", PreparedStatementArrayProxy::class,
-                                    arrayTypeName, it)
-                            .endControlFlow()
-                            .add(")\n")
+                    add("_stmt.setArray(${paramIndex++}, _db.createArrayOf(_stmt.connection, %S, %L.toTypedArray()))\n",
+                        arrayTypeName, it)
                 }else {
-                    codeBlock.add("_stmt.set${getPreparedStatementSetterGetterTypeName(paramType.javaToKotlinType())}(${paramIndex++}, " +
+                    add("_stmt.set${paramType.javaToKotlinType().preparedStatementSetterGetterTypeName}(${paramIndex++}, " +
                             "${it})\n")
                 }
             }
@@ -960,10 +812,10 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                 logMessage(Diagnostic.Kind.ERROR,
                         "Parameters in query not found in method signature: ${queryVarsNotSubstituted.joinToString()}",
                         enclosing, method)
-                return CodeBlock.builder().build()
+                return this
             }
         }else {
-            codeBlock.add("$rawQueryVarName.bindToPreparedStmt(_stmt, _db, _con)\n")
+            add("$rawQueryVarName.bindToPreparedStmt(_stmt, _db, _stmt.connection)\n")
         }
 
         var resultSet = null as ResultSet?
@@ -976,19 +828,19 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                  Run this query now so that we would get an exception if there is something wrong with it.
                  */
                 execStmt?.executeUpdate(execStmtSql)
-                codeBlock.add("val _numUpdates = _stmt.executeUpdate()\n")
+                add("val _numUpdates = _stmt.executeUpdate()\n")
                 val entityModified = findEntityModifiedByQuery(execStmtSql!!, allKnownEntityNames)
 
-                codeBlock.beginControlFlow("if(_numUpdates > 0)")
+                beginControlFlow("if(_numUpdates > 0)")
                         .add("_db.handleTableChanged(listOf(%S))\n", entityModified)
                         .endControlFlow()
 
                 if(resultType != UNIT) {
-                    codeBlock.add("$resultVarName = _numUpdates\n")
+                    add("$resultVarName = _numUpdates\n")
                 }
             }else {
-                codeBlock.add("val _resultSet = _stmt.executeQuery()\n")
-                        .add("_resultSetToClose = _resultSet\n")
+                beginControlFlow("_stmt.executeQuery().use")
+                add(" _resultSet ->\n")
 
                 val colNames = mutableListOf<String>()
                 if(execStmtSql != null) {
@@ -997,43 +849,37 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                     for(i in 1 .. metaData.columnCount) {
                         colNames.add(metaData.getColumnName(i))
                     }
-                }else {
-                    //colNames.addAll(entityFieldMap!!.fieldMap.map { it.key.substringAfterLast('.') })
                 }
 
                 val entityVarName = "_entity"
-                val entityInitializerBlock = if(QUERY_SINGULAR_TYPES.contains(entityType)) {
-                    CodeBlock.builder().add("${defaultVal(entityType)}").build()
-                }else {
-                    CodeBlock.builder().add("%T()", entityType).build()
-                }
 
                 if(entityType !in QUERY_SINGULAR_TYPES && rawQueryVarName != null) {
-                    codeBlock.add("val _resultMetaData = _resultSet.metaData\n")
+                    add("val _resultMetaData = _resultSet.metaData\n")
                             .add("val _columnIndexMap = (1 .. _resultMetaData.columnCount).map { _resultMetaData.getColumnLabel(it) to it }.toMap()\n")
                 }
 
 
                 if(resultType.isListOrArray()) {
-                    codeBlock.beginControlFlow("while(_resultSet.next())")
+                    beginControlFlow("while(_resultSet.next())")
                 }else {
-                    codeBlock.beginControlFlow("if(_resultSet.next())")
+                    beginControlFlow("if(_resultSet.next())")
                 }
 
                 if(QUERY_SINGULAR_TYPES.contains(entityType)) {
-                    codeBlock.add("val $entityVarName = _resultSet.get${getPreparedStatementSetterGetterTypeName(entityType)}(1)\n")
+                    add("val $entityVarName = _resultSet.get${entityType.preparedStatementSetterGetterTypeName}(1)\n")
                 }else {
-                    codeBlock.add(resultEntityField!!.createSetterCodeBlock(rawQuery = rawQueryVarName != null,
+                    add(resultEntityField!!.createSetterCodeBlock(rawQuery = rawQueryVarName != null,
                             colIndexVarName = "_columnIndexMap"))
                 }
 
                 if(resultType.isListOrArray()) {
-                    codeBlock.add("$resultVarName.add(_entity)\n")
+                    add("$resultVarName.add(_entity)\n")
                 }else {
-                    codeBlock.add("$resultVarName = _entity\n")
+                    add("$resultVarName = _entity\n")
                 }
 
-                codeBlock.endControlFlow()
+                endControlFlow()
+                endControlFlow() //end use of resultset
             }
         }catch(e: SQLException) {
             logMessage(Diagnostic.Kind.ERROR,
@@ -1042,16 +888,9 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                     annotation = method?.annotationMirrors?.firstOrNull {it.annotationType.asTypeName() == Query::class.asTypeName()})
         }
 
-        codeBlock.nextControlFlow("catch(_e: %T)", SQLException::class)
-                .add("_e.printStackTrace()\n")
-                .add("throw %T(_e)\n", RuntimeException::class)
-                .nextControlFlow("finally")
-                .add("_resultSetToClose?.close()\n")
-                .add("_stmtToClose?.close()\n")
-                .add("_conToClose?.close()\n")
-                .endControlFlow()
+        endControlFlow()
 
-        return codeBlock.build()
+        return this
     }
 
     /**
@@ -1093,7 +932,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
             entityTypeSpec.propertySpecs.forEach { prop ->
                 fieldNames.add(prop.name)
                 val pkAnnotation = prop.annotations.firstOrNull { it.className == PrimaryKey::class.asClassName() }
-                val setterMethodName = getPreparedStatementSetterGetterTypeName(prop.type)
+                val setterMethodName = prop.type.preparedStatementSetterGetterTypeName
                 if(pkAnnotation != null && pkAnnotation.members.findBooleanMemberValue("autoGenerate") ?: false) {
                     parameterHolders.add("\${when(_db.jdbcDbType) { DoorDbType.POSTGRES -> " +
                             "\"COALESCE(?,nextval('${entityTypeSpec.name}_${prop.name}_seq'))\" else -> \"?\"} }")
@@ -1273,70 +1112,6 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                             .endControlFlow()
                             .build()
                 },
-//                beforeInsertCode = {accessorVarName, className, isList ->
-//                    if(findEntitiesWithAnnotation(className, EntityWithAttachment::class.java,
-//                                    processingEnv).isNotEmpty()) {
-//                        val attDirVarName = "_attDir_${className.simpleName}"
-//                        val attEntityCodeBlock= CodeBlock.builder()
-//                                .add("val $attDirVarName = %T(_attachmentsDir, %S)\n",
-//                                        File::class, className.simpleName)
-//                                .beginControlFlow("if(!$attDirVarName.exists())")
-//                                .add("$attDirVarName.mkdirs()\n")
-//                                .endControlFlow()
-//
-//                        val entityVarName = if(isList) {
-//                            attEntityCodeBlock.beginControlFlow("$accessorVarName.forEach ")
-//                            "it"
-//                        }else {
-//                            accessorVarName
-//                        }
-//
-//                        val entityPkEl = processingEnv.elementUtils.getTypeElement(className.canonicalName)
-//                                .enclosedElements.first { it.getAnnotation(PrimaryKey::class.java) != null}
-//
-//                        attEntityCodeBlock
-//                                .beginControlFlow("try")
-//                                .beginControlFlow("_httpClient.%M<%T>",
-//                                    CLIENT_GET_MEMBER_NAME, HttpStatement::class)
-//                                .add("%M(_db)\n",
-//                                        MemberName("com.ustadmobile.door.ext", "dbVersionHeader"))
-//                                .beginControlFlow("url")
-//                                .add("%M(_endpoint)\n", MemberName("io.ktor.http", "takeFrom"))
-//                                .add("encodedPath = \"\${encodedPath}\${_dbPath}/%L/%L\"\n", daoName,
-//                                        "_get${className.simpleName}AttachmentData")
-//                                .endControlFlow()
-//                                .add("%M(%S, $entityVarName.%L)\n", CLIENT_PARAMETER_MEMBER_NAME,
-//                                        "_pk", entityPkEl.simpleName)
-//                                .nextControlFlow(".execute")
-//                                .add("response ->\n")
-//                                //TODO: throw an exception whne the status code != 200
-//                                .beginControlFlow("if(response.status == %T.OK)",
-//                                        HttpStatusCode::class)
-//                                .add("val _attFileDest = File($attDirVarName, $entityVarName.${entityPkEl.simpleName}.toString())\n")
-//                                .add("response.content.%M(_attFileDest.%M())\n",
-//                                        MemberName("io.ktor.utils.io", "copyAndClose"),
-//                                        MemberName("io.ktor.util.cio", "writeChannel"))
-//                                .endControlFlow()
-//                                .endControlFlow()
-//
-//                        attEntityCodeBlock.nextControlFlow("catch(e: %T)", Exception::class)
-//                                .add("throw %T(" +
-//                                        "\"Could·not·download·attachment·for·${className.simpleName}·PK·\${$entityVarName.${entityPkEl.simpleName}}\",e)\n",
-//                                        IOException::class)
-//                                .nextControlFlow("finally")
-//                                .endControlFlow()
-//
-//                        if(isList) {
-//                            attEntityCodeBlock.endControlFlow()
-//                        }
-//
-//
-//
-//                        attEntityCodeBlock.build()
-//                    }else {
-//                        CodeBlock.of("")
-//                    }
-//                },
                 resultType = resultType, processingEnv = processingEnv,
                 syncHelperDaoVarName = syncHelperDaoVarName))
 
@@ -1394,9 +1169,10 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
 
                 val overridingFun = funSpec.toBuilder()
                         .addModifiers(KModifier.OVERRIDE)
-                        .addCode(generateQueryCodeBlock(funSpec.returnType ?: UNIT,
+                        .addCode(CodeBlock.builder().addJdbcQueryCode(funSpec.returnType ?: UNIT,
                                 funSpec.parameters.map { it.name to it.type}.toMap(),
-                                queryAnnotation.memberToString(), null, null))
+                                queryAnnotation.memberToString(), null, null)
+                            .build())
                 if(funSpec.returnType != UNIT) {
                     overridingFun.addCode("return _result\n")
                 }

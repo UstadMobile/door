@@ -7,7 +7,7 @@ import java.util.*
  * for insert, update, delete, and replace. It will return false for other (e.g. select) queries
  */
 fun String.isSQLAModifyingQuery() : Boolean {
-    val queryTrim = toLowerCase(Locale.ROOT).trim()
+    val queryTrim = lowercase().trim()
     return listOf("update", "delete", "insert", "replace").any { queryTrim.startsWith(it) }
 }
 
@@ -39,3 +39,10 @@ fun String.removeAllSuffixedInstancesOf(suffix: String): String {
     return str
 }
 
+
+fun String.withSuffixIf(suffix: String, condition: (String) -> Boolean) : String{
+    if(condition(this))
+        return "$this$suffix"
+    else
+        return this
+}

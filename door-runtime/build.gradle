@@ -3,7 +3,6 @@ plugins {
     id 'kotlinx-atomicfu'
     id 'org.jetbrains.kotlin.plugin.serialization'
     id 'com.android.library'
-    id 'kotlin-android-extensions'
     id 'maven-publish'
 }
 
@@ -11,13 +10,13 @@ group rootProject.group
 version rootProject.version
 
 repositories {
-    jcenter()
     mavenCentral()
 }
 
 
 android {
     compileSdkVersion 30
+    buildToolsVersion "30.0.3"
     sourceSets.main.manifest.srcFile('src/androidMain/AndroidManifest.xml')
     defaultConfig {
         minSdkVersion 21

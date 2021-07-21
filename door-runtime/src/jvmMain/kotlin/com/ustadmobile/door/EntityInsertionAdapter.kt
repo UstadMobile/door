@@ -2,10 +2,28 @@ package com.ustadmobile.door
 
 import java.sql.*
 
-abstract class EntityInsertionAdapter<T>(dbType: Int) {
+/**
+ * This is similar to the EntityInsertionAdapter on Room. It is used by generated code.
+ * @param dbType The DbType constant as per DoorDbType
+ */
+@Suppress("unused", "VARIABLE_WITH_REDUNDANT_INITIALIZER") //What appears unused to the IDE is actually used by generated code
+abstract class EntityInsertionAdapter<T>(protected val dbType: Int) {
 
+    /**
+     * Set values on the PreparedStatement (which is created using makeSql) for the given entity. This is implemented
+     * by generated code on the JDBC DAO.
+     *
+     * @param stmt The PreparedStatement that was prepared using the output of makeSql
+     * @param entity the entity to set values from
+     */
     abstract fun bindPreparedStmtToEntity(stmt: PreparedStatement, entity: T)
 
+    /**
+     * Generate the SQL to insert this into the database. This is implemented by generated code.
+     *
+     * @param returnsId If true, it indicates that the SQL should support returning primary keys
+     * @return SQL as per the dbType
+     */
     abstract fun makeSql(returnsId: Boolean): String
 
     fun insert(entity: T, con: Connection) {

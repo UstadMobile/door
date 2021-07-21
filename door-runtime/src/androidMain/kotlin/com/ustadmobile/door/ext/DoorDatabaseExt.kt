@@ -7,6 +7,7 @@ import androidx.room.*
 import com.ustadmobile.door.*
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.DOOR_ATTACHMENT_URI_PREFIX
 import java.io.File
+import kotlin.reflect.KClass
 
 private val dbVersions = mutableMapOf<Class<*>, Int>()
 
@@ -54,3 +55,21 @@ fun DoorDatabase.resolveAttachmentAndroidUri(attachmentUri: String): Uri {
     }
 }
 
+
+private val metadataCache = mutableMapOf<KClass<*>, DoorDatabaseMetadata<*>>()
+
+@Suppress("UNCHECKED_CAST", "RECEIVER_NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
+actual fun <T: DoorDatabase> KClass<T>.doorDatabaseMetadata(): DoorDatabaseMetadata<T> {
+    return metadataCache.getOrPut(this) {
+        Class.forName(this.java.canonicalName.substringBefore('_') + DoorDatabaseMetadata.SUFFIX_DOOR_METADATA).newInstance()
+                as DoorDatabaseMetadata<*>
+    } as DoorDatabaseMetadata<T>
+}
+
+actual fun DoorDatabase.execSqlBatch(vararg sqlStatements: String) {
+    runInTransaction {
+        sqlStatements.forEach {
+            this.query(it, arrayOf())
+        }
+    }
+}

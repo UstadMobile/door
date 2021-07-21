@@ -10,7 +10,7 @@ actual open class DoorMutableLiveData<T> : LiveData<T> {
 
     /**
      * Synonymous with postValue. Unfortunately we can't use a straight typeAlias because the
-     * MutableLiveData class is overriding a protected method and making it public in Java. Because
+     * MutableLiveData class is overriding a protected method (onActive and onInactive) and making it public in Java. Because
      * the protected keyword in Kotlin has a different meaning to the keyword in Java, the compiler
      * will reject the function signatures as being incompatible.
      */

@@ -2,6 +2,9 @@ package com.ustadmobile.door
 
 import kotlin.reflect.KClass
 
+//There is no alternative to the unchecked cast here. The cast is operating on generated code, so it will always
+//succeed
+@Suppress("UNCHECKED_CAST")
 actual inline fun <reified  T: SyncableDoorDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T {
     val dbUnwrapped = if(this is DoorDatabaseSyncableReadOnlyWrapper) {
         this.unwrap(T::class)

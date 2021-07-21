@@ -3,3 +3,8 @@
 -keep public class com.ustadmobile.door.EntityAck {
     *;
 }
+
+#
+-keep public class * extends com.ustadmobile.door.ext.DoorDatabaseMetadata {
+    *;
+}

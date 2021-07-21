@@ -146,7 +146,7 @@ suspend inline fun <reified T:Any, reified K: Any> DoorDatabaseSyncRepository.sy
                     encodedPath = "$encodedPath$dbPath/$daoName/_replace${entityName}"
                 }
 
-                dbVersionHeader(db)
+                doorNodeAndVersionHeaders(this@syncEntity)
                 body = defaultSerializer().write(localUnsentEntities,
                         ContentType.Application.Json.withUtf8Charset())
             }

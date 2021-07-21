@@ -4,7 +4,7 @@ import com.ustadmobile.door.DoorConstants
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.DoorDatabaseSyncRepository
 import com.ustadmobile.door.ext.dbSchemaVersion
-import com.ustadmobile.door.ext.dbVersionHeader
+import com.ustadmobile.door.ext.doorNodeAndVersionHeaders
 import com.ustadmobile.door.ext.writeToFile
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -31,12 +31,13 @@ actual suspend fun DoorDatabaseRepository.uploadAttachment(entityWithAttachment:
     val attachmentMd5 = entityWithAttachment.attachmentMd5
             ?: throw IllegalArgumentException("uploadAttachment: Entity attachment must not be null")
 
-    val attachmentFile = File(requireAttachmentDirFile(), attachmentUri.substringAfter(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX))
+    val attachmentFile = File(requireAttachmentDirFile(),
+        attachmentUri.substringAfter(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX))
     val endpointUrl = URL(URL(config.endpoint), "$dbPath/attachments/upload")
 
     //val inputFile = Paths.get(systemUri).toFile()
     config.httpClient.post<Unit>(endpointUrl.toString()) {
-        dbVersionHeader(db)
+        doorNodeAndVersionHeaders(this@uploadAttachment)
         parameter("md5", attachmentMd5)
         parameter("uri", attachmentUri)
 
@@ -63,6 +64,8 @@ actual suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<E
                 val urlConnection = url.openConnection() as HttpURLConnection
                 urlConnection.setRequestProperty(DoorConstants.HEADER_DBVERSION,
                         db.dbSchemaVersion().toString())
+                urlConnection.setRequestProperty(DoorConstants.HEADER_NODE,
+                    "${this@downloadAttachments.config.nodeId}/${this@downloadAttachments.config.auth}")
                 urlConnection.inputStream.writeToFile(destFile)
             }
         }
