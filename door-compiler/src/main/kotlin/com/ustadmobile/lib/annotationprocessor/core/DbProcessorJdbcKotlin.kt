@@ -648,8 +648,9 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                         DoorLiveDataJdbcImpl::class.asClassName(),
                         resultType.copy(nullable = isNullableResultType(resultType)),
                         tablesToWatch.map {"\"$it\""}.joinToString())
-                    .add(generateQueryCodeBlock(resultType, queryVarsMap, querySql,
-                        daoTypeElement, funElement, resultVarName = "_liveResult"))
+                    .addJdbcQueryCode(resultType, queryVarsMap, querySql,
+                        daoTypeElement, funElement, resultVarName = "_liveResult",
+                        suspended = funSpec.isSuspended)
                     .add("_liveResult")
                     .applyIf(resultType.isList()) {
                         add(".toList()")
@@ -664,8 +665,9 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 else
                     null
 
-                addCode(generateQueryCodeBlock(resultType, queryVarsMap, querySql,
-                    daoTypeElement, funElement, rawQueryVarName = rawQueryParamName))
+                addCode(CodeBlock.builder().addJdbcQueryCode(resultType, queryVarsMap, querySql,
+                    daoTypeElement, funElement, rawQueryVarName = rawQueryParamName)
+                    .build())
             }
             .applyIf(funSpec.hasReturnType) {
                 addCode("return _result\n")

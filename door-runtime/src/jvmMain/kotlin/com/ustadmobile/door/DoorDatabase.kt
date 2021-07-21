@@ -187,14 +187,35 @@ actual abstract class DoorDatabase actual constructor(){
     }
 
     /**
+     * Convenience extension function that will create a prepared statement. It will
+     * use builtin support for arrays if required and available, or fallback to using
+     * PreparedStatementArrayProxy otherwise.
+     */
+    protected fun Connection.prepareStatement(stmtConfig: PreparedStatementConfig) : PreparedStatement {
+        return when {
+            !stmtConfig.hasListParams -> prepareStatement(stmtConfig.sql)
+            jdbcArraySupported -> prepareStatement(adjustQueryWithSelectInParam(stmtConfig.sql))
+            else -> PreparedStatementArrayProxy(stmtConfig.sql, this)
+        } ?: throw IllegalStateException("Null statement")
+    }
+
+    /**
+     * Suspended wrapper that will prepare a Statement, execute a code block, and return the code block result
+     */
+    fun <R> prepareAndUseStatement(
+        sql: String,
+        block: (PreparedStatement) -> R
+    ) = prepareAndUseStatement(PreparedStatementConfig(sql), block)
+
+    /**
      * Wrapper that will prepare a Statement, execute a code block, and return the code block result
      */
-    fun <R> prepareAndUseStatement(sql: String, block: (PreparedStatement) -> R) : R {
+    fun <R> prepareAndUseStatement(stmtConfig: PreparedStatementConfig, block: (PreparedStatement) -> R) : R {
         var connection: Connection? = null
         var stmt: PreparedStatement? = null
         try {
             connection = openConnection()
-            stmt = connection.prepareStatement(sql)
+            stmt = connection.prepareStatement(stmtConfig)
             return block(stmt)
         }finally {
             stmt?.close()
@@ -205,16 +226,37 @@ actual abstract class DoorDatabase actual constructor(){
     /**
      * Suspended wrapper that will prepare a Statement, execute a code block, and return the code block result
      */
-    suspend fun <R> prepareAndUseStatementAsync(sql: String, block: suspend (PreparedStatement) -> R) : R {
+    suspend fun <R> prepareAndUseStatementAsync(
+        sql: String,
+        block: suspend (PreparedStatement) -> R
+    ) = prepareAndUseStatementAsync(PreparedStatementConfig(sql), block)
+
+    /**
+     * Suspended wrapper that will prepare a Statement, execute a code block, and return the code block result
+     */
+    suspend fun <R> prepareAndUseStatementAsync(stmtConfig: PreparedStatementConfig, block: suspend (PreparedStatement) -> R) : R {
         var connection: Connection? = null
         var stmt: PreparedStatement? = null
         try {
             connection = openConnection()
-            stmt = connection.prepareStatement(sql)
+            stmt = connection.prepareStatement(stmtConfig)
+
             return block(stmt)
         }finally {
             stmt?.close()
             connection?.close()
+        }
+    }
+
+    /**
+     * Wrapper for Connection.createArrayOf. If the underlying database supports jdbc arrays, that support will be
+     * used. Otherwise the PreparedStatementArrayProxy type will be used
+     */
+    fun createArrayOf(connection: Connection, arrayType: String, objects: Array<out Any?>): java.sql.Array {
+        return if(jdbcArraySupported) {
+            connection.createArrayOf(arrayType, objects)
+        }else {
+            PreparedStatementArrayProxy.createArrayOf(arrayType, objects)
         }
     }
 
