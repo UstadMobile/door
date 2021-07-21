@@ -5,7 +5,6 @@ import com.squareup.kotlinpoet.*
 import javax.annotation.processing.*
 import javax.lang.model.element.*
 import javax.lang.model.type.*
-import javax.sql.DataSource
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.ustadmobile.door.*
 import com.ustadmobile.door.annotation.SyncableEntity
@@ -17,13 +16,11 @@ import javax.lang.model.element.TypeElement
 import javax.lang.model.type.TypeMirror
 import kotlin.reflect.jvm.internal.impl.name.FqName
 import kotlin.reflect.jvm.internal.impl.builtins.jvm.JavaToKotlinClassMap
-import java.sql.*
 import javax.lang.model.util.SimpleTypeVisitor7
 import javax.tools.Diagnostic
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.annotation.QueryLiveTables
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorSync.Companion.TRACKER_SUFFIX
-import kotlin.RuntimeException
 import com.ustadmobile.door.annotation.PgOnConflict
 import com.ustadmobile.door.ext.DoorDatabaseMetadata
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
@@ -698,8 +695,8 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             .removeAnnotations()
             .addModifiers(KModifier.OVERRIDE)
             .addCode(CodeBlock.builder()
-                .add("var _con = null as %T?\n", Connection::class)
-                .add("var _stmt = null as %T?\n", PreparedStatement::class)
+                .add("var _con = null as %T?\n", CLASSNAME_CONNECTION)
+                .add("var _stmt = null as %T?\n", CLASSNAME_PREPARED_STATEMENT)
                 .add("var _numChanges = 0\n")
                 .beginControlFlow("try")
                 .add("_con = _db.openConnection()\n")
@@ -720,9 +717,9 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .beginControlFlow("if(_numChanges > 0)")
                 .add("_db.handleTableChanged(listOf(%S))\n", entityTypeEl.simpleName)
                 .endControlFlow()
-                .nextControlFlow("catch(_e: %T)", SQLException::class)
+                .nextControlFlow("catch(_e: %T)", CLASSNAME_SQLEXCEPTION)
                 .add("_e.printStackTrace()\n")
-                .add("throw %T(_e)\n", RuntimeException::class)
+                .add("throw %T(_e)\n", CLASSNAME_RUNTIME_EXCEPTION)
                 .nextControlFlow("finally")
                 .add("_stmt?.close()\n")
                 .add("_con?.close()\n")
@@ -911,7 +908,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     .apply {
                         if(supportedDbTypes.size != 1) {
                             beginControlFlow("else ->")
-                            add("throw %T(%S)\n", IllegalArgumentException::class, "Unsupported db type")
+                            add("throw %T(%S)\n", CLASSNAME_ILLEGALARGUMENTEXCEPTION, "Unsupported db type")
                             endControlFlow()
                             endControlFlow()
                         }else {
@@ -922,7 +919,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .build())
             .addFunction(FunSpec.builder("bindPreparedStmtToEntity")
                 .addModifiers(KModifier.OVERRIDE)
-                .addParameter("stmt", PreparedStatement::class)
+                .addParameter("stmt", CLASSNAME_PREPARED_STATEMENT)
                 .addParameter("entity", entityClassName)
                 .addCode(CodeBlock.builder()
                     .apply {
@@ -1022,7 +1019,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         addType(TypeSpec.classBuilder(dbTypeElement.asClassNameWithSuffix(SUFFIX_JDBC_KT2))
             .superclass(dbTypeElement.asClassName())
             .primaryConstructor(FunSpec.constructorBuilder()
-                .addParameter("dataSource", DataSource::class)
+                .addParameter("dataSource",  CLASSNAME_DATASOURCE)
                 .applyIf(dbTypeElement.isDbSyncable(processingEnv)) {
                     addParameter(ParameterSpec.builder("master", BOOLEAN)
                         .defaultValue("false")
@@ -1064,8 +1061,8 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         addFunction(FunSpec.builder("createAllTables")
             .addModifiers(KModifier.OVERRIDE)
             .addCode(CodeBlock.builder()
-                .add("var _con = null as %T?\n", Connection::class)
-                .add("var _stmt = null as %T?\n", Statement::class)
+                .add("var _con = null as %T?\n", CLASSNAME_CONNECTION)
+                .add("var _stmt = null as %T?\n", CLASSNAME_STATEMENT)
                 .beginControlFlow("try")
                 .add("_con = openConnection()!!\n")
                 .add("_stmt = _con.createStatement()!!\n")
@@ -1137,9 +1134,9 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     }
                 }
                 .endControlFlow()
-                .nextControlFlow("catch(e: %T)", Exception::class)
+                .nextControlFlow("catch(e: %T)", CLASSNAME_EXCEPTION)
                 .add("e.printStackTrace()\n")
-                .add("throw %T(%S, e)\n", RuntimeException::class, "Exception creating tables")
+                .add("throw %T(%S, e)\n", CLASSNAME_RUNTIME_EXCEPTION, "Exception creating tables")
                 .nextControlFlow("finally")
                 .add("_stmt?.close()\n")
                 .add("_con?.close()\n")
@@ -1155,8 +1152,8 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
     ) : TypeSpec.Builder {
         addFunction(FunSpec.builder("clearAllTables")
             .addModifiers(KModifier.OVERRIDE)
-            .addCode("var _con = null as %T?\n", Connection::class)
-            .addCode("var _stmt = null as %T?\n", Statement::class)
+            .addCode("var _con = null as %T?\n", CLASSNAME_CONNECTION)
+            .addCode("var _stmt = null as %T?\n", CLASSNAME_STATEMENT)
             .beginControlFlow("try")
             .addCode("_con = openConnection()!!\n")
             .addCode("_stmt = _con.createStatement()!!\n")

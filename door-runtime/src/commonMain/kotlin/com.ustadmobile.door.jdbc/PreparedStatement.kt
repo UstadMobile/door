@@ -2,7 +2,7 @@ package com.ustadmobile.door.jdbc
 
 import com.ustadmobile.door.jdbc.types.*
 
-expect interface PreparedStatement {
+expect interface PreparedStatement : Statement {
 
     fun setBoolean(index: Int, value: Boolean)
 
@@ -36,5 +36,4 @@ expect interface PreparedStatement {
 
     fun executeQuery(): ResultSet
 
-    fun close()
 }

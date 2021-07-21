@@ -1,9 +1,9 @@
 package com.ustadmobile.door
 
 
+import com.ustadmobile.door.jdbc.*
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import java.sql.*
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.regex.Pattern
 import javax.sql.DataSource

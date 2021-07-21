@@ -3,8 +3,7 @@ package com.ustadmobile.lib.annotationprocessor.core
 import androidx.paging.DataSource
 import androidx.room.*
 import com.squareup.kotlinpoet.*
-import java.lang.RuntimeException
-import java.sql.*
+import com.ustadmobile.door.jdbc.*
 import javax.annotation.processing.AbstractProcessor
 import javax.annotation.processing.Messager
 import javax.annotation.processing.ProcessingEnvironment
@@ -984,7 +983,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                             .addCode("return \"\"\"%L\"\"\"", sql).build())
                     .addFunction(FunSpec.builder("bindPreparedStmtToEntity")
                             .addModifiers(KModifier.OVERRIDE)
-                            .addParameter("stmt", PreparedStatement::class)
+                            .addParameter("stmt", CLASSNAME_PREPARED_STATEMENT)
                             .addParameter("entity", entityClassName)
                             .addCode(bindCodeBlock.build()).build())
 
@@ -1122,7 +1121,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         //End GlobalScope.launch if applicable by triggering the load end ending the control flow
         codeBlock.takeIf { isLiveDataOrDataSourceFactory && generateGlobalScopeLaunchBlockForLiveDataTypes }
                 ?.add("_loadHelper.doRequest()\n")
-                ?.nextControlFlow("catch(_e: %T)", Exception::class)
+                ?.nextControlFlow("catch(_e: %T)", CLASSNAME_EXCEPTION)
                 ?.add("%M(%S)\n", MemberName("kotlin.io", "println"), "Caught doRequest exception:")
                 ?.endControlFlow()
                 ?.endControlFlow()
@@ -1137,7 +1136,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                         }
                         .beginControlFlow("try")
                         .add("_loadHelper.doRequest()\n")
-                        .nextControlFlow("catch(_e: %T)", Exception::class)
+                        .nextControlFlow("catch(_e: %T)", CLASSNAME_EXCEPTION)
                         .add("%M(%S)", MemberName("kotlin.io", "println"), "Caught doRequest exception: \\\$_e")
                         .endControlFlow()
                         .apply {
@@ -1236,6 +1235,24 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
 
             writeTo(File(outputPath))
         }
+    }
+
+    companion object {
+        val CLASSNAME_CONNECTION = ClassName("com.ustadmobile.door.jdbc", "Connection")
+
+        val CLASSNAME_PREPARED_STATEMENT = ClassName("com.ustadmobile.door.jdbc", "PreparedStatement")
+
+        val CLASSNAME_STATEMENT = ClassName("com.ustadmobile.door.jdbc", "Statement")
+
+        val CLASSNAME_SQLEXCEPTION = ClassName("com.ustadmobile.door.jdbc", "SQLException")
+
+        val CLASSNAME_DATASOURCE = ClassName("com.ustadmobile.door.jdbc", "DataSource")
+
+        val CLASSNAME_EXCEPTION = ClassName("kotlin", "Exception")
+
+        val CLASSNAME_RUNTIME_EXCEPTION = ClassName("kotlin", "RuntimeException")
+
+        val CLASSNAME_ILLEGALARGUMENTEXCEPTION = ClassName("kotlin", "IllegalArgumentException")
     }
 
 }
