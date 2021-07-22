@@ -110,23 +110,6 @@ fun jdbcDaoTypeSpecBuilder(simpleName: String, superTypeName: TypeName) = TypeSp
         .superclass(superTypeName)
 
 
-fun daosOnDb(dbType: ClassName, processingEnv: ProcessingEnvironment, excludeDbSyncDao: Boolean = false): List<ClassName> {
-    val dbTypeEl = processingEnv.elementUtils.getTypeElement(dbType.canonicalName) as TypeElement
-    val daoList = dbTypeEl.enclosedElements
-            .filter { it.kind == ElementKind.METHOD && Modifier.ABSTRACT in it.modifiers}
-            .map { it as ExecutableElement }
-            .fold(mutableListOf<ClassName>(), {list, subEl ->
-        list.add(subEl.returnType.asTypeName() as ClassName)
-        list
-    })
-
-    return if(excludeDbSyncDao) {
-        daoList.filter { it.simpleName != "${dbType.simpleName}${DbProcessorSync.SUFFIX_SYNCDAO_ABSTRACT}" }
-    }else {
-        daoList
-    }
-}
-
 fun syncableEntityTypesOnDb(dbType: TypeElement, processingEnv: ProcessingEnvironment) =
         entityTypesOnDb(dbType, processingEnv).filter { it.getAnnotation(SyncableEntity::class.java) != null}
 
@@ -228,20 +211,6 @@ internal fun getHttpBodyParams(params: List<ParameterSpec>) = params.filter {
     !isQueryParam(it.type) && !isContinuationParam(it.type)
 }
 
-
-/**
- * Given a list of parameters, get a list of those that get not pass as query parameters over http.
- * This is any parameters except primitive types, strings, or lists and arrays thereof
- *
- * @param daoMethodEl the method element itself, used to find parameter names
- * @param daoExecutableType the executable type, used to find parameter types (the executable type
- * may well come from typeUtils.asMemberOf to resolve type arguments
- */
-internal fun getHttpBodyParams(daoMethodEl: ExecutableElement, daoExecutableType: ExecutableType) =
-        getHttpBodyParams(daoMethodEl.parameters.mapIndexed { index, paramEl ->
-            ParameterSpec.builder(paramEl.simpleName.toString(),
-                    daoExecutableType.parameterTypes[index].asTypeName().javaToKotlinType()).build()
-        })
 
 /**
  * Given a list of http parameters, find the first, if any, which should be sent as the http body
@@ -817,8 +786,8 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
             add("$rawQueryVarName.bindToPreparedStmt(_stmt, _db, _stmt.connection)\n")
         }
 
-        var resultSet = null as ResultSet?
-        var execStmt = null as Statement?
+        val resultSet: ResultSet?
+        val execStmt: Statement?
         try {
             execStmt = dbConnection?.createStatement()
 
@@ -827,7 +796,13 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                  Run this query now so that we would get an exception if there is something wrong with it.
                  */
                 execStmt?.executeUpdate(execStmtSql)
-                add("val _numUpdates = _stmt.executeUpdate()\n")
+                add("val _numUpdates = _stmt.")
+                if(suspended) {
+                    add("%M()\n", MemberName("com.ustadmobile.door.jdbc.ext", "executeUpdateAsyncKmp"))
+                }else {
+                    add("executeUpdate()\n")
+                }
+
                 val entityModified = findEntityModifiedByQuery(execStmtSql!!, allKnownEntityNames)
 
                 beginControlFlow("if(_numUpdates > 0)")
@@ -838,7 +813,14 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                     add("$resultVarName = _numUpdates\n")
                 }
             }else {
-                beginControlFlow("_stmt.executeQuery().use")
+                if(suspended) {
+                    beginControlFlow("_stmt.%M().%M",
+                        MEMBERNAME_ASYNC_QUERY, MEMBERNAME_RESULTSET_USERESULTS)
+                }else {
+                    beginControlFlow("_stmt.executeQuery().%M",
+                        MEMBERNAME_RESULTSET_USERESULTS)
+                }
+
                 add(" _resultSet ->\n")
 
                 val colNames = mutableListOf<String>()
@@ -1253,6 +1235,10 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         val CLASSNAME_RUNTIME_EXCEPTION = ClassName("kotlin", "RuntimeException")
 
         val CLASSNAME_ILLEGALARGUMENTEXCEPTION = ClassName("kotlin", "IllegalArgumentException")
+
+        val MEMBERNAME_ASYNC_QUERY = MemberName("com.ustadmobile.door.jdbc.ext", "executeQueryAsyncKmp")
+
+        val MEMBERNAME_RESULTSET_USERESULTS = MemberName("com.ustadmobile.door.ext", "useResults")
     }
 
 }

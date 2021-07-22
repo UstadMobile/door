@@ -5,6 +5,12 @@ import com.ustadmobile.door.jdbc.ResultSet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-actual suspend fun PreparedStatement.executeQueryAsync(): ResultSet {
+actual suspend fun PreparedStatement.executeQueryAsyncKmp(): ResultSet {
     return withContext(Dispatchers.IO) { executeQuery() }
 }
+
+actual suspend fun PreparedStatement.executeUpdateAsyncKmp(): Int {
+    return withContext(Dispatchers.IO) { executeUpdate() }
+}
+
+

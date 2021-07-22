@@ -2,7 +2,7 @@ package com.ustadmobile.door.jdbc
 
 import com.ustadmobile.door.jdbc.types.*
 
-actual interface PreparedStatement {
+actual interface PreparedStatement : Statement {
 
     actual fun setBoolean(index: Int, value: Boolean)
 
@@ -41,7 +41,5 @@ actual interface PreparedStatement {
     suspend fun executeQueryAsyncInt(): ResultSet
 
     actual fun executeQuery(): ResultSet
-
-    actual fun close()
 
 }

@@ -1,6 +1,6 @@
 import androidx.room.Dao
 import com.ustadmobile.door.DoorDatabase
-import com.ustadmobile.door.jdbc.ext.executeQueryAsync
+import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
 
 @Dao
 class ExampleDaoJs(private val database: DoorDatabase) {
@@ -45,7 +45,7 @@ class ExampleDaoJs(private val database: DoorDatabase) {
         val connection = database.openConnection()
         val statement = connection.prepareStatement("SELECT * FROM ExampleEntity WHERE uid = ?")
         statement.setLong(1, mUid)
-        val resultSet = statement.executeQueryAsync()
+        val resultSet = statement.executeQueryAsyncKmp()
         if(resultSet.next()) {
             return ExampleJsEntity().apply {
                 uid = resultSet.getLong("uid")
@@ -60,7 +60,7 @@ class ExampleDaoJs(private val database: DoorDatabase) {
     suspend fun findAll(): List<ExampleJsEntity> {
         val connection = database.openConnection()
         val statement = connection.prepareStatement("SELECT * FROM ExampleJsEntity")
-        val resultSet = statement.executeQueryAsync()
+        val resultSet = statement.executeQueryAsyncKmp()
         val result = mutableListOf<ExampleJsEntity>()
         while(resultSet.next()) {
             result.add(ExampleJsEntity().apply {

@@ -50,7 +50,7 @@ ext {
     version_logback = "1.2.3"
     version_okhttp = "4.9.0"
     version_kotlinx_serialization = "1.2.2"
-    version_kotlin_extensions = "1.0.1-pre.213-kotlin-$version_kotlin"
+    version_kotlin_extensions = "1.0.1-pre.220-kotlin-$version_kotlin"
 
 }
 

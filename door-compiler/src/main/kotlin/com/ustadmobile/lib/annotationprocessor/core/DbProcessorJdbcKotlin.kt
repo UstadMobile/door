@@ -663,7 +663,8 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     null
 
                 addCode(CodeBlock.builder().addJdbcQueryCode(resultType, queryVarsMap, querySql,
-                    daoTypeElement, funElement, rawQueryVarName = rawQueryParamName)
+                    daoTypeElement, funElement, rawQueryVarName = rawQueryParamName,
+                    suspended = funSpec.isSuspended)
                     .build())
             }
             .applyIf(funSpec.hasReturnType) {
