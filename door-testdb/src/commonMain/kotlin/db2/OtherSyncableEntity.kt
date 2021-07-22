@@ -14,4 +14,4 @@ data class OtherSyncableEntity (@PrimaryKey(autoGenerate = true) var osUid: Long
                                 @LocalChangeSeqNum var osLcsn: Int = 0,
                                 var otherFk: Int = 0,
                                 var otherNum: Int = 0,
-                                var otherStr: String = "")
+                                var otherStr: String? = "")

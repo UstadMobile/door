@@ -40,7 +40,7 @@ class DoorSyncableDatabaseCallback2(val nodeId: Int, val tableMap: Map<String, I
                     """INSERT $onConflictPrefix INTO SqliteChangeSeqNums(sCsnTableId, sCsnNextLocal, sCsnNextPrimary)
                           VALUES (${tableEntry.value}, 1, 1)""")
             }.toTypedArray())
-        }else {
+        }else if(dbType == DoorDbType.POSTGRES) {
             execSqlFn(tableMap.entries.flatMap { tableEntry ->
                 listOf("""
                     INSERT INTO TableSyncStatus(tsTableId, tsLastChanged, tsLastSynced)
@@ -51,6 +51,8 @@ class DoorSyncableDatabaseCallback2(val nodeId: Int, val tableMap: Map<String, I
                                      tsLastSynced = excluded.tsLastSynced
                     """)
             }.toTypedArray())
+        }else {
+            throw IllegalStateException("Unsupported database type")
         }
 
         if(forceReset)

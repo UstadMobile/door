@@ -20,7 +20,7 @@ expect interface PreparedStatement : Statement {
 
     fun setBigDecimal(index: Int, value: BigDecimal)
 
-    fun setString(index: Int, value: String)
+    fun setString(index: Int, value: String?)
 
     fun setBytes(index: Int, value: ByteArray)
 
@@ -28,9 +28,9 @@ expect interface PreparedStatement : Statement {
 
     fun setTime(index: Int, value: Time)
 
-    fun setTimestamp(index: Int, value: TimeStamp)
+    fun setObject(index: Int, value: Any?)
 
-    fun setObject(index: Int, value: Any)
+    fun setArray(index: Int, array: com.ustadmobile.door.jdbc.Array)
 
     fun executeUpdate(): Int
 

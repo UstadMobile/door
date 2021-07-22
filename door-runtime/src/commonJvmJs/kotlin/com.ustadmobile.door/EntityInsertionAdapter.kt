@@ -1,6 +1,6 @@
 package com.ustadmobile.door
 
-import java.sql.*
+import com.ustadmobile.door.jdbc.*
 
 /**
  * This is similar to the EntityInsertionAdapter on Room. It is used by generated code.
@@ -34,7 +34,6 @@ abstract class EntityInsertionAdapter<T>(protected val dbType: Int) {
             stmt.executeUpdate()
         }finally {
             stmt?.close()
-            con.autoCommit = false
             con.close()
         }
     }
@@ -43,7 +42,7 @@ abstract class EntityInsertionAdapter<T>(protected val dbType: Int) {
         var generatedKeyRs = null as ResultSet?
         var generatedKey = 0L
         try {
-            generatedKeyRs = stmt.generatedKeys
+            generatedKeyRs = stmt.getGeneratedKeys()
             if(generatedKeyRs.next())
                 generatedKey = generatedKeyRs.getLong(1)
         }finally {
@@ -57,7 +56,7 @@ abstract class EntityInsertionAdapter<T>(protected val dbType: Int) {
         var stmt = null as PreparedStatement?
         var generatedKey = 0L
         try {
-            stmt = con.prepareStatement(makeSql(true), Statement.RETURN_GENERATED_KEYS)
+            stmt = con.prepareStatement(makeSql(true), StatementConstantsKmp.RETURN_GENERATED_KEYS)
             bindPreparedStmtToEntity(stmt, entity)
             stmt.executeUpdate()
             generatedKey = getGeneratedKey(stmt)
@@ -73,17 +72,19 @@ abstract class EntityInsertionAdapter<T>(protected val dbType: Int) {
         var stmt = null as PreparedStatement?
         val generatedKeys = mutableListOf<Long>()
         try {
-            con.autoCommit = false
-            stmt = con.prepareStatement(makeSql(true), Statement.RETURN_GENERATED_KEYS)
+            con.setAutoCommit(false)
+            stmt = con.prepareStatement(makeSql(true), StatementConstantsKmp.RETURN_GENERATED_KEYS)
             for(entity in entities) {
                 bindPreparedStmtToEntity(stmt, entity)
                 stmt.executeUpdate()
                 generatedKeys.add(getGeneratedKey(stmt))
             }
+            con.commit()
         }catch(e: SQLException) {
             e.printStackTrace()
+            throw e
         }finally {
-            con.autoCommit = true
+            con.setAutoCommit(true)
             stmt?.close()
             con.close()
         }
@@ -94,7 +95,7 @@ abstract class EntityInsertionAdapter<T>(protected val dbType: Int) {
     fun insertList(entities: List<T>, con: Connection) {
         var stmt = null as PreparedStatement?
         try {
-            con.autoCommit = false
+            con.setAutoCommit(false)
             stmt = con.prepareStatement(makeSql(false))
             for(entity in entities) {
                 bindPreparedStmtToEntity(stmt, entity)
@@ -103,9 +104,10 @@ abstract class EntityInsertionAdapter<T>(protected val dbType: Int) {
             con.commit()
         }catch(e: SQLException) {
             e.printStackTrace()
+            throw e
         }finally {
             stmt?.close()
-            con.autoCommit = true
+            con.setAutoCommit(true)
             con.close()
         }
     }

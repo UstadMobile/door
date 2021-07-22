@@ -768,7 +768,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                 }else if(paramType.javaToKotlinType().isListOrArray()) {
                     //val con = null as Connection
                     val arrayTypeName = sqlArrayComponentTypeOf(paramType.javaToKotlinType())
-                    add("_stmt.setArray(${paramIndex++}, _db.createArrayOf(_stmt.connection, %S, %L.toTypedArray()))\n",
+                    add("_stmt.setArray(${paramIndex++}, _db.createArrayOf(_stmt.getConnection(), %S, %L.toTypedArray()))\n",
                         arrayTypeName, it)
                 }else {
                     add("_stmt.set${paramType.javaToKotlinType().preparedStatementSetterGetterTypeName}(${paramIndex++}, " +
@@ -783,7 +783,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                 return this
             }
         }else {
-            add("$rawQueryVarName.bindToPreparedStmt(_stmt, _db, _stmt.connection)\n")
+            add("$rawQueryVarName.bindToPreparedStmt(_stmt, _db, _stmt.getConnection())\n")
         }
 
         val resultSet: ResultSet?
@@ -835,8 +835,8 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                 val entityVarName = "_entity"
 
                 if(entityType !in QUERY_SINGULAR_TYPES && rawQueryVarName != null) {
-                    add("val _resultMetaData = _resultSet.metaData\n")
-                            .add("val _columnIndexMap = (1 .. _resultMetaData.columnCount).map { _resultMetaData.getColumnLabel(it) to it }.toMap()\n")
+                    add("val _columnIndexMap = _resultSet.%M()\n",
+                        MemberName("com.ustadmobile.door.ext", "columnIndexMap"))
                 }
 
 

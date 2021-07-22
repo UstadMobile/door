@@ -25,6 +25,7 @@ import com.ustadmobile.door.annotation.PgOnConflict
 import com.ustadmobile.door.ext.DoorDatabaseMetadata
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_ANDROID_OUTPUT
+import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JS_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JVM_DIRS
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorRepository.Companion.SUFFIX_REPOSITORY2
 import kotlin.reflect.KClass
@@ -549,7 +550,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_JDBC_KT2)
                 .addJdbcDbImplType(dbTypeEl as TypeElement)
                 .build()
-                .writeToDirsFromArg(listOf(OPTION_JVM_DIRS))
+                .writeToDirsFromArg(listOf(OPTION_JVM_DIRS, OPTION_JS_OUTPUT))
 
             FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_DOOR_METADATA)
                 .addDatabaseMetadataType(dbTypeEl, processingEnv)
@@ -566,7 +567,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 daoElement.simpleName.toString() + SUFFIX_JDBC_KT2)
                 .addDaoJdbcImplType(daoTypeEl)
                 .build()
-                .writeToDirsFromArg(listOf(OPTION_JVM_DIRS))
+                .writeToDirsFromArg(listOf(OPTION_JVM_DIRS, OPTION_JS_OUTPUT))
         }
 
         return true
@@ -703,7 +704,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .add("_con = _db.openConnection()\n")
                 .add("_stmt = _con.prepareStatement(%S)\n", stmtSql)
                 .applyIf(firstParam.type.isListOrArray()) {
-                    add("_con.autoCommit = false\n")
+                    add("_con.setAutoCommit(false)\n")
                     beginControlFlow("for(_entity in ${firstParam.name})")
                     entityVarName = "_entity"
                 }
@@ -713,7 +714,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .applyIf(firstParam.type.isListOrArray()) {
                     endControlFlow()
                     add("_con.commit()\n")
-                    add("_con.autoCommit = true\n")
+                    add("_con.setAutoCommit(true)\n")
                 }
                 .beginControlFlow("if(_numChanges > 0)")
                 .add("_db.handleTableChanged(listOf(%S))\n", entityTypeEl.simpleName)
@@ -763,7 +764,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .beginControlFlow("_db.prepareAndUseStatement".withSuffixIf("Async")  { funSpec.isSuspended } +"(_sql)")
                 .add(" _stmt ->\n")
                 .applyIf(firstParam.type.isListOrArray()) {
-                    add("_stmt.connection.autoCommit = false\n")
+                    add("_stmt.getConnection().setAutoCommit(false)\n")
                         .beginControlFlow("for(_entity in ${firstParam.name})")
                     entityVarName = "_entity"
                 }
@@ -784,7 +785,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 }
                 .applyIf(firstParam.type.isListOrArray()) {
                     endControlFlow()
-                    add("_stmt.connection.commit()\n")
+                    add("_stmt.getConnection().commit()\n")
                 }
                 .apply {
                     endControlFlow()
@@ -1020,16 +1021,19 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         addType(TypeSpec.classBuilder(dbTypeElement.asClassNameWithSuffix(SUFFIX_JDBC_KT2))
             .superclass(dbTypeElement.asClassName())
             .primaryConstructor(FunSpec.constructorBuilder()
-                .addParameter("dataSource",  CLASSNAME_DATASOURCE)
+                .addParameter(ParameterSpec("dataSource",  CLASSNAME_DATASOURCE,
+                    KModifier.OVERRIDE))
                 .applyIf(dbTypeElement.isDbSyncable(processingEnv)) {
                     addParameter(ParameterSpec.builder("master", BOOLEAN)
                         .defaultValue("false")
                         .addModifiers(KModifier.OVERRIDE).build())
                 }
-                .addCode("this.dataSource = dataSource\n")
                 .addCode("setupFromDataSource()\n")
                 .build())
             .addDbVersionProperty(dbTypeElement)
+            .addProperty(PropertySpec.builder("dataSource", CLASSNAME_DATASOURCE)
+                .initializer("dataSource")
+                .build())
             .applyIf(dbTypeElement.isDbSyncable(processingEnv)) {
                 addProperty(PropertySpec.builder("master", BOOLEAN)
                     .initializer("master").build())
@@ -1073,9 +1077,9 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                         val dbTypeName = DoorDbType.PRODUCT_INT_TO_NAME_MAP[dbProductType] as String
                         beginControlFlow("$dbProductType -> ")
                         add("// - create for this $dbTypeName \n")
-                        add("_stmt.executeUpdate(\"CREATE·TABLE·IF·NOT·EXISTS·${DoorDatabase.DBINFO_TABLENAME}" +
+                        add("_stmt.executeUpdate(\"CREATE·TABLE·IF·NOT·EXISTS·${DoorDatabaseCommon.DBINFO_TABLENAME}" +
                                 "·(dbVersion·int·primary·key,·dbHash·varchar(255))\")\n")
-                        add("_stmt.executeUpdate(\"INSERT·INTO·${DoorDatabase.DBINFO_TABLENAME}·" +
+                        add("_stmt.executeUpdate(\"INSERT·INTO·${DoorDatabaseCommon.DBINFO_TABLENAME}·" +
                                 "VALUES·($initDbVersion,·'')\")\n")
                         dbTypeElement.allDbEntities(processingEnv).forEach { entityType ->
                             val fieldListStr = entityType.entityFields.joinToString { it.simpleName.toString() }

@@ -98,7 +98,9 @@ kotlin {
             }
         }
 
-        jsMain {}
+        jsMain {
+            kotlin.srcDir("$buildDir/generated/source/door-js")
+        }
 
         jsTest {
             dependencies {

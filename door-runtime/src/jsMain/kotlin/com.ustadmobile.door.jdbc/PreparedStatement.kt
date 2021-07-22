@@ -20,7 +20,7 @@ actual interface PreparedStatement : Statement {
 
     actual fun setBigDecimal(index: Int, value: BigDecimal)
 
-    actual fun setString(index: Int, value: String)
+    actual fun setString(index: Int, value: String?)
 
     actual fun setBytes(index: Int, value: ByteArray)
 
@@ -28,11 +28,9 @@ actual interface PreparedStatement : Statement {
 
     actual fun setTime(index: Int, value: Time)
 
-    actual fun setTimestamp(index: Int, value: TimeStamp)
+    actual fun setObject(index: Int, value: Any?)
 
-    actual fun setObject(index: Int, value: Any)
-
-    fun setArray(index: Int, value: Array<Any>)
+    actual fun setArray(index: Int, array: com.ustadmobile.door.jdbc.Array)
 
     actual fun executeUpdate(): Int
 

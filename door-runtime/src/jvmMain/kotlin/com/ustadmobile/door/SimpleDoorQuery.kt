@@ -46,7 +46,7 @@ actual class SimpleDoorQuery actual constructor(private val sql: String, overrid
                     val arrayParam = if(db.arraySupported) {
                         con.createArrayOf(paramType, valuesArr)
                     }else {
-                        PreparedStatementArrayProxy.createArrayOf(paramType!!, valuesArr)
+                        JdbcArrayProxy(paramType ?: throw IllegalStateException("ParamType is null!"), valuesArr)
                     } as java.sql.Array
 
                     stmt.setArray(paramIndex++, arrayParam)

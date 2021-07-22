@@ -2,6 +2,9 @@ package com.ustadmobile.door
 
 import com.ustadmobile.door.ext.createInstance
 import com.ustadmobile.door.ext.init
+import org.w3c.dom.Worker
+import wrappers.SQLiteDatasourceJs
+import wrappers.SqliteStatementJs
 import kotlin.reflect.KClass
 
 actual class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private var dbClass: KClass<T>, private var dbName: String){
@@ -12,14 +15,16 @@ actual class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private 
 
     actual fun build(): T {
         val path = webWorkerPath
-        if(webWorkerPath == null){
+        if(path == null){
             throw Exception("Set WebWorker path before building your Database")
         }
         val implClass = implementationMap[dbClass] as KClass<T>
-        val dbImpl = implClass.js.createInstance(context, dbName) as T
-        if(path != null){
-            dbImpl.init(dbName, path)
-        }
+        val dataSource = SQLiteDatasourceJs(dbName, Worker(path))
+        val dbImpl = implClass.js.createInstance(dataSource, false) as T
+        //TODO: this needs to be reworked where the build function itself is suspended.
+//        if(path != null){
+//            dbImpl.init(dbName, path)
+//        }
         return dbImpl
     }
 

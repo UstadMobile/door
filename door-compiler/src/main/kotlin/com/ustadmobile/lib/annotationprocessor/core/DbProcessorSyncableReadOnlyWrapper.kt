@@ -128,6 +128,7 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(dbTypeEl: TypeElement,
                                 .addModifiers(KModifier.OVERRIDE)
                                 .addCode("_db.createAllTables()\n")
                                 .build())
+                        addDataSourceProperty("_db")
                     }
                     .apply {
                         dbTypeEl.allDbClassDaoGetters(processingEnv).forEach {daoGetter ->

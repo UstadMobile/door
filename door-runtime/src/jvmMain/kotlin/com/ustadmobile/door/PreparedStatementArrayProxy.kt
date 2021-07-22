@@ -1,5 +1,6 @@
 package com.ustadmobile.door
 
+import com.ustadmobile.door.jdbc.TypesKmp
 import java.io.InputStream
 import java.io.Reader
 import java.math.BigDecimal
@@ -23,247 +24,19 @@ import java.util.*
  * preparedStmt.setArray(1, myArray);
  * ResultSet result = preparedStmt.executeQuery();
  *
- */
-class PreparedStatementArrayProxy
-/**
  * Create a new PreparedStatementArrayProxy
  *
  * @param query The query to execute (as per a normal PreparedStatement using ? for parameters)
  * @param connection the JDBC connection to run the query on
+ *
  */
-(private val query: String, private val connection: Connection) : PreparedStatement {
-
-    private val queryParams = TreeMap<Int, Any>()
-
-    private val queryTypes = TreeMap<Int, Int>()
-
-    private class JdbcArrayProxy(private val typeName: String, val objects: kotlin.Array<out Any?>) : Array {
-
-        private var baseType: Int = 0
-
-        init {
-
-            when (typeName) {
-                "INTEGER" -> baseType = Types.INTEGER
-                "VARCHAR" -> baseType = Types.VARCHAR
-                "BIGINT" -> baseType = Types.BIGINT
-                "SHORT" -> baseType = Types.SMALLINT
-                "BOOLEAN" -> baseType = Types.BOOLEAN
-                "TEXT" -> baseType = Types.LONGVARCHAR
-            }
-        }
-
-        @Throws(SQLException::class)
-        override fun getBaseTypeName(): String {
-            return typeName
-        }
-
-        @Throws(SQLException::class)
-        override fun getBaseType(): Int {
-            return baseType
-        }
-
-        @Throws(SQLException::class)
-        override fun getArray(): Any {
-            return this
-        }
-
-        @Throws(SQLException::class)
-        override fun getArray(map: Map<String, Class<*>>): Any? {
-            return null
-        }
-
-        @Throws(SQLException::class)
-        override fun getArray(l: Long, i: Int): Any? {
-            return null
-        }
-
-        @Throws(SQLException::class)
-        override fun getArray(l: Long, i: Int, map: Map<String, Class<*>>): Any? {
-            return null
-        }
-
-        @Throws(SQLException::class)
-        override fun getResultSet(): ResultSet? {
-            return null
-        }
-
-        @Throws(SQLException::class)
-        override fun getResultSet(map: Map<String, Class<*>>): ResultSet? {
-            return null
-        }
-
-        @Throws(SQLException::class)
-        override fun getResultSet(l: Long, i: Int): ResultSet? {
-            return null
-        }
-
-        @Throws(SQLException::class)
-        override fun getResultSet(l: Long, i: Int, map: Map<String, Class<*>>): ResultSet? {
-            return null
-        }
-
-        @Throws(SQLException::class)
-        override fun free() {
-
-        }
-    }
-
-    @Throws(SQLException::class)
-    protected fun prepareStatement(): PreparedStatement {
-        var arrayOffset = 0
-        val paramValues = TreeMap<Int, Any?>()
-        val paramTypes = TreeMap<Int, Int>()
-        var adjustedQuery = query
-        for (paramIndex in queryParams.keys) {
-            val value = queryParams[paramIndex]
-            if (value is Array) {
-                val arrayProxy = value as JdbcArrayProxy
-                val objects = arrayProxy.objects
-                val arrayParamPos = ordinalIndexOf(adjustedQuery, '?', paramIndex)
-                adjustedQuery = adjustedQuery.substring(0, arrayParamPos) +
-                        makeArrayPlaceholders(objects.size) + adjustedQuery.substring(arrayParamPos + 1)
-                for (i in objects.indices) {
-                    val paramPos = paramIndex + arrayOffset + i
-                    paramValues[paramPos] = objects[i]
-                    paramTypes[paramPos] = arrayProxy.baseType
-                }
-
-                arrayOffset += objects.size - 1
-            } else {
-                paramValues[paramIndex + arrayOffset] = value!!
-                paramTypes[paramIndex + arrayOffset] = queryTypes[paramIndex]!!
-            }
-        }
-
-
-        var stmt: PreparedStatement? = null
-        try {
-            stmt = connection.prepareStatement(adjustedQuery)
-            for (paramIndex in paramValues.keys) {
-                val value = paramValues[paramIndex]
-                when (paramTypes[paramIndex]) {
-                    Types.INTEGER -> stmt!!.setInt(paramIndex, value as Int)
-
-                    Types.BOOLEAN -> stmt!!.setBoolean(paramIndex, value as Boolean)
-
-                    Types.VARCHAR, Types.LONGVARCHAR -> stmt!!.setString(paramIndex, value as String)
-
-                    Types.BIGINT -> stmt!!.setLong(paramIndex, value as Long)
-
-                    Types.FLOAT -> stmt!!.setFloat(paramIndex, value as Float)
-
-                    ARR_PROXY_SET_OBJECT -> stmt!!.setObject(paramIndex, value)
-                }
-
-            }
-
-
-        } catch (e: SQLException) {
-            stmt?.close()
-
-            throw e
-        }
-
-        return stmt
-    }
-
-    @Throws(SQLException::class)
-    override fun executeQuery(): ResultSet {
-        val stmt = prepareStatement()
-        val resultSet = stmt!!.executeQuery()
-        return PreparedStatementResultSetWrapper(resultSet, stmt)
-    }
-
-
-    private fun makeArrayPlaceholders(numPlaceholders: Int): String {
-        val sb = StringBuffer(Math.max(0, 2 * numPlaceholders - 1))
-
-        for (i in 0 until numPlaceholders) {
-            if (i != 0)
-                sb.append(',')
-
-            sb.append('?')
-        }
-
-        return sb.toString()
-    }
+actual class PreparedStatementArrayProxy actual constructor(
+    query: String,
+    connection: Connection
+) : PreparedStatementArrayProxyCommon(query, connection) {
 
     @Throws(SQLException::class)
     override fun setNull(i: Int, i1: Int) {
-
-    }
-
-    @Throws(SQLException::class)
-    override fun setBoolean(i: Int, b: Boolean) {
-        queryParams[i] = b
-        queryTypes[i] = Types.BOOLEAN
-    }
-
-    @Throws(SQLException::class)
-    override fun setByte(i: Int, b: Byte) {
-        queryParams[i] = b
-        queryTypes[i] = Types.SMALLINT
-    }
-
-    @Throws(SQLException::class)
-    override fun setShort(i: Int, i1: Short) {
-        queryParams[i] = i1
-        queryTypes[i] = Types.SMALLINT
-    }
-
-    @Throws(SQLException::class)
-    override fun setInt(i: Int, i1: Int) {
-        queryParams[i] = i1
-        queryTypes[i] = Types.INTEGER
-    }
-
-    @Throws(SQLException::class)
-    override fun setLong(i: Int, l: Long) {
-        queryParams[i] = l
-        queryTypes[i] = Types.BIGINT
-    }
-
-    @Throws(SQLException::class)
-    override fun setFloat(i: Int, v: Float) {
-        queryParams[i] = v
-        queryTypes[i] = Types.FLOAT
-    }
-
-    @Throws(SQLException::class)
-    override fun setDouble(i: Int, v: Double) {
-        queryParams[i] = v
-        queryTypes[i] = Types.DOUBLE
-    }
-
-    @Throws(SQLException::class)
-    override fun setBigDecimal(i: Int, bigDecimal: BigDecimal) {
-        throw SQLException("PreparedStatementArrayProxy unsupported type: BigDecimal")
-    }
-
-    @Throws(SQLException::class)
-    override fun setString(i: Int, s: String) {
-        queryParams[i] = s
-        queryTypes[i] = Types.VARCHAR
-    }
-
-    @Throws(SQLException::class)
-    override fun setBytes(i: Int, bytes: ByteArray) {
-        throw SQLException("PreparedStatementArrayProxy unsupported type: Bytes")
-    }
-
-    @Throws(SQLException::class)
-    override fun setDate(i: Int, date: Date) {
-        throw SQLException("PreparedStatementArrayProxy unsupported type: Date")
-    }
-
-    @Throws(SQLException::class)
-    override fun setTime(i: Int, time: Time) {
-
-    }
-
-    @Throws(SQLException::class)
-    override fun setTimestamp(i: Int, timestamp: Timestamp) {
 
     }
 
@@ -283,19 +56,20 @@ class PreparedStatementArrayProxy
     }
 
     @Throws(SQLException::class)
-    override fun clearParameters() {
+    override fun setTimestamp(i: Int, timestamp: Timestamp) {
 
     }
+
 
     @Throws(SQLException::class)
     override fun setObject(i: Int, o: Any, i1: Int) {
         throw SQLException("Unsupported: setObject, Int")
     }
 
+
     @Throws(SQLException::class)
-    override fun setObject(i: Int, o: Any) {
-        queryParams[i] = o
-        queryTypes[i] = ARR_PROXY_SET_OBJECT
+    override fun clearParameters() {
+
     }
 
     @Throws(SQLException::class)
@@ -600,7 +374,7 @@ class PreparedStatementArrayProxy
 
     @Throws(SQLException::class)
     override fun getConnection(): Connection {
-        return connection
+        return connectionInternal
     }
 
     @Throws(SQLException::class)
@@ -680,47 +454,5 @@ class PreparedStatementArrayProxy
         return false
     }
 
-    @Throws(SQLException::class)
-    override fun setArray(i: Int, array: Array) {
-        queryParams[i] = array
-        queryTypes[i] = Types.ARRAY
-    }
 
-
-    @Throws(SQLException::class)
-    override fun executeUpdate(): Int {
-        try {
-            prepareStatement()!!.use { stmt -> return stmt.executeUpdate() }
-        } catch (e: SQLException) {
-            throw e
-        }
-
-    }
-
-    companion object {
-
-        const val ARR_PROXY_SET_OBJECT = -5000
-
-        /**
-         * Create a proxy array, using the same method parameters as a JDBC connection uses to create it.
-         *
-         * @param arrayType the JDBC data type e.g. "VARCHAR", "INTEGER", etc
-         * @param objects The objects contained in the array
-         *
-         * @return A java.sql.Array object that can be used as a parameter with this class
-         */
-        @JvmStatic
-        fun createArrayOf(arrayType: String, objects: kotlin.Array<out Any?>): Array {
-            return JdbcArrayProxy(arrayType, objects)
-        }
-
-        private fun ordinalIndexOf(str: String, c: Char, n: Int): Int {
-            var n = n
-            var pos = str.indexOf(c)
-            while (--n > 0 && pos != -1)
-                pos = str.indexOf(c, pos + 1)
-
-            return pos
-        }
-    }
 }

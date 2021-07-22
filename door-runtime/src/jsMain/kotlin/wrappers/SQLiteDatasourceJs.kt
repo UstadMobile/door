@@ -1,6 +1,7 @@
 package wrappers
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
+import com.ustadmobile.door.jdbc.ResultSet
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -41,6 +42,26 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
         message["id"] = actionId
         worker.postMessage(message)
         return completable.await()
+    }
+
+    private fun makeMessage(sql: String, params: Array<Any?>?) : Json {
+        val message = json(
+            "action" to "exec",
+            "sql" to sql
+        )
+
+        if(params != null) {
+            message["params"] = params
+        }
+        return message
+    }
+
+    internal suspend fun sendQuery(sql: String, params: Array<Any?>?): ResultSet {
+        return sendMessage(makeMessage(sql, params)).results?.let { SQLiteResultSet(it) } ?: SQLiteResultSet(arrayOf())
+    }
+
+    internal suspend fun sendUpdate(sql: String, params: Array<Any?>?): Int {
+        return sendMessage(makeMessage(sql, params)).let { if(it.ready) 1 else 0 }
     }
 
     /**

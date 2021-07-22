@@ -7,40 +7,29 @@ import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.launch
 import wrappers.SQLiteDatasourceJs
 
-actual abstract class DoorDatabase actual constructor(): DoorDatabaseChangeListener() {
+actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon() {
 
-    internal lateinit var dataSource: SQLiteDatasourceJs
+    override val jdbcDbType: Int
+        get() = DoorDbType.SQLITE
+
+    override val jdbcArraySupported: Boolean
+        get() = false
 
     internal lateinit var webWorkerPath: String
 
-    abstract val dbVersion: Int
-
     val initCompletable = CompletableDeferred<Boolean>()
-
-    suspend fun openConnection() : Connection {
-        awaitReady()
-        return dataSource.getConnection()
-    }
 
     private suspend fun awaitReady() {
         initCompletable.await()
     }
 
-    open suspend fun createAllTables() {
-        //Generated code will actually run this
-    }
-
     actual abstract fun clearAllTables()
 
-    actual open fun runInTransaction(runnable: Runnable) {
-        runnable.run()
+    actual override fun runInTransaction(runnable: Runnable) {
+        super.runInTransaction(runnable)
     }
 
-    override fun addChangeListener(changeListenerRequest: ChangeListenerRequest) = this.apply {
-        changeListeners.add(changeListenerRequest)
-    }
-
-    override fun removeChangeListener(changeListenerRequest: ChangeListenerRequest)= this.apply {
-        changeListeners.remove(changeListenerRequest)
+    protected fun setupFromDataSource() {
+        TODO("Implement on JS by converting its builder to being async")
     }
 }

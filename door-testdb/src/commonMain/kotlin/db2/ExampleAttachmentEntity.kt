@@ -20,5 +20,5 @@ class ExampleAttachmentEntity(@PrimaryKey(autoGenerate = true) var eaUid: Long =
                               @AttachmentSize
                               var eaSize: Int = 0,
 
-                              var eaMimeType: String = "application/octet",
+                              var eaMimeType: String? = "application/octet",
                               var eaNumber: Int = 0)

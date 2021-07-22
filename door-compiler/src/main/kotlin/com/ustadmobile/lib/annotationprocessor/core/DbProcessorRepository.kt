@@ -13,6 +13,7 @@ import javax.lang.model.element.TypeElement
 import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.annotation.SyncableEntity
 import com.ustadmobile.door.attachments.EntityWithAttachment
+import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_DATASOURCE
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_ANDROID_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JVM_DIRS
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorJdbcKotlin.Companion.SUFFIX_JDBC_KT2
@@ -72,14 +73,17 @@ fun TypeSpec.Builder.addTableIdMapProperty(dbTypeElement: TypeElement, processin
  * Add a TypeSpec to the given FileSpec Builder that is an implementation of the repository for a
  * database as per the dbTypeElement parameter.
  */
-fun FileSpec.Builder.addDbRepoType(dbTypeElement: TypeElement,
-                                   processingEnv: ProcessingEnvironment,
-                                   syncDaoMode: Int = DbProcessorRepository.REPO_SYNCABLE_DAO_CONSTRUCT,
-                                   overrideClearAllTables: Boolean = true,
-                                   overrideSyncDao: Boolean = false,
-                                   overrideOpenHelper: Boolean = false,
-                                   addDbVersionProp: Boolean = false,
-                                   overrideKtorHelpers: Boolean = false): FileSpec.Builder {
+fun FileSpec.Builder.addDbRepoType(
+    dbTypeElement: TypeElement,
+    processingEnv: ProcessingEnvironment,
+    syncDaoMode: Int = DbProcessorRepository.REPO_SYNCABLE_DAO_CONSTRUCT,
+    overrideClearAllTables: Boolean = true,
+    overrideSyncDao: Boolean = false,
+    overrideOpenHelper: Boolean = false,
+    addDbVersionProp: Boolean = false,
+    overrideKtorHelpers: Boolean = false,
+    overrideDataSourceProp: Boolean = false
+): FileSpec.Builder {
     addType(TypeSpec.classBuilder(dbTypeElement.asClassNameWithSuffix(SUFFIX_REPOSITORY2))
             .superclass(dbTypeElement.asClassName())
             .apply {
@@ -98,6 +102,9 @@ fun FileSpec.Builder.addDbRepoType(dbTypeElement: TypeElement,
                 .addParameter("dbUnwrapped", dbTypeElement.asClassName())
                 .addParameter("config", RepositoryConfig::class)
                 .build())
+            .applyIf(overrideDataSourceProp) {
+                addDataSourceProperty("db")
+            }
             .addProperty(PropertySpec.builder("config", RepositoryConfig::class)
                     .addModifiers(KModifier.OVERRIDE)
                     .initializer("config")
@@ -1038,7 +1045,9 @@ class DbProcessorRepository: AbstractDbProcessor() {
 
             FileSpec.builder(dbTypeEl.packageName, "${dbTypeEl.simpleName}$SUFFIX_REPOSITORY2")
                     .addDbRepoType(dbTypeEl as TypeElement, processingEnv,
-                        syncDaoMode = REPO_SYNCABLE_DAO_CONSTRUCT, addDbVersionProp = true)
+                        syncDaoMode = REPO_SYNCABLE_DAO_CONSTRUCT,
+                        addDbVersionProp = true,
+                        overrideDataSourceProp = true)
                     .build()
                     .writeToDirsFromArg(OPTION_JVM_DIRS)
             FileSpec.builder(dbTypeEl.packageName, "${dbTypeEl.simpleName}$SUFFIX_REPOSITORY2")

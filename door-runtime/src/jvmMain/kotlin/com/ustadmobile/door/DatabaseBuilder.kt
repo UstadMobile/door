@@ -44,7 +44,7 @@ actual class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private 
             dbImplClass.getConstructor(DataSource::class.java).newInstance(dataSource)
         }
 
-        if(!doorDb.tableNames.any {it.toLowerCase(Locale.ROOT) == DoorDatabase.DBINFO_TABLENAME}) {
+        if(!doorDb.tableNames.any {it.lowercase() == DoorDatabaseCommon.DBINFO_TABLENAME}) {
             doorDb.createAllTables()
             callbacks.forEach { it.onCreate(doorDb.sqlDatabaseImpl) }
         }else {
