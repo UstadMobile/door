@@ -1,5 +1,5 @@
 group 'com.ustadmobile.door'
-version '0.0.26-js'
+version '0.0.27'
 
 ext.localProperties = new Properties()
 if(project.file("local.properties").exists()) {
