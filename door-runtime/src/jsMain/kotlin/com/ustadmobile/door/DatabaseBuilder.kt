@@ -1,10 +1,9 @@
 package com.ustadmobile.door
 
 import com.ustadmobile.door.ext.createInstance
-import com.ustadmobile.door.ext.init
+import com.ustadmobile.door.migration.DoorMigration
 import org.w3c.dom.Worker
 import wrappers.SQLiteDatasourceJs
-import wrappers.SqliteStatementJs
 import kotlin.reflect.KClass
 
 class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private var dbClass: KClass<T>, private var dbName: String){

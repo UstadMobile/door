@@ -5,8 +5,9 @@ import androidx.room.Room
 import kotlin.reflect.KClass
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.ustadmobile.door.migration.DoorMigration
 
-@Suppress("UNCHECKED_CAST")
+@Suppress("UNCHECKED_CAST", "unused") //This is used as an API
 class DatabaseBuilder<T: DoorDatabase>(private val roomBuilder: RoomDatabase.Builder<T>,
                                               val dbClass: KClass<T>) {
 
@@ -49,7 +50,8 @@ class DatabaseBuilder<T: DoorDatabase>(private val roomBuilder: RoomDatabase.Bui
     }
 
     fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
-        roomBuilder.addMigrations(*migrations)
+        //TODO
+        //roomBuilder.addMigrations(*migrations)
         return this
     }
 

@@ -95,7 +95,7 @@ abstract class DoorDatabaseCommon {
 
     fun openConnection() =  effectiveDatabase.dataSource.getConnection()
 
-    abstract fun createAllTables()
+    abstract fun createAllTables(): List<String>
 
     open fun runInTransaction(runnable: Runnable) {
         runnable.run()

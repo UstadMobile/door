@@ -106,6 +106,23 @@ fun CodeBlock.Builder.addRunCodeBlocksOnParamComponents(param: ParameterSpec, va
 }
 
 /**
+ * Add SQL to the output. This could be done as appending to a list variable, or this can be done as a function call
+ */
+fun CodeBlock.Builder.addSql(
+    execSqlFn: String?,
+    sqlListVar: String? = null,
+    sql: String
+) : CodeBlock.Builder {
+    if(sqlListVar != null) {
+        add("$sqlListVar += %S\n", sql)
+    }else {
+        add("$execSqlFn(%S)\n", sql)
+    }
+
+    return this
+}
+
+/**
  * Add code that will create the table using a function that executes SQL (e.g. stmt.executeUpdate or
  * db.execSQL) to create a table and any indices specified. Indices can be specified by through
  * the indices argument (e.g. for those that come from the Entity annotation) and via the
@@ -116,9 +133,14 @@ fun CodeBlock.Builder.addRunCodeBlocksOnParamComponents(param: ParameterSpec, va
  * @param dbProductType DoorDbType.SQLITE or POSTGRES
  * @param indices a list of IndexMirror representing the indices that should be added.
  */
-fun CodeBlock.Builder.addCreateTableCode(entityTypeSpec: TypeSpec, execSqlFn: String,
-                                         dbProductType: Int, indices: List<IndexMirror> = listOf()) : CodeBlock.Builder {
-    add("$execSqlFn(%S)\n", entityTypeSpec.toCreateTableSql(dbProductType))
+fun CodeBlock.Builder.addCreateTableCode(
+    entityTypeSpec: TypeSpec,
+    execSqlFn: String,
+    dbProductType: Int,
+    indices: List<IndexMirror> = listOf(),
+    sqlListVar: String? = null
+) : CodeBlock.Builder {
+    addSql(execSqlFn, sqlListVar, entityTypeSpec.toCreateTableSql(dbProductType))
     indices.forEach {
         val indexName = if(it.name != "") {
             it.name
@@ -126,14 +148,14 @@ fun CodeBlock.Builder.addCreateTableCode(entityTypeSpec: TypeSpec, execSqlFn: St
             "index_${entityTypeSpec.name}_${it.value.joinToString(separator = "_", postfix = "", prefix = "")}"
         }
 
-        add("$execSqlFn(%S)\n", "CREATE ${if(it.unique){ "UNIQUE " } else { "" } }INDEX $indexName" +
+        addSql(execSqlFn, sqlListVar, "CREATE ${if(it.unique){ "UNIQUE " } else { "" } }INDEX $indexName" +
                 " ON ${entityTypeSpec.name} (${it.value.joinToString()})")
     }
 
     entityTypeSpec.entityFields().forEach { field ->
         if(field.annotations.any { it.className == ColumnInfo::class.asClassName()
                         && it.members.findBooleanMemberValue("index") ?: false }) {
-            add("_stmt.executeUpdate(%S)\n",
+            addSql(execSqlFn, sqlListVar,
                     "CREATE INDEX index_${entityTypeSpec.name}_${field.name} ON ${entityTypeSpec.name} (${field.name})")
         }
     }
@@ -150,30 +172,39 @@ fun CodeBlock.Builder.addCreateTableCode(entityTypeSpec: TypeSpec, execSqlFn: St
  * @param execSqlFn the code to run an SQL statement e.g. "db.execSQL"
  * @return this
  */
-fun CodeBlock.Builder.addSyncableEntityInsertTriggersSqlite(execSqlFn: String, syncableEntityInfo: SyncableEntityInfo): CodeBlock.Builder {
+fun CodeBlock.Builder.addSyncableEntityInsertTriggersSqlite(
+    execSqlFn: String,
+    syncableEntityInfo: SyncableEntityInfo,
+    sqlListVar: String? = null
+): CodeBlock.Builder {
     val localCsnFieldName = syncableEntityInfo.entityLocalCsnField.name
     val primaryCsnFieldName = syncableEntityInfo.entityMasterCsnField.name
     val entityName = syncableEntityInfo.syncableEntity.simpleName
     val pkFieldName = syncableEntityInfo.entityPkField.name
     val tableId = syncableEntityInfo.tableId
 
-    beginControlFlow("%T.generateSyncableEntityInsertTriggersSqlite(%S, %L, %S, %S, %S).forEach",
-        DoorSqlGenerator::class, entityName, tableId, pkFieldName, localCsnFieldName,
-        primaryCsnFieldName)
-    add("$execSqlFn(it)\n")
-    endControlFlow()
+    if(sqlListVar != null) {
+        add("$sqlListVar += %T.generateSyncableEntityInsertTriggersSqlite(%S, %L, %S, %S, %S)\n",
+            DoorSqlGenerator::class, entityName, tableId, pkFieldName, localCsnFieldName,
+            primaryCsnFieldName)
+    }else {
+        beginControlFlow("%T.generateSyncableEntityInsertTriggersSqlite(%S, %L, %S, %S, %S).forEach",
+            DoorSqlGenerator::class, entityName, tableId, pkFieldName, localCsnFieldName,
+            primaryCsnFieldName)
+        add("$execSqlFn(it)\n")
+        endControlFlow()
+    }
+
 
     return this
 }
 
-fun CodeBlock.Builder.addSyncableEntityFunctionAndTriggerPostgres(execSqlFn: String, syncableEntityInfo: SyncableEntityInfo) : CodeBlock.Builder {
-    beginControlFlow("%T.generateSyncableEntityFunctionAndTriggerPostgres(entityName = %S, tableId = %L, pkFieldName = %S, " +
-            "localCsnFieldName = %S, primaryCsnFieldName = %S).forEach",
+fun CodeBlock.Builder.addSyncableEntityFunctionAndTriggerPostgres(sqlListVar: String, syncableEntityInfo: SyncableEntityInfo) : CodeBlock.Builder {
+    add("$sqlListVar += %T.generateSyncableEntityFunctionAndTriggerPostgres(entityName = %S, tableId = %L, pkFieldName = %S, " +
+            "localCsnFieldName = %S, primaryCsnFieldName = %S)\n",
         DoorSqlGenerator::class, syncableEntityInfo.syncableEntity.simpleName, syncableEntityInfo.tableId,
         syncableEntityInfo.entityPkField.name, syncableEntityInfo.entityLocalCsnField.name,
         syncableEntityInfo.entityMasterCsnField.name)
-    add("$execSqlFn(it)\n")
-    endControlFlow()
 
     return this
 }
@@ -187,17 +218,27 @@ fun CodeBlock.Builder.addSyncableEntityFunctionAndTriggerPostgres(execSqlFn: Str
  * @param execSqlFn the code to run an SQL statement e.g. "db.execSQL"
  * @return this
  */
-fun CodeBlock.Builder.addSyncableEntityUpdateTriggersSqlite(execSqlFn: String, syncableEntityInfo: SyncableEntityInfo) : CodeBlock.Builder {
+fun CodeBlock.Builder.addSyncableEntityUpdateTriggersSqlite(
+    execSqlFn: String,
+    syncableEntityInfo: SyncableEntityInfo,
+    sqlListVar: String? = null
+) : CodeBlock.Builder {
     val localCsnFieldName = syncableEntityInfo.entityLocalCsnField.name
     val primaryCsnFieldName = syncableEntityInfo.entityMasterCsnField.name
     val entityName = syncableEntityInfo.syncableEntity.simpleName
     val pkFieldName = syncableEntityInfo.entityPkField.name
     val tableId = syncableEntityInfo.tableId
 
-    beginControlFlow("%T.generateSyncableEntityUpdateTriggersSqlite(%S, %L, %S, %S, %S).forEach",
-        DoorSqlGenerator::class, entityName, tableId, pkFieldName, localCsnFieldName, primaryCsnFieldName)
-    add("$execSqlFn(it)\n")
-    endControlFlow()
+    if(sqlListVar != null) {
+        add("$sqlListVar += %T.generateSyncableEntityUpdateTriggersSqlite(%S, %L, %S, %S, %S)\n",
+            DoorSqlGenerator::class, entityName, tableId, pkFieldName, localCsnFieldName, primaryCsnFieldName)
+    }else{
+        beginControlFlow("%T.generateSyncableEntityUpdateTriggersSqlite(%S, %L, %S, %S, %S).forEach",
+            DoorSqlGenerator::class, entityName, tableId, pkFieldName, localCsnFieldName, primaryCsnFieldName)
+        add("$execSqlFn(it)\n")
+        endControlFlow()
+    }
+
 
     return this
 }
@@ -368,10 +409,14 @@ fun CodeBlock.Builder.beginRunBlockingControlFlow() =
 /**
  * Add code that will generate triggers to catch Zombie attachment uris on SQLite
  */
-fun CodeBlock.Builder.addGenerateAttachmentTriggerSqlite(entity: TypeElement, execSqlFn: String) : CodeBlock.Builder{
+fun CodeBlock.Builder.addGenerateAttachmentTriggerSqlite(
+    entity: TypeElement,
+    execSqlFn: String,
+    stmtListVar: String? = null
+) : CodeBlock.Builder{
     val attachmentInfo = EntityAttachmentInfo(entity)
     val pkFieldName = entity.enclosedElementsWithAnnotation(PrimaryKey::class.java).first().simpleName
-    add("$execSqlFn(%S)\n", """
+    addSql(execSqlFn, stmtListVar, """
         CREATE TRIGGER ATTUPD_${entity.simpleName}
         AFTER UPDATE ON ${entity.simpleName} FOR EACH ROW WHEN
         OLD.${attachmentInfo.md5PropertyName} IS NOT NULL AND (SELECT COUNT(*) FROM ${entity.simpleName} WHERE ${attachmentInfo.md5PropertyName} = OLD.${attachmentInfo.md5PropertyName}) = 0
@@ -386,10 +431,10 @@ fun CodeBlock.Builder.addGenerateAttachmentTriggerSqlite(entity: TypeElement, ex
 /**
  * Add code that will generate triggers to catch Zombie attachment uris on Postgres
  */
-fun CodeBlock.Builder.addGenerateAttachmentTriggerPostgres(entity: TypeElement, execSqlFn: String) : CodeBlock.Builder {
+fun CodeBlock.Builder.addGenerateAttachmentTriggerPostgres(entity: TypeElement, stmtListVar: String) : CodeBlock.Builder {
     val attachmentInfo = EntityAttachmentInfo(entity)
     val pkFieldName = entity.enclosedElementsWithAnnotation(PrimaryKey::class.java).first().simpleName
-    add("$execSqlFn(%S)\n", """
+    add("$stmtListVar += %S\n", """
         CREATE OR REPLACE FUNCTION attach_${entity.simpleName}_fn() RETURNS trigger AS ${'$'}${'$'}
         BEGIN
         INSERT INTO ZombieAttachmentData(zaTableName, zaPrimaryKey, zaUri) 
@@ -399,7 +444,7 @@ fun CodeBlock.Builder.addGenerateAttachmentTriggerPostgres(entity: TypeElement, 
         END ${'$'}${'$'}
         LANGUAGE plpgsql
     """.trimIndent())
-    add("$execSqlFn(%S)\n", """
+    add("$stmtListVar += %S\n", """
         CREATE TRIGGER attach_${entity.simpleName}_trig
         AFTER UPDATE ON ${entity.simpleName}
         FOR EACH ROW WHEN (OLD.${attachmentInfo.uriPropertyName} IS NOT NULL)

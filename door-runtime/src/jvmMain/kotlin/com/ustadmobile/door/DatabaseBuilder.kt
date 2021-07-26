@@ -1,5 +1,10 @@
 package com.ustadmobile.door
 
+import com.ustadmobile.door.migration.DoorMigration
+import com.ustadmobile.door.migration.DoorMigrationAsync
+import com.ustadmobile.door.migration.DoorMigrationStatementList
+import com.ustadmobile.door.migration.DoorMigrationSync
+import kotlinx.coroutines.runBlocking
 import java.lang.IllegalStateException
 import java.sql.Connection
 import java.sql.ResultSet
@@ -46,7 +51,7 @@ class DatabaseBuilder<T: DoorDatabase> internal constructor(private var context:
         }
 
         if(!doorDb.tableNames.any {it.lowercase() == DoorDatabaseCommon.DBINFO_TABLENAME}) {
-            doorDb.createAllTables()
+            doorDb.sqlDatabaseImpl.execSQLBatch(doorDb.createAllTables().toTypedArray())
             callbacks.forEach { it.onCreate(doorDb.sqlDatabaseImpl) }
         }else {
             var sqlCon = null as Connection?
@@ -72,7 +77,12 @@ class DatabaseBuilder<T: DoorDatabase> internal constructor(private var context:
                 val nextMigration = migrationList.filter { it.startVersion == currentDbVersion}
                         .maxByOrNull { it.endVersion }
                 if(nextMigration != null) {
-                    nextMigration.migrate(doorDb.sqlDatabaseImpl)
+                    when(nextMigration) {
+                        is DoorMigrationSync -> nextMigration.migrateFn(doorDb.sqlDatabaseImpl)
+                        is DoorMigrationAsync -> runBlocking { nextMigration.migrateFn(doorDb.sqlDatabaseImpl) }
+                        is DoorMigrationStatementList -> doorDb.execSQLBatch(*nextMigration.migrateStmts().toTypedArray())
+                    }
+
                     currentDbVersion = nextMigration.endVersion
                     doorDb.sqlDatabaseImpl.execSQL("UPDATE _doorwayinfo SET dbVersion = $currentDbVersion")
                 }else {

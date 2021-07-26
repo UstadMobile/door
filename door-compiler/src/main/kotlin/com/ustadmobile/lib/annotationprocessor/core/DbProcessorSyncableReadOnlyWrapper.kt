@@ -3,6 +3,7 @@ package com.ustadmobile.lib.annotationprocessor.core
 import androidx.room.Database
 import androidx.room.Dao
 import com.squareup.kotlinpoet.*
+import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.ustadmobile.door.DoorDatabase
 import javax.annotation.processing.ProcessingEnvironment
 import javax.annotation.processing.RoundEnvironment
@@ -126,7 +127,8 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(dbTypeEl: TypeElement,
                         addDbVersionProperty(dbTypeEl)
                         addFunction(FunSpec.builder("createAllTables")
                                 .addModifiers(KModifier.OVERRIDE)
-                                .addCode("_db.createAllTables()\n")
+                                .returns(List::class.parameterizedBy(String::class))
+                                .addCode("return _db.createAllTables()\n")
                                 .build())
                         addDataSourceProperty("_db")
                     }

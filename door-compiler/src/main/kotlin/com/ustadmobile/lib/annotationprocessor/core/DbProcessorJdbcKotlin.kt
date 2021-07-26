@@ -1065,22 +1065,19 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         val initDbVersion = dbTypeElement.getAnnotation(Database::class.java).version
         addFunction(FunSpec.builder("createAllTables")
             .addModifiers(KModifier.OVERRIDE)
+            .returns(List::class.parameterizedBy(String::class))
             .addCode(CodeBlock.builder()
-                .add("var _con = null as %T?\n", CLASSNAME_CONNECTION)
-                .add("var _stmt = null as %T?\n", CLASSNAME_STATEMENT)
-                .beginControlFlow("try")
-                .add("_con = openConnection()!!\n")
-                .add("_stmt = _con.createStatement()!!\n")
+                .add("val _stmtList = mutableListOf<String>()\n")
                 .beginControlFlow("when(jdbcDbType)")
                 .apply {
                     for(dbProductType in DoorDbType.SUPPORTED_TYPES) {
                         val dbTypeName = DoorDbType.PRODUCT_INT_TO_NAME_MAP[dbProductType] as String
                         beginControlFlow("$dbProductType -> ")
                         add("// - create for this $dbTypeName \n")
-                        add("_stmt.executeUpdate(\"CREATE·TABLE·IF·NOT·EXISTS·${DoorDatabaseCommon.DBINFO_TABLENAME}" +
-                                "·(dbVersion·int·primary·key,·dbHash·varchar(255))\")\n")
-                        add("_stmt.executeUpdate(\"INSERT·INTO·${DoorDatabaseCommon.DBINFO_TABLENAME}·" +
-                                "VALUES·($initDbVersion,·'')\")\n")
+                        add("_stmtList += \"CREATE·TABLE·IF·NOT·EXISTS·${DoorDatabaseCommon.DBINFO_TABLENAME}" +
+                                "·(dbVersion·int·primary·key,·dbHash·varchar(255))\"\n")
+                        add(" _stmtList += \"INSERT·INTO·${DoorDatabaseCommon.DBINFO_TABLENAME}·" +
+                                "VALUES·($initDbVersion,·'')\"\n")
                         dbTypeElement.allDbEntities(processingEnv).forEach { entityType ->
                             val fieldListStr = entityType.entityFields.joinToString { it.simpleName.toString() }
                             add("//Begin: Create table ${entityType.simpleName} for $dbTypeName\n")
@@ -1090,7 +1087,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                                 .add("END MIGRATION */\n")
                             addCreateTableCode(entityType.asEntityTypeSpec(),
                                 "_stmt.executeUpdate", dbProductType,
-                                entityType.indicesAsIndexMirrorList())
+                                entityType.indicesAsIndexMirrorList(), sqlListVar = "_stmtList")
                             add("/* START MIGRATION: \n")
                             add("_stmt.executeUpdate(%S)\n", "INSERT INTO ${entityType.simpleName} ($fieldListStr) " +
                                     "SELECT $fieldListStr FROM ${entityType.simpleName}_OLD")
@@ -1101,7 +1098,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                                 val syncableEntityInfo = SyncableEntityInfo(entityType.asClassName(),
                                     processingEnv)
                                 addSyncableEntityTriggers(entityType.asClassName(),
-                                    "_stmt.executeUpdate", dbProductType)
+                                    "_stmt.executeUpdate", dbProductType, sqlListVar = "_stmtList")
 
                                 if(dbProductType == DoorDbType.POSTGRES) {
                                     add("/* START MIGRATION: \n")
@@ -1113,7 +1110,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                                 }
 
                                 val trackerEntityClassName = generateTrackerEntity(entityType, processingEnv)
-                                add("_stmt.executeUpdate(%S)\n", makeCreateTableStatement(
+                                add("_stmtList += %S\n", makeCreateTableStatement(
                                     trackerEntityClassName, dbProductType))
 
                                 add(generateCreateIndicesCodeBlock(
@@ -1122,14 +1119,15 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                                         DbProcessorSync.TRACKER_CHANGESEQNUM_FIELDNAME)),
                                         IndexMirror(value = arrayOf(DbProcessorSync.TRACKER_ENTITY_PK_FIELDNAME,
                                             DbProcessorSync.TRACKER_DESTID_FIELDNAME), unique = true)),
-                                    trackerEntityClassName.name!!, "_stmt.executeUpdate"))
+                                    trackerEntityClassName.name!!, "_stmtList"))
                             }
 
                             if(entityType.entityHasAttachments) {
                                 if(dbProductType == DoorDbType.SQLITE) {
-                                    addGenerateAttachmentTriggerSqlite(entityType, "_stmt.executeUpdate")
+                                    addGenerateAttachmentTriggerSqlite(entityType,
+                                        "_stmt.executeUpdate", "_stmtList")
                                 }else {
-                                    addGenerateAttachmentTriggerPostgres(entityType, "_stmt.executeUpdate")
+                                    addGenerateAttachmentTriggerPostgres(entityType, "_stmtList")
                                 }
                             }
 
@@ -1139,13 +1137,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     }
                 }
                 .endControlFlow()
-                .nextControlFlow("catch(e: %T)", CLASSNAME_EXCEPTION)
-                .add("e.printStackTrace()\n")
-                .add("throw %T(%S, e)\n", CLASSNAME_RUNTIME_EXCEPTION, "Exception creating tables")
-                .nextControlFlow("finally")
-                .add("_stmt?.close()\n")
-                .add("_con?.close()\n")
-                .endControlFlow()
+                .add("return _stmtList\n")
                 .build())
             .build())
 

@@ -1,7 +1,7 @@
 package com.ustadmobile.lib.annotationprocessor.core.migrations
 
 import com.squareup.kotlinpoet.*
-import com.ustadmobile.door.DoorMigration
+import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.DoorSqlDatabase
 import javax.annotation.processing.ProcessingEnvironment
 import javax.annotation.processing.RoundEnvironment

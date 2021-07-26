@@ -626,8 +626,11 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         return sql
     }
 
-    protected fun generateCreateIndicesCodeBlock(indexes: Array<IndexMirror>, tableName: String,
-                                            execSqlFnName: String): CodeBlock {
+    protected fun generateCreateIndicesCodeBlock(
+        indexes: Array<IndexMirror>,
+        tableName: String,
+        sqlStmtListVar: String,
+    ): CodeBlock {
         val codeBlock = CodeBlock.builder()
         indexes.forEach {
             val indexName = if(it.name != "") {
@@ -636,7 +639,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                 "index_${tableName}_${it.value.joinToString(separator = "_", postfix = "", prefix = "")}"
             }
 
-            codeBlock.add("$execSqlFnName(%S)\n", "CREATE " +
+            codeBlock.add("$sqlStmtListVar += %S\n", "CREATE " +
                  (if(it.unique) "UNIQUE" else "" ) +" INDEX $indexName" +
                  " ON $tableName (${it.value.joinToString()})")
         }
@@ -650,22 +653,23 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
     protected fun CodeBlock.Builder.addSyncableEntityTriggers(
         entityClass: ClassName,
         execSqlFn: String,
-        dbType: Int
+        dbType: Int,
+        sqlListVar: String? = null
     ): CodeBlock.Builder {
         val syncableEntityInfo = SyncableEntityInfo(entityClass, processingEnv)
         when(dbType){
             DoorDbType.SQLITE -> {
-                addSyncableEntityInsertTriggersSqlite(execSqlFn, syncableEntityInfo)
-                addSyncableEntityUpdateTriggersSqlite(execSqlFn, syncableEntityInfo)
+                addSyncableEntityInsertTriggersSqlite(execSqlFn, syncableEntityInfo, sqlListVar)
+                addSyncableEntityUpdateTriggersSqlite(execSqlFn, syncableEntityInfo, sqlListVar)
             }
 
             DoorDbType.POSTGRES -> {
                 listOf("m", "l").forEach {
-                    add("$execSqlFn(%S)\n",
+                    add("$sqlListVar += %S\n",
                         "CREATE SEQUENCE IF NOT EXISTS ${syncableEntityInfo.syncableEntity.simpleName}_${it}csn_seq")
                 }
 
-                addSyncableEntityFunctionAndTriggerPostgres(execSqlFn, syncableEntityInfo)
+                addSyncableEntityFunctionAndTriggerPostgres(sqlListVar.toString(), syncableEntityInfo)
             }
         }
 
