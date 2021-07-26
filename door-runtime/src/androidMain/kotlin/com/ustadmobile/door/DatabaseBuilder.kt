@@ -7,11 +7,11 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Suppress("UNCHECKED_CAST")
-actual class DatabaseBuilder<T: DoorDatabase>(private val roomBuilder: RoomDatabase.Builder<T>,
+class DatabaseBuilder<T: DoorDatabase>(private val roomBuilder: RoomDatabase.Builder<T>,
                                               val dbClass: KClass<T>) {
 
-    actual companion object {
-        actual fun <T : DoorDatabase> databaseBuilder(context: Any, dbClass: KClass<T>, dbName: String): DatabaseBuilder<T> {
+    companion object {
+        fun <T : DoorDatabase> databaseBuilder(context: Any, dbClass: KClass<T>, dbName: String): DatabaseBuilder<T> {
             val applicationContext = (context as Context).applicationContext
             val builder = DatabaseBuilder(Room.databaseBuilder(applicationContext, dbClass.java, dbName),
                 dbClass)
@@ -29,7 +29,7 @@ actual class DatabaseBuilder<T: DoorDatabase>(private val roomBuilder: RoomDatab
 
 
 
-    actual fun build(): T {
+    fun build(): T {
         val db = roomBuilder.build()
         return if(db is SyncableDoorDatabase) {
             db.wrap(dbClass as KClass<SyncableDoorDatabase>) as T
@@ -38,7 +38,7 @@ actual class DatabaseBuilder<T: DoorDatabase>(private val roomBuilder: RoomDatab
         }
     }
 
-    actual fun addCallback(callback: DoorDatabaseCallback) : DatabaseBuilder<T> {
+    fun addCallback(callback: DoorDatabaseCallback) : DatabaseBuilder<T> {
         roomBuilder.addCallback(object: RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase)  = callback.onCreate(db)
 
@@ -48,7 +48,7 @@ actual class DatabaseBuilder<T: DoorDatabase>(private val roomBuilder: RoomDatab
         return this
     }
 
-    actual fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
+    fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
         roomBuilder.addMigrations(*migrations)
         return this
     }

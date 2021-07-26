@@ -12,19 +12,20 @@ import javax.sql.DataSource
 import kotlin.reflect.KClass
 
 
-actual class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private var dbClass: KClass<T>, private var dbName: String){
+@Suppress("unused") //This is used as an API
+class DatabaseBuilder<T: DoorDatabase> internal constructor(private var context: Any, private var dbClass: KClass<T>, private var dbName: String){
 
     private val callbacks = mutableListOf<DoorDatabaseCallback>()
 
     private val migrationList = mutableListOf<DoorMigration>()
 
-    actual companion object {
-        actual fun <T : DoorDatabase> databaseBuilder(context: Any, dbClass: KClass<T>, dbName: String): DatabaseBuilder<T>
+    companion object {
+        fun <T : DoorDatabase> databaseBuilder(context: Any, dbClass: KClass<T>, dbName: String): DatabaseBuilder<T>
             = DatabaseBuilder(context, dbClass, dbName)
     }
 
     @Suppress("UNCHECKED_CAST")
-    actual fun build(): T {
+    fun build(): T {
         val iContext = InitialContext()
         val dataSource = iContext.lookup("java:/comp/env/jdbc/${dbName}") as DataSource
         val dbImplClass = Class.forName("${dbClass.java.canonicalName}_JdbcKt") as Class<T>
@@ -90,13 +91,13 @@ actual class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private 
         }
     }
 
-    actual fun addCallback(callback: DoorDatabaseCallback) : DatabaseBuilder<T>{
+    fun addCallback(callback: DoorDatabaseCallback) : DatabaseBuilder<T>{
         callbacks.add(callback)
 
         return this
     }
 
-    actual fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
+    fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
         migrationList.addAll(migrations)
         return this
     }
