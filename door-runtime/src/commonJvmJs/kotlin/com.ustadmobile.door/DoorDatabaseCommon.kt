@@ -150,7 +150,7 @@ abstract class DoorDatabaseCommon {
      */
     protected fun Connection.prepareStatement(stmtConfig: PreparedStatementConfig) : PreparedStatement {
         return when {
-            !stmtConfig.hasListParams -> prepareStatement(stmtConfig.sql)
+            !stmtConfig.hasListParams -> prepareStatement(stmtConfig.sql, stmtConfig.generatedKeys)
             jdbcArraySupported -> prepareStatement(adjustQueryWithSelectInParam(stmtConfig.sql))
             else -> PreparedStatementArrayProxy(stmtConfig.sql, this)
         } ?: throw IllegalStateException("Null statement")

@@ -199,7 +199,12 @@ fun resolveQueryResultType(returnTypeName: TypeName)  =
             returnTypeName
         }
 
-fun makeInsertAdapterMethodName(paramType: TypeName, returnType: TypeName, processingEnv: ProcessingEnvironment): String {
+fun makeInsertAdapterMethodName(
+    paramType: TypeName,
+    returnType: TypeName,
+    processingEnv: ProcessingEnvironment,
+    async: Boolean = false
+): String {
     var methodName = "insert"
     if(paramType is ParameterizedTypeName && paramType.rawType == List::class.asClassName()) {
         methodName += "List"
@@ -210,6 +215,9 @@ fun makeInsertAdapterMethodName(paramType: TypeName, returnType: TypeName, proce
             methodName += "AndReturnId"
         }
     }
+
+    if(async)
+        methodName += "Async"
 
     return methodName
 }
@@ -824,7 +832,8 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     entityTypeSpec,
                     daoTypeBuilder,
                     upsertMode,
-                    pgOnConflict = pgOnConflict)
+                    pgOnConflict = pgOnConflict,
+                    suspended = funSpec.isSuspended)
                 .build())
             .build())
         return this
@@ -845,7 +854,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         val pkField = entityFields.first { it.annotations.any { it.typeName == PrimaryKey::class.asClassName() } }
         val insertAdapterSpec = TypeSpec.anonymousClassBuilder()
             .superclass(EntityInsertionAdapter::class.asClassName().parameterizedBy(entityClassName))
-            .addSuperclassConstructorParameter("_db.jdbcDbType")
+            .addSuperclassConstructorParameter("_db")
             .addFunction(FunSpec.builder("makeSql")
                 .addParameter("returnsId", BOOLEAN)
                 .addModifiers(KModifier.OVERRIDE)
@@ -961,7 +970,8 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         upsertMode: Boolean = false,
         addReturnStmt: Boolean = true,
         pgOnConflict: String? = null,
-        supportedDbTypes: List<Int> = DoorDbType.SUPPORTED_TYPES
+        supportedDbTypes: List<Int> = DoorDbType.SUPPORTED_TYPES,
+        suspended: Boolean = false
     ): CodeBlock.Builder {
         val paramType = parameterSpec.type
         val entityClassName = paramType.unwrapListOrArrayComponentType() as ClassName
@@ -978,8 +988,8 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         }
 
 
-        val insertMethodName = makeInsertAdapterMethodName(paramType, returnType, processingEnv)
-        add("$entityInserterPropName.$insertMethodName(${parameterSpec.name}, _db.openConnection())")
+        val insertMethodName = makeInsertAdapterMethodName(paramType, returnType, processingEnv, suspended)
+        add("$entityInserterPropName.$insertMethodName(${parameterSpec.name})")
 
         if(returnType != UNIT) {
             if(returnType.isListOrArray()

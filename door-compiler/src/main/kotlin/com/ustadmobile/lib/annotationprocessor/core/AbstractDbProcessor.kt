@@ -893,6 +893,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
      * @param addReturnStmt - if true, a return statement will be added to the codeblock, where the
      * return type will match the given returnType
      */
+    @Deprecated("This should not be used anymore. This is handled in the refactored JDBC generator. It will be removed when sync is updated")
     fun generateInsertCodeBlock(parameterSpec: ParameterSpec, returnType: TypeName,
                                    entityTypeSpec: TypeSpec,
                                    daoTypeBuilder: TypeSpec.Builder,
@@ -962,7 +963,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
 
             val insertAdapterSpec = TypeSpec.anonymousClassBuilder()
                     .superclass(EntityInsertionAdapter::class.asClassName().parameterizedBy(entityClassName))
-                    .addSuperclassConstructorParameter("_db.jdbcDbType")
+                    .addSuperclassConstructorParameter("_db")
                     .addFunction(FunSpec.builder("makeSql")
                             .addParameter("returnsId", BOOLEAN)
                             .addModifiers(KModifier.OVERRIDE)
@@ -987,7 +988,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
 
 
         val insertMethodName = makeInsertAdapterMethodName(paramType, returnType, processingEnv)
-        codeBlock.add("$entityInserterPropName.$insertMethodName(${parameterSpec.name}, _db.openConnection())")
+        codeBlock.add("$entityInserterPropName.$insertMethodName(${parameterSpec.name})")
 
         if(returnType != UNIT) {
             if(returnType.isListOrArray()
