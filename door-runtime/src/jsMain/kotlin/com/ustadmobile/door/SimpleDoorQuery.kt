@@ -8,12 +8,12 @@ actual class SimpleDoorQuery actual constructor(private val sql: String, overrid
     override fun getSql() = sql
 
     override fun getArgCount(): Int {
-        TODO("Not yet implemented")
+        TODO("getArgCount: Not yet implemented")
     }
 
 
     override fun bindToPreparedStmt(stmt: PreparedStatement, db: DoorDatabase, con: Connection) {
-        TODO("Not yet implemented")
+        TODO("bindToPreparedStmt: Not yet implemented")
     }
 
 

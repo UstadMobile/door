@@ -3,27 +3,25 @@ package com.ustadmobile.door
 import com.ustadmobile.door.ext.createInstance
 import com.ustadmobile.door.migration.DoorMigration
 import org.w3c.dom.Worker
+import wrappers.IndexedDb
 import wrappers.SQLiteDatasourceJs
-import kotlin.reflect.KClass
 
-class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private var dbClass: KClass<T>, private var dbName: String){
+class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private val builderOptions: DatabaseBuilderOptions){
 
     private val callbacks = mutableListOf<DoorDatabaseCallback>()
 
     private val migrationList = mutableListOf<DoorMigration>()
 
-    fun build(): T {
-        val path = webWorkerPath
-        if(path == null){
-            throw Exception("Set WebWorker path before building your Database")
+    suspend fun build(): T {
+        val path = webWorkerPath ?: throw Exception("Set WebWorker path before building your Database")
+        val dataSource = SQLiteDatasourceJs(builderOptions.dbName, Worker(path))
+        val dbImpl = builderOptions.dbImplClass.js.createInstance(dataSource, false) as T
+        val exists = IndexedDb.checkIfExists(builderOptions.dbName)
+        if(exists){
+            dataSource.loadDbFromIndexedDb()
+        }else{
+            dbImpl.execSQLBatchAsync(dbImpl.createAllTables().joinToString("#"))
         }
-        val implClass = implementationMap[dbClass] as KClass<T>
-        val dataSource = SQLiteDatasourceJs(dbName, Worker(path))
-        val dbImpl = implClass.js.createInstance(dataSource, false) as T
-        //TODO: this needs to be reworked where the build function itself is suspended.
-//        if(path != null){
-//            dbImpl.init(dbName, path)
-//        }
         return dbImpl
     }
 
@@ -45,19 +43,11 @@ class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private var dbC
 
     companion object {
 
-        private val implementationMap = mutableMapOf<KClass<*>, KClass<*>>()
-
         internal var webWorkerPath: String? = null
 
-        fun <T> registerImplementation(dbClass: KClass<*>, implClass: KClass<*>) {
-            implementationMap[dbClass] = implClass
-        }
-
         fun <T : DoorDatabase> databaseBuilder(
-            context: Any,
-            dbClass: KClass<T>,
-            dbName: String
-        ): DatabaseBuilder<T> = DatabaseBuilder(context, dbClass, dbName)
+            context: Any,builderOptions: DatabaseBuilderOptions
+        ): DatabaseBuilder<T> = DatabaseBuilder(context, builderOptions)
 
     }
 }

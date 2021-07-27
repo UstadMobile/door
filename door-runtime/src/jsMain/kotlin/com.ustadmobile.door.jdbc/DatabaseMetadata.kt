@@ -4,6 +4,8 @@ import kotlin.Array
 
 actual interface DatabaseMetadata {
 
+    val databaseProductName: String
+
     actual fun getTables(
         catalog: String?,
         schemaPattern: String?,

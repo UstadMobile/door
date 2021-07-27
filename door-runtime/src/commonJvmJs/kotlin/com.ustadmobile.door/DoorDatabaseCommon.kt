@@ -123,7 +123,7 @@ abstract class DoorDatabaseCommon {
      * Execute a batch of SQL Statements in a transaction. This is generally much faster
      * than executing statements individually.
      */
-    fun execSQLBatch(vararg sqlStatements: String) {
+    open fun execSQLBatch(vararg sqlStatements: String) {
         var connection: Connection? = null
         var statement: Statement? = null
         try {

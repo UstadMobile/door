@@ -1,12 +1,6 @@
 package com.ustadmobile.door
 
 
-import com.ustadmobile.door.jdbc.*
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
-import java.util.concurrent.CopyOnWriteArrayList
-import java.util.regex.Pattern
-
 @Suppress("unused") //Some functions are used by generated code
 actual abstract class DoorDatabase actual constructor() : DoorDatabaseCommon(){
 

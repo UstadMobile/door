@@ -23,6 +23,6 @@ open class SqliteStatementJs(
     override fun getConnection() = connection
 
     override fun getGeneratedKeys(): ResultSet {
-        TODO("Not yet implemented")
+        TODO("getGeneratedKeys: Not yet implemented")
     }
 }

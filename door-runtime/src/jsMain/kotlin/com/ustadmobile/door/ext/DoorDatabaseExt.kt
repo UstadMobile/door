@@ -32,22 +32,6 @@ actual fun DoorSqlDatabase.dbType(): Int {
 }
 
 /**
- * Init work that will only really be done for the real database implementation class (not the repo, syncreadonlywrapper, etc)
- */
-fun DoorDatabase.init(dbName: String, webWorkerPath: String) {
-    //dataSource = SQLiteDatasourceJs(dbName, Worker(webWorkerPath))
-//    GlobalScope.launch {
-//        val exists = IndexedDb.checkIfExists(dbName)
-//        if(exists){
-//            dataSource.loadDbFromIndexedDb()
-//        }else{
-//            createAllTables()
-//        }
-//        initCompletable.complete(true)
-//    }
-}
-
-/**
  * Multiplatform wrapper function that will execute raw SQL statements in a
  * batch.
  *

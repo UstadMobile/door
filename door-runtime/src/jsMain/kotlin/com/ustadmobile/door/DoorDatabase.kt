@@ -1,27 +1,22 @@
 package com.ustadmobile.door
 
-import com.ustadmobile.door.jdbc.Connection
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.GlobalScope
+import com.ustadmobile.door.ext.useConnection
+import com.ustadmobile.door.jdbc.SQLException
 import kotlinx.coroutines.Runnable
-import kotlinx.coroutines.launch
-import wrappers.SQLiteDatasourceJs
+import wrappers.SQLiteConnectionJs
+import wrappers.SQLitePreparedStatementJs
+import kotlin.jvm.Volatile
 
 actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon() {
 
-    override val jdbcDbType: Int
-        get() = DoorDbType.SQLITE
+    override var jdbcDbType: Int = -1
+        get() = sourceDatabase?.jdbcDbType ?: field
+        protected set
 
-    override val jdbcArraySupported: Boolean
-        get() = false
-
-    internal lateinit var webWorkerPath: String
-
-    val initCompletable = CompletableDeferred<Boolean>()
-
-    private suspend fun awaitReady() {
-        initCompletable.await()
-    }
+    @Volatile
+    override var jdbcArraySupported: Boolean = false
+        get() = sourceDatabase?.jdbcArraySupported ?: field
+        protected set
 
     actual abstract fun clearAllTables()
 
@@ -29,7 +24,29 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon() {
         super.runInTransaction(runnable)
     }
 
+    suspend fun execSQLBatchAsync(vararg sqlStatements: String){
+        var connection: SQLiteConnectionJs? = null
+        try {
+            connection = openConnection() as SQLiteConnectionJs
+            connection.setAutoCommit(false)
+            sqlStatements.first().split("#").forEach { sql ->
+                val statement = SQLitePreparedStatementJs(connection,sql)
+                val result = statement.executeUpdateAsync()
+                if(result != -1){
+                    statement.close()
+                }
+            }
+        }catch(e: SQLException) {
+            throw e
+        }finally {
+            connection?.close()
+        }
+    }
+
     protected fun setupFromDataSource() {
-        TODO("Implement on JS by converting its builder to being async")
+        openConnection().useConnection { dbConnection ->
+            jdbcDbType = DoorDbType.typeIntFromProductName(dbConnection.getMetaData().databaseProductName)
+            jdbcArraySupported = jdbcDbType == DoorDbType.SQLITE
+        }
     }
 }

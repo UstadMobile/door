@@ -10,12 +10,15 @@ class SQLiteConnectionJs(val datasource: SQLiteDatasourceJs):Connection {
 
     private var closed = false
 
-    override fun setAutoCommit(commit: Boolean) {
+    private var mAutoCommit = true
 
+
+    override fun setAutoCommit(commit: Boolean) {
+        mAutoCommit = commit
     }
 
     override fun getAutoCommit(): Boolean {
-        return true
+        return mAutoCommit
     }
 
     override fun prepareStatement(sql: String): PreparedStatement {
@@ -27,16 +30,13 @@ class SQLiteConnectionJs(val datasource: SQLiteDatasourceJs):Connection {
     }
 
     override fun createStatement(): Statement {
-        TODO("Not yet implemented")
+        return SqliteStatementJs(datasource.getConnection() as SQLiteConnectionJs)
     }
 
     override fun commit() {}
 
     override fun close() {
         closed = true
-//        GlobalScope.launch {
-//            datasource.sendMessage(json("action" to "close"))
-//        }
     }
 
     override fun isClosed() = closed
@@ -46,7 +46,7 @@ class SQLiteConnectionJs(val datasource: SQLiteDatasourceJs):Connection {
     }
 
     override fun getMetaData(): DatabaseMetadata {
-        TODO("Not yet implemented")
+        return DatabaseMetadataJs(datasource)
     }
 
 

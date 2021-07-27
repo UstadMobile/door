@@ -2,6 +2,7 @@ package wrappers
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.jdbc.ResultSet
+import com.ustadmobile.door.jdbc.SQLException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -20,12 +21,25 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
 
     private val pendingMessages = mutableMapOf<Int, CompletableDeferred<WorkerResult>>()
 
+    private val executedSqlQueries = mutableMapOf<Int, String>()
+
     init {
         worker.onmessage = { it: dynamic ->
-            val pendingCompletable = pendingMessages.remove(it.data["id"].toString().toInt())
+            val actionId = it.data["id"].toString().toInt()
+            val executedQuery = executedSqlQueries[actionId]
+            if(it.data["error"] != js("undefined")){
+                throw SQLException("Error occurred while trying to execute a query",
+                    Exception("${it.data["error"]} when executing $executedQuery"))
+            }
+            val pendingCompletable = pendingMessages.remove(actionId)
             if(pendingCompletable != null){
+                val executedSuccessfully = it.data["ready"] == (js("undefined") && it.data["results"] != js("undefined"))
+                        || it.data["ready"]
+
+                val results = if(it.data["results"] != js("undefined")) it.data["results"] else arrayOf<Any>()
+
                 pendingCompletable.complete(
-                    WorkerResult(it.data["id"], it.data["results"], it.data["ready"], it.data["buffer"])
+                    WorkerResult(it.data["id"], results, executedSuccessfully, it.data["buffer"])
                 )
             }
         }
@@ -39,6 +53,7 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
         val completable = CompletableDeferred<WorkerResult>()
         val actionId = ++idCounter
         pendingMessages[actionId] = completable
+        executedSqlQueries[actionId] = message["sql"].toString()
         message["id"] = actionId
         worker.postMessage(message)
         return completable.await()
