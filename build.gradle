@@ -52,6 +52,14 @@ ext {
     version_kotlinx_serialization = "1.2.2"
     version_kotlin_extensions = "1.0.1-pre.220-kotlin-$version_kotlin"
 
+    version_kotlin_react = "17.0.2-pre.204-kotlin-1.5.0"
+    version_kotlin_react_router_dom = "5.2.0-pre.204-kotlin-1.5.0"
+    version_kotlin_styled = "5.3.0-pre.204-kotlin-1.5.0"
+    version_kotlin_redux = "4.0.5-pre.204-kotlin-1.5.0"
+    version_kotlin_extensions = "1.0.1-pre.204-kotlin-1.5.0"
+    version_kotlin_react_redux = "7.2.3-pre.204-kotlin-1.5.0"
+    version_muirwik_components = "0.8.2"
+
 }
 
 allprojects {

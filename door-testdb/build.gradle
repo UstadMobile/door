@@ -103,6 +103,7 @@ kotlin {
         }
 
         jsTest {
+            kotlin.srcDir("$buildDir/generated/source/door-js")
             dependencies {
                 implementation kotlin('test-js')
             }

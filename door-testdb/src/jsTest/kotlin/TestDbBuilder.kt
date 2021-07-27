@@ -1,29 +1,42 @@
+import com.ustadmobile.door.DatabaseBuilderOptions
 import com.ustadmobile.door.DatabaseBuilder
+import com.ustadmobile.door.DoorDbType
+import db2.ExampleDatabase2
+import db2.ExampleDatabase2_JdbcKt
+import db2.ExampleEntity2
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.promise
 import kotlin.test.*
 
 class TestDbBuilder {
 
-    lateinit var databaseJs: ExampleDatabaseJs
-
-    //@BeforeTest
-    fun setup(){
-        //DatabaseBuilder.registerImplementation<ExampleDatabaseJs>(ExampleDatabaseJs::class, ExampleDatabaseJs_Impl::class)
-        databaseJs =  DatabaseBuilder.databaseBuilder(Any(), ExampleDatabaseJs::class, "jsDb")
-            .webWorker("./worker.sql-wasm.js")
+    private suspend fun setupDatabase() : ExampleDatabase2 {
+        val builderOptions = DatabaseBuilderOptions(ExampleDatabase2::class, ExampleDatabase2_JdbcKt::class, "jsDb1")
+        val databaseJs =  DatabaseBuilder.databaseBuilder<ExampleDatabase2>(Any(),builderOptions)
+            .webWorker("./worker.sql-asm.js")
             .build()
-        databaseJs.clearAllTables()
+
+        //Not implemented yet
+        //databaseJs.clearAllTables()
+        return databaseJs
     }
 
-    //@Test
-    fun givenInsertedEntry_whenQueried_shouldBeFound() = GlobalScope.promise {
-        val dao = databaseJs.exampleJsDao()
-        val entryId = 10L
-        /*dao.insertAsync(ExampleJsEntity().apply {
-            uid = entryId
+    @Test
+    fun givenDatabaseBuilder_whenBuilding_shouldBuildAndInitializeTheDatabase() = GlobalScope.promise{
+        val db = setupDatabase()
+        assertEquals(db.jdbcDbType, DoorDbType.SQLITE)
+    }
+
+    @Test
+    fun givenInsertedEntry_whenQueried_shouldBeEqual() = GlobalScope.promise {
+        val entity = ExampleEntity2().apply {
+            uid = 10L
             name = "SampleEntityName"
-        })
-        val entity = dao.findByUid(entryId)*/
+        }
+        val db = setupDatabase()
+        val dao = db.exampleDao2()
+        dao.insertAsync(entity)
+        val retrievedEntity = dao.findByUidAsync(entity.uid)
+        assertEquals(entity, retrievedEntity, "Entities are equal")
     }
 }

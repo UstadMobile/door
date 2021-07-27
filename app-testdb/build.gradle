@@ -1,0 +1,45 @@
+plugins {
+    id 'org.jetbrains.kotlin.js'
+}
+
+group = rootProject.group
+version = rootProject.version
+
+repositories {
+    mavenCentral()
+}
+
+kotlin {
+    js(LEGACY) {
+        browser {
+            binaries.executable()
+            webpackTask {
+                cssSupport.enabled = true
+            }
+            runTask {
+                cssSupport.enabled = true
+            }
+            testTask {
+                useKarma {
+                    useChromeHeadless()
+                    webpackConfig.cssSupport.enabled = true
+                }
+            }
+        }
+    }
+}
+
+
+dependencies {
+    testImplementation 'org.jetbrains.kotlin:kotlin-test'
+    implementation "org.jetbrains.kotlin-wrappers:kotlin-react:$version_kotlin_react"
+    implementation "org.jetbrains.kotlin-wrappers:kotlin-react-dom:$version_kotlin_react"
+    implementation "org.jetbrains.kotlin-wrappers:kotlin-styled:$version_kotlin_styled"
+    implementation "org.jetbrains.kotlin-wrappers:kotlin-react-router-dom:$version_kotlin_react_router_dom"
+    implementation "org.jetbrains.kotlin-wrappers:kotlin-redux:$version_kotlin_redux"
+    implementation "org.jetbrains.kotlin-wrappers:kotlin-react-redux:$version_kotlin_react_redux"
+    implementation project(":door-runtime")
+    implementation project(":door-testdb")
+    implementation "io.ktor:ktor-client-js:$version_ktor"
+    implementation "com.ccfraser.muirwik:muirwik-components:$version_muirwik_components"
+}
