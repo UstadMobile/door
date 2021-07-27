@@ -1,13 +1,17 @@
 package com.ustadmobile.door
 
 import com.ustadmobile.door.jdbc.*
+import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
 
 /**
  * This is similar to the EntityInsertionAdapter on Room. It is used by generated code.
  * @param dbType The DbType constant as per DoorDbType
  */
 @Suppress("unused", "VARIABLE_WITH_REDUNDANT_INITIALIZER") //What appears unused to the IDE is actually used by generated code
-abstract class EntityInsertionAdapter<T>(protected val dbType: Int) {
+abstract class EntityInsertionAdapter<T>(protected val db: DoorDatabase) {
+
+    //used by generated code
+    protected val dbType: Int = db.jdbcDbType
 
     /**
      * Set values on the PreparedStatement (which is created using makeSql) for the given entity. This is implemented
@@ -26,15 +30,17 @@ abstract class EntityInsertionAdapter<T>(protected val dbType: Int) {
      */
     abstract fun makeSql(returnsId: Boolean): String
 
-    fun insert(entity: T, con: Connection) {
-        var stmt = null as PreparedStatement?
-        try {
-            stmt = con.prepareStatement(makeSql(false))
+    fun insert(entity: T) {
+        db.prepareAndUseStatement(makeSql(false)) { stmt ->
             bindPreparedStmtToEntity(stmt, entity)
             stmt.executeUpdate()
-        }finally {
-            stmt?.close()
-            con.close()
+        }
+    }
+
+    suspend fun insertAsync(entity: T) {
+        db.prepareAndUseStatementAsync(makeSql(false)) { stmt ->
+            bindPreparedStmtToEntity(stmt, entity)
+            stmt.executeUpdateAsyncKmp()
         }
     }
 
@@ -52,63 +58,98 @@ abstract class EntityInsertionAdapter<T>(protected val dbType: Int) {
         return generatedKey
     }
 
-    fun insertAndReturnId(entity: T, con: Connection): Long {
-        var stmt = null as PreparedStatement?
-        var generatedKey = 0L
-        try {
-            stmt = con.prepareStatement(makeSql(true), StatementConstantsKmp.RETURN_GENERATED_KEYS)
+    fun insertAndReturnId(entity: T): Long {
+        val stmtConfig = PreparedStatementConfig(makeSql(true),
+            generatedKeys = StatementConstantsKmp.RETURN_GENERATED_KEYS)
+        return db.prepareAndUseStatement(stmtConfig){ stmt ->
             bindPreparedStmtToEntity(stmt, entity)
             stmt.executeUpdate()
-            generatedKey = getGeneratedKey(stmt)
-        }finally {
-            stmt?.close()
-            con.close()
+            getGeneratedKey(stmt)
         }
-
-        return generatedKey
     }
 
-    fun insertListAndReturnIds(entities: List<T>, con :Connection): List<Long> {
-        var stmt = null as PreparedStatement?
+    suspend fun insertAndReturnIdAsync(entity: T): Long {
+        val stmtConfig = PreparedStatementConfig(makeSql(true),
+            generatedKeys = StatementConstantsKmp.RETURN_GENERATED_KEYS)
+        return db.prepareAndUseStatementAsync(stmtConfig){ stmt ->
+            bindPreparedStmtToEntity(stmt, entity)
+            stmt.executeUpdateAsyncKmp()
+            getGeneratedKey(stmt)
+        }
+    }
+
+    fun insertListAndReturnIds(entities: List<T>): List<Long> {
+        val stmtConfig = PreparedStatementConfig(makeSql(true),
+            generatedKeys = StatementConstantsKmp.RETURN_GENERATED_KEYS)
         val generatedKeys = mutableListOf<Long>()
-        try {
-            con.setAutoCommit(false)
-            stmt = con.prepareStatement(makeSql(true), StatementConstantsKmp.RETURN_GENERATED_KEYS)
-            for(entity in entities) {
-                bindPreparedStmtToEntity(stmt, entity)
-                stmt.executeUpdate()
-                generatedKeys.add(getGeneratedKey(stmt))
+        db.prepareAndUseStatement(stmtConfig) { stmt ->
+            stmt.getConnection().setAutoCommit(false)
+            try {
+                entities.forEach {
+                    bindPreparedStmtToEntity(stmt, it)
+                    stmt.executeUpdate()
+                    generatedKeys += getGeneratedKey(stmt)
+                }
+                stmt.getConnection().commit()
+            }finally {
+                stmt.getConnection().setAutoCommit(true)
             }
-            con.commit()
-        }catch(e: SQLException) {
-            e.printStackTrace()
-            throw e
-        }finally {
-            con.setAutoCommit(true)
-            stmt?.close()
-            con.close()
         }
 
-        return generatedKeys
+        return generatedKeys.toList()
     }
 
-    fun insertList(entities: List<T>, con: Connection) {
-        var stmt = null as PreparedStatement?
-        try {
-            con.setAutoCommit(false)
-            stmt = con.prepareStatement(makeSql(false))
-            for(entity in entities) {
-                bindPreparedStmtToEntity(stmt, entity)
-                stmt.executeUpdate()
+    suspend fun insertListAndReturnIdsAsync(entities: List<T>): List<Long> {
+        val stmtConfig = PreparedStatementConfig(makeSql(true),
+            generatedKeys = StatementConstantsKmp.RETURN_GENERATED_KEYS)
+
+        val generatedKeys = mutableListOf<Long>()
+        db.prepareAndUseStatementAsync(stmtConfig) { stmt ->
+            stmt.getConnection().setAutoCommit(false)
+            try {
+                entities.forEach {
+                    bindPreparedStmtToEntity(stmt, it)
+                    stmt.executeUpdateAsyncKmp()
+                    generatedKeys += getGeneratedKey(stmt)
+                }
+                stmt.getConnection().commit()
+            }finally {
+                stmt.getConnection().setAutoCommit(true)
             }
-            con.commit()
-        }catch(e: SQLException) {
-            e.printStackTrace()
-            throw e
-        }finally {
-            stmt?.close()
-            con.setAutoCommit(true)
-            con.close()
+        }
+
+        return generatedKeys.toList()
+    }
+
+
+    fun insertList(entities: List<T>) {
+        db.prepareAndUseStatement(makeSql(false)) { stmt ->
+            try {
+                stmt.getConnection().setAutoCommit(false)
+                entities.forEach {
+                    bindPreparedStmtToEntity(stmt, it)
+                    stmt.executeUpdate()
+                }
+                stmt.getConnection().commit()
+            }finally {
+                stmt.getConnection().setAutoCommit(true)
+            }
+        }
+    }
+
+
+    suspend fun insertListAsync(entities: List<T>) {
+        db.prepareAndUseStatementAsync(makeSql(false)) { stmt ->
+            try {
+                stmt.getConnection().setAutoCommit(false)
+                entities.forEach {
+                    bindPreparedStmtToEntity(stmt, it)
+                    stmt.executeUpdateAsyncKmp()
+                }
+                stmt.getConnection().commit()
+            }finally {
+                stmt.getConnection().setAutoCommit(true)
+            }
         }
     }
 
