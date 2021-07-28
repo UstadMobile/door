@@ -35,33 +35,9 @@ abstract class DoorDatabaseCommon {
 
     abstract val jdbcArraySupported: Boolean
 
+    abstract val tableNames: List<String>
+
     val changeListeners = concurrentSafeListOf<ChangeListenerRequest>() as MutableList<ChangeListenerRequest>
-
-    val tableNames: List<String> by lazy {
-        val delegatedDatabaseVal = sourceDatabase
-        if(delegatedDatabaseVal != null) {
-            delegatedDatabaseVal.tableNames
-        }else {
-            var con = null as Connection?
-            val tableNamesList = mutableListOf<String>()
-            var tableResult = null as ResultSet?
-            try {
-                con = openConnection()
-                val metadata = con.getMetaData()
-                tableResult = metadata.getTables(null, null, "%", arrayOf("TABLE"))
-                while(tableResult.next()) {
-                    tableResult.getString("TABLE_NAME")?.also {
-                        tableNamesList.add(it)
-                    }
-                }
-            }finally {
-                con?.close()
-            }
-
-            tableNamesList.toList()
-        }
-
-    }
 
     inner class DoorSqlDatabaseImpl : DoorSqlDatabase {
 

@@ -32,7 +32,7 @@ class SQLiteResultSet(private val results: Array<Any>): ResultSet {
     private var lastWasNull = true
 
     init {
-        columns = results.first().asDynamic().columns
+        columns = if(results.isNotEmpty()) results.first().asDynamic().columns else null
     }
 
 

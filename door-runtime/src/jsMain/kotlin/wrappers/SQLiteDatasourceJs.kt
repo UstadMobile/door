@@ -24,23 +24,24 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
     private val executedSqlQueries = mutableMapOf<Int, String>()
 
     init {
-        worker.onmessage = { it: dynamic ->
-            val actionId = it.data["id"].toString().toInt()
+        worker.onmessage = { dbEvent: dynamic ->
+            val actionId = dbEvent.data["id"].toString().toInt()
             val executedQuery = executedSqlQueries[actionId]
-            if(it.data["error"] != js("undefined")){
-                throw SQLException("Error occurred while trying to execute a query",
-                    Exception("${it.data["error"]} when executing $executedQuery"))
+            if(dbEvent.data["error"] != js("undefined")){
+                throw SQLException(dbEvent.data["error"].toString(),
+                    Exception("Error occurred when executing $executedQuery"))
             }
+
             val pendingCompletable = pendingMessages.remove(actionId)
             if(pendingCompletable != null){
-                val executedSuccessfully = it.data["ready"] == (js("undefined") && it.data["results"] != js("undefined"))
-                        || it.data["ready"]
 
-                val results = if(it.data["results"] != js("undefined")) it.data["results"] else arrayOf<Any>()
+                val executedSuccessfully = dbEvent.data["ready"] == (js("undefined")
+                        && dbEvent.data["results"] != js("undefined")) || dbEvent.data["ready"]
 
-                pendingCompletable.complete(
-                    WorkerResult(it.data["id"], results, executedSuccessfully, it.data["buffer"])
-                )
+                val results = if(dbEvent.data["results"] != js("undefined")) dbEvent.data["results"] else arrayOf<Any>()
+                val buffer = if(dbEvent.data["buffer"] != js("undefined")) dbEvent.data["buffer"] else null
+
+                pendingCompletable.complete(WorkerResult(dbEvent.data["id"], results, executedSuccessfully, buffer))
             }
         }
     }
@@ -59,19 +60,17 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
         return completable.await()
     }
 
-    private fun makeMessage(sql: String, params: Array<Any?>?) : Json {
-        val message = json(
+    private fun makeMessage(sql: String, params: Array<Any?>? = arrayOf()): Json {
+        return json(
             "action" to "exec",
-            "sql" to sql
+            "sql" to sql,
+            "params" to JSON.parse(
+                JSON.stringify(params?.map { (if(it != js("undefined")) it else null).toString()
+            }))
         )
-
-        if(params != null) {
-            message["params"] = params
-        }
-        return message
     }
 
-    internal suspend fun sendQuery(sql: String, params: Array<Any?>?): ResultSet {
+    internal suspend fun sendQuery(sql: String, params: Array<Any?>? = null): ResultSet {
         return sendMessage(makeMessage(sql, params)).results?.let { SQLiteResultSet(it) } ?: SQLiteResultSet(arrayOf())
     }
 
