@@ -1,10 +1,7 @@
 package wrappers
 
 import com.ustadmobile.door.jdbc.*
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
 import kotlin.Array
-import kotlin.js.json
 
 class SQLiteConnectionJs(val datasource: SQLiteDatasourceJs):Connection {
 
@@ -46,7 +43,7 @@ class SQLiteConnectionJs(val datasource: SQLiteDatasourceJs):Connection {
     }
 
     override fun getMetaData(): DatabaseMetadata {
-        return DatabaseMetadataJs(datasource)
+        return SQLiteDatabaseMetadataJs(datasource)
     }
 
 

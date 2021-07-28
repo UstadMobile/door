@@ -2,11 +2,15 @@ package com.ustadmobile.door
 
 import com.ustadmobile.door.ext.createInstance
 import com.ustadmobile.door.migration.DoorMigration
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import org.w3c.dom.Worker
+import wrappers.DatabaseExportToIndexedDbCallback
 import wrappers.IndexedDb
 import wrappers.SQLiteDatasourceJs
 
-class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private val builderOptions: DatabaseBuilderOptions){
+class DatabaseBuilder<T: DoorDatabase>(private val builderOptions: DatabaseBuilderOptions,
+                                       private val dbExportCallback: DatabaseExportToIndexedDbCallback){
 
     private val callbacks = mutableListOf<DoorDatabaseCallback>()
 
@@ -20,8 +24,20 @@ class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private val bui
         if(exists){
             dataSource.loadDbFromIndexedDb()
         }else{
-            dbImpl.execSQLBatchAsync(dbImpl.createAllTables().joinToString("#"))
+            if(!dbImpl.getTableNamesAsync().any {it.lowercase() == DoorDatabaseCommon.DBINFO_TABLENAME}) {
+                dbImpl.execSQLBatchAsync(dbImpl.createAllTables().joinToString("#"))
+                callbacks.forEach { it.onCreate(dbImpl.sqlDatabaseImpl) }
+            }else{
+                TODO("Handling db builder with migrations")
+            }
         }
+        val changeListener = ChangeListenerRequest(dbImpl.getTableNamesAsync()){
+            GlobalScope.launch {
+                dbExportCallback.onExport(dataSource)
+            }
+        }
+
+        dbImpl.addChangeListener(changeListener)
         return dbImpl
     }
 
@@ -46,8 +62,9 @@ class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private val bui
         internal var webWorkerPath: String? = null
 
         fun <T : DoorDatabase> databaseBuilder(
-            context: Any,builderOptions: DatabaseBuilderOptions
-        ): DatabaseBuilder<T> = DatabaseBuilder(context, builderOptions)
+            builderOptions: DatabaseBuilderOptions,
+            dbExportCallback: DatabaseExportToIndexedDbCallback
+        ): DatabaseBuilder<T> = DatabaseBuilder(builderOptions, dbExportCallback)
 
     }
 }
