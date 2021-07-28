@@ -1,7 +1,5 @@
 import com.ccfraser.muirwik.components.*
-import com.ccfraser.muirwik.components.button.MButtonSize
-import com.ccfraser.muirwik.components.button.MButtonVariant
-import com.ccfraser.muirwik.components.button.mButton
+import com.ccfraser.muirwik.components.button.*
 import com.ccfraser.muirwik.components.form.MFormControlVariant
 import com.ccfraser.muirwik.components.list.mList
 import com.ccfraser.muirwik.components.list.mListItem
@@ -18,6 +16,9 @@ import kotlinx.css.*
 import react.*
 import styled.css
 import styled.styledDiv
+import wrappers.DatabaseExportToIndexedDbCallback
+import wrappers.SQLiteDatasourceJs
+import kotlin.js.Date
 
 class AppComponent(mProps: RProps): RComponent<RProps, RState>(mProps) {
 
@@ -30,6 +31,7 @@ class AppComponent(mProps: RProps): RComponent<RProps, RState>(mProps) {
     override fun RState.init(props: RProps) {
         GlobalScope.launch {
             setupDatabase()
+            fetchData()
         }
     }
 
@@ -39,7 +41,7 @@ class AppComponent(mProps: RProps): RComponent<RProps, RState>(mProps) {
                 mGridItem(MGridSize.cells8){
                     mTextField(label = "Entity name",
                         helperText = "",
-                        value = entity.name,
+                        value = entity.name ?: "",
                         variant = MFormControlVariant.outlined,
                         onChange = {
                             it.persist()
@@ -54,7 +56,7 @@ class AppComponent(mProps: RProps): RComponent<RProps, RState>(mProps) {
                 }
 
                 mGridItem(MGridSize.cells4){
-                    mButton("Save Now", size = MButtonSize.large,
+                    mButton(if(entity.uid == 0L) "Save Now" else "Update Now", size = MButtonSize.large,
                         disabled = entity.name.isNullOrEmpty(),
                         variant = MButtonVariant.contained,
                         onClick = {
@@ -80,9 +82,23 @@ class AppComponent(mProps: RProps): RComponent<RProps, RState>(mProps) {
                     mList {
                         entryList?.forEach { entry ->
                             mListItem {
-                                mGridContainer {
-                                    mGridItem(MGridSize.cells11){
+                                mGridContainer(MGridSpacing.spacing4) {
+                                    mGridItem(MGridSize.cells5){
                                         mTypography(entry.name, variant = MTypographyVariant.body2)
+                                    }
+
+                                    mGridItem(MGridSize.cells3){
+                                        mTypography(entry.uid.toString(), variant = MTypographyVariant.body2)
+                                    }
+
+                                    mGridItem(MGridSize.cells3){
+                                        mTypography(entry.someNumber.toString(), variant = MTypographyVariant.body2)
+                                    }
+
+                                    mGridItem(MGridSize.cells1){
+                                        mIconButton("edit",size = MIconButtonSize.medium, onClick = {
+                                            editEntry(entry)
+                                        })
                                     }
                                 }
                             }
@@ -93,21 +109,49 @@ class AppComponent(mProps: RProps): RComponent<RProps, RState>(mProps) {
         }
     }
 
-    private fun saveData(){
-        GlobalScope.launch {
-            dao.insertAsync(entity)
-            window.setTimeout(suspend{
-                val dataList = dao.findAllAsync()
-                setState {
-                    entryList = dataList
-                }
-            }, 500)
+    private fun editEntry(entry: ExampleEntity2) {
+        setState {
+            entity = entry
         }
     }
 
+    private fun saveData(){
+        GlobalScope.launch {
+            if(entity.uid == 0L){
+                entity.apply {
+                    uid = Date().getTime().toLong()
+                    someNumber = Date().getTime().toLong()/3000
+                }
+                dao.insertAsync(entity)
+            }else{
+                entity.name?.let { dao.updateByParamAsync(it, entity.someNumber) }
+            }
+
+            window.setTimeout(fetchData(), 500)
+        }
+    }
+
+    private suspend fun fetchData(){
+        entity.name = null
+        val dataList = dao.findAllAsync()
+        setState {
+            entryList = dataList
+        }
+    }
+
+    private suspend fun exportHandler(datasource: SQLiteDatasourceJs){
+        datasource.importDbToIndexedDb()
+    }
+
     private suspend fun setupDatabase() {
+        //Listen for tables to be changed and trigger save to indexdb
+        val dbExportCallback = object: DatabaseExportToIndexedDbCallback{
+            override suspend fun onExport(datasource: SQLiteDatasourceJs) {
+                window.setTimeout(exportHandler(datasource), 5000)
+            }
+        }
         val builderOptions = DatabaseBuilderOptions(ExampleDatabase2::class, ExampleDatabase2_JdbcKt::class, "jsDb1")
-        val database =  DatabaseBuilder.databaseBuilder<ExampleDatabase2>(Any(),builderOptions)
+        val database =  DatabaseBuilder.databaseBuilder<ExampleDatabase2>(builderOptions, dbExportCallback)
             .webWorker("./worker.sql-asm.js")
             .build()
         dao = database.exampleDao2()
