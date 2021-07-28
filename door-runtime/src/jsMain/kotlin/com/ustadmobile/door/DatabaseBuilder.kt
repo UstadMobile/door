@@ -31,10 +31,9 @@ class DatabaseBuilder<T: DoorDatabase>(private val builderOptions: DatabaseBuild
                 TODO("Handling db builder with migrations")
             }
         }
+
         val changeListener = ChangeListenerRequest(dbImpl.getTableNamesAsync()){
-            GlobalScope.launch {
-                dbExportCallback.onExport(dataSource)
-            }
+            dbExportCallback.onExport(dataSource)
         }
 
         dbImpl.addChangeListener(changeListener)

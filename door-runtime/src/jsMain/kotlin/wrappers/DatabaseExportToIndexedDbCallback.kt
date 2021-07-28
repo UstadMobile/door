@@ -2,5 +2,5 @@ package wrappers
 
 interface DatabaseExportToIndexedDbCallback {
 
-    suspend fun onExport(datasource: SQLiteDatasourceJs)
+    fun onExport(datasource: SQLiteDatasourceJs)
 }

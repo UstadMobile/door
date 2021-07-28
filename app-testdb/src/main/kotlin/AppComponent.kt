@@ -128,11 +128,17 @@ class AppComponent(mProps: RProps): RComponent<RProps, RState>(mProps) {
             }
 
             window.setTimeout(fetchData(), 500)
+            setState {
+                entity = entity.apply {
+                    uid = 0L
+                    someNumber = 0
+                    name = null
+                }
+            }
         }
     }
 
     private suspend fun fetchData(){
-        entity.name = null
         val dataList = dao.findAllAsync()
         setState {
             entryList = dataList
@@ -144,10 +150,12 @@ class AppComponent(mProps: RProps): RComponent<RProps, RState>(mProps) {
     }
 
     private suspend fun setupDatabase() {
-        //Listen for tables to be changed and trigger save to indexdb
+        //Listen for tables change and trigger save to indexedDb
         val dbExportCallback = object: DatabaseExportToIndexedDbCallback{
-            override suspend fun onExport(datasource: SQLiteDatasourceJs) {
-                window.setTimeout(exportHandler(datasource), 5000)
+            override fun onExport(datasource: SQLiteDatasourceJs) {
+                GlobalScope.launch {
+                    window.setTimeout(exportHandler(datasource), 5000)
+                }
             }
         }
         val builderOptions = DatabaseBuilderOptions(ExampleDatabase2::class, ExampleDatabase2_JdbcKt::class, "jsDb1")
