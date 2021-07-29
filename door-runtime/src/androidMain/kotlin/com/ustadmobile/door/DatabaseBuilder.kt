@@ -50,8 +50,7 @@ class DatabaseBuilder<T: DoorDatabase>(private val roomBuilder: RoomDatabase.Bui
     }
 
     fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
-        //TODO
-        //roomBuilder.addMigrations(*migrations)
+        roomBuilder.addMigrations(*migrations.map { it.asRoomMigration() }.toTypedArray())
         return this
     }
 
