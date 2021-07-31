@@ -6,12 +6,13 @@ import org.w3c.dom.Worker
 import wrappers.SQLiteDatasourceJs
 import kotlin.reflect.KClass
 
-class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private var dbClass: KClass<T>, private var dbName: String){
+actual class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private var dbClass: KClass<T>, private var dbName: String){
 
     private val callbacks = mutableListOf<DoorDatabaseCallback>()
 
     private val migrationList = mutableListOf<DoorMigration>()
 
+    @Suppress("UNCHECKED_CAST")
     fun build(): T {
         val path = webWorkerPath
         if(path == null){
@@ -32,12 +33,12 @@ class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private var dbC
         return this
     }
 
-    fun addCallback(callback: DoorDatabaseCallback) : DatabaseBuilder<T>{
+    actual fun addCallback(callback: DoorDatabaseCallback) : DatabaseBuilder<T>{
         callbacks.add(callback)
         return this
     }
 
-    fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
+    actual fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
         migrationList.addAll(migrations)
         return this
     }

@@ -18,7 +18,7 @@ import kotlin.reflect.KClass
 
 
 @Suppress("unused") //This is used as an API
-class DatabaseBuilder<T: DoorDatabase> internal constructor(private var context: Any, private var dbClass: KClass<T>, private var dbName: String){
+actual class DatabaseBuilder<T: DoorDatabase> internal constructor(private var context: Any, private var dbClass: KClass<T>, private var dbName: String){
 
     private val callbacks = mutableListOf<DoorDatabaseCallback>()
 
@@ -101,13 +101,13 @@ class DatabaseBuilder<T: DoorDatabase> internal constructor(private var context:
         }
     }
 
-    fun addCallback(callback: DoorDatabaseCallback) : DatabaseBuilder<T>{
+    actual fun addCallback(callback: DoorDatabaseCallback) : DatabaseBuilder<T>{
         callbacks.add(callback)
 
         return this
     }
 
-    fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
+    actual fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
         migrationList.addAll(migrations)
         return this
     }
