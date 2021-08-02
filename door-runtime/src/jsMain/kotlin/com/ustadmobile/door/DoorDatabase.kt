@@ -57,7 +57,7 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon() {
         try {
             connection = openConnection() as SQLiteConnectionJs
             connection.setAutoCommit(false)
-            val statement = SQLitePreparedStatementJs(connection,sqlStatements.first())
+            val statement = SQLitePreparedStatementJs(connection,sqlStatements.joinToString(";"))
             val result = statement.executeUpdateAsync()
             if(result != -1){
                 statement.close()

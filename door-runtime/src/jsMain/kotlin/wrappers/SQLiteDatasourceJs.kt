@@ -112,8 +112,7 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
                             || "$param".matches("-?\\d+(\\.\\d+)?".toRegex()))
                     val newParam = when {
                         isNotAString -> param
-                        param != null && param is String -> "'$param'"
-                        else -> it
+                        else -> "'$param'"
                     }
                     newParam.toString()
                 }else{

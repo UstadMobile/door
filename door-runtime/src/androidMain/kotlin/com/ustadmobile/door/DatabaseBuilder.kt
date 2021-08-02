@@ -8,8 +8,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.ustadmobile.door.migration.DoorMigration
 
 @Suppress("UNCHECKED_CAST", "unused") //This is used as an API
-class DatabaseBuilder<T: DoorDatabase>(private val roomBuilder: RoomDatabase.Builder<T>,
-                                              val dbClass: KClass<T>) {
+actual class DatabaseBuilder<T: DoorDatabase>(
+    private val roomBuilder: RoomDatabase.Builder<T>,
+    private val dbClass: KClass<T>
+) {
 
     companion object {
         fun <T : DoorDatabase> databaseBuilder(context: Any, dbClass: KClass<T>, dbName: String): DatabaseBuilder<T> {
@@ -39,7 +41,7 @@ class DatabaseBuilder<T: DoorDatabase>(private val roomBuilder: RoomDatabase.Bui
         }
     }
 
-    fun addCallback(callback: DoorDatabaseCallback) : DatabaseBuilder<T> {
+    actual fun addCallback(callback: DoorDatabaseCallback) : DatabaseBuilder<T> {
         roomBuilder.addCallback(object: RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase)  = callback.onCreate(db)
 
@@ -49,9 +51,8 @@ class DatabaseBuilder<T: DoorDatabase>(private val roomBuilder: RoomDatabase.Bui
         return this
     }
 
-    fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
-        //TODO
-        //roomBuilder.addMigrations(*migrations)
+    actual fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
+        roomBuilder.addMigrations(*migrations.map { it.asRoomMigration() }.toTypedArray())
         return this
     }
 

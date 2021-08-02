@@ -43,7 +43,15 @@ actual abstract class DoorLiveData<T> {
         }
 
         if(initialValueLoaded) {
-            value.value?.let { observer.onChanged(it) }
+            if(initialValueLoaded && value.value == null) {
+                //If initial value has been set as loaded, but it is null, the type arg must be nullable. The only
+                //option here is to use an unchecked cast.
+                @Suppress("UNCHECKED_CAST")
+                val nullableObserver = observer as DoorObserver<T?>
+                nullableObserver.onChanged(null)
+            }else {
+                value.value?.let { observer.onChanged(it) }
+            }
         }
     }
 
