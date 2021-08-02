@@ -57,12 +57,10 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon() {
         try {
             connection = openConnection() as SQLiteConnectionJs
             connection.setAutoCommit(false)
-            sqlStatements.first().split("#").forEach { sql ->
-                val statement = SQLitePreparedStatementJs(connection,sql)
-                val result = statement.executeUpdateAsync()
-                if(result != -1){
-                    statement.close()
-                }
+            val statement = SQLitePreparedStatementJs(connection,sqlStatements.first())
+            val result = statement.executeUpdateAsync()
+            if(result != -1){
+                statement.close()
             }
         }catch(e: SQLException) {
             throw e

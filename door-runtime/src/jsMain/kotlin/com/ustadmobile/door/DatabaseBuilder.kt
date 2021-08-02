@@ -25,7 +25,7 @@ class DatabaseBuilder<T: DoorDatabase>(private val builderOptions: DatabaseBuild
             dataSource.loadDbFromIndexedDb()
         }else{
             if(!dbImpl.getTableNamesAsync().any {it.lowercase() == DoorDatabaseCommon.DBINFO_TABLENAME}) {
-                dbImpl.execSQLBatchAsync(dbImpl.createAllTables().joinToString("#"))
+                dbImpl.execSQLBatchAsync(dbImpl.createAllTables().joinToString(";"))
                 callbacks.forEach { it.onCreate(dbImpl.sqlDatabaseImpl) }
             }else{
                 TODO("Handling db builder with migrations")
