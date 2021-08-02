@@ -9,7 +9,6 @@ class SQLiteConnectionJs(val datasource: SQLiteDatasourceJs):Connection {
 
     private var mAutoCommit = true
 
-
     override fun setAutoCommit(commit: Boolean) {
         mAutoCommit = commit
     }

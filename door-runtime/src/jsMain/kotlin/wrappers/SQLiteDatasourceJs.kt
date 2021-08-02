@@ -23,6 +23,8 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
 
     private val executedSqlQueries = mutableMapOf<Int, String>()
 
+    var generatedKeys: ResultSet = SQLiteResultSet(arrayOf())
+
     init {
         worker.onmessage = { dbEvent: dynamic ->
             val actionId = dbEvent.data["id"].toString().toInt()
@@ -74,8 +76,52 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
         return sendMessage(makeMessage(sql, params)).results?.let { SQLiteResultSet(it) } ?: SQLiteResultSet(arrayOf())
     }
 
-    internal suspend fun sendUpdate(sql: String, params: Array<Any?>?): Int {
-        return sendMessage(makeMessage(sql, params)).let { if(it.ready) 1 else 0 }
+    internal suspend fun sendUpdate(sql: String, params: Array<Any?>?, returnGeneratedKey: Boolean = false): Int {
+        val newSql = makeSqlQuery(sql,params, returnGeneratedKey)
+        val workerResult = sendMessage(makeMessage(newSql, if(returnGeneratedKey) arrayOf() else params))
+        val results = workerResult.results
+        if(results != null){
+            generatedKeys = SQLiteResultSet(results)
+            console.log(generatedKeys)
+        }
+        return workerResult.let { if(it.ready) 1 else 0 }
+    }
+
+
+    /**
+     * SQL JS doesn't work when you try to execute multiple queries at a time with one of them having params.
+     * It will try to bind params event to that query with no params which will result to column
+     * index out of range exception.
+     *
+     * Instead, we generate new SQL query with inline values so that we can execute those queries without passing
+     * any params.
+     *
+     * NOTE:
+     * SQL inline values is known for slowing down SQL performance.
+     */
+    private fun makeSqlQuery(sql: String, params: Array<Any?>?, returnGeneratedKey: Boolean): String {
+        if(!returnGeneratedKey){
+            return sql
+        }else {
+            var paramTracker = -1
+            return sql.map{
+                val newChar = if(it.toString() == "?") {
+                    paramTracker += 1
+                    val param = params?.get(paramTracker)
+                    val isNotAString = param != null && (param !is String
+                            || "$param".matches("-?\\d+(\\.\\d+)?".toRegex()))
+                    val newParam = when {
+                        isNotAString -> param
+                        param != null && param is String -> "'$param'"
+                        else -> it
+                    }
+                    newParam.toString()
+                }else{
+                    it
+                }
+                newChar
+            }.joinToString("")+ ";SELECT last_insert_rowid();"
+        }
     }
 
     /**
