@@ -82,7 +82,6 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
         val results = workerResult.results
         if(results != null){
             generatedKeys = SQLiteResultSet(results)
-            console.log(generatedKeys)
         }
         return workerResult.let { if(it.ready) 1 else 0 }
     }
