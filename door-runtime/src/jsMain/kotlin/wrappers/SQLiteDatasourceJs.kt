@@ -6,6 +6,8 @@ import com.ustadmobile.door.jdbc.SQLException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.w3c.dom.Worker
 import wrappers.IndexedDb.DATABASE_VERSION
 import wrappers.IndexedDb.DB_STORE_KEY
@@ -23,19 +25,22 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
 
     private val executedSqlQueries = mutableMapOf<Int, String>()
 
+    private val sendUpdateLock = Mutex()
+
     var generatedKeys: ResultSet = SQLiteResultSet(arrayOf())
 
     init {
         worker.onmessage = { dbEvent: dynamic ->
             val actionId = dbEvent.data["id"].toString().toInt()
             val executedQuery = executedSqlQueries[actionId]
-            if(dbEvent.data["error"] != js("undefined")){
-                throw SQLException(dbEvent.data["error"].toString(),
-                    Exception("Error occurred when executing $executedQuery"))
-            }
-
             val pendingCompletable = pendingMessages.remove(actionId)
             if(pendingCompletable != null){
+
+                if(dbEvent.data["error"] != js("undefined")){
+                    val exception = SQLException(dbEvent.data["error"].toString(),
+                        Exception("Error occurred when executing $executedQuery"))
+                    pendingCompletable.completeExceptionally(exception)
+                }
 
                 val executedSuccessfully = dbEvent.data["ready"] == (js("undefined")
                         && dbEvent.data["results"] != js("undefined")) || dbEvent.data["ready"]
@@ -52,7 +57,7 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
      * Execute SQL task by sending a message via Worker
      * @param message message to be sent for SQLJs to execute
      */
-    suspend fun sendMessage(message: Json): WorkerResult {
+    private suspend fun sendMessage(message: Json): WorkerResult {
         val completable = CompletableDeferred<WorkerResult>()
         val actionId = ++idCounter
         pendingMessages[actionId] = completable
@@ -77,48 +82,16 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
     }
 
     internal suspend fun sendUpdate(sql: String, params: Array<Any?>?, returnGeneratedKey: Boolean = false): Int {
-        val newSql = makeSqlQuery(sql,params, returnGeneratedKey)
-        val workerResult = sendMessage(makeMessage(newSql, if(returnGeneratedKey) arrayOf() else params))
-        val results = workerResult.results
-        if(results != null){
-            generatedKeys = SQLiteResultSet(results)
-        }
-        return workerResult.let { if(it.ready) 1 else 0 }
-    }
-
-
-    /**
-     * SQL JS doesn't work when you try to execute multiple queries at a time with one of them having params.
-     * It will try to bind params event to that query with no params which will result to column
-     * index out of range exception.
-     *
-     * Instead, we generate new SQL query with inline values so that we can execute those queries without passing
-     * any params.
-     *
-     * NOTE:
-     * SQL inline values is known for slowing down SQL performance.
-     */
-    private fun makeSqlQuery(sql: String, params: Array<Any?>?, returnGeneratedKey: Boolean): String {
-        if(!returnGeneratedKey){
-            return sql
-        }else {
-            var paramTracker = -1
-            return sql.map{
-                val newChar = if(it.toString() == "?") {
-                    paramTracker += 1
-                    val param = params?.get(paramTracker)
-                    val isNotAString = param != null && (param !is String
-                            || "$param".matches("-?\\d+(\\.\\d+)?".toRegex()))
-                    val newParam = when {
-                        isNotAString -> param
-                        else -> "'$param'"
-                    }
-                    newParam.toString()
-                }else{
-                    it
+        sendUpdateLock.withLock {
+            val workerResult = sendMessage(makeMessage(sql, params))
+            if(returnGeneratedKey){
+                val rowIdWorker = sendMessage(makeMessage("SELECT last_insert_rowid()"))
+                val results = rowIdWorker.results
+                if(results != null){
+                    generatedKeys = SQLiteResultSet(results)
                 }
-                newChar
-            }.joinToString("")+ ";SELECT last_insert_rowid();"
+            }
+            return workerResult.let { if(it.ready) 1 else 0 }
         }
     }
 
@@ -150,9 +123,9 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
     }
 
     /**
-     * Import SQLJs database to the indexed Database
+     * Save SQL.JS database to the indexed Database
      */
-    suspend fun importDbToIndexedDb(): Boolean {
+    suspend fun saveDatabaseToIndexedDb(): Boolean {
         val exportCompletable = CompletableDeferred<Boolean>()
         val result = sendMessage(json("action" to "export"))
         val request = indexedDb.open(dbName, DATABASE_VERSION)

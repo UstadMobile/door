@@ -18,6 +18,10 @@ class SQLiteDatabaseMetadataJs(val datasource: SQLiteDatasourceJs): DatabaseMeta
         throw Exception("getTables: This can not be used on JS, only for JVM. Call getTablesAsync instead")
     }
 
+    /**
+     * List all tables from the database, this implementation was adapter from SQLiteJDBC
+     * @see https://github.com/xerial/sqlite-jdbc/blob/master/src/main/java/org/sqlite/jdbc3/JDBC3DatabaseMetaData.java
+     */
     suspend fun getTablesAsync(catalog: String?, schemaPattern: String?, tableNamePattern: String?,
                                types: Array<out String>): ResultSet {
 

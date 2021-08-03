@@ -5,22 +5,21 @@ import com.ustadmobile.door.jdbc.SQLException
 import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.migration.DoorMigrationAsync
 import com.ustadmobile.door.migration.DoorMigrationStatementList
-import com.ustadmobile.door.migration.DoorMigrationSync
 import org.w3c.dom.Worker
 import wrappers.*
 
-actual class DatabaseBuilder<T: DoorDatabase>(private val builderOptions: DatabaseBuilderOptions,
-                                              private val dbExportCallback: DatabaseExportToIndexedDbCallback){
+actual class DatabaseBuilder<T: DoorDatabase> private constructor(private val builderOptions: DatabaseBuilderOptions){
 
     private val callbacks = mutableListOf<DoorDatabaseCallback>()
 
     private val migrationList = mutableListOf<DoorMigration>()
 
     suspend fun build(): T {
-        val path = webWorkerPath ?: throw Exception("Set WebWorker path before building your Database")
-        val dataSource = SQLiteDatasourceJs(builderOptions.dbName, Worker(path))
+        val dataSource = SQLiteDatasourceJs(builderOptions.dbName,
+            Worker(builderOptions.webWorkerPath))
         val dbImpl = builderOptions.dbImplClass.js.createInstance(dataSource, false) as T
         val exists = IndexedDb.checkIfExists(builderOptions.dbName)
+        DatabaseChangeMonitor(dbImpl, dataSource, builderOptions.saveToIndexedDbDelayTime)
         if(exists){
             dataSource.loadDbFromIndexedDb()
         }else{
@@ -52,7 +51,6 @@ actual class DatabaseBuilder<T: DoorDatabase>(private val builderOptions: Databa
                         .maxByOrNull { it.endVersion }
                     if(nextMigration != null) {
                         when(nextMigration) {
-                            is DoorMigrationSync -> throw Exception("Synchronous Operation not supported!")
                             is DoorMigrationAsync -> nextMigration.migrateFn(dbImpl.sqlDatabaseImpl)
                             is DoorMigrationStatementList -> dbImpl.execSQLBatchAsync(*nextMigration.migrateStmts().toTypedArray())
                         }
@@ -66,12 +64,6 @@ actual class DatabaseBuilder<T: DoorDatabase>(private val builderOptions: Databa
                 }
             }
         }
-
-        val changeListener = ChangeListenerRequest(dbImpl.getTableNamesAsync()){
-            dbExportCallback.onExport(dataSource)
-        }
-
-        dbImpl.addChangeListener(changeListener)
         return dbImpl
     }
 
@@ -85,19 +77,11 @@ actual class DatabaseBuilder<T: DoorDatabase>(private val builderOptions: Databa
         return this
     }
 
-    fun webWorker(path: String): DatabaseBuilder<T>{
-        webWorkerPath = path
-        return this
-    }
-
     companion object {
 
-        internal var webWorkerPath: String? = null
-
         fun <T : DoorDatabase> databaseBuilder(
-            builderOptions: DatabaseBuilderOptions,
-            dbExportCallback: DatabaseExportToIndexedDbCallback
-        ): DatabaseBuilder<T> = DatabaseBuilder(builderOptions, dbExportCallback)
+            builderOptions: DatabaseBuilderOptions
+        ): DatabaseBuilder<T> = DatabaseBuilder(builderOptions)
 
     }
 }

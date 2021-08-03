@@ -16,8 +16,6 @@ import kotlinx.css.*
 import react.*
 import styled.css
 import styled.styledDiv
-import wrappers.DatabaseExportToIndexedDbCallback
-import wrappers.SQLiteDatasourceJs
 import kotlin.js.Date
 
 class AppComponent(mProps: RProps): RComponent<RProps, RState>(mProps) {
@@ -141,27 +139,15 @@ class AppComponent(mProps: RProps): RComponent<RProps, RState>(mProps) {
     private suspend fun fetchData(){
         val dataList = dao.findAllAsync()
         setState {
-            entryList = dataList
+            entryList = dataList.sortedByDescending { it.uid }
         }
-    }
-
-    private suspend fun exportHandler(datasource: SQLiteDatasourceJs){
-        datasource.importDbToIndexedDb()
     }
 
     private suspend fun setupDatabase() {
-        //Listen for tables change and trigger save to indexedDb
-        val dbExportCallback = object: DatabaseExportToIndexedDbCallback{
-            override fun onExport(datasource: SQLiteDatasourceJs) {
-                GlobalScope.launch {
-                    window.setTimeout(exportHandler(datasource), 5000)
-                }
-            }
-        }
-        val builderOptions = DatabaseBuilderOptions(ExampleDatabase2::class, ExampleDatabase2_JdbcKt::class, "jsDb1")
-        val database =  DatabaseBuilder.databaseBuilder<ExampleDatabase2>(builderOptions, dbExportCallback)
-            .webWorker("./worker.sql-asm.js")
-            .build()
+        val builderOptions = DatabaseBuilderOptions(ExampleDatabase2::class,
+            ExampleDatabase2_JdbcKt::class, "jsDb1","./worker.sql-asm.js")
+
+        val database =  DatabaseBuilder.databaseBuilder<ExampleDatabase2>(builderOptions).build()
         dao = database.exampleDao2()
     }
 }
