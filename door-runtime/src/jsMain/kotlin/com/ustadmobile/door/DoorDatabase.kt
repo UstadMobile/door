@@ -9,14 +9,10 @@ import kotlin.jvm.Volatile
 
 actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon() {
 
-    override var jdbcDbType: Int = -1
-        get() = sourceDatabase?.jdbcDbType ?: field
-        protected set
+    override val jdbcDbType: Int = DoorDbType.SQLITE
 
     @Volatile
-    override var jdbcArraySupported: Boolean = false
-        get() = sourceDatabase?.jdbcArraySupported ?: field
-        protected set
+    override val jdbcArraySupported: Boolean = false
 
     actual abstract fun clearAllTables()
 
@@ -70,9 +66,6 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon() {
     }
 
     protected fun setupFromDataSource() {
-        openConnection().useConnection { dbConnection ->
-            jdbcDbType = DoorDbType.typeIntFromProductName(dbConnection.getMetaData().databaseProductName)
-            jdbcArraySupported = jdbcDbType == DoorDbType.SQLITE
-        }
+        //ON JS: nothing to do here - it is always SQLite
     }
 }

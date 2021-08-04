@@ -117,8 +117,8 @@ class AppComponent(mProps: RProps): RComponent<RProps, RState>(mProps) {
         GlobalScope.launch {
             if(entity.uid == 0L){
                 entity.apply {
-                    uid = Date().getTime().toLong()
-                    someNumber = Date().getTime().toLong()/3000
+                    name = "Bob"
+                    someNumber = 42
                 }
                 dao.insertAsync(entity)
             }else{
@@ -145,7 +145,7 @@ class AppComponent(mProps: RProps): RComponent<RProps, RState>(mProps) {
 
     private suspend fun setupDatabase() {
         val builderOptions = DatabaseBuilderOptions(ExampleDatabase2::class,
-            ExampleDatabase2_JdbcKt::class, "jsDb1","./worker.sql-asm.js")
+            ExampleDatabase2_JdbcKt::class, "jsDb1","./worker.sql-asm-debug.js")
 
         val database =  DatabaseBuilder.databaseBuilder<ExampleDatabase2>(builderOptions).build()
         dao = database.exampleDao2()

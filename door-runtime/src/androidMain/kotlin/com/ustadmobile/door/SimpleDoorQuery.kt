@@ -6,7 +6,7 @@ fun expandArrayParams(sql: String, values: Array<out Any?>?): DoorQuery {
     //do the expansion
 
     var newSql = sql
-    var newParams = mutableListOf<Any?>()
+    val newParams = mutableListOf<Any?>()
     var fromIndex = 0
 
     values?.forEach {

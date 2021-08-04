@@ -9,6 +9,9 @@ open class SQLiteStatementJs(
 
     private var closed: Boolean = false
 
+    //This is set when running executeUpdateAsync
+    protected var lastGeneratedKey: ResultSet? = null
+
     override fun executeUpdate(sql: String): Int {
         throw SQLException("Synchronous SQL not supported!")
     }
@@ -23,7 +26,7 @@ open class SQLiteStatementJs(
     override fun getConnection() = connection
 
     override fun getGeneratedKeys(): ResultSet {
-        return connection.datasource.generatedKeys
+        return lastGeneratedKey ?: SQLiteResultSet(arrayOf())
     }
 
 }

@@ -27,8 +27,6 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
 
     private val sendUpdateLock = Mutex()
 
-    var generatedKeys: ResultSet = SQLiteResultSet(arrayOf())
-
     init {
         worker.onmessage = { dbEvent: dynamic ->
             val actionId = dbEvent.data["id"].toString().toInt()
@@ -71,27 +69,24 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
         return json(
             "action" to "exec",
             "sql" to sql,
-            "params" to JSON.parse(
-                JSON.stringify(params?.map { (if(it != js("undefined")) it else null).toString()
-            }))
+            "params" to params
         )
     }
 
     internal suspend fun sendQuery(sql: String, params: Array<Any?>? = null): ResultSet {
-        return sendMessage(makeMessage(sql, params)).results?.let { SQLiteResultSet(it) } ?: SQLiteResultSet(arrayOf())
+        val results = sendMessage(makeMessage(sql, params)).results
+        return results?.let { SQLiteResultSet(it) } ?: SQLiteResultSet(arrayOf())
     }
 
-    internal suspend fun sendUpdate(sql: String, params: Array<Any?>?, returnGeneratedKey: Boolean = false): Int {
+    internal suspend fun sendUpdate(sql: String, params: Array<Any?>?, returnGeneratedKey: Boolean = false): UpdateResult {
         sendUpdateLock.withLock {
-            val workerResult = sendMessage(makeMessage(sql, params))
-            if(returnGeneratedKey){
-                val rowIdWorker = sendMessage(makeMessage("SELECT last_insert_rowid()"))
-                val results = rowIdWorker.results
-                if(results != null){
-                    generatedKeys = SQLiteResultSet(results)
-                }
+            sendMessage(makeMessage(sql, params))
+            val generatedKey = if(returnGeneratedKey) {
+                sendMessage(makeMessage("SELECT last_insert_rowid()")).results?.let { SQLiteResultSet(it) }
+            }else {
+                null
             }
-            return workerResult.let { if(it.ready) 1 else 0 }
+            return UpdateResult(1, generatedKey)
         }
     }
 
