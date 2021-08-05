@@ -117,10 +117,10 @@ class AppComponent(mProps: RProps): RComponent<RProps, RState>(mProps) {
         GlobalScope.launch {
             if(entity.uid == 0L){
                 entity.apply {
-                    name = "Bob"
-                    someNumber = 42
+                    someNumber = Date().getTime().toLong()
                 }
-                dao.insertAsync(entity)
+                val id = dao.insertAsyncAndGiveId(entity)
+                console.log("Inserted rowID $id")
             }else{
                 entity.name?.let { dao.updateByParamAsync(it, entity.someNumber) }
             }
