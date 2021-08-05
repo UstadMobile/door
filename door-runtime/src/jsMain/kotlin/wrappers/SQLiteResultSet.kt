@@ -156,7 +156,7 @@ class SQLiteResultSet(private val results: Array<Any>): ResultSet {
     }
 
     private fun getValue(columnIndex: Int): Any? {
-        return currentRow?.get(columnIndex).also {
+        return currentRow?.get(columnIndex - 1).also {
             lastWasNull = it == null
         }
     }
