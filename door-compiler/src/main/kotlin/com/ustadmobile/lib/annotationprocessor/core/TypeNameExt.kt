@@ -5,6 +5,7 @@ import com.squareup.kotlinpoet.*
 import javax.lang.model.element.TypeElement
 import androidx.room.Dao
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import com.ustadmobile.door.DoorDataSource
 import com.ustadmobile.door.DoorLiveData
 import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.DoorDbType
@@ -48,12 +49,15 @@ internal fun String.sqlTypeDefaultValue(dbType: Int) = this.trim().uppercase().l
     }
 }
 
-internal fun TypeName.isDataSourceFactory(paramTypeFilter: (List<TypeName>) -> Boolean = {true}) = this is ParameterizedTypeName
-        && this.rawType == DataSource.Factory::class.asClassName() && paramTypeFilter(this.typeArguments)
+internal fun TypeName.isDataSourceFactory(paramTypeFilter: (List<TypeName>) -> Boolean = {true}): Boolean {
+    return this is ParameterizedTypeName
+            && (this.rawType == DataSource.Factory::class.asClassName() || this.rawType == DoorDataSource.Factory::class.asClassName())
+            && paramTypeFilter(this.typeArguments)
+}
 
 
 internal fun TypeName.isDataSourceFactoryOrLiveData() = this is ParameterizedTypeName
-        && (this.rawType == DataSource.Factory::class.asClassName() || this.rawType == DoorLiveData::class.asClassName())
+        && (this.isDataSourceFactory() ||  this.rawType == DoorLiveData::class.asClassName())
 
 fun TypeName.isListOrArray() = (this is ClassName && this.canonicalName =="kotlin.Array")
         || (this is ParameterizedTypeName && this.rawType == List::class.asClassName())
@@ -112,15 +116,12 @@ internal fun TypeName.asComponentClassNameIfList() : ClassName {
  * E.g. DataSource.Factory<Foo> will unwrap as List<Foo>
  */
 fun TypeName.unwrapLiveDataOrDataSourceFactory()  =
-        if(this is ParameterizedTypeName
-                && rawType == DoorLiveData::class.asClassName()) {
-            typeArguments[0]
-        }else if(this is ParameterizedTypeName
-                && rawType == DataSource.Factory::class.asClassName()) {
-            List::class.asClassName().parameterizedBy(typeArguments[1])
-        }else {
-            this
-        }
+    when {
+        this is ParameterizedTypeName && rawType == DoorLiveData::class.asClassName() -> typeArguments[0]
+        this is ParameterizedTypeName && rawType == DataSource.Factory::class.asClassName() -> typeArguments[1]
+        this is ParameterizedTypeName && rawType == DoorDataSource.Factory::class.asClassName() -> typeArguments[1]
+        else -> this
+    }
 
 /**
  * Unwrap the component type of an array or list

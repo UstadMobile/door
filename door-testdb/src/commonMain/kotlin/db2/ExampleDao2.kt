@@ -1,6 +1,5 @@
 package db2
 
-import androidx.paging.DataSource
 import androidx.room.*
 import com.ustadmobile.door.*
 
@@ -109,7 +108,7 @@ abstract class ExampleDao2 {
     abstract fun rawQueryForSingleValue(query: DoorQuery): ExampleEntity2?
 
     @Query("SELECT * FROM ExampleEntity2")
-    abstract fun queryAllLive(): DataSource.Factory<Int, ExampleEntity2>
+    abstract fun queryAllLive(): DoorDataSource.Factory<Int, ExampleEntity2>
 
     @RawQuery
     abstract fun rawQueryWithArrParam(query: DoorQuery): List<ExampleEntity2>

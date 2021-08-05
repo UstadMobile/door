@@ -1,5 +1,5 @@
 package androidx.paging
 
-actual open class DataSource<Key, Value> {
-    actual abstract class Factory<Key, Value> {}
+abstract class DataSource<Key, Value> {
+    abstract class Factory<Key, Value> {}
 }
