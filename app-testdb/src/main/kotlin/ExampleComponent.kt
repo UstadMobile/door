@@ -91,15 +91,33 @@ class ExampleComponent(mProps: RProps): RComponent<RProps, RState>(mProps),
 
                 mGridItem(MGridSize.cells12){
                     mList {
+                        mListItem {
+                            mGridContainer(MGridSpacing.spacing4) {
+                                mGridItem(MGridSize.cells3){
+                                    mTypography("#", variant = MTypographyVariant.body2)
+                                }
+
+                                mGridItem(MGridSize.cells5){
+                                    mTypography("Name", variant = MTypographyVariant.body2)
+                                }
+
+                                mGridItem(MGridSize.cells3){
+                                    mTypography("Number", variant = MTypographyVariant.body2)
+                                }
+
+                                mGridItem(MGridSize.cells1){
+                                }
+                            }
+                        }
                         list?.forEach { entry ->
                             mListItem {
                                 mGridContainer(MGridSpacing.spacing4) {
-                                    mGridItem(MGridSize.cells5){
-                                        mTypography(entry.name, variant = MTypographyVariant.body2)
-                                    }
-
                                     mGridItem(MGridSize.cells3){
                                         mTypography(entry.uid.toString(), variant = MTypographyVariant.body2)
+                                    }
+
+                                    mGridItem(MGridSize.cells5){
+                                        mTypography(entry.name, variant = MTypographyVariant.body2)
                                     }
 
                                     mGridItem(MGridSize.cells3){
