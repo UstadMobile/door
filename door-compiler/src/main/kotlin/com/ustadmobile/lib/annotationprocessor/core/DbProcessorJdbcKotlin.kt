@@ -195,7 +195,10 @@ fun resolveQueryResultType(returnTypeName: TypeName)  =
         }else if(returnTypeName is ParameterizedTypeName
                 && returnTypeName.rawType == androidx.paging.DataSource.Factory::class.asClassName()) {
             List::class.asClassName().parameterizedBy(returnTypeName.typeArguments[1])
-        }else {
+        }else if(returnTypeName is ParameterizedTypeName
+            && returnTypeName.rawType == DoorDataSource.Factory::class.asClassName())
+            List::class.asClassName().parameterizedBy(returnTypeName.typeArguments[1])
+        else {
             returnTypeName
         }
 
@@ -623,48 +626,88 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         val querySql = funElement.getAnnotation(Query::class.java)?.value
         val resultType = funSpec.returnType?.unwrapLiveDataOrDataSourceFactory() ?: UNIT
 
+        fun CodeBlock.Builder.addLiveDataImpl(
+            liveQueryVarsMap: Map<String, TypeName> = queryVarsMap,
+            liveResultType: TypeName = resultType,
+            liveSql: String? = querySql
+        ): CodeBlock.Builder {
+            val tablesToWatch = mutableListOf<String>()
+            val specifiedLiveTables = funElement.getAnnotation(QueryLiveTables::class.java)
+            if(specifiedLiveTables == null) {
+                try {
+                    val select = CCJSqlParserUtil.parse(liveSql) as Select
+                    val tablesNamesFinder = TablesNamesFinder()
+                    tablesToWatch.addAll(tablesNamesFinder.getTableList(select))
+                }catch(e: Exception) {
+                    messager.printMessage(Diagnostic.Kind.ERROR,
+                        "${makeLogPrefix(funElement.enclosingElement as TypeElement, funElement)}: " +
+                                "Sorry: JSQLParser could not parse the query : " +
+                                querySql +
+                                "Please manually specify the tables to observe using @QueryLiveTables annotation")
+                }
+            }else {
+                tablesToWatch.addAll(specifiedLiveTables.value)
+            }
+
+            beginControlFlow("%T<%T>(_db, listOf(%L)) ",
+                DoorLiveDataImpl::class.asClassName(),
+                liveResultType.copy(nullable = isNullableResultType(liveResultType)),
+                tablesToWatch.map {"\"$it\""}.joinToString())
+            .addJdbcQueryCode(liveResultType, liveQueryVarsMap, liveSql,
+                daoTypeElement, funElement, resultVarName = "_liveResult",
+                suspended = funSpec.isSuspended)
+            .add("_liveResult")
+            .applyIf(resultType.isList()) {
+                add(".toList()")
+            }
+            .add("\n")
+            .endControlFlow()
+            .build()
+
+            return this
+        }
+
         addFunction(funSpec.toBuilder()
             .removeAbstractModifier()
             .removeAnnotations()
             .addModifiers(KModifier.OVERRIDE)
             .applyIf(funSpec.returnType?.isDataSourceFactory() == true) {
-                addCode("val _result = %T<%T, %T>()\n", DoorDataSourceJdbc.Factory::class, INT,
-                    funSpec.returnType?.unwrapQueryResultComponentType())
+                val returnTypeUnwrapped = funSpec.returnType?.unwrapQueryResultComponentType()
+                    ?: throw IllegalStateException("TODO: datasource not typed - ${daoTypeElement.qualifiedName}#${funSpec.name}")
+                addCode("val _result = %L\n",
+                TypeSpec.anonymousClassBuilder()
+                    .superclass(DoorDataSource.Factory::class.asTypeName().parameterizedBy(INT,
+                        returnTypeUnwrapped))
+                    .addFunction(FunSpec.builder("getData")
+                        .addModifiers(KModifier.OVERRIDE)
+                        .returns(DoorLiveData::class.asTypeName()
+                            .parameterizedBy(List::class.asTypeName().parameterizedBy(returnTypeUnwrapped)))
+                        .addParameter("_offset", INT)
+                        .addParameter("_limit", INT)
+                        .addCode(CodeBlock.builder()
+                            .add("return ")
+                            .addLiveDataImpl(
+                                liveQueryVarsMap = queryVarsMap + mapOf("_offset" to INT, "_limit" to INT),
+                                liveResultType = List::class.asClassName().parameterizedBy(returnTypeUnwrapped),
+                                liveSql = "SELECT * FROM ($querySql) LIMIT :_limit OFFSET :_offset ")
+                            .build())
+                        .build())
+                    .addFunction(FunSpec.builder("getLength")
+                        .addModifiers(KModifier.OVERRIDE)
+                        .returns(DoorLiveData::class.asTypeName().parameterizedBy(INT))
+                        .addCode(CodeBlock.builder()
+                            .add("return ")
+                            .addLiveDataImpl(
+                                liveResultType = INT,
+                                liveSql = "SELECT COUNT(*) FROM ($querySql)")
+                            .build())
+                        .build())
+                    .build())
             }.applyIf(funSpec.returnType?.isLiveData() == true) {
-                val tablesToWatch = mutableListOf<String>()
-                val specifiedLiveTables = funElement.getAnnotation(QueryLiveTables::class.java)
-                if(specifiedLiveTables == null) {
-                    try {
-                        val select = CCJSqlParserUtil.parse(querySql) as Select
-                        val tablesNamesFinder = TablesNamesFinder()
-                        tablesToWatch.addAll(tablesNamesFinder.getTableList(select))
-                    }catch(e: Exception) {
-                        messager.printMessage(Diagnostic.Kind.ERROR,
-                            "${makeLogPrefix(funElement.enclosingElement as TypeElement, funElement)}: " +
-                                    "Sorry: JSQLParser could not parse the query : " +
-                                    querySql +
-                                    "Please manually specify the tables to observe using @QueryLiveTables annotation")
-                    }
-                }else {
-                    tablesToWatch.addAll(specifiedLiveTables.value)
-                }
-
                 addCode(CodeBlock.builder()
-                    .beginControlFlow("val _result = %T<%T>(_db, listOf(%L)) ",
-                        DoorLiveDataImpl::class.asClassName(),
-                        resultType.copy(nullable = isNullableResultType(resultType)),
-                        tablesToWatch.map {"\"$it\""}.joinToString())
-                    .addJdbcQueryCode(resultType, queryVarsMap, querySql,
-                        daoTypeElement, funElement, resultVarName = "_liveResult",
-                        suspended = funSpec.isSuspended)
-                    .add("_liveResult")
-                    .applyIf(resultType.isList()) {
-                        add(".toList()")
-                    }
-                    .add("\n")
-                    .endControlFlow()
-                    .build()
-                )
+                    .add("val _result = ")
+                    .addLiveDataImpl()
+                    .build())
             }.applyIf(funSpec.returnType?.isDataSourceFactoryOrLiveData() != true) {
                 val rawQueryParamName = if(funElement.hasAnnotation(RawQuery::class.java))
                     funSpec.parameters.first().name

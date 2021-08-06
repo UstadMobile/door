@@ -347,8 +347,7 @@ fun CodeBlock.Builder.addKtorRouteSelectCodeBlock(daoMethod: FunSpec, processing
             ?: throw IllegalArgumentException("addKtorRouteSelectCodeBlock for ${daoMethod.name}: has null return type")
 
     val resultType = returnTypeName.unwrapLiveDataOrDataSourceFactory()
-    val isDataSourceFactory = returnTypeName is ParameterizedTypeName
-            && returnTypeName.rawType == DataSource.Factory::class.asClassName()
+    val isDataSourceFactory = returnTypeName.isDataSourceFactory()
 
     val queryVarsList = daoMethod.parameters.toMutableList()
     if(isDataSourceFactory){

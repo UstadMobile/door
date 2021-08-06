@@ -3,33 +3,46 @@ import com.ccfraser.muirwik.components.button.*
 import com.ccfraser.muirwik.components.form.MFormControlVariant
 import com.ccfraser.muirwik.components.list.mList
 import com.ccfraser.muirwik.components.list.mListItem
-import com.ustadmobile.door.DatabaseBuilder
-import com.ustadmobile.door.DatabaseBuilderOptions
-import db2.ExampleDao2
-import db2.ExampleDatabase2
-import db2.ExampleDatabase2_JdbcKt
+import com.ustadmobile.door.DoorLifecycleObserver
+import com.ustadmobile.door.DoorLifecycleOwner
 import db2.ExampleEntity2
-import kotlinx.browser.window
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
 import kotlinx.css.*
 import react.*
 import styled.css
 import styled.styledDiv
-import kotlin.js.Date
 
-class AppComponent(mProps: RProps): RComponent<RProps, RState>(mProps) {
+class ExampleComponent(mProps: RProps): RComponent<RProps, RState>(mProps),
+    ExampleView, DoorLifecycleOwner {
 
-    private var entryList: List<ExampleEntity2>? = null
+    private var mPresenter: ExamplePresenter<*>? = null
 
-    private lateinit var dao: ExampleDao2
+    private var observerStatus: Int = -1
 
-    private var entity: ExampleEntity2 = ExampleEntity2()
+    private val observerList: MutableList<DoorLifecycleObserver> = mutableListOf()
 
-    override fun RState.init(props: RProps) {
-        GlobalScope.launch {
-            setupDatabase()
-            fetchData()
+    override var list: List<ExampleEntity2>? = null
+        get() = field
+        set(value) {
+            setState {
+                field = value
+            }
+        }
+
+    override var entity: ExampleEntity2 = ExampleEntity2()
+        get() = field
+        set(value) {
+            setState {
+                field = value
+            }
+        }
+
+    override fun componentDidMount() {
+        mPresenter = ExamplePresenter(this, this)
+        mPresenter?.onCreate()
+        observerStatus = DoorLifecycleObserver.STARTED
+
+        for (doorLifecycleObserver in observerList) {
+            doorLifecycleObserver.onCreate(this)
         }
     }
 
@@ -61,7 +74,7 @@ class AppComponent(mProps: RProps): RComponent<RProps, RState>(mProps) {
                            if(entity.name.isNullOrEmpty()){
                                return@mButton
                            }
-                            saveData()
+                            mPresenter?.handleSaveEntity(entity)
                         }
                     ){
                         css{
@@ -78,7 +91,7 @@ class AppComponent(mProps: RProps): RComponent<RProps, RState>(mProps) {
 
                 mGridItem(MGridSize.cells12){
                     mList {
-                        entryList?.forEach { entry ->
+                        list?.forEach { entry ->
                             mListItem {
                                 mGridContainer(MGridSpacing.spacing4) {
                                     mGridItem(MGridSize.cells5){
@@ -95,7 +108,7 @@ class AppComponent(mProps: RProps): RComponent<RProps, RState>(mProps) {
 
                                     mGridItem(MGridSize.cells1){
                                         mIconButton("edit",size = MIconButtonSize.medium, onClick = {
-                                            editEntry(entry)
+                                            mPresenter?.handleEditEntity(entry)
                                         })
                                     }
                                 }
@@ -107,49 +120,26 @@ class AppComponent(mProps: RProps): RComponent<RProps, RState>(mProps) {
         }
     }
 
-    private fun editEntry(entry: ExampleEntity2) {
-        setState {
-            entity = entry
-        }
+    override val currentState: Int
+        get() = observerStatus
+
+    override fun addObserver(observer: DoorLifecycleObserver) {
+        observerList.add(observer)
     }
 
-    private fun saveData(){
-        GlobalScope.launch {
-            if(entity.uid == 0L){
-                entity.apply {
-                    someNumber = Date().getTime().toLong()
-                }
-                val id = dao.insertAsyncAndGiveId(entity)
-                console.log("Inserted rowID $id")
-            }else{
-                entity.name?.let { dao.updateByParamAsync(it, entity.someNumber) }
-            }
-
-            window.setTimeout(fetchData(), 500)
-            setState {
-                entity = entity.apply {
-                    uid = 0L
-                    someNumber = 0
-                    name = null
-                }
-            }
-        }
+    override fun removeObserver(observer: DoorLifecycleObserver) {
+        observerList.remove(observer)
     }
 
-    private suspend fun fetchData(){
-        val dataList = dao.findAllAsync()
-        setState {
-            entryList = dataList.sortedByDescending { it.uid }
+    override fun componentWillUnmount() {
+        observerStatus = DoorLifecycleObserver.STOPPED
+
+        for (doorLifecycleObserver in observerList) {
+            doorLifecycleObserver.onStop(this)
         }
-    }
 
-    private suspend fun setupDatabase() {
-        val builderOptions = DatabaseBuilderOptions(ExampleDatabase2::class,
-            ExampleDatabase2_JdbcKt::class, "jsDb1","./worker.sql-asm-debug.js")
-
-        val database =  DatabaseBuilder.databaseBuilder<ExampleDatabase2>(builderOptions).build()
-        dao = database.exampleDao2()
+        mPresenter?.onDestroy()
     }
 }
 
-fun RBuilder.renderApp() = child(AppComponent::class) {}
+fun RBuilder.renderApp() = child(ExampleComponent::class) {}
