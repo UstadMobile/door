@@ -23,7 +23,7 @@ class MigrationAdapter(
                 doorMigration.migrateFn(database)
             }
             is DoorMigrationStatementList -> {
-                database.execSqlBatch(*doorMigration.migrateStmts().toTypedArray())
+                database.execSqlBatch(*doorMigration.migrateStmts(database).toTypedArray())
             }
         }
     }

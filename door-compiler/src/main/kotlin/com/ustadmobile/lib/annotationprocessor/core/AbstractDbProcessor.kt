@@ -1,6 +1,5 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import androidx.paging.DataSource
 import androidx.room.*
 import com.squareup.kotlinpoet.*
 import com.ustadmobile.door.jdbc.*
@@ -1035,7 +1034,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         val resultType = resolveQueryResultType(daoFunReturnType)
         val isLiveDataOrDataSourceFactory = daoFunReturnType is ParameterizedTypeName
                 && daoFunReturnType.rawType in
-                listOf(DoorLiveData::class.asClassName(), DataSource.Factory::class.asClassName())
+                listOf(DoorLiveData::class.asClassName())
         val isLiveData = daoFunReturnType is ParameterizedTypeName
                 && daoFunReturnType.rawType == DoorLiveData::class.asClassName()
         val isSuspendedFun = KModifier.SUSPEND in daoFunSpec.modifiers

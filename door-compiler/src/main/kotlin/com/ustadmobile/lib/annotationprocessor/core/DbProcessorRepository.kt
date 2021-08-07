@@ -1,6 +1,5 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import androidx.paging.DataSource
 import androidx.room.*
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
@@ -505,7 +504,7 @@ fun FileSpec.Builder.addDaoRepoType(daoTypeSpec: TypeSpec,
                                 .build())
                         .addTypeVariable(TypeVariableName("T"))
                         .addParameter("dataSource",
-                                DataSource.Factory::class.asClassName().parameterizedBy(INT,
+                                DoorDataSourceFactory::class.asClassName().parameterizedBy(INT,
                                         TypeVariableName("T")))
                         .addModifiers(KModifier.OVERRIDE)
                         .returns(BOUNDARY_CALLBACK_CLASSNAME
@@ -559,7 +558,7 @@ fun TypeSpec.Builder.addDaoRepoFun(daoFunSpec: FunSpec,
     if(pagingBoundaryCallbackEnabled
             && repoMethodType == Repository.METHOD_SYNCABLE_GET
             && returnTypeVal is ParameterizedTypeName
-            && returnTypeVal.rawType == DataSource.Factory::class.asClassName()) {
+            && returnTypeVal.rawType == DoorDataSourceFactory::class.asClassName()) {
         generateBoundaryCallback = true
         repoMethodType = Repository.METHOD_DELEGATE_TO_DAO
     }
@@ -1129,7 +1128,7 @@ class DbProcessorRepository: AbstractDbProcessor() {
                 "RepositoryBoundaryCallback")
 
         val BOUNDARY_CALLBACK_MAP_CLASSNAME = WeakHashMap::class.asClassName().parameterizedBy(
-                DataSource.Factory::class.asClassName().parameterizedBy(INT, STAR),
+                DoorDataSourceFactory::class.asClassName().parameterizedBy(INT, STAR),
                 BOUNDARY_CALLBACK_CLASSNAME.parameterizedBy(STAR))
 
     }
