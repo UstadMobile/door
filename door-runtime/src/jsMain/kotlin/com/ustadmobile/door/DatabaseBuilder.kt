@@ -5,6 +5,7 @@ import com.ustadmobile.door.jdbc.SQLException
 import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.migration.DoorMigrationAsync
 import com.ustadmobile.door.migration.DoorMigrationStatementList
+import com.ustadmobile.door.migration.DoorMigrationSync
 import org.w3c.dom.Worker
 import wrappers.*
 
@@ -19,7 +20,7 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(private val bu
             Worker(builderOptions.webWorkerPath))
         val dbImpl = builderOptions.dbImplClass.js.createInstance(dataSource, false) as T
         val exists = IndexedDb.checkIfExists(builderOptions.dbName)
-        DatabaseChangeMonitor(dbImpl, dataSource, builderOptions.saveToIndexedDbDelayTime)
+        SaveToIndexedDbChangeListener(dbImpl, dataSource, builderOptions.saveToIndexedDbDelayTime)
         if(exists){
             dataSource.loadDbFromIndexedDb()
         }else{
@@ -47,8 +48,11 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(private val bu
                 }
 
                 while(currentDbVersion < dbImpl.dbVersion) {
-                    val nextMigration = migrationList.filter { it.startVersion == currentDbVersion}
-                        .maxByOrNull { it.endVersion }
+                    val nextMigration = migrationList.filter {
+                        it.startVersion == currentDbVersion && it !is DoorMigrationSync
+                    }
+                    .maxByOrNull { it.endVersion }
+
                     if(nextMigration != null) {
                         when(nextMigration) {
                             is DoorMigrationAsync -> nextMigration.migrateFn(dbImpl.sqlDatabaseImpl)
