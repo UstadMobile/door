@@ -1,13 +1,10 @@
-package wrappers
+package com.ustadmobile.door.sqljsjdbc
 
 import com.ustadmobile.door.jdbc.DatabaseMetadata
 import com.ustadmobile.door.jdbc.ResultSet
 import kotlin.text.Regex.Companion.escape
 
 class SQLiteDatabaseMetadataJs(val datasource: SQLiteDatasourceJs): DatabaseMetadata {
-
-    override val databaseProductName: String
-        get() = DB_PRODUCT_NAME_SQLITE
 
     override fun getTables(
         catalog: String?,
@@ -66,9 +63,5 @@ class SQLiteDatabaseMetadataJs(val datasource: SQLiteDatasourceJs): DatabaseMeta
 
         sql += ") ORDER BY TABLE_TYPE, TABLE_NAME"
         return datasource.sendQuery(sql)
-    }
-
-    companion object {
-        const val DB_PRODUCT_NAME_SQLITE = "SQLite"
     }
 }

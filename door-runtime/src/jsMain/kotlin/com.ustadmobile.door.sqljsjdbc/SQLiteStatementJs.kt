@@ -1,4 +1,4 @@
-package wrappers
+package com.ustadmobile.door.sqljsjdbc
 
 import com.ustadmobile.door.jdbc.*
 
@@ -14,6 +14,11 @@ open class SQLiteStatementJs(
 
     override fun executeUpdate(sql: String): Int {
         throw SQLException("Synchronous SQL not supported!")
+    }
+
+    suspend fun executeUpdateAsync(sql: String): Int {
+        connection.datasource.sendQuery(sql)
+        return 1
     }
 
     override fun close() {

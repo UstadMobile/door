@@ -1,4 +1,4 @@
-package wrappers
+package com.ustadmobile.door.sqljsjdbc
 
 import com.ustadmobile.door.jdbc.PreparedStatement
 import com.ustadmobile.door.jdbc.ResultSet

@@ -1,4 +1,4 @@
-package wrappers
+package com.ustadmobile.door.sqljsjdbc
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.jdbc.ResultSet
@@ -9,10 +9,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.w3c.dom.Worker
-import wrappers.IndexedDb.DATABASE_VERSION
-import wrappers.IndexedDb.DB_STORE_KEY
-import wrappers.IndexedDb.DB_STORE_NAME
-import wrappers.IndexedDb.indexedDb
+import com.ustadmobile.door.sqljsjdbc.IndexedDb.DATABASE_VERSION
+import com.ustadmobile.door.sqljsjdbc.IndexedDb.DB_STORE_KEY
+import com.ustadmobile.door.sqljsjdbc.IndexedDb.DB_STORE_NAME
+import com.ustadmobile.door.sqljsjdbc.IndexedDb.indexedDb
 import kotlin.js.Json
 import kotlin.js.json
 
