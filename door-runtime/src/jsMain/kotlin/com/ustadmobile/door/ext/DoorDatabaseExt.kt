@@ -5,10 +5,6 @@ import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.DoorSqlDatabase
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import org.w3c.dom.Worker
-import wrappers.IndexedDb
-import wrappers.SQLiteDatasourceJs
-import kotlin.js.json
 import kotlin.reflect.KClass
 
 /**

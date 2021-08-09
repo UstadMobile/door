@@ -1,4 +1,4 @@
-package wrappers
+package com.ustadmobile.door.sqljsjdbc
 
 import kotlinx.coroutines.CompletableDeferred
 

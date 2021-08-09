@@ -5,8 +5,8 @@ import com.ustadmobile.door.jdbc.SQLException
 import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.migration.DoorMigrationAsync
 import com.ustadmobile.door.migration.DoorMigrationStatementList
+import com.ustadmobile.door.sqljsjdbc.*
 import org.w3c.dom.Worker
-import wrappers.*
 
 actual class DatabaseBuilder<T: DoorDatabase> private constructor(private val builderOptions: DatabaseBuilderOptions){
 
@@ -19,7 +19,7 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(private val bu
             Worker(builderOptions.webWorkerPath))
         val dbImpl = builderOptions.dbImplClass.js.createInstance(dataSource, false) as T
         val exists = IndexedDb.checkIfExists(builderOptions.dbName)
-        DatabaseChangeMonitor(dbImpl, dataSource, builderOptions.saveToIndexedDbDelayTime)
+        SaveToIndexedDbChangeListener(dbImpl, dataSource, builderOptions.saveToIndexedDbDelayTime)
         if(exists){
             dataSource.loadDbFromIndexedDb()
         }else{
@@ -52,7 +52,8 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(private val bu
                     if(nextMigration != null) {
                         when(nextMigration) {
                             is DoorMigrationAsync -> nextMigration.migrateFn(dbImpl.sqlDatabaseImpl)
-                            is DoorMigrationStatementList -> dbImpl.execSQLBatchAsync(*nextMigration.migrateStmts().toTypedArray())
+                            is DoorMigrationStatementList -> dbImpl.execSQLBatchAsync(
+                                *nextMigration.migrateStmts(dbImpl.sqlDatabaseImpl).toTypedArray())
                         }
 
                         currentDbVersion = nextMigration.endVersion

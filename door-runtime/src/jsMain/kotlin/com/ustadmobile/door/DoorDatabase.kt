@@ -1,10 +1,11 @@
 package com.ustadmobile.door
 
-import com.ustadmobile.door.ext.useConnection
 import com.ustadmobile.door.jdbc.ResultSet
 import com.ustadmobile.door.jdbc.SQLException
-import kotlinx.coroutines.*
-import wrappers.*
+import kotlinx.coroutines.Runnable
+import com.ustadmobile.door.sqljsjdbc.SQLiteConnectionJs
+import com.ustadmobile.door.sqljsjdbc.SQLiteDatabaseMetadataJs
+import com.ustadmobile.door.sqljsjdbc.SQLiteStatementJs
 import kotlin.jvm.Volatile
 
 actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon() {
@@ -52,12 +53,9 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon() {
         var connection: SQLiteConnectionJs? = null
         try {
             connection = openConnection() as SQLiteConnectionJs
-            connection.setAutoCommit(false)
-            val statement = SQLitePreparedStatementJs(connection,sqlStatements.joinToString(";"))
-            val result = statement.executeUpdateAsync()
-            if(result != -1){
-                statement.close()
-            }
+            val statement = connection.createStatement() as SQLiteStatementJs
+            statement.executeUpdateAsync(sqlStatements.joinToString(";"))
+            statement.close()
         }catch(e: SQLException) {
             throw e
         }finally {

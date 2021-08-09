@@ -80,7 +80,8 @@ actual class DatabaseBuilder<T: DoorDatabase> internal constructor(private var c
                     when(nextMigration) {
                         is DoorMigrationSync -> nextMigration.migrateFn(doorDb.sqlDatabaseImpl)
                         is DoorMigrationAsync -> runBlocking { nextMigration.migrateFn(doorDb.sqlDatabaseImpl) }
-                        is DoorMigrationStatementList -> doorDb.execSQLBatch(*nextMigration.migrateStmts().toTypedArray())
+                        is DoorMigrationStatementList -> doorDb.execSQLBatch(
+                            *nextMigration.migrateStmts(doorDb.sqlDatabaseImpl).toTypedArray())
                     }
 
                     currentDbVersion = nextMigration.endVersion

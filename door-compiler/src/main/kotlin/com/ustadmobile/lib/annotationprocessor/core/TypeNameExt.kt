@@ -1,17 +1,11 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import androidx.paging.DataSource
 import com.squareup.kotlinpoet.*
-import javax.lang.model.element.TypeElement
-import androidx.room.Dao
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
-import com.ustadmobile.door.DoorDataSource
+import com.ustadmobile.door.DoorDataSourceFactory
 import com.ustadmobile.door.DoorLiveData
-import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.DoorDbType
 import javax.annotation.processing.ProcessingEnvironment
-import com.ustadmobile.door.annotation.AttachmentUri
-import javax.lang.model.element.ElementKind
 
 /**
  * Provides the appropriate SQL type name as a string for this type name
@@ -41,17 +35,18 @@ internal fun TypeName.toSqlType(dbType: Int = 0) = when {
 /**
  * Given a string of the SQL column type, get the default value (0 for numbers, null for strings, false for boolean)
  */
+@Suppress("UNUSED_PARAMETER")
 internal fun String.sqlTypeDefaultValue(dbType: Int) = this.trim().uppercase().let {
-    when {
-        it == "BOOL" -> "false"
-        it == "TEXT" -> "null"
+    when(it) {
+        "BOOL" -> "false"
+        "TEXT" -> "null"
         else -> "0"
     }
 }
 
 internal fun TypeName.isDataSourceFactory(paramTypeFilter: (List<TypeName>) -> Boolean = {true}): Boolean {
     return this is ParameterizedTypeName
-            && (this.rawType == DataSource.Factory::class.asClassName() || this.rawType == DoorDataSource.Factory::class.asClassName())
+            && this.rawType == DoorDataSourceFactory::class.asClassName()
             && paramTypeFilter(this.typeArguments)
 }
 
@@ -111,15 +106,15 @@ internal fun TypeName.asComponentClassNameIfList() : ClassName {
  * In the case of LiveData this is simply the first parameter type.
  * E.g. LiveData<Foo> will return 'Foo', LiveData<List<Foo>> will return List<Foo>
  *
- * In the case of a DataSource.Factory, this will be a list of the first parameter type (as a
+ * In the case of a DataSourceFactory, this will be a list of the first parameter type (as a
  * DataSource.Factory is providing a list)
  * E.g. DataSource.Factory<Foo> will unwrap as List<Foo>
  */
 fun TypeName.unwrapLiveDataOrDataSourceFactory()  =
     when {
         this is ParameterizedTypeName && rawType == DoorLiveData::class.asClassName() -> typeArguments[0]
-        this is ParameterizedTypeName && rawType == DataSource.Factory::class.asClassName() -> typeArguments[1]
-        this is ParameterizedTypeName && rawType == DoorDataSource.Factory::class.asClassName() -> typeArguments[1]
+        this is ParameterizedTypeName && rawType == DoorDataSourceFactory::class.asClassName() ->
+            List::class.asClassName().parameterizedBy(typeArguments[1])
         else -> this
     }
 
@@ -128,7 +123,7 @@ fun TypeName.unwrapLiveDataOrDataSourceFactory()  =
  */
 fun TypeName.unwrapListOrArrayComponentType() =
         if(this is ParameterizedTypeName &&
-                (this.rawType == List::class.asClassName() || this.rawType == ClassName("kotlin.Array"))) {
+                (this.rawType == List::class.asClassName() || this.rawType == ClassName("kotlin", "Array"))) {
             val typeArg = typeArguments[0]
             if(typeArg is WildcardTypeName) {
                 typeArg.outTypes[0]

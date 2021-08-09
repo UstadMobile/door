@@ -9,7 +9,8 @@ import org.w3c.dom.url.URL
 actual class DoorUri(val uri: URL)  {
 
     actual suspend fun getFileName(context: Any): String {
-        TODO("getFileName: Not yet implemented")
+        val hashedUrl = uri.href.indexOf("#") != -1
+        return uri.href.substringAfterLast(if(hashedUrl) "#" else "/")
     }
 
     actual companion object {

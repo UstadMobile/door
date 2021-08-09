@@ -2,6 +2,7 @@ package db2
 
 import androidx.room.*
 import com.ustadmobile.door.*
+import com.ustadmobile.door.annotation.QueryLiveTables
 
 @Dao
 abstract class ExampleDao2 {
@@ -107,11 +108,19 @@ abstract class ExampleDao2 {
     @RawQuery
     abstract fun rawQueryForSingleValue(query: DoorQuery): ExampleEntity2?
 
-    @Query("SELECT * FROM ExampleEntity2")
-    abstract fun queryAllLive(): DoorDataSource.Factory<Int, ExampleEntity2>
+    @RawQuery(observedEntities = [ExampleEntity2::class])
+    @QueryLiveTables(["ExampleEntity2"])
+    abstract fun rawQueryForLiveData(query: DoorQuery): DoorLiveData<List<ExampleEntity2>>
+
+    @RawQuery(observedEntities = [ExampleEntity2::class])
+    @QueryLiveTables(["ExampleEntity2"])
+    abstract fun rawQueryForDataSource(query: DoorQuery): DoorDataSourceFactory<Int, ExampleEntity2>
 
     @Query("SELECT * FROM ExampleEntity2")
-    abstract suspend fun queryAllLiveAsync(): DoorDataSource.Factory<Int, ExampleEntity2>
+    abstract fun queryAllLive(): DoorDataSourceFactory<Int, ExampleEntity2>
+
+    @Query("SELECT * FROM ExampleEntity2")
+    abstract suspend fun queryAllLiveAsync(): DoorDataSourceFactory<Int, ExampleEntity2>
 
     @RawQuery
     abstract fun rawQueryWithArrParam(query: DoorQuery): List<ExampleEntity2>

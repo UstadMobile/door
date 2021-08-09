@@ -193,10 +193,7 @@ fun resolveQueryResultType(returnTypeName: TypeName)  =
                 && returnTypeName.rawType == DoorLiveData::class.asClassName()) {
             returnTypeName.typeArguments[0]
         }else if(returnTypeName is ParameterizedTypeName
-                && returnTypeName.rawType == androidx.paging.DataSource.Factory::class.asClassName()) {
-            List::class.asClassName().parameterizedBy(returnTypeName.typeArguments[1])
-        }else if(returnTypeName is ParameterizedTypeName
-            && returnTypeName.rawType == DoorDataSource.Factory::class.asClassName())
+            && returnTypeName.rawType == DoorDataSourceFactory::class.asClassName())
             List::class.asClassName().parameterizedBy(returnTypeName.typeArguments[1])
         else {
             returnTypeName
@@ -625,11 +622,16 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         val queryVarsMap = funSpec.parameters.map { it.name to it.type }.toMap()
         val querySql = funElement.getAnnotation(Query::class.java)?.value
         val resultType = funSpec.returnType?.unwrapLiveDataOrDataSourceFactory() ?: UNIT
+        val rawQueryParamName = if(funElement.hasAnnotation(RawQuery::class.java))
+            funSpec.parameters.first().name
+        else
+            null
 
         fun CodeBlock.Builder.addLiveDataImpl(
             liveQueryVarsMap: Map<String, TypeName> = queryVarsMap,
             liveResultType: TypeName = resultType,
-            liveSql: String? = querySql
+            liveSql: String? = querySql,
+            liveRawQueryParamName: String? = rawQueryParamName
         ): CodeBlock.Builder {
             val tablesToWatch = mutableListOf<String>()
             val specifiedLiveTables = funElement.getAnnotation(QueryLiveTables::class.java)
@@ -655,9 +657,9 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 tablesToWatch.map {"\"$it\""}.joinToString())
             .addJdbcQueryCode(liveResultType, liveQueryVarsMap, liveSql,
                 daoTypeElement, funElement, resultVarName = "_liveResult",
-                suspended = funSpec.isSuspended)
+                suspended = true, rawQueryVarName = liveRawQueryParamName)
             .add("_liveResult")
-            .applyIf(resultType.isList()) {
+            .applyIf(liveResultType.isList()) {
                 add(".toList()")
             }
             .add("\n")
@@ -676,7 +678,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     ?: throw IllegalStateException("TODO: datasource not typed - ${daoTypeElement.qualifiedName}#${funSpec.name}")
                 addCode("val _result = %L\n",
                 TypeSpec.anonymousClassBuilder()
-                    .superclass(DoorDataSource.Factory::class.asTypeName().parameterizedBy(INT,
+                    .superclass(DoorDataSourceFactory::class.asTypeName().parameterizedBy(INT,
                         returnTypeUnwrapped))
                     .addFunction(FunSpec.builder("getData")
                         .addModifiers(KModifier.OVERRIDE)
@@ -685,21 +687,34 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                         .addParameter("_offset", INT)
                         .addParameter("_limit", INT)
                         .addCode(CodeBlock.builder()
+                            .applyIf(rawQueryParamName != null) {
+                                add("val _rawQuery = $rawQueryParamName.%M(\n",
+                                    MemberName("com.ustadmobile.door.ext", "copyWithExtraParams"))
+                                add("sql = \"(SELECT * FROM (\${$rawQueryParamName.getSql()}) LIMIT ? OFFSET ?\",\n")
+                                add("extraParams = arrayOf(_limit, _offset))\n")
+                            }
                             .add("return ")
                             .addLiveDataImpl(
                                 liveQueryVarsMap = queryVarsMap + mapOf("_offset" to INT, "_limit" to INT),
                                 liveResultType = List::class.asClassName().parameterizedBy(returnTypeUnwrapped),
-                                liveSql = "SELECT * FROM ($querySql) LIMIT :_limit OFFSET :_offset ")
+                                liveSql = querySql?.let { "SELECT * FROM ($it) LIMIT :_limit OFFSET :_offset " },
+                                liveRawQueryParamName = rawQueryParamName?.let { "_rawQuery" })
                             .build())
                         .build())
                     .addFunction(FunSpec.builder("getLength")
                         .addModifiers(KModifier.OVERRIDE)
                         .returns(DoorLiveData::class.asTypeName().parameterizedBy(INT))
                         .addCode(CodeBlock.builder()
+                            .applyIf(rawQueryParamName != null) {
+                                add("val _rawQuery = $rawQueryParamName.%M(\n",
+                                    MemberName("com.ustadmobile.door.ext", "copy"))
+                                add("sql = \"SELECT COUNT(*) FROM (\${$rawQueryParamName.getSql()})\")\n")
+                            }
                             .add("return ")
                             .addLiveDataImpl(
                                 liveResultType = INT,
-                                liveSql = "SELECT COUNT(*) FROM ($querySql)")
+                                liveSql = querySql?.let { "SELECT COUNT(*) FROM ($querySql) "},
+                                liveRawQueryParamName = rawQueryParamName?.let { "_rawQuery" })
                             .build())
                         .build())
                     .build())
@@ -709,11 +724,6 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     .addLiveDataImpl()
                     .build())
             }.applyIf(funSpec.returnType?.isDataSourceFactoryOrLiveData() != true) {
-                val rawQueryParamName = if(funElement.hasAnnotation(RawQuery::class.java))
-                    funSpec.parameters.first().name
-                else
-                    null
-
                 addCode(CodeBlock.builder().addJdbcQueryCode(resultType, queryVarsMap, querySql,
                     daoTypeElement, funElement, rawQueryVarName = rawQueryParamName,
                     suspended = funSpec.isSuspended)
