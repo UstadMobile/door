@@ -5,6 +5,7 @@ import com.ustadmobile.door.jdbc.SQLException
 import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.migration.DoorMigrationAsync
 import com.ustadmobile.door.migration.DoorMigrationStatementList
+import com.ustadmobile.door.migration.DoorMigrationSync
 import com.ustadmobile.door.sqljsjdbc.*
 import org.w3c.dom.Worker
 
@@ -47,8 +48,11 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(private val bu
                 }
 
                 while(currentDbVersion < dbImpl.dbVersion) {
-                    val nextMigration = migrationList.filter { it.startVersion == currentDbVersion}
-                        .maxByOrNull { it.endVersion }
+                    val nextMigration = migrationList.filter {
+                        it.startVersion == currentDbVersion && it !is DoorMigrationSync
+                    }
+                    .maxByOrNull { it.endVersion }
+
                     if(nextMigration != null) {
                         when(nextMigration) {
                             is DoorMigrationAsync -> nextMigration.migrateFn(dbImpl.sqlDatabaseImpl)
