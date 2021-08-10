@@ -26,7 +26,7 @@ class SQLiteConnectionJs(val datasource: SQLiteDatasourceJs):Connection {
     }
 
     override fun createStatement(): Statement {
-        return SQLiteStatementJs(datasource.getConnection() as SQLiteConnectionJs)
+        return SQLiteStatementJs(this)
     }
 
     override fun commit() {}

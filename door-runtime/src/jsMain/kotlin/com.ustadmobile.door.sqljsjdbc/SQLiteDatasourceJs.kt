@@ -30,7 +30,7 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
     init {
         worker.onmessage = { dbEvent: dynamic ->
             val actionId = dbEvent.data["id"].toString().toInt()
-            val executedQuery = executedSqlQueries[actionId]
+            val executedQuery = executedSqlQueries.remove(actionId)
             val pendingCompletable = pendingMessages.remove(actionId)
             if(pendingCompletable != null){
 
