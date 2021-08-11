@@ -8,10 +8,8 @@ import javax.lang.model.type.DeclaredType
 import javax.lang.model.type.ExecutableType
 import androidx.room.*
 import com.ustadmobile.door.SyncableDoorDatabase
-import com.ustadmobile.door.annotation.AttachmentUri
-import com.ustadmobile.door.annotation.ReplicateEntity
-import com.ustadmobile.door.annotation.Repository
-import com.ustadmobile.door.annotation.SyncableEntity
+import com.ustadmobile.door.annotation.*
+import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.SUFFIX_DEFAULT_RECEIVEVIEW
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SUFFIX_KTOR_HELPER
 import com.ustadmobile.lib.annotationprocessor.core.ext.findByClass
 import javax.lang.model.type.TypeMirror
@@ -327,4 +325,13 @@ fun TypeElement.getReplicationTracker(processingEnv: ProcessingEnvironment): Typ
     return processingEnv.typeUtils.asElement(trkrTypeMirror) as TypeElement
 }
 
+/**
+ * Where this is a TypeElement representing a ReplicateEntity, provide the view name for the receive view
+ */
+val TypeElement.replicationEntityReceiveViewName: String
+    get() = getAnnotation(ReplicateReceiveView::class.java)?.name ?: (simpleName.toString() + SUFFIX_DEFAULT_RECEIVEVIEW)
+
+val TypeElement.replicationTrackerForeignKey: Element
+    get() = enclosedElementsWithAnnotation(ReplicationEntityForeignKey::class.java, ElementKind.FIELD).firstOrNull()
+        ?: throw IllegalArgumentException("${this.qualifiedName} has no replicationentityforeignkey")
 

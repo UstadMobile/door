@@ -231,7 +231,6 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
                     }
                 }
             }
-
         }
 
 

@@ -22,6 +22,7 @@ import com.ustadmobile.door.annotation.*
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorSync.Companion.TRACKER_SUFFIX
 import com.ustadmobile.door.ext.DoorDatabaseMetadata
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
+import com.ustadmobile.door.ext.minifySql
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_ANDROID_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JS_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JVM_DIRS
@@ -1185,6 +1186,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
 
                             if(entityType.hasAnnotation(ReplicateEntity::class.java)) {
                                 addReplicateEntityChangeLogTrigger(entityType, "_stmtList", dbProductType)
+                                addCreateReceiveView(entityType, "_stmtList")
                             }
 
                             addCreateTriggersCode(entityType, "_stmtList", dbProductType)
@@ -1208,6 +1210,27 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .build())
             .build())
 
+        return this
+    }
+
+
+    /**
+     * Add a ReceiveView for the given EntityTypeElement.
+     */
+    private fun CodeBlock.Builder.addCreateReceiveView(
+        entityTypeEl: TypeElement,
+        sqlListVar: String
+    ): CodeBlock.Builder {
+        val trkrEl = entityTypeEl.getReplicationTracker(processingEnv)
+        val receiveViewAnn = entityTypeEl.getAnnotation(ReplicateReceiveView::class.java)
+        val viewName = receiveViewAnn?.name ?: "${entityTypeEl.entityTableName}$SUFFIX_DEFAULT_RECEIVEVIEW"
+        val sql = receiveViewAnn?.value ?: """
+            SELECT ${entityTypeEl.simpleName}.*, ${trkrEl.entityTableName}.*
+              FROM ${entityTypeEl.simpleName}
+                   LEFT JOIN ${trkrEl.simpleName} ON ${trkrEl.entityTableName}.${trkrEl.replicationTrackerForeignKey.simpleName} = 
+                        ${entityTypeEl.entityTableName}.${entityTypeEl.entityPrimaryKey?.simpleName}
+        """.minifySql()
+        add("$sqlListVar += %S\n", "CREATE VIEW $viewName AS $sql")
         return this
     }
 

@@ -5,10 +5,15 @@ import com.ustadmobile.door.annotation.Trigger
 import com.ustadmobile.door.ext.minifySql
 import com.ustadmobile.lib.annotationprocessor.core.applyIf
 import com.ustadmobile.lib.annotationprocessor.core.entityTableName
+import com.ustadmobile.lib.annotationprocessor.core.replicationEntityReceiveViewName
 import javax.lang.model.element.TypeElement
 
 fun Trigger.toSql(entityTypeEl: TypeElement, dbProductType: Int) : List<String>{
-    val tableOrViewName = if(on == Trigger.On.ENTITY) entityTypeEl.entityTableName else "RemoteInsertView"
+    val tableOrViewName = if(on == Trigger.On.ENTITY)
+        entityTypeEl.entityTableName
+    else
+        entityTypeEl.replicationEntityReceiveViewName
+
     return when(dbProductType) {
         DoorDbType.SQLITE -> this.events.map { event ->
             val postfix = event.sqlKeyWord.lowercase().substring(0, 3)

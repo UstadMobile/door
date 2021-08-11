@@ -1328,6 +1328,8 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         val MEMBERNAME_RESULTSET_USERESULTS = MemberName("com.ustadmobile.door.ext", "useResults")
 
         val MEMBERNAME_MUTABLE_LINKEDLISTOF = MemberName("com.ustadmobile.door.ext", "mutableLinkedListOf")
+
+        const val SUFFIX_DEFAULT_RECEIVEVIEW = "_ReceiveView"
     }
 
 }
