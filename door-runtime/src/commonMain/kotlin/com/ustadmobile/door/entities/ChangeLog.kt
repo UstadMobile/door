@@ -13,8 +13,11 @@ data class ChangeLog (
 
         val chEntityPk: Long = 0L,
 
-        val dispatched: Boolean = false,
+        val chType: Int
+) {
+    companion object {
+        const val CHANGE_UPSERT = 1
 
-        val chTime: Long = 0L
-
-)
+        const val CHANGE_DELETE = 2
+    }
+}

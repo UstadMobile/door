@@ -119,6 +119,9 @@ kapt {
         arg("doordb_js_out", "$buildDir/generated/source/door-js")
         arg("doordb_source_path", project.file("src/commonMain/kotlin"))
         arg("doordb_migrations_out", project.file("$buildDir/generated/door-migrations"))
+        arg("doordb_postgres_url", "jdbc:postgresql:///door")
+        arg("doordb_postgres_user", "door")
+        arg("doordb_postgres_password", "opensesame")
     }
 }
 

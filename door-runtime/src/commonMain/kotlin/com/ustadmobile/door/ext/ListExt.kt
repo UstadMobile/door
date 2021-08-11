@@ -6,4 +6,5 @@ package com.ustadmobile.door.ext
  */
 expect fun <T> concurrentSafeListOf(vararg items: T) : MutableList<T>
 
+expect fun <T> mutableLinkedListOf(vararg  items: T): MutableList<T>
 

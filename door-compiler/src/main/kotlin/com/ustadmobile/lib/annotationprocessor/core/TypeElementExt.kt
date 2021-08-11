@@ -9,9 +9,11 @@ import javax.lang.model.type.ExecutableType
 import androidx.room.*
 import com.ustadmobile.door.SyncableDoorDatabase
 import com.ustadmobile.door.annotation.AttachmentUri
+import com.ustadmobile.door.annotation.ReplicateEntity
 import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.annotation.SyncableEntity
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SUFFIX_KTOR_HELPER
+import com.ustadmobile.lib.annotationprocessor.core.ext.findByClass
 import javax.lang.model.type.TypeMirror
 
 val ALL_QUERY_ANNOTATIONS = listOf(Query::class.java, Update::class.java, Delete::class.java,
@@ -303,3 +305,26 @@ val TypeElement.entityFields: List<Element>
         it.kind == ElementKind.FIELD && it.simpleName.toString() != "Companion"
                 && !it.modifiers.contains(Modifier.STATIC)
     }
+
+/**
+ * This is a placeholder that will, in future, allow for support of instances where the table name is different to the
+ * entity
+ */
+val TypeElement.entityTableName: String
+    get() = simpleName.toString()
+
+
+/**
+ * If the given element is an entity with the ReplicateEntity annotation, this will provide the TypeElement that
+ * represents the tracker entity
+ */
+fun TypeElement.getReplicationTracker(processingEnv: ProcessingEnvironment): TypeElement {
+    val repAnnotation = annotationMirrors.findByClass(processingEnv, ReplicateEntity::class)
+        ?: throw IllegalArgumentException("Class ${this.qualifiedName} has no replicate entity annotation")
+
+    val repTrkr = repAnnotation.elementValues.entries.first { it.key.simpleName.toString() == "tracker" }
+    val trkrTypeMirror = repTrkr.value.value as TypeMirror
+    return processingEnv.typeUtils.asElement(trkrTypeMirror) as TypeElement
+}
+
+

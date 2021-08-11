@@ -50,7 +50,6 @@ abstract class SyncHelperEntitiesDao : ISyncHelperEntitiesDao {
     @Query("""
         DELETE FROM ChangeLog
         WHERE chTableId = :tableId
-        AND chTime < (SELECT max(pnTimestamp) FROM UpdateNotification WHERE pnTableId = :tableId)
     """)
     override abstract fun deleteChangeLogs(tableId: Int)
 
@@ -61,7 +60,7 @@ abstract class SyncHelperEntitiesDao : ISyncHelperEntitiesDao {
      *
      * @return A list of tableIds for which there are pending ChangeLogs
      */
-    @Query("SELECT DISTINCT chTableId FROM ChangeLog WHERE CAST(dispatched AS INTEGER) = 0")
+    @Query("SELECT DISTINCT chTableId FROM ChangeLog ")
     override abstract suspend fun findTablesWithPendingChangeLogs(): List<Int>
 
 

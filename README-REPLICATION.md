@@ -35,7 +35,10 @@ etc. to decide how to process incoming replication data.
  */
 @ReplicateEntity(
 tracker = Entity_ReplicationTracker::class,
-tableId = 42) 
+tableId = 42,
+batch = 100) //Where a batch is specified, the lowest numbered batches will be replicated first. No higher batch
+            //will start replication until earlier batches finish. This can be used to manage dependencies (eg 
+            //sync permissions first)
 /*
  * The replication process will by default automatically create a Remote Insert View. 
  * This annotation itself is optional. If it is not specified, Door will automatically create "Entity_ReceiveView" 
@@ -50,7 +53,9 @@ SELECT Entity_ReplicationTracker.*, Entity.*
 /*
  *  Now use the triggers to determine how to handle incoming data from another node.
  */ 
-@SqliteTrigger(
+@Trigger(
+name = "insert from remote",
+
 """
 CREATE TRIGGER EntityCheckRemoteInsert 
 INSTEAD OF INSERT ON Entity_ReceiveView
@@ -78,7 +83,7 @@ Annotate exactly one field as ReplicationVersionId. This will be used to avoid e
 You can use the optional LastChangedTime annotation so that the Door repository will automatically use the
 modification timestamp as a version identifier. 
 
-The Door repository will generate a unique 64bit primary key where autoGenerate is set to true. The 64bit is based on 
+The Door repository will generate a unique 64bit primary key where autoGenerate is set to true. The 64bit key is based on 
 a combination of the time, device identifiers, and a sequence number on the device. It can generate up to 4,096
 unique primary keys per second (per table). This is loosely based on the Twitter snowflake approach.
 
@@ -105,7 +110,8 @@ class Entity_ReplicationTracker {
 
 }
 ```
-Create a normal entity with special annotations as above. The ReplicationVersionId types must match.
+Create a normal entity with special annotations as above. The fields annotated @ReplicationVersionId must be of the same 
+type on both the entity itself and the replication tracker entity. 
 
 ### DAO Setup
 ```
@@ -246,6 +252,16 @@ Response Body
 }
 ]
 ```
+
+Remote runs SQL:
+```
+SELECT Entity.*, Entity_RT.*
+  FROM Entity_RT
+       JOIN Entity ON Entity_RT.trkrEntityPrimaryKey = Entity.primaryKey
+ WHERE Entity_RT.trkrDestinationNode = :nodeId
+   AND Entity_RT.trkrProcessed = 0 
+```
+
 Local runs:
 ```
 INSERT INTO RemoteInsertView (entityPrimaryKey, lastChanged, aNumberField, trkrEntityPrimaryKey,

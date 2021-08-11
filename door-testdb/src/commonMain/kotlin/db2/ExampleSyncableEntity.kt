@@ -14,8 +14,8 @@ import kotlinx.serialization.Serializable
 @SyncableEntity(tableId = TABLE_ID,
     notifyOnUpdate = ["""SELECT DISTINCT deviceId as deviceId, $TABLE_ID as tableId 
                             FROM AccessGrant 
-                            WHERE entityUid IN (SELECT chEntityPk FROM ChangeLog WHERE chTableId = 42 AND CAST(dispatched AS BOOLEAN) = false)
-                            AND tableId = $TABLE_ID"""],
+                            WHERE entityUid IN (SELECT chEntityPk FROM ChangeLog WHERE chTableId = 42
+                            AND tableId = $TABLE_ID)"""],
     syncFindAllQuery = """Select ExampleSyncableEntity.* 
                           FROM ExampleSyncableEntity
                           LEFT JOIN AccessGrant ON AccessGrant.entityUid = ExampleSyncableEntity.esUid AND AccessGrant.tableId = 42 AND AccessGrant.deviceId = :clientId

@@ -208,6 +208,20 @@ fun TypeName.defaultTypeValueCode(): CodeBlock {
     return codeBlock.build()
 }
 
+fun TypeName.defaultSqlValue(dbProductType: Int): String {
+    val kotlinType = javaToKotlinType()
+    return when(kotlinType) {
+        BOOLEAN -> if(dbProductType == DoorDbType.SQLITE) "0" else "false"
+        BYTE -> "0"
+        SHORT -> "0"
+        INT -> "0"
+        LONG -> "0"
+        FLOAT -> "0"
+        DOUBLE -> "0"
+        else -> "null"
+    }
+}
+
 /**
  * Get the name of the function that would be used to set this kind of parameter on a PreparedStatement
  * e.g. setInt, setDouble, setBoolean etc.

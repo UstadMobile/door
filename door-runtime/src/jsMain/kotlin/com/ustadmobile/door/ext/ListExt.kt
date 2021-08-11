@@ -9,3 +9,9 @@ actual fun <T> concurrentSafeListOf(vararg items: T): MutableList<T> {
         it.addAll(items)
     }
 }
+
+actual fun <T> mutableLinkedListOf(vararg items: T): MutableList<T> {
+    return mutableListOf<T>().also {
+        it.addAll(items)
+    }
+}

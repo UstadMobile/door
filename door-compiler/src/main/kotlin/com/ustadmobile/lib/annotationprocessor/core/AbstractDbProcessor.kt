@@ -20,6 +20,9 @@ import io.ktor.content.TextContent
 import io.ktor.http.ContentType
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.ustadmobile.door.*
+import com.ustadmobile.door.entities.ChangeLog
+import com.ustadmobile.door.ext.minifySql
+import com.ustadmobile.lib.annotationprocessor.core.ext.toSql
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import kotlinx.coroutines.Runnable
 import kotlin.reflect.KClass
@@ -675,6 +678,86 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         return this
     }
 
+    /**
+     * Add triggers that will insert into the ChangeLog table
+     */
+    protected fun CodeBlock.Builder.addReplicateEntityChangeLogTrigger(
+        entityType: TypeElement,
+        sqlListVar: String,
+        dbProductType: Int,
+    ) : CodeBlock.Builder{
+        val replicateEntity = entityType.getAnnotation(ReplicateEntity::class.java)
+        val primaryKeyEl = entityType.entityPrimaryKey
+            ?: throw IllegalArgumentException("addReplicateEntityChangeLogTrigger ${entityType.qualifiedName} has NO PRIMARY KEY!")
+
+        data class TriggerParams(val opName: String, val prefix: String, val opCode: Int) {
+            val opPrefix = opName.lowercase().substring(0, 3)
+        }
+
+        if(dbProductType == DoorDbType.SQLITE) {
+            val triggerParams = listOf(
+                TriggerParams("INSERT", "NEW", ChangeLog.CHANGE_UPSERT),
+                TriggerParams("UPDATE", "NEW", ChangeLog.CHANGE_UPSERT),
+                TriggerParams("DELETE", "OLD", ChangeLog.CHANGE_DELETE)
+            )
+
+            triggerParams.forEach { params ->
+                add("$sqlListVar += %S\n",
+                    """
+                CREATE TRIGGER ch_${params.opPrefix}_${replicateEntity.tableId}
+                       AFTER ${params.opName} ON ${entityType.entityTableName}
+                BEGIN
+                       INSERT INTO ChangeLog(chTableId, chEntityPk, chType)
+                       VALUES (${replicateEntity.tableId}, ${params.prefix}.${primaryKeyEl.simpleName}, ${params.opCode});
+                END       
+                """.minifySql())
+            }
+        }else {
+            val triggerParams = listOf(
+                TriggerParams("UPDATE OR INSERT", "NEW", ChangeLog.CHANGE_UPSERT),
+                TriggerParams("DELETE", "OLD", ChangeLog.CHANGE_DELETE))
+            triggerParams.forEach { params ->
+                add("$sqlListVar += %S\n",
+                    """
+               CREATE OR REPLACE FUNCTION 
+               ch_${params.opPrefix}_${replicateEntity.tableId}_fn() RETURNS TRIGGER AS $$
+               BEGIN
+               INSERT INTO ChangeLog(chTableId, chEntityPk, chType)
+                       VALUES (${replicateEntity.tableId}, ${params.prefix}.${primaryKeyEl.simpleName}, ${params.opCode});
+               RETURN NULL;
+               END $$
+               LANGUAGE plpgsql         
+            """.minifySql())
+                add("$sqlListVar += %S\n",
+                    """
+            CREATE TRIGGER ch_${params.opPrefix}_${replicateEntity.tableId}_trig 
+                   AFTER ${params.opName} ON RepEntity
+                   FOR EACH ROW
+                   EXECUTE PROCEDURE ch_ups_${replicateEntity.tableId}_fn();
+            """.minifySql())
+            }
+
+
+        }
+
+        return this
+    }
+
+
+    protected fun CodeBlock.Builder.addCreateTriggersCode(
+        entityType: TypeElement,
+        stmtListVar: String,
+        dbProductType: Int
+    ): CodeBlock.Builder {
+        entityType.getAnnotationsByType(Trigger::class.java).forEach { trigger ->
+            trigger.toSql(entityType, dbProductType).forEach { sqlStr ->
+                add("$stmtListVar += %S\n", sqlStr)
+            }
+        }
+
+        return this
+    }
+
 
     /**
      * Generate a codeblock with the JDBC code required to perform a query and return the given
@@ -1243,6 +1326,8 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         val MEMBERNAME_ASYNC_QUERY = MemberName("com.ustadmobile.door.jdbc.ext", "executeQueryAsyncKmp")
 
         val MEMBERNAME_RESULTSET_USERESULTS = MemberName("com.ustadmobile.door.ext", "useResults")
+
+        val MEMBERNAME_MUTABLE_LINKEDLISTOF = MemberName("com.ustadmobile.door.ext", "mutableLinkedListOf")
     }
 
 }

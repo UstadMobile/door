@@ -19,12 +19,7 @@ fun ClassName.findAllEntitiesWithAnnotation(annotationClass: Class<out Annotatio
         return mapOf()
 
 
-    val entityTypeEl = processingEnv.elementUtils.getTypeElement(canonicalName)
-    if(entityTypeEl == null){
-        processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
-                "findAllEntitiesWithAnnotation cannot find : " + canonicalName)
-        return mapOf()
-    }
+    val entityTypeEl = processingEnv.elementUtils.getTypeElement(canonicalName) ?: return mapOf()
 
     val syncableEntityList = mutableMapOf<List<String>, ClassName>()
 

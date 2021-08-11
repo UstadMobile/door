@@ -7,7 +7,6 @@ import javax.lang.model.element.*
 import javax.lang.model.type.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.ustadmobile.door.*
-import com.ustadmobile.door.annotation.SyncableEntity
 import net.sf.jsqlparser.parser.CCJSqlParserUtil
 import net.sf.jsqlparser.statement.select.Select
 import net.sf.jsqlparser.util.TablesNamesFinder
@@ -19,9 +18,8 @@ import kotlin.reflect.jvm.internal.impl.builtins.jvm.JavaToKotlinClassMap
 import javax.lang.model.util.SimpleTypeVisitor7
 import javax.tools.Diagnostic
 import com.ustadmobile.door.DoorDbType
-import com.ustadmobile.door.annotation.QueryLiveTables
+import com.ustadmobile.door.annotation.*
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorSync.Companion.TRACKER_SUFFIX
-import com.ustadmobile.door.annotation.PgOnConflict
 import com.ustadmobile.door.ext.DoorDatabaseMetadata
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_ANDROID_OUTPUT
@@ -1130,7 +1128,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             .addModifiers(KModifier.OVERRIDE)
             .returns(List::class.parameterizedBy(String::class))
             .addCode(CodeBlock.builder()
-                .add("val _stmtList = mutableListOf<String>()\n")
+                .add("val _stmtList = %M<String>()\n", MEMBERNAME_MUTABLE_LINKEDLISTOF)
                 .beginControlFlow("when(jdbcDbType)")
                 .apply {
                     for(dbProductType in DoorDbType.SUPPORTED_TYPES) {
@@ -1184,6 +1182,12 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                                             DbProcessorSync.TRACKER_DESTID_FIELDNAME), unique = true)),
                                     trackerEntityClassName.name!!, "_stmtList"))
                             }
+
+                            if(entityType.hasAnnotation(ReplicateEntity::class.java)) {
+                                addReplicateEntityChangeLogTrigger(entityType, "_stmtList", dbProductType)
+                            }
+
+                            addCreateTriggersCode(entityType, "_stmtList", dbProductType)
 
                             if(entityType.entityHasAttachments) {
                                 if(dbProductType == DoorDbType.SQLITE) {
