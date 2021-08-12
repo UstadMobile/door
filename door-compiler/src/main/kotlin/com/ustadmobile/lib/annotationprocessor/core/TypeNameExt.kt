@@ -5,6 +5,7 @@ import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.ustadmobile.door.DoorDataSourceFactory
 import com.ustadmobile.door.DoorLiveData
 import com.ustadmobile.door.DoorDbType
+import com.ustadmobile.door.jdbc.TypesKmp
 import javax.annotation.processing.ProcessingEnvironment
 
 /**
@@ -30,6 +31,22 @@ internal fun TypeName.toSqlType(dbType: Int = 0) = when {
     this == String::class.asClassName() -> "TEXT"
 
     else -> "ERR_UNSUPPORTED_TPYE-$this"
+}
+
+/**
+ * Map a Kotlin Type to JDBC Types constant
+ */
+fun TypeName.toSqlTypesInt() = when {
+    this == BOOLEAN -> TypesKmp.BOOLEAN
+    this == BYTE -> TypesKmp.SMALLINT
+    this == SHORT -> TypesKmp.SMALLINT
+    this == INT -> TypesKmp.INTEGER
+    this == LONG -> TypesKmp.BIGINT
+    this == FLOAT -> TypesKmp.FLOAT
+    this == DOUBLE -> TypesKmp.DOUBLE
+    this == String::class.asClassName() -> TypesKmp.LONGVARCHAR
+    this == String::class.asClassName().copy(nullable = true) -> TypesKmp.LONGVARCHAR
+    else -> throw IllegalArgumentException("Could not get sqlTypeInt for: $this")
 }
 
 /**

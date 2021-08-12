@@ -2,10 +2,7 @@ package repdb
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.ustadmobile.door.annotation.LastChangedBy
-import com.ustadmobile.door.annotation.LastChangedTime
-import com.ustadmobile.door.annotation.ReplicateEntity
-import com.ustadmobile.door.annotation.Trigger
+import com.ustadmobile.door.annotation.*
 
 @Entity
 @ReplicateEntity(tableId = 42, tracker = RepEntityTracker::class)
@@ -23,6 +20,7 @@ class RepEntity {
     @PrimaryKey(autoGenerate = true)
     var rePrimaryKey: Long = 0
 
+    @ReplicationVersionId
     @LastChangedBy
     var reLastChangedBy: Long = 0
 

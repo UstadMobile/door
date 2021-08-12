@@ -17,10 +17,16 @@ targetCompatibility = "1.8"
 
 compileKotlin{
     kotlinOptions.jvmTarget = "1.8"
+    kotlinOptions {
+        freeCompilerArgs += "-Xopt-in=com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview"
+    }
 }
 
 compileTestKotlin {
     kotlinOptions.jvmTarget = "1.8"
+    kotlinOptions {
+        freeCompilerArgs += "-Xopt-in=com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview"
+    }
 }
 
 dependencies {
@@ -30,6 +36,8 @@ dependencies {
     implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.1.0'
     implementation "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
     implementation "com.squareup:kotlinpoet:$version_kotlinpoet"
+    implementation"com.squareup:kotlinpoet-metadata:$version_kotlinpoet"
+    implementation"com.squareup:kotlinpoet-metadata-specs:$version_kotlinpoet"
     implementation "com.github.jsqlparser:jsqlparser:$version_jsqlparser"
     implementation "org.apache.commons:commons-text:$version_apache_commons_text"
     implementation "com.google.code.gson:gson:$version_gson"
@@ -49,7 +57,7 @@ dependencies {
     implementation "org.kodein.di:kodein-di:$version_kodein_di"
     implementation "org.kodein.di:kodein-di-framework-ktor-server-jvm:$version_kodein_di"
     implementation "io.github.aakira:napier-jvm:$version_napier"
-
+    implementation "org.jetbrains.kotlinx:kotlinx-metadata-jvm:$version_kotlinx_metadata"
 }
 
 

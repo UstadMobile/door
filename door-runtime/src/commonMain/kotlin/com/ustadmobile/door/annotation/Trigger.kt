@@ -15,21 +15,30 @@ package com.ustadmobile.door.annotation
  */
 annotation class Trigger(
 
+    /** Base name for the trigger */
     val name: String,
 
+    /** When the trigger runs e.g. BEFORE, AFTER, INSTEAD_OF */
     val order: Order,
 
+    /** e.g. UPDATE, INSERT, DELETE */
     val events: Array<Event>,
 
-    val sqlStatements: Array<String>,
-
-
-
-    //By default, the trigger will be on the entity that it is annotated on
-    val on: On = Trigger.On.ENTITY,
+    /**
+     * The table that the trigger will be attached to. By default this is the table name of the
+     * entity on which the trigger annotation is present. This should be set to the On.RECEIVEVIEW
+     * for the trigger to work when data is received from a remote node as per the REPLICATION README.
+     */
+    val on: On = On.ENTITY,
 
     /**
-     * An SQL query that evaluates as a Boolean to determine when the
+     * A list of SQL statements that should run. These SQL statements may use NEW. and OLD. prefixes
+     * depending on which event they are acting upon.
+     */
+    val sqlStatements: Array<String>,
+
+    /**
+     * An SQL query that evaluates as a Boolean to determine if the sqlStatements should run.
      */
     val conditionSql: String = "",
 

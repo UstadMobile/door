@@ -13,13 +13,17 @@ import javax.lang.model.element.TypeElement
 import androidx.room.Database
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.squareup.kotlinpoet.BOOLEAN
+import com.squareup.kotlinpoet.LONG
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asTypeName
+import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
+import com.squareup.kotlinpoet.metadata.toImmutableKmClass
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.DoorDbType.Companion.PRODUCT_INT_TO_NAME_MAP
-import com.ustadmobile.door.annotation.ReplicateEntity
-import com.ustadmobile.door.annotation.SyncableEntity
-import com.ustadmobile.door.annotation.Trigger
+import com.ustadmobile.door.annotation.*
+import kotlinx.metadata.jvm.KotlinClassHeader
+import kotlinx.metadata.jvm.KotlinClassMetadata
 import org.sqlite.SQLiteDataSource
 import java.io.File
 import java.sql.Connection
@@ -120,14 +124,86 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
             }
         }
 
-        val replicableEntitiesGroupedById = dbs.flatMap { it.allDbEntities(processingEnv) }.toSet()
+        val allReplicateEntities = dbs.flatMap { it.allDbEntities(processingEnv) }.toSet()
             .filter { it.hasAnnotation(ReplicateEntity::class.java) }
+
+        val replicableEntitiesGroupedById = allReplicateEntities
             .groupBy { it.getAnnotation(ReplicateEntity::class.java).tableId }
 
         replicableEntitiesGroupedById.filter { it.value.size > 1 }.forEach { duplicates ->
             messager.printMessage(Diagnostic.Kind.ERROR,
                 "Duplicate replicate tableId ${duplicates.key} : ${duplicates.value.joinToString { it.simpleName }} ",
                 duplicates.value.first())
+        }
+
+        //Check entities with the ReplicateEntity annotation have all the required fields
+        allReplicateEntities.forEach { entity ->
+            val entityKmClass = entity.getAnnotation(Metadata::class.java).toImmutableKmClass()
+
+            try {
+                val entityRepTrkr = entity.getReplicationTracker(processingEnv)
+
+                val entityVersionIdField = entity.enclosedElementsWithAnnotation(ReplicationVersionId::class.java)
+                if(entityVersionIdField.size != 1)
+                    messager.printMessage(Diagnostic.Kind.ERROR,
+                        "@ReplicateEntity must have exactly one field annotated @ReplicationVersionId",
+                        entity)
+
+
+                if(!entityRepTrkr.hasAnnotation(Entity::class.java))
+                    messager.printMessage(Diagnostic.Kind.ERROR, "Replication tracker entity does not have @Entity annotation",
+                        entityRepTrkr)
+
+                val trkrForeignKey = entityRepTrkr.enclosedElementsWithAnnotation(ReplicationEntityForeignKey::class.java)
+                entityKmClass.properties.first().returnType
+
+
+                if(trkrForeignKey.size != 1 ||
+                    entity.kmPropertiesWithAnnotation(PrimaryKey::class.java).first().returnType !=
+                    entityRepTrkr.kmPropertiesWithAnnotation(ReplicationEntityForeignKey::class.java).first().returnType)
+
+                    messager.printMessage(Diagnostic.Kind.ERROR,
+                        "Replication tracker must have exactly one field annotated @ReplicationEntityForeignKey of the same type as the entity's primary key")
+
+
+
+                val trkrVersionId = entityRepTrkr.enclosedElementsWithAnnotation(ReplicationVersionId::class.java)
+                if(trkrVersionId.size != 1 ||
+                        trkrVersionId.first().asType().asTypeName() != entityVersionIdField.firstOrNull()?.asType()?.asTypeName()) {
+                    messager.printMessage(Diagnostic.Kind.ERROR,
+                        "Replication tracker must have exactly one field annotated @ReplicationVersionId " +
+                            "and it must be the same type as the field annotated @ReplicationVersionId on the main entity",
+                        entityRepTrkr)
+                }
+
+                val trkrNodeId = entityRepTrkr.enclosedElementsWithAnnotation(ReplicationDestinationNodeId::class.java)
+                if(trkrNodeId.size != 1 || trkrNodeId.first().asType().asTypeName() != LONG) {
+                    messager.printMessage(Diagnostic.Kind.ERROR, "Replication tracker must have exactly one field" +
+                            "annotated @ReplicationDestinationNodeId and it must be of type long", entityRepTrkr)
+                }
+
+                val trkrProcessed = entityRepTrkr.enclosedElementsWithAnnotation(ReplicationTrackerProcessed::class.java)
+                if(trkrProcessed.size != 1 || trkrProcessed.first().asType().asTypeName() != BOOLEAN) {
+                    messager.printMessage(Diagnostic.Kind.ERROR, "Replication Tracker must have exactly one field " +
+                            "annotated @ReplicationTrackerProcessed and it must be of type boolean", entityRepTrkr)
+                }
+
+                //check for duplicate fields between tracker and entity
+                val entityFieldNames = entity.entityFields
+                val trkrFieldNames = entityRepTrkr.entityFields.map { it.simpleName.toString() }
+
+                val duplicateFieldElements = entityFieldNames.filter { it.simpleName.toString() in trkrFieldNames }
+                duplicateFieldElements.forEach { fieldEl ->
+                    messager.printMessage(Diagnostic.Kind.ERROR, "Same field names used in both entity and tracker. " +
+                            "This is not allowed as it will lead to a conflict in SQL query row names",
+                        fieldEl)
+                }
+
+            }catch(e: IllegalArgumentException){
+                messager.printMessage(Diagnostic.Kind.ERROR, "ReplicateEntity must have a tracker entity specified",
+                    entity)
+            }
+
         }
 
 
@@ -198,7 +274,7 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
                     messager.printMessage(Diagnostic.Kind.ERROR, "Trigger ${trigger.name} has no SQL statements", entity)
 
                 val repTrkr = entity.getReplicationTracker(processingEnv)
-                var dbType: Int = 0
+                var dbType = 0
                 trigger.sqlStatements.forEach { sql ->
 
                     try {

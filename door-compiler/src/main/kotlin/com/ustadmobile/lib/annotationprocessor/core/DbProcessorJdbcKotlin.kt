@@ -23,6 +23,8 @@ import com.ustadmobile.lib.annotationprocessor.core.DbProcessorSync.Companion.TR
 import com.ustadmobile.door.ext.DoorDatabaseMetadata
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
 import com.ustadmobile.door.ext.minifySql
+import com.ustadmobile.door.replication.ReplicationEntityMetaData
+import com.ustadmobile.door.replication.ReplicationFieldMetaData
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_ANDROID_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JS_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JVM_DIRS
@@ -53,6 +55,7 @@ fun resolveEntityFromResultType(type: TypeName) =
 fun pkgNameOfElement(element: Element, processingEnv: ProcessingEnvironment) =
         processingEnv.elementUtils.getPackageOf(element).qualifiedName.toString()
 
+@Suppress("UNCHECKED_CAST")
 fun entityTypesOnDb(dbType: TypeElement, processingEnv: ProcessingEnvironment): MutableList<TypeElement> {
     val entityTypeElements = mutableListOf<TypeElement>()
     for (annotationMirror in dbType.getAnnotationMirrors()) {
@@ -279,6 +282,24 @@ fun FileSpec.Builder.addDatabaseMetadataType(dbTypeElement: TypeElement, process
                 .addCode("return TABLE_ID_MAP\n", dbTypeElement.asClassNameWithSuffix(SUFFIX_REPOSITORY2))
                 .build())
             .build())
+        .addProperty(PropertySpec.builder("replicateEntities", Map::class.parameterizedBy(Int::class, ReplicationEntityMetaData::class))
+            .addModifiers(KModifier.OVERRIDE)
+            .delegate(
+                CodeBlock.builder()
+                    .beginControlFlow("lazy(%T.NONE)", LazyThreadSafetyMode::class)
+                    .add("mapOf<%T, %T>(\n", INT, ReplicationEntityMetaData::class)
+                    .apply {
+                        dbTypeElement.allDbEntities(processingEnv)
+                            .filter { it.hasAnnotation(ReplicateEntity::class.java)}.forEach { replicateEntity ->
+                                add("%L to ", replicateEntity.getAnnotation(ReplicateEntity::class.java).tableId)
+                                addReplicateEntityMetaDataCode(replicateEntity, processingEnv)
+                                add(",\n")
+                        }
+                    }
+                    .add(")\n")
+                    .endControlFlow()
+                    .build())
+            .build())
         .addType(TypeSpec.companionObjectBuilder()
             .addTableIdMapProperty(dbTypeElement, processingEnv)
             .build())
@@ -286,6 +307,41 @@ fun FileSpec.Builder.addDatabaseMetadataType(dbTypeElement: TypeElement, process
 
     return this
 }
+
+private fun CodeBlock.Builder.addReplicateEntityMetaDataCode(
+    entity: TypeElement,
+    processingEnv: ProcessingEnvironment
+): CodeBlock.Builder {
+
+    fun CodeBlock.Builder.addFieldsCodeBlock(typeEl: TypeElement) : CodeBlock.Builder{
+        add("listOf(")
+        typeEl.entityFields.forEach {
+            add("%T(%S, %L),", ReplicationFieldMetaData::class, it.simpleName,
+                it.asType().asTypeName().javaToKotlinType().toSqlTypesInt())
+        }
+        add(")")
+        return this
+    }
+
+    val repEntityAnnotation = entity.getAnnotation(ReplicateEntity::class.java)
+    val trackerTypeEl = entity.getReplicationTracker(processingEnv)
+    add("%T(", ReplicationEntityMetaData::class)
+    add("%L, ", repEntityAnnotation.tableId)
+    add("%S, ", entity.entityTableName)
+    add("%S, ", trackerTypeEl.entityTableName)
+    add("%S, ", entity.replicationEntityReceiveViewName)
+    add("%S, ", entity.entityPrimaryKey?.simpleName.toString())
+    add("%S, ", entity.firstFieldWithAnnotation(ReplicationVersionId::class.java).simpleName)
+    add("%S, ", trackerTypeEl.firstFieldWithAnnotation(ReplicationEntityForeignKey::class.java))
+    add("%S, ", trackerTypeEl.firstFieldWithAnnotation(ReplicationDestinationNodeId::class.java))
+    add("%S, ", trackerTypeEl.firstFieldWithAnnotation(ReplicationVersionId::class.java))
+    add("%S, \n", trackerTypeEl.firstFieldWithAnnotation(ReplicationTrackerProcessed::class.java))
+    addFieldsCodeBlock(entity).add(",\n")
+    addFieldsCodeBlock(trackerTypeEl).add("\n")
+    add(")")
+    return this
+}
+
 
 /**
  * This class represents a POKO object in the result. It is a tree like structure (e.g. each item
@@ -1269,6 +1325,8 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
 
         //As it should be including the underscore - the above will be deprecated
         const val SUFFIX_JDBC_KT2 = "_JdbcKt"
+
+        const val SUFFIX_METADATA = "_DoorDbMetaData"
 
     }
 }

@@ -54,16 +54,20 @@ SELECT Entity_ReplicationTracker.*, Entity.*
  *  Now use the triggers to determine how to handle incoming data from another node.
  */ 
 @Trigger(
-name = "insert from remote",
-
-"""
+name = "remove_insert_trig",
+order = Trigger.Order.INSTEAD_OF
+events = [Trigger.Event.INSERT],
+on = Trigger.On.RECEIVEVIEW
+sqlStatements = ["""
 CREATE TRIGGER EntityCheckRemoteInsert 
 INSTEAD OF INSERT ON Entity_ReceiveView
 BEGIN
 REPLACE INTO Entity(entityPrimaryKey, entityLastChangedTime, aNumberField) 
         VALUES(NEW.entityPrimaryKey, NEW.entityLastChangedTime, NEW.aNumberField);
 END
-""")
+"""]
+//Optionally: add conditionSql to control if the SQL statements execute.
+)
 class Entity {
    @PrimaryKey(autoGenerate = true)
    var entityPrimaryKey: Long = 0
@@ -118,9 +122,8 @@ type on both the entity itself and the replication tracker entity.
 @Dao
 class EntityDao { 
     /* Indicate that this function should be run when any of the given Entity tables are changed.  */
-    @ReplicationRunOnChange(Entity::class, ...)
-    /* Indicate which tables affected nodes need to check for new entries to replicate */
-    @ReplicationNotify(Entity::class - or another entity) 
+    @ReplicationRunOnChange(value = [Entity::class], 
+        notify = Entity::class /*by default, otherwise specify another entity*/)
     @Query("""
 REPLACE INTO Entity_ReplicationTracker(tkrEntityPrimaryKey, trkrEntityPrimaryKey, trkrDestinationNode,
              trkrVersionId, trkrProcessed)

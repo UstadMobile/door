@@ -7,6 +7,9 @@ import javax.lang.model.element.*
 import javax.lang.model.type.DeclaredType
 import javax.lang.model.type.ExecutableType
 import androidx.room.*
+import com.squareup.kotlinpoet.metadata.ImmutableKmProperty
+import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
+import com.squareup.kotlinpoet.metadata.toImmutableKmClass
 import com.ustadmobile.door.SyncableDoorDatabase
 import com.ustadmobile.door.annotation.*
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.SUFFIX_DEFAULT_RECEIVEVIEW
@@ -142,6 +145,7 @@ fun TypeElement.allDaoClassModifyingQueryMethods() : List<ExecutableElement> {
  * Where the TypeElement represents a database class, get a list of TypeElements representing
  * all the entities as per the @Database annotation.
  */
+@Suppress("UNCHECKED_CAST")
 fun TypeElement.allDbEntities(processingEnv: ProcessingEnvironment): List<TypeElement> {
     val entityTypeElements = mutableListOf<TypeElement>()
     for (annotationMirror in getAnnotationMirrors()) {
@@ -335,3 +339,12 @@ val TypeElement.replicationTrackerForeignKey: Element
     get() = enclosedElementsWithAnnotation(ReplicationEntityForeignKey::class.java, ElementKind.FIELD).firstOrNull()
         ?: throw IllegalArgumentException("${this.qualifiedName} has no replicationentityforeignkey")
 
+fun <A: Annotation> TypeElement.firstFieldWithAnnotation(annotationClass: Class<A>): Element {
+    return enclosedElementsWithAnnotation(annotationClass).first()
+}
+
+fun  <A: Annotation> TypeElement.kmPropertiesWithAnnotation(annotationClass: Class<A>): List<ImmutableKmProperty> {
+    val kmClass = getAnnotation(Metadata::class.java).toImmutableKmClass()
+    val elementsWithAnnotationNames = enclosedElementsWithAnnotation(annotationClass).map { it.simpleName.toString() }
+    return kmClass.properties.filter { it.name in elementsWithAnnotationNames }
+}

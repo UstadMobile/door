@@ -3,56 +3,56 @@ package com.ustadmobile.door.replication
 class ReplicationEntityMetaData(
     val tableId: Int,
     val entityTableName: String,
-    val rtTableName: String,
+    val trackerTableName: String,
     val receiveViewName: String,
     val entityPrimaryKeyFieldName: String,
-    val entityIdVersionFieldName: String,
-    val rtEntityForeignKeyFieldName: String,
-    val rtDestNodeIdFieldName: String,
-    val rtVersionFieldName: String,
-    val rtProcessedFieldName: String,
+    val entityVersionIdFieldName: String,
+    val trackerForeignKeyFieldName: String,
+    val trackerDestNodeIdFieldName: String,
+    val trackerVersionFieldName: String,
+    val trackerProcessedFieldName: String,
     val entityFields: List<ReplicationFieldMetaData>,
     val trackerFields: List<ReplicationFieldMetaData>
 ) {
 
     val findPendingTrackerSql: String by lazy(LazyThreadSafetyMode.NONE) {
         """
-        SELECT $rtEntityForeignKeyFieldName AS primaryKey, 
-               $rtVersionFieldName AS versionId
-          FROM $rtTableName
+        SELECT $trackerForeignKeyFieldName AS primaryKey, 
+               $trackerVersionFieldName AS versionId
+          FROM $trackerTableName
          WHERE nodeId = ?
-           AND CAST($rtProcessedFieldName AS INTEGER) = 0      
+           AND CAST($trackerProcessedFieldName AS INTEGER) = 0      
     """
     }
 
     val findAlreadyUpToDateEntitiesSql: String by lazy(LazyThreadSafetyMode.NONE) {
         """
         SELECT $entityPrimaryKeyFieldName, AS primaryKey,
-               $entityIdVersionFieldName AS versionId
+               $entityVersionIdFieldName AS versionId
           FROM $entityTableName
          WHERE $entityPrimaryKeyFieldName = ?
-           AND $entityIdVersionFieldName = ?
+           AND $entityVersionIdFieldName = ?
         """
     }
 
     val updateSetTrackerProcessedSqlSqlite: String by lazy(LazyThreadSafetyMode.NONE) {
         """
-        UPDATE $rtTableName
-           SET $rtProcessedFieldName = 1
-         WHERE $rtEntityForeignKeyFieldName = ?
-           AND $rtVersionFieldName = ?
-           AND $rtDestNodeIdFieldName = ?     
+        UPDATE $trackerTableName
+           SET $trackerProcessedFieldName = 1
+         WHERE $trackerForeignKeyFieldName = ?
+           AND $trackerVersionFieldName = ?
+           AND $trackerDestNodeIdFieldName = ?     
         """
     }
 
     val findPendingReplicationSql: String by lazy(LazyThreadSafetyMode.NONE) {
         """
-        SELECT $entityTableName.*, $rtTableName.*
-          FROM $rtTableName
+        SELECT $entityTableName.*, $trackerTableName.*
+          FROM $trackerTableName
                LEFT JOIN $entityTableName 
-                    ON $rtTableName.$rtEntityForeignKeyFieldName = $entityTableName.$entityPrimaryKeyFieldName
-         WHERE $rtTableName.$rtDestNodeIdFieldName = ?
-           AND $rtProcessedFieldName = 0 
+                    ON $trackerTableName.$trackerForeignKeyFieldName = $entityTableName.$entityPrimaryKeyFieldName
+         WHERE $trackerTableName.$trackerDestNodeIdFieldName = ?
+           AND $trackerProcessedFieldName = 0 
         """
     }
 }

@@ -1,6 +1,7 @@
 package com.ustadmobile.door.ext
 
 import com.ustadmobile.door.DoorDatabase
+import com.ustadmobile.door.replication.ReplicationEntityMetaData
 import kotlin.reflect.KClass
 
 /**
@@ -20,6 +21,8 @@ abstract class DoorDatabaseMetadata<T: DoorDatabase> {
      * The KClass object for this database.
      */
     abstract val dbClass: KClass<T>
+
+    abstract val replicateEntities: Map<Int, ReplicationEntityMetaData>
 
     companion object {
 
