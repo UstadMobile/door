@@ -15,6 +15,7 @@ import com.ustadmobile.door.annotation.*
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.SUFFIX_DEFAULT_RECEIVEVIEW
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SUFFIX_KTOR_HELPER
 import com.ustadmobile.lib.annotationprocessor.core.ext.findByClass
+import com.ustadmobile.lib.annotationprocessor.core.ext.getClassArrayValue
 import javax.lang.model.type.TypeMirror
 
 val ALL_QUERY_ANNOTATIONS = listOf(Query::class.java, Update::class.java, Delete::class.java,
@@ -147,29 +148,9 @@ fun TypeElement.allDaoClassModifyingQueryMethods() : List<ExecutableElement> {
  */
 @Suppress("UNCHECKED_CAST")
 fun TypeElement.allDbEntities(processingEnv: ProcessingEnvironment): List<TypeElement> {
-    val entityTypeElements = mutableListOf<TypeElement>()
-    for (annotationMirror in getAnnotationMirrors()) {
-        val annotationTypeEl = processingEnv.typeUtils
-                .asElement(annotationMirror.getAnnotationType()) as TypeElement
-        if (annotationTypeEl.qualifiedName.toString() != "androidx.room.Database")
-            continue
-
-        val annotationEntryMap = annotationMirror.getElementValues()
-        for (entry in annotationEntryMap.entries) {
-            val key = entry.key.getSimpleName().toString()
-            val value = entry.value.getValue()
-            if (key == "entities") {
-                val typeMirrors = value as List<AnnotationValue>
-                for (entityValue in typeMirrors) {
-                    entityTypeElements.add(processingEnv.typeUtils
-                            .asElement(entityValue.value as TypeMirror) as TypeElement)
-                }
-            }
-        }
-    }
-
-
-    return entityTypeElements.toList()
+    val dbAnnotationMirror = annotationMirrors.findByClass(processingEnv, Database::class)
+        ?: throw IllegalArgumentException("allDbEntities: ${this.qualifiedName} has no database annotation!")
+    return dbAnnotationMirror.getClassArrayValue("entities", processingEnv)
 }
 
 /**

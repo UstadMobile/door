@@ -29,6 +29,9 @@ import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.C
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JS_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JVM_DIRS
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorRepository.Companion.SUFFIX_REPOSITORY2
+import com.ustadmobile.lib.annotationprocessor.core.ext.filterByClass
+import com.ustadmobile.lib.annotationprocessor.core.ext.findByClass
+import com.ustadmobile.lib.annotationprocessor.core.ext.getClassArrayValue
 import kotlin.reflect.KClass
 
 val QUERY_SINGULAR_TYPES = listOf(INT, LONG, SHORT, BYTE, BOOLEAN, FLOAT, DOUBLE,
@@ -619,6 +622,11 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .addDatabaseMetadataType(dbTypeEl, processingEnv)
                 .build()
                 .writeToDirsFromArg(listOf(OPTION_JVM_DIRS, OPTION_ANDROID_OUTPUT))
+
+            FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_REP_ENTITY_CHANGE_LISTENER)
+                .addReplicatedEntityChangeListenerType(dbTypeEl)
+                .build()
+                .writeToDirsFromArg(listOf(OPTION_JVM_DIRS, OPTION_JS_OUTPUT))
         }
 
 
@@ -1131,6 +1139,51 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         return this
     }
 
+    fun FileSpec.Builder.addReplicatedEntityChangeListenerType(
+        dbTypeElement: TypeElement
+    ): FileSpec.Builder {
+        //find all DAOs on the database that contain a ReplicationRunOnChange annotation
+        val daosWithRunOnChange = dbTypeElement.dbEnclosedDaos(processingEnv)
+            .filter { it.enclosedElementsWithAnnotation(ReplicationRunOnChange::class.java).isNotEmpty() }
+
+        val replicatedEntitiesWithOnChangeFunctions = daosWithRunOnChange
+            .flatMap {
+                val funsWithOnChange = it.enclosedElementsWithAnnotation(ReplicationRunOnChange::class.java)
+                val repOnChangeAnnotationMirrors = funsWithOnChange.flatMap {
+                    it.annotationMirrors.filterByClass(processingEnv, ReplicationRunOnChange::class)
+                }
+                repOnChangeAnnotationMirrors.flatMap { it.getClassArrayValue("value", processingEnv) }
+            }
+
+
+        addType(TypeSpec.classBuilder(dbTypeElement.asClassNameWithSuffix(SUFFIX_REP_ENTITY_CHANGE_LISTENER))
+            .addSuperinterface(TableChangeListener::class)
+            .primaryConstructor(FunSpec.constructorBuilder()
+                .addParameter("_repo", DoorDatabase::class)
+                .build())
+            .addProperty(PropertySpec.builder("_repo", DoorDatabase::class)
+                .initializer("_repo")
+                .build())
+            .apply {
+                //TODO: this should have an abstract super class to implement the MessageBus
+                replicatedEntitiesWithOnChangeFunctions.forEach { repEntity ->
+                    addFunction(FunSpec.builder("handle${repEntity.simpleName}Changed")
+                        .addModifiers(KModifier.SUSPEND)
+                        .addCode(CodeBlock.builder()
+                            .apply {
+                                daosWithRunOnChange.forEach { dao ->
+
+                                }
+                            }
+                            .build())
+                        .build())
+                }
+            }
+            .build())
+
+        return this
+    }
+
 
     fun FileSpec.Builder.addJdbcDbImplType(
         dbTypeElement: TypeElement
@@ -1326,7 +1379,8 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         //As it should be including the underscore - the above will be deprecated
         const val SUFFIX_JDBC_KT2 = "_JdbcKt"
 
-        const val SUFFIX_METADATA = "_DoorDbMetaData"
+        const val SUFFIX_REP_ENTITY_CHANGE_LISTENER = "_ReplicatedEntityChangeListener"
+
 
     }
 }
