@@ -1016,17 +1016,17 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
 
                         when {
                             pgOnConflict != null -> {
-                                insertSql += pgOnConflict.replace(" ", "·")
+                                insertSql += pgOnConflict.replace(" ", " ")
                             }
                             upsertMode -> {
                                 insertSql += " ON CONFLICT (${pkField.name}) DO UPDATE SET "
                                 insertSql += entityFields.filter { !it.annotations.any { it.typeName == PrimaryKey::class.asTypeName() } }
                                     .joinToString(separator = ",") {
-                                        "${it.name}·=·excluded.${it.name}"
+                                        "${it.name} = excluded.${it.name}"
                                     }
                             }
                         }
-                        add("%S", insertSql)
+                        add("%S·+·if(returnsId)·{·%S·}·else·\"\"·", insertSql, " RETURNING ${pkField.name}")
                     }
                     .applyIf(supportedDbTypes.size != 1 && DoorDbType.POSTGRES in supportedDbTypes) {
                         add("\n")
