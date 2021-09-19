@@ -200,6 +200,7 @@ fun FileSpec.Builder.addDbRepoType(
             }
             .applyIf(overrideOpenHelper) {
                 addRoomCreateInvalidationTrackerFunction()
+                addOverrideGetRoomInvalidationTracker("_db")
                 addRoomDatabaseCreateOpenHelperFunction()
             }
             .applyIf(addDbVersionProp) {
@@ -1043,7 +1044,7 @@ class DbProcessorRepository: AbstractDbProcessor() {
                 continue //This database has no repositories - skip it
 
             FileSpec.builder(dbTypeEl.packageName, "${dbTypeEl.simpleName}$SUFFIX_REPOSITORY2")
-                    .addDbRepoType(dbTypeEl as TypeElement, processingEnv,
+                    .addDbRepoType(dbTypeEl, processingEnv,
                         syncDaoMode = REPO_SYNCABLE_DAO_CONSTRUCT,
                         addDbVersionProp = true,
                         overrideDataSourceProp = true)

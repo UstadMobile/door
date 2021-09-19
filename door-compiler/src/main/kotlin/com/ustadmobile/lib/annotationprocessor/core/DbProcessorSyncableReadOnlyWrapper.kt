@@ -178,6 +178,7 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(dbTypeEl: TypeElement,
                     .applyIf(addRoomOverrides) {
                         addRoomDatabaseCreateOpenHelperFunction()
                         addRoomCreateInvalidationTrackerFunction()
+                        addOverrideGetRoomInvalidationTracker("_db")
                     }
                     .build())
             .build()
