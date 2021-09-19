@@ -20,7 +20,7 @@ abstract class RepDao {
                JOIN DoorNode 
                     ON DoorNode.nodeId != 0
     """)
-    @ReplicationRunOnChange(value = [RepEntity::class], notifyEntity = [RepEntity::class])
+    @ReplicationRunOnChange(value = [RepEntity::class], checkPendingReplicationsFor = [RepEntity::class])
     abstract suspend fun updateReplicationTrackers()
 
     @Insert

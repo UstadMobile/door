@@ -28,6 +28,17 @@ fun List<AnnotationMirror>.filterByClass(processingEnv: ProcessingEnvironment, k
 }
 
 /**
+ * Where an annotation class contains Class values, the AnnotationValue.value object will
+ * be a list of AnnotationValues, and their .value objects will be a TypeMirror
+ */
+@Suppress("UNCHECKED_CAST")
+private fun AnnotationValue.mapAnnotationValuesToTypeElements(
+    processingEnv: ProcessingEnvironment
+) : List<TypeElement> {
+    return (value as? List<AnnotationValue>)?.mapNotNull { processingEnv.typeUtils.asElement(it.value as TypeMirror) as? TypeElement } ?: listOf()
+}
+
+/**
  * Given an Annotation that has an array of classes e.g.
  *
  * @Annotation(valueKey = [Clazz::class ...])
@@ -36,18 +47,12 @@ fun List<AnnotationMirror>.filterByClass(processingEnv: ProcessingEnvironment, k
  */
 @Suppress("UNCHECKED_CAST")
 fun AnnotationMirror.getClassArrayValue(valueKey: String, processingEnv: ProcessingEnvironment): List<TypeElement> {
-    val typeElements = mutableListOf<TypeElement>()
-    for (entry in getElementValues().entries) {
-        val key = entry.key.getSimpleName().toString()
-        val value = entry.value.getValue()
-        if (key == valueKey) {
-            val typeMirrors = value as List<AnnotationValue>
-            for (entityValue in typeMirrors) {
-                typeElements.add(processingEnv.typeUtils
-                    .asElement(entityValue.value as TypeMirror) as TypeElement)
-            }
-        }
-    }
-
-    return typeElements
+    val annotationValueEntry = elementValues.entries.firstOrNull { it.key.simpleName.toString() == valueKey }?.value
+    return annotationValueEntry?.mapAnnotationValuesToTypeElements(processingEnv) ?: listOf()
 }
+
+fun AnnotationMirror.getClassValue(valueKey: String, processingEnv: ProcessingEnvironment): TypeElement? {
+    val annotationValueEntry = elementValues.entries.firstOrNull { it.key.simpleName.toString() == valueKey }?.value
+     return annotationValueEntry?.mapAnnotationValuesToTypeElements(processingEnv)?.firstOrNull()
+}
+

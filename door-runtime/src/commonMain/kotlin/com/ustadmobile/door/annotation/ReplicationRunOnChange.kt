@@ -5,5 +5,7 @@ import kotlin.reflect.KClass
 annotation class ReplicationRunOnChange(
     val value: Array<KClass<*>>,
 
-    val notifyEntity: Array<KClass<*>> = []
+
+    @Suppress("ReplaceArrayOfWithLiteral") //Using literal [] does not compile on Javascript
+    val checkPendingReplicationsFor: Array<KClass<*>> = arrayOf()
 )

@@ -22,7 +22,7 @@ import javax.lang.model.element.VariableElement
 internal fun ExecutableElement.makeAccessorCodeBlock(): CodeBlock {
     val codeBlock = CodeBlock.builder()
     if(this.simpleName.toString().startsWith("get")) {
-        codeBlock.add(simpleName.substring(3, 4).toLowerCase(Locale.ROOT) + simpleName.substring(4))
+        codeBlock.add(simpleName.substring(3, 4).lowercase() + simpleName.substring(4))
     }else {
         codeBlock.add("$simpleName()")
     }

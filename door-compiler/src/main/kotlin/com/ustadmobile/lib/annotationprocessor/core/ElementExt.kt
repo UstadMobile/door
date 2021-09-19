@@ -2,10 +2,7 @@ package com.ustadmobile.lib.annotationprocessor.core
 
 import java.lang.annotation.ElementType
 import javax.annotation.processing.ProcessingEnvironment
-import javax.lang.model.element.Element
-import javax.lang.model.element.ElementKind
-import javax.lang.model.element.PackageElement
-import javax.lang.model.element.TypeElement
+import javax.lang.model.element.*
 
 /**
  * Get the qualified package name of the given element as a string
@@ -17,6 +14,10 @@ fun Element.qualifiedPackageName(processingEnv: ProcessingEnvironment): String =
  * Shorthand to check if the given element has an annotation or not
  */
 fun <A: Annotation> Element.hasAnnotation(annotation: Class<A>): Boolean = this.getAnnotation(annotation) != null
+
+fun Element.hasAnyAnnotation(annotationChecker: (AnnotationMirror) -> Boolean) : Boolean {
+    return annotationMirrors.any(annotationChecker)
+}
 
 /**
  * Shorthand to get the package name of a given element

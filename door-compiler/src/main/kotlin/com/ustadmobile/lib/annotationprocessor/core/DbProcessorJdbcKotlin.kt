@@ -23,6 +23,7 @@ import com.ustadmobile.lib.annotationprocessor.core.DbProcessorSync.Companion.TR
 import com.ustadmobile.door.ext.DoorDatabaseMetadata
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
 import com.ustadmobile.door.ext.minifySql
+import com.ustadmobile.door.replication.ReplicationRunOnChangeRunner
 import com.ustadmobile.door.replication.ReplicationEntityMetaData
 import com.ustadmobile.door.replication.ReplicationFieldMetaData
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_ANDROID_OUTPUT
@@ -30,8 +31,8 @@ import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.C
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JVM_DIRS
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorRepository.Companion.SUFFIX_REPOSITORY2
 import com.ustadmobile.lib.annotationprocessor.core.ext.filterByClass
-import com.ustadmobile.lib.annotationprocessor.core.ext.findByClass
 import com.ustadmobile.lib.annotationprocessor.core.ext.getClassArrayValue
+import com.ustadmobile.lib.annotationprocessor.core.ext.getClassValue
 import kotlin.reflect.KClass
 
 val QUERY_SINGULAR_TYPES = listOf(INT, LONG, SHORT, BYTE, BOOLEAN, FLOAT, DOUBLE,
@@ -623,8 +624,8 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .build()
                 .writeToDirsFromArg(listOf(OPTION_JVM_DIRS, OPTION_ANDROID_OUTPUT))
 
-            FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_REP_ENTITY_CHANGE_LISTENER)
-                .addReplicatedEntityChangeListenerType(dbTypeEl)
+            FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_REP_RUN_ON_CHANGE_RUNNER)
+                .addReplicationRunOnChangeRunnerType(dbTypeEl)
                 .build()
                 .writeToDirsFromArg(listOf(OPTION_JVM_DIRS, OPTION_JS_OUTPUT))
         }
@@ -1139,7 +1140,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         return this
     }
 
-    fun FileSpec.Builder.addReplicatedEntityChangeListenerType(
+    fun FileSpec.Builder.addReplicationRunOnChangeRunnerType(
         dbTypeElement: TypeElement
     ): FileSpec.Builder {
         //find all DAOs on the database that contain a ReplicationRunOnChange annotation
@@ -1156,13 +1157,17 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             }
 
 
-        addType(TypeSpec.classBuilder(dbTypeElement.asClassNameWithSuffix(SUFFIX_REP_ENTITY_CHANGE_LISTENER))
-            .addSuperinterface(TableChangeListener::class)
+        addType(TypeSpec.classBuilder(dbTypeElement.asClassNameWithSuffix(SUFFIX_REP_RUN_ON_CHANGE_RUNNER))
+            .addSuperinterface(ReplicationRunOnChangeRunner::class)
             .primaryConstructor(FunSpec.constructorBuilder()
-                .addParameter("_repo", DoorDatabase::class)
+                .addParameter("_repo", dbTypeElement.asClassName(), KModifier.PRIVATE)
+                .addParameter("_db", dbTypeElement.asClassName(), KModifier.PRIVATE)
                 .build())
-            .addProperty(PropertySpec.builder("_repo", DoorDatabase::class)
+            .addProperty(PropertySpec.builder("_repo", dbTypeElement.asClassName())
                 .initializer("_repo")
+                .build())
+            .addProperty(PropertySpec.builder("_db", dbTypeElement.asClassName())
+                .initializer("_db")
                 .build())
             .apply {
                 //TODO: this should have an abstract super class to implement the MessageBus
@@ -1172,13 +1177,23 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                         .addCode(CodeBlock.builder()
                             .apply {
                                 daosWithRunOnChange.forEach { dao ->
-
+                                    val daoFunsToRun = dao.enclosedElements
+                                        .filter { it.hasAnyAnnotation { it.getClassValue("value", processingEnv) == repEntity} }
+                                    val daoAccessorCodeBlock = dbTypeElement.findDaoGetter(dao, processingEnv)
+                                    daoFunsToRun.mapNotNull { it as? ExecutableElement}.forEach { funToRun ->
+                                        add("_db.%L.${funToRun.simpleName}()\n", daoAccessorCodeBlock)
+                                    }
                                 }
                             }
                             .build())
                         .build())
                 }
             }
+            .addFunction(FunSpec.builder("runReplicationRunOnChange")
+                .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
+                .addParameter("tableNames", Set::class.parameterizedBy(String::class))
+                .addCode("return setOf<String>()\n")
+                .build())
             .build())
 
         return this
@@ -1379,7 +1394,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         //As it should be including the underscore - the above will be deprecated
         const val SUFFIX_JDBC_KT2 = "_JdbcKt"
 
-        const val SUFFIX_REP_ENTITY_CHANGE_LISTENER = "_ReplicatedEntityChangeListener"
+        const val SUFFIX_REP_RUN_ON_CHANGE_RUNNER = "_ReplicationRunOnChangeRunner"
 
 
     }

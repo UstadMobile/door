@@ -8,7 +8,6 @@ import javax.lang.model.type.DeclaredType
 import javax.lang.model.type.ExecutableType
 import androidx.room.*
 import com.squareup.kotlinpoet.metadata.ImmutableKmProperty
-import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import com.squareup.kotlinpoet.metadata.toImmutableKmClass
 import com.ustadmobile.door.SyncableDoorDatabase
 import com.ustadmobile.door.annotation.*
@@ -328,4 +327,10 @@ fun  <A: Annotation> TypeElement.kmPropertiesWithAnnotation(annotationClass: Cla
     val kmClass = getAnnotation(Metadata::class.java).toImmutableKmClass()
     val elementsWithAnnotationNames = enclosedElementsWithAnnotation(annotationClass).map { it.simpleName.toString() }
     return kmClass.properties.filter { it.name in elementsWithAnnotationNames }
+}
+
+fun TypeElement.findDaoGetter(daoTypeElement: TypeElement, processingEnv: ProcessingEnvironment): CodeBlock {
+    val executableFunEl = enclosedElements
+        .first { it.kind == ElementKind.METHOD && (it as ExecutableElement).returnType.asTypeElement(processingEnv) == daoTypeElement }
+    return (executableFunEl as ExecutableElement).makeAccessorCodeBlock()
 }
