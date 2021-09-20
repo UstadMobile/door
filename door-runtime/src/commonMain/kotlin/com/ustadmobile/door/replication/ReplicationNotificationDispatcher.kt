@@ -16,8 +16,11 @@ class ReplicationNotificationDispatcher(
 
 ) : TableChangeListener{
 
+    //Init should run a query to find anything pending in ChangeLog and call onTableChanged to handle them
+
     override fun onTableChanged(tableName: String) {
         //TODO: collate events and then fire replicationRunOnChangeListener.runReplicationRunOnChange
+
     }
 
     /**

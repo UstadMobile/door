@@ -1,27 +1,25 @@
 package com.ustadmobile.door.replication
 
 import com.ustadmobile.door.DoorDatabase
-import kotlinx.serialization.json.JsonArray
+import com.ustadmobile.door.DoorDatabaseRepository
 
 //expect suspend fun DoorDatabase.findPendingTrackers(
 //    replicationEntityMetaData: ReplicationEntityMetaData,
 //    nodeId: Long
 //): JsonArray
 
-suspend fun DoorDatabase.sendPendingReplications(
-    remoteNodeId: Long,
-    remoteEndpoint: String,
+//
+
+suspend fun DoorDatabaseRepository.sendPendingReplications(
     tableId: Int
 ) {
-
+    //should return a result object of some kind
 }
 
 suspend fun DoorDatabase.fetchPendingReplications(
-    remoteNodeId: Long,
-    remoteEndpoint: String,
     tableId: Int
 ) {
-
+    //should return a result object of some kind
 }
 
 
