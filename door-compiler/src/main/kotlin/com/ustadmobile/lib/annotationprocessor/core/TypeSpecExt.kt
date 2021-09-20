@@ -212,7 +212,7 @@ fun TypeSpec.entityFields(getAutoIncLast: Boolean = true): List<PropertySpec> {
 fun TypeSpec.Builder.addOverrideGetRoomInvalidationTracker(realDbVarName: String) : TypeSpec.Builder {
     addFunction(FunSpec.builder("getInvalidationTracker")
         .returns(ClassName("androidx.room", "InvalidationTracker"))
-        .addModifiers(KModifier.OVERRIDE, KModifier.PROTECTED)
+        .addModifiers(KModifier.OVERRIDE)
         .addCode("return $realDbVarName.getInvalidationTracker()\n")
         .build())
     return this
