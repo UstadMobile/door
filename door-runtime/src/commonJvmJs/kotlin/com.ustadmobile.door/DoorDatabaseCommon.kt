@@ -188,22 +188,7 @@ abstract class DoorDatabaseCommon {
         block: suspend (PreparedStatement) -> R
     ) = prepareAndUseStatementAsync(PreparedStatementConfig(sql), block)
 
-    /**
-     * Suspended wrapper that will prepare a Statement, execute a code block, and return the code block result
-     */
-    suspend fun <R> prepareAndUseStatementAsync(stmtConfig: PreparedStatementConfig, block: suspend (PreparedStatement) -> R) : R {
-        var connection: Connection? = null
-        var stmt: PreparedStatement? = null
-        try {
-            connection = openConnection()
-            stmt = connection.prepareStatement(stmtConfig)
 
-            return block(stmt)
-        }finally {
-            stmt?.close()
-            connection?.close()
-        }
-    }
 
     /**
      * Wrapper for Connection.createArrayOf. If the underlying database supports jdbc arrays, that support will be

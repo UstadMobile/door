@@ -27,3 +27,6 @@ expect suspend inline fun <T: DoorDatabase, R> T.doorWithTransaction(crossinline
 expect fun DoorDatabase.execSqlBatch(vararg sqlStatements: String)
 
 expect fun <T: DoorDatabase> KClass<T>.doorDatabaseMetadata(): DoorDatabaseMetadata<T>
+
+expect fun
+
