@@ -1,7 +1,10 @@
 package com.ustadmobile.door.ext
 
 import com.ustadmobile.door.DoorDatabase
+import com.ustadmobile.door.PreparedStatementConfig
 import kotlin.reflect.KClass
+import com.ustadmobile.door.jdbc.*
+
 
 /**
  * Get the database type that is running on the given database (DoorDbType.SQLITE Or DoorDbType.POSTGRES)
@@ -28,5 +31,19 @@ expect fun DoorDatabase.execSqlBatch(vararg sqlStatements: String)
 
 expect fun <T: DoorDatabase> KClass<T>.doorDatabaseMetadata(): DoorDatabaseMetadata<T>
 
-expect fun
+/**
+ * Suspended wrapper that will prepare a Statement, execute a code block, and return the code block result
+ */
+expect suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
+    stmtConfig: PreparedStatementConfig,
+    block: suspend (PreparedStatement) -> R
+) : R
+
+/**
+ * Wrapper that will prepare a Statement, execute a code block, and return the code block result
+ */
+expect fun <R> DoorDatabase.prepareAndUseStatement(
+    stmtConfig: PreparedStatementConfig,
+    block: (PreparedStatement) -> R
+) : R
 

@@ -92,6 +92,7 @@ kotlin {
         androidMain {
             dependsOn commonJvmMain
             dependencies {
+                implementation project(":door-room-jdbc")
                 implementation "androidx.room:room-runtime:$version_android_room"
                 implementation "androidx.room:room-ktx:$version_android_room"
                 implementation "androidx.lifecycle:lifecycle-livedata-ktx:$version_androidx_lifecycle"

@@ -6,6 +6,9 @@ import java.lang.RuntimeException
 import androidx.room.*
 import com.ustadmobile.door.*
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.DOOR_ATTACHMENT_URI_PREFIX
+import com.ustadmobile.door.jdbc.PreparedStatement
+import com.ustadmobile.door.PreparedStatementConfig
+import com.ustadmobile.door.roomjdbc.ConnectionRoomJdbc
 import java.io.File
 import kotlin.reflect.KClass
 
@@ -71,5 +74,34 @@ actual fun DoorDatabase.execSqlBatch(vararg sqlStatements: String) {
         sqlStatements.forEach {
             this.query(it, arrayOf())
         }
+    }
+}
+actual suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
+    stmtConfig: PreparedStatementConfig,
+    block: suspend (PreparedStatement) -> R
+) : R {
+    var stmt: PreparedStatement? = null
+
+    try {
+        stmt = ConnectionRoomJdbc(this).prepareStatement(
+            stmtConfig.sql, stmtConfig.generatedKeys)
+        return block(stmt)
+    }finally {
+        stmt?.close()
+    }
+}
+
+actual fun <R> DoorDatabase.prepareAndUseStatement(
+    stmtConfig: PreparedStatementConfig,
+    block: (PreparedStatement) -> R
+) : R {
+    var stmt: PreparedStatement? = null
+
+    try {
+        stmt = ConnectionRoomJdbc(this).prepareStatement(
+            stmtConfig.sql, stmtConfig.generatedKeys)
+        return block(stmt)
+    }finally {
+        stmt?.close()
     }
 }

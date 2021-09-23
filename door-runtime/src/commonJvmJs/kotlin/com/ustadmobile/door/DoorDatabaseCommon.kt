@@ -124,46 +124,13 @@ abstract class DoorDatabaseCommon {
      * use builtin support for arrays if required and available, or fallback to using
      * PreparedStatementArrayProxy otherwise.
      */
-    protected fun Connection.prepareStatement(stmtConfig: PreparedStatementConfig) : PreparedStatement {
+    internal fun Connection.prepareStatement(stmtConfig: PreparedStatementConfig) : PreparedStatement {
         return when {
             !stmtConfig.hasListParams -> prepareStatement(stmtConfig.sql, stmtConfig.generatedKeys)
             jdbcArraySupported -> prepareStatement(adjustQueryWithSelectInParam(stmtConfig.sql))
             else -> PreparedStatementArrayProxy(stmtConfig.sql, this)
         } ?: throw IllegalStateException("Null statement")
     }
-
-    /**
-     * Suspended wrapper that will prepare a Statement, execute a code block, and return the code block result
-     */
-    fun <R> prepareAndUseStatement(
-        sql: String,
-        block: (PreparedStatement) -> R
-    ) = prepareAndUseStatement(PreparedStatementConfig(sql), block)
-
-    /**
-     * Wrapper that will prepare a Statement, execute a code block, and return the code block result
-     */
-    fun <R> prepareAndUseStatement(stmtConfig: PreparedStatementConfig, block: (PreparedStatement) -> R) : R {
-        var connection: Connection? = null
-        var stmt: PreparedStatement? = null
-        try {
-            connection = openConnection()
-            stmt = connection.prepareStatement(stmtConfig)
-            return block(stmt)
-        }finally {
-            stmt?.close()
-            connection?.close()
-        }
-    }
-
-    /**
-     * Suspended wrapper that will prepare a Statement, execute a code block, and return the code block result
-     */
-    suspend fun <R> prepareAndUseStatementAsync(
-        sql: String,
-        block: suspend (PreparedStatement) -> R
-    ) = prepareAndUseStatementAsync(PreparedStatementConfig(sql), block)
-
 
 
     /**

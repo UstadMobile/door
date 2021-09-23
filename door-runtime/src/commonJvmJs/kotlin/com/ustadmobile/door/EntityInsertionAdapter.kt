@@ -2,6 +2,8 @@ package com.ustadmobile.door
 
 import com.ustadmobile.door.jdbc.*
 import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
+import com.ustadmobile.door.ext.prepareAndUseStatement
+import com.ustadmobile.door.ext.prepareAndUseStatementAsync
 
 /**
  * This is similar to the EntityInsertionAdapter on Room. It is used by generated code.

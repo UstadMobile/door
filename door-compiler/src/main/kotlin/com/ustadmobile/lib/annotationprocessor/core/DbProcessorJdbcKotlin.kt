@@ -886,7 +886,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     add("var _result = %L\n", funSpec.returnType?.defaultTypeValueCode())
                 }
                 .add("val _sql = %S\n", sqlStmt)
-                .beginControlFlow("_db.prepareAndUseStatement".withSuffixIf("Async")  { funSpec.isSuspended } +"(_sql)")
+                .beginControlFlow("_db.%M(_sql)", prepareAndUseStatmentMemberName(funSpec.isSuspended))
                 .add(" _stmt ->\n")
                 .applyIf(firstParam.type.isListOrArray()) {
                     add("_stmt.getConnection().setAutoCommit(false)\n")

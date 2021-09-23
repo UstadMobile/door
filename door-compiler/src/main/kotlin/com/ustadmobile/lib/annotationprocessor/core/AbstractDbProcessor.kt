@@ -841,7 +841,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         }
 
 
-        beginControlFlow("_db.prepareAndUseStatement".withSuffixIf("Async") { suspended } + "(_stmtConfig)")
+        beginControlFlow("_db.%M(_stmtConfig)", prepareAndUseStatmentMemberName(suspended))
         add("_stmt ->\n")
 
         if(querySql != null) {
@@ -1262,11 +1262,11 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                    element: Element? = null, annotation: AnnotationMirror? = null) {
         val messageStr = "DoorDb: ${enclosing?.qualifiedName}#${element?.simpleName} $message "
         if(annotation != null && element != null) {
-            messager?.printMessage(kind, messageStr, element, annotation)
+            messager.printMessage(kind, messageStr, element, annotation)
         }else if(element != null) {
-            messager?.printMessage(kind, messageStr, element)
+            messager.printMessage(kind, messageStr, element)
         }else {
-            messager?.printMessage(kind, messageStr)
+            messager.printMessage(kind, messageStr)
         }
     }
 
@@ -1328,6 +1328,16 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         val MEMBERNAME_RESULTSET_USERESULTS = MemberName("com.ustadmobile.door.ext", "useResults")
 
         val MEMBERNAME_MUTABLE_LINKEDLISTOF = MemberName("com.ustadmobile.door.ext", "mutableLinkedListOf")
+
+        val MEMBERNAME_PREPARE_AND_USE_STMT_ASYNC = MemberName("com.ustadmobile.door.ext",
+            "prepareAndUseStatementAsync")
+
+        val MEMBERNAME_PREPARE_AND_USE_STMT = MemberName("com.ustadmobile.door.ext", "prepareAndUseStatement")
+
+        internal fun prepareAndUseStatmentMemberName(suspended: Boolean) = if(suspended)
+            MEMBERNAME_PREPARE_AND_USE_STMT_ASYNC
+        else
+            MEMBERNAME_PREPARE_AND_USE_STMT
 
         const val SUFFIX_DEFAULT_RECEIVEVIEW = "_ReceiveView"
     }

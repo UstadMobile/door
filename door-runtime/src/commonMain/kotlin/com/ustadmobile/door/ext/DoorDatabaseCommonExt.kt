@@ -1,6 +1,7 @@
 package com.ustadmobile.door.ext
 
 import com.ustadmobile.door.*
+import com.ustadmobile.door.jdbc.PreparedStatement
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 import kotlin.reflect.KClass
@@ -116,3 +117,19 @@ val DoorDatabase.syncableTableIdMap: Map<String, Int>
  */
 val <T: DoorDatabase> KClass<T>.syncableTableIdMap: Map<String, Int>
     get() = doorDatabaseMetadata().syncableTableIdMap
+
+/**
+ * Suspended wrapper that will prepare a Statement, execute a code block, and return the code block result
+ */
+suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
+    sql: String,
+    block: suspend (PreparedStatement) -> R
+) = prepareAndUseStatementAsync(PreparedStatementConfig(sql), block)
+
+/**
+ * Suspended wrapper that will prepare a Statement, execute a code block, and return the code block result
+ */
+fun <R> DoorDatabase.prepareAndUseStatement(
+    sql: String,
+    block: (PreparedStatement) -> R
+) = prepareAndUseStatement(PreparedStatementConfig(sql), block)
