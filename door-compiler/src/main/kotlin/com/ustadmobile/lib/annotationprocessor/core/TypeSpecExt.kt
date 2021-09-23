@@ -206,6 +206,19 @@ fun TypeSpec.entityFields(getAutoIncLast: Boolean = true): List<PropertySpec> {
 }
 
 /**
+ * If code actually wants to use the invalidation tracker, it should use the real database invalidation tracker, not
+ * a dummy.
+ */
+fun TypeSpec.Builder.addOverrideGetRoomInvalidationTracker(realDbVarName: String) : TypeSpec.Builder {
+    addFunction(FunSpec.builder("getInvalidationTracker")
+        .returns(ClassName("androidx.room", "InvalidationTracker"))
+        .addModifiers(KModifier.OVERRIDE)
+        .addCode("return $realDbVarName.getInvalidationTracker()\n")
+        .build())
+    return this
+}
+
+/**
  * Where the given TypeSpec represents an entity, generate a string for the CREATE TABLE SQL
  *
  * @param dbType Integer constant as per DoorDbType
