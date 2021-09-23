@@ -4,9 +4,13 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import com.ustadmobile.door.annotation.ReplicationRunOnChange
+import com.ustadmobile.door.entities.DoorNode
 
 @Dao
 abstract class RepDao {
+
+    @Insert
+    abstract suspend fun insertDoorNode(node: DoorNode)
 
     @Query("""
         INSERT INTO RepEntityTracker(trkrForeignKey, trkrVersionId, trkrDestination, trkrProcessed)

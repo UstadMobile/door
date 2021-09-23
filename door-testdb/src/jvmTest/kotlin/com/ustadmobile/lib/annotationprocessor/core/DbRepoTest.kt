@@ -50,6 +50,7 @@ import java.util.*
 import kotlin.random.Random
 
 
+/*
 class DbRepoTest {
 
     private var serverDb : ExampleDatabase2? = null
@@ -1074,3 +1075,4 @@ class DbRepoTest {
     }
 
 }
+ */

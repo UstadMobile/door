@@ -23,6 +23,7 @@ import com.ustadmobile.lib.annotationprocessor.core.DbProcessorSync.Companion.TR
 import com.ustadmobile.door.ext.DoorDatabaseMetadata
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
 import com.ustadmobile.door.ext.minifySql
+import com.ustadmobile.door.ext.mutableLinkedListOf
 import com.ustadmobile.door.replication.ReplicationRunOnChangeRunner
 import com.ustadmobile.door.replication.ReplicationEntityMetaData
 import com.ustadmobile.door.replication.ReplicationFieldMetaData
@@ -1159,6 +1160,9 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
 
         addType(TypeSpec.classBuilder(dbTypeElement.asClassNameWithSuffix(SUFFIX_REP_RUN_ON_CHANGE_RUNNER))
             .addSuperinterface(ReplicationRunOnChangeRunner::class)
+            .addAnnotation(AnnotationSpec.builder(Suppress::class)
+                .addMember("%S, %S, %S, %S", "LocalVariableName", "RedundantVisibilityModifier", "unused", "ClassName")
+                .build())
             .primaryConstructor(FunSpec.constructorBuilder()
                 .addParameter("_repo", dbTypeElement.asClassName(), KModifier.PRIVATE)
                 .addParameter("_db", dbTypeElement.asClassName(), KModifier.PRIVATE)
@@ -1174,16 +1178,26 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 replicatedEntitiesWithOnChangeFunctions.forEach { repEntity ->
                     addFunction(FunSpec.builder("handle${repEntity.simpleName}Changed")
                         .addModifiers(KModifier.SUSPEND)
+                        .addModifiers(KModifier.PRIVATE)
+                        .returns(Set::class.parameterizedBy(String::class))
                         .addCode(CodeBlock.builder()
                             .apply {
+                                val repTablesToCheck = mutableSetOf<String>()
                                 daosWithRunOnChange.forEach { dao ->
                                     val daoFunsToRun = dao.enclosedElements
                                         .filter { it.hasAnyAnnotation { it.getClassValue("value", processingEnv) == repEntity} }
                                     val daoAccessorCodeBlock = dbTypeElement.findDaoGetter(dao, processingEnv)
                                     daoFunsToRun.mapNotNull { it as? ExecutableElement}.forEach { funToRun ->
                                         add("_db.%L.${funToRun.simpleName}()\n", daoAccessorCodeBlock)
+                                        val checkingPendingRepTableNames = funToRun.annotationMirrors
+                                            .filter { it.annotationType.asElement() == ReplicationRunOnChange::class.asTypeElement(processingEnv) }
+                                            .map { it.getClassArrayValue("checkPendingReplicationsFor", processingEnv) }
+                                            .flatten().map { it.simpleName.toString() }
+                                        repTablesToCheck.addAll(checkingPendingRepTableNames)
                                     }
                                 }
+
+                                add("return setOf(${repTablesToCheck.joinToString { "\"$it\"" }})\n")
                             }
                             .build())
                         .build())
@@ -1192,7 +1206,20 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             .addFunction(FunSpec.builder("runReplicationRunOnChange")
                 .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
                 .addParameter("tableNames", Set::class.parameterizedBy(String::class))
-                .addCode("return setOf<String>()\n")
+                .returns(Set::class.parameterizedBy(String::class))
+                .addCode(CodeBlock.builder()
+                    .apply {
+                        add("val _checkPendingNotifications = mutableSetOf<String>()\n")
+                        beginControlFlow("when")
+                        replicatedEntitiesWithOnChangeFunctions.forEach { repEntity ->
+                            beginControlFlow("%S in tableNames -> ", repEntity.simpleName)
+                            add("_checkPendingNotifications.addAll(handle${repEntity.simpleName}Changed())\n")
+                            endControlFlow()
+                        }
+                        endControlFlow()
+                        add("return _checkPendingNotifications\n")
+                    }
+                    .build())
                 .build())
             .build())
 

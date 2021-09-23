@@ -90,7 +90,7 @@ abstract class DoorDatabaseCommon {
     open fun handleTableChanged(changeTableNames: List<String>) = effectiveDatabase.apply {
         GlobalScope.launch {
             changeListeners.filter { it.tableNames.isEmpty() || it.tableNames.any { changeTableNames.contains(it) } }.forEach {
-                it.onChange.invoke(changeTableNames)
+                it.onInvalidated.onTablesInvalidated(changeTableNames)
             }
         }
     }

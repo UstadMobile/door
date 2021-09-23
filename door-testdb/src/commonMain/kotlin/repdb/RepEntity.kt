@@ -3,9 +3,10 @@ package repdb
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.ustadmobile.door.annotation.*
+import repdb.RepEntity.Companion.TABLE_ID
 
 @Entity
-@ReplicateEntity(tableId = 42, tracker = RepEntityTracker::class)
+@ReplicateEntity(tableId = TABLE_ID, tracker = RepEntityTracker::class)
 @Trigger(name = "repent_remote_insert",
     order = Trigger.Order.INSTEAD_OF,
     on = Trigger.On.RECEIVEVIEW,
@@ -30,5 +31,9 @@ class RepEntity {
     var reNumField: Int = 0
 
     var reString: String? = null
+
+    companion object {
+        const val TABLE_ID = 500
+    }
 
 }
