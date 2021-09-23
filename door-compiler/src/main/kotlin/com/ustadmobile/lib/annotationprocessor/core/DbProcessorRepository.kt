@@ -4,15 +4,10 @@ import androidx.room.*
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.ustadmobile.door.*
-import com.ustadmobile.door.daos.*
-import io.ktor.client.HttpClient
-import javax.annotation.processing.RoundEnvironment
-import javax.lang.model.element.ExecutableElement
-import javax.lang.model.element.TypeElement
 import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.annotation.SyncableEntity
 import com.ustadmobile.door.attachments.EntityWithAttachment
-import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_DATASOURCE
+import com.ustadmobile.door.daos.*
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_ANDROID_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JVM_DIRS
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorJdbcKotlin.Companion.SUFFIX_JDBC_KT2
@@ -23,9 +18,13 @@ import com.ustadmobile.lib.annotationprocessor.core.DbProcessorRepository.Compan
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorSync.Companion.CLASSNAME_SYNC_HELPERENTITIES_DAO
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorSync.Companion.SUFFIX_SYNCDAO_ABSTRACT
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorSync.Companion.SUFFIX_SYNCDAO_IMPL
+import io.ktor.client.*
 import kotlinx.coroutines.GlobalScope
 import java.util.*
 import javax.annotation.processing.ProcessingEnvironment
+import javax.annotation.processing.RoundEnvironment
+import javax.lang.model.element.ExecutableElement
+import javax.lang.model.element.TypeElement
 
 /**
  * Where this TypeElement represents a Database class, this is the property name which should be

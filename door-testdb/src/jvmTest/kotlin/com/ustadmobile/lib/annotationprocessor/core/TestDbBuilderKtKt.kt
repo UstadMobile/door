@@ -118,7 +118,8 @@ class TestDbBuilderKtKt {
         entity.uid = exampleDb2.examlpeDaoWithInterface().insertOne(entity)
 
         val entityFromQuery = exampleDb2.exampleDao2().rawQueryForSingleValue(
-                SimpleDoorQuery("SELECT * FROM ExampleEntity2 WHERE uid = ?", arrayOf<Any>(entity.uid)))
+                SimpleDoorQuery("SELECT * FROM ExampleEntity2 WHERE uid = ?", arrayOf<Any>(entity.uid))
+        )
         assertEquals(entity, entityFromQuery, "Entity inserted using DAO is equal to result with raw query")
     }
 
@@ -128,7 +129,8 @@ class TestDbBuilderKtKt {
         entityList.forEach { it.uid = exampleDb2.exampleDao2().insertAndReturnId(it) }
         val queryResult = exampleDb2.exampleDao2().rawQueryWithArrParam(
                 SimpleDoorQuery("SELECT * FROM ExampleEntity2 WHERE uid IN (?)",
-                        arrayOf(arrayOf(entityList[1].uid, entityList[2].uid))))
+                        arrayOf(arrayOf(entityList[1].uid, entityList[2].uid)))
+        )
         assertEquals(2, queryResult.size, "Raw query with array param returns expected number of results")
     }
 

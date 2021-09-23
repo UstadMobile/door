@@ -6,4 +6,3 @@ package com.ustadmobile.door.ext
  * https://stackoverflow.com/questions/194846/is-there-any-kind-of-hash-code-function-in-javascript
  */
 expect val Any.doorIdentityHashCode: Int
-

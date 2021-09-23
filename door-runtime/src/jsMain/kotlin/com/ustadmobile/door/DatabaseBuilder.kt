@@ -1,41 +1,75 @@
 package com.ustadmobile.door
 
 import com.ustadmobile.door.ext.createInstance
+import com.ustadmobile.door.jdbc.SQLException
 import com.ustadmobile.door.migration.DoorMigration
+import com.ustadmobile.door.migration.DoorMigrationAsync
+import com.ustadmobile.door.migration.DoorMigrationStatementList
+import com.ustadmobile.door.migration.DoorMigrationSync
+import com.ustadmobile.door.sqljsjdbc.*
 import org.w3c.dom.Worker
-import wrappers.SQLiteDatasourceJs
-import kotlin.reflect.KClass
 
-actual class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private var dbClass: KClass<T>, private var dbName: String){
+actual class DatabaseBuilder<T: DoorDatabase> private constructor(private val builderOptions: DatabaseBuilderOptions){
 
     private val callbacks = mutableListOf<DoorDatabaseCallback>()
 
     private val migrationList = mutableListOf<DoorMigration>()
 
-    @Suppress("UNCHECKED_CAST")
-    fun build(): T {
-        val path = webWorkerPath
-        if(path == null){
-            throw Exception("Set WebWorker path before building your Database")
+    suspend fun build(): T {
+        val dataSource = SQLiteDatasourceJs(builderOptions.dbName,
+            Worker(builderOptions.webWorkerPath))
+        val dbImpl = builderOptions.dbImplClass.js.createInstance(dataSource, false) as T
+        val exists = IndexedDb.checkIfExists(builderOptions.dbName)
+        SaveToIndexedDbChangeListener(dbImpl, dataSource, builderOptions.saveToIndexedDbDelayTime)
+        if(exists){
+            dataSource.loadDbFromIndexedDb()
+        }else{
+            if(!dbImpl.getTableNamesAsync().any {it.lowercase() == DoorDatabaseCommon.DBINFO_TABLENAME}) {
+                dbImpl.execSQLBatchAsync(*dbImpl.createAllTables().toTypedArray())
+                callbacks.forEach { it.onCreate(dbImpl.sqlDatabaseImpl) }
+            }else{
+                var sqlCon = null as SQLiteConnectionJs?
+                var stmt = null as SQLitePreparedStatementJs?
+                var resultSet = null as SQLiteResultSet?
+
+                var currentDbVersion = -1
+                try {
+                    sqlCon = dataSource.getConnection() as SQLiteConnectionJs
+                    stmt = SQLitePreparedStatementJs(sqlCon,"SELECT dbVersion FROM _doorwayinfo")
+                    resultSet = stmt.executeQueryAsyncInt() as SQLiteResultSet
+                    if(resultSet.next())
+                        currentDbVersion = resultSet.getInt(1)
+                }catch(exception: SQLException) {
+                    throw exception
+                }finally {
+                    resultSet?.close()
+                    stmt?.close()
+                    sqlCon?.close()
+                }
+
+                while(currentDbVersion < dbImpl.dbVersion) {
+                    val nextMigration = migrationList.filter {
+                        it.startVersion == currentDbVersion && it !is DoorMigrationSync
+                    }
+                    .maxByOrNull { it.endVersion }
+
+                    if(nextMigration != null) {
+                        when(nextMigration) {
+                            is DoorMigrationAsync -> nextMigration.migrateFn(dbImpl.sqlDatabaseImpl)
+                            is DoorMigrationStatementList -> dbImpl.execSQLBatchAsync(
+                                *nextMigration.migrateStmts(dbImpl.sqlDatabaseImpl).toTypedArray())
+                        }
+
+                        currentDbVersion = nextMigration.endVersion
+                        dbImpl.execSQLBatchAsync("UPDATE _doorwayinfo SET dbVersion = $currentDbVersion")
+                    }else {
+                        throw IllegalStateException("Need to migrate to version " +
+                                "${dbImpl.dbVersion} from $currentDbVersion - could not find next migration")
+                    }
+                }
+            }
         }
-        val implClass = implementationMap[dbClass] as KClass<T>
-        val dataSource = SQLiteDatasourceJs(dbName, Worker(path))
-        val dbImpl = implClass.js.createInstance(dataSource, false) as T
-        //TODO: this needs to be reworked where the build function itself is suspended.
-//        if(path != null){
-//            dbImpl.init(dbName, path)
-//        }
         return dbImpl
-    }
-
-    fun webWorker(path: String): DatabaseBuilder<T>{
-        webWorkerPath = path
-        return this
-    }
-
-    actual fun addCallback(callback: DoorDatabaseCallback) : DatabaseBuilder<T>{
-        callbacks.add(callback)
-        return this
     }
 
     actual fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
@@ -43,22 +77,16 @@ actual class DatabaseBuilder<T: DoorDatabase>(private var context: Any, private 
         return this
     }
 
+    actual fun addCallback(callback: DoorDatabaseCallback): DatabaseBuilder<T> {
+        callbacks.add(callback)
+        return this
+    }
 
     companion object {
 
-        private val implementationMap = mutableMapOf<KClass<*>, KClass<*>>()
-
-        internal var webWorkerPath: String? = null
-
-        fun <T> registerImplementation(dbClass: KClass<*>, implClass: KClass<*>) {
-            implementationMap[dbClass] = implClass
-        }
-
         fun <T : DoorDatabase> databaseBuilder(
-            context: Any,
-            dbClass: KClass<T>,
-            dbName: String
-        ): DatabaseBuilder<T> = DatabaseBuilder(context, dbClass, dbName)
+            builderOptions: DatabaseBuilderOptions
+        ): DatabaseBuilder<T> = DatabaseBuilder(builderOptions)
 
     }
 }

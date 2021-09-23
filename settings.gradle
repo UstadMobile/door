@@ -1,3 +1,4 @@
 rootProject.name = 'door'
 include 'door-runtime', 'door-compiler', 'room-annotations', 'door-testdb'
+include 'app-testdb'
 include ':door-room-jdbc'

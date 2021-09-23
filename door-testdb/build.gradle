@@ -103,6 +103,7 @@ kotlin {
         }
 
         jsTest {
+            kotlin.srcDir("$buildDir/generated/source/door-js")
             dependencies {
                 implementation kotlin('test-js')
             }
@@ -124,6 +125,10 @@ kapt {
         arg("doordb_postgres_password", "opensesame")
     }
 }
+
+// The Javascript can only build after the jvm build runs (as the JVM build triggers the annotation processor which
+// generates the Js implementation.
+compileKotlinJs.dependsOn(jvmMainClasses)
 
 dependencies {
     kapt project(":door-compiler")

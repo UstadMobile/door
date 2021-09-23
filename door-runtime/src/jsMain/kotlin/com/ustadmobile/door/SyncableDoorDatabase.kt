@@ -4,11 +4,11 @@ import io.ktor.client.*
 import kotlin.reflect.KClass
 
 actual fun <T : SyncableDoorDatabase> T.wrap(dbClass: KClass<T>): T {
-    TODO("Not yet implemented")
+    TODO("wrap: Not yet implemented")
 }
 
 actual fun <T : SyncableDoorDatabase> T.unwrap(dbClass: KClass<T>): T {
-    TODO("Not yet implemented")
+    TODO("unwrap: Not yet implemented")
 }
 
 /**
@@ -24,5 +24,5 @@ actual fun <T : SyncableDoorDatabase> T.unwrap(dbClass: KClass<T>): T {
  * ClientSyncManager and connect to server sent events to receive immediate updates.
  */
 actual inline fun <reified T : SyncableDoorDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T {
-    TODO("Not yet implemented")
+    TODO("asRepository: Not yet implemented")
 }
