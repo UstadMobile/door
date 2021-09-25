@@ -21,7 +21,7 @@ class ReplicationNotificationDispatcher(
      */
     private val replicationRunOnChangeRunner: ReplicationRunOnChangeRunner,
 
-    private coroutineScope: CoroutineScope,
+    coroutineScope: CoroutineScope,
 
     private val dbMetaData: DoorDatabaseMetadata<*> = db::class.doorDatabaseMetadata()
 
@@ -76,6 +76,7 @@ class ReplicationNotificationDispatcher(
      * This is used by ReplicationSubscriptionManager (to trigger sending changes). This will also trigger events if
      * there are any pending replication tracker entities for the given node.
      */
+    @Suppress("RedundantSuspendModifier")
     suspend fun addReplicationPendingEventListener(nodeId: Long, listener: ReplicationPendingListener) {
         //TODO: run a query and find pending replications for this node (if any)
 

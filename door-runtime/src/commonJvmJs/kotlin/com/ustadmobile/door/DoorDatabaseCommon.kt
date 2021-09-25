@@ -69,7 +69,7 @@ abstract class DoorDatabaseCommon {
     }
 
 
-    fun openConnection() =  effectiveDatabase.dataSource.getConnection()
+    open fun openConnection() =  effectiveDatabase.dataSource.getConnection()
 
     abstract fun createAllTables(): List<String>
 

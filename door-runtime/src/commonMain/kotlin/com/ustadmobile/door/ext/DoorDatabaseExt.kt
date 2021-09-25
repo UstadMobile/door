@@ -14,9 +14,38 @@ expect fun DoorDatabase.dbType(): Int
 expect fun DoorDatabase.dbSchemaVersion(): Int
 
 /**
- * Run a transaction within a suspend coroutine context.
+ * Execute the given block as part of a transaction. E.g.
+ *
+ * db.withDoorTransactionAsync(DbType::class) { transactionDb ->
+ *      transactionDb.insertAsync(SomeEntity())
+ *      transactionDb.updateTotalsAsync()
+ * }
+ *
+ * Nested transactions are supported. The real commit will only happen when all nested transactions are complete.
+ *
+ * On Android this will use Room's own withTransaction support (which is one at a time, first come, first served).
+ *
+ * On JDBC this will use JDBC transaction support and create a new (wrapper) instance of the database class tied to
+ * the given transaction.
+ *
  */
-expect suspend inline fun <T: DoorDatabase, R> T.doorWithTransaction(crossinline block: suspend(T) -> R): R
+expect suspend fun <T: DoorDatabase, R> T.withDoorTransactionAsync(dbKClass: KClass<T>, block: suspend (T) -> R) : R
+
+/**
+ * Execute the given block as part of a transaction. E.g.
+ *
+ * db.withDoorTransaction(DbType::class) { transactionDb ->
+ *      transactionDb.insert(SomeEntity())
+ *      transactionDb.updateTotals()
+ * }
+ *
+ * On Android this will use Room's own withTransaction support (which is one at a time, first come, first served).
+ *
+ * On JDBC this will use JDBC transaction support and create a new (wrapper) instance of the database class tied to
+ * the given transaction.
+ *
+ */
+expect fun <T: DoorDatabase, R> T.withDoorTransaction(dbKClass: KClass<T>, block: (T) -> R) : R
 
 /**
  * Multiplatform wrapper function that will execute raw SQL statements in a

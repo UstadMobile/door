@@ -17,11 +17,16 @@ actual fun DoorDatabase.dbType(): Int {
 actual fun DoorDatabase.dbSchemaVersion(): Int = this.dbVersion
 
 /**
- * Run a transaction within a suspend coroutine context.
+ * Run a transaction within a suspend coroutine context. Not really implemented at the moment.
  */
-actual suspend inline fun <T : DoorDatabase, R> T.doorWithTransaction(crossinline block: suspend (T) -> R): R {
+actual suspend fun <T: DoorDatabase, R> T.withDoorTransactionAsync(dbKClass: KClass<T>, block: suspend (T) -> R) : R {
     return block(this)
 }
+
+actual fun <T: DoorDatabase, R> T.withDoorTransaction(dbKClass: KClass<T>, block: (T) -> R) : R {
+    return block(this)
+}
+
 
 actual fun DoorSqlDatabase.dbType(): Int {
     return DoorDbType.SQLITE

@@ -12,10 +12,15 @@ actual fun DoorDatabase.dbType(): Int = this.jdbcDbType
 
 actual fun DoorDatabase.dbSchemaVersion(): Int = this.dbVersion
 
-actual suspend inline fun <T: DoorDatabase, R> T.doorWithTransaction(crossinline block: suspend(T) -> R): R {
-    //TODO: In next version, actually start a transaction here
-    return block(this)
+actual suspend fun <T: DoorDatabase, R> T.withDoorTransactionAsync(dbKClass: KClass<T>, block: suspend (T) -> R): R {
+    return withDoorTransactionInternalAsync(dbKClass, block)
 }
+
+actual fun <T: DoorDatabase, R> T.withDoorTransaction(dbKClass: KClass<T>, block: (T) -> R): R {
+    return withDoorTransactionInternal(dbKClass, block)
+}
+
+
 
 actual fun DoorDatabase.execSqlBatch(vararg sqlStatements: String) {
     execSQLBatch(*sqlStatements)

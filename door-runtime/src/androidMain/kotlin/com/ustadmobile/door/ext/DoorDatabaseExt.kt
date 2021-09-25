@@ -10,6 +10,7 @@ import com.ustadmobile.door.jdbc.PreparedStatement
 import com.ustadmobile.door.PreparedStatementConfig
 import com.ustadmobile.door.roomjdbc.ConnectionRoomJdbc
 import java.io.File
+import java.util.concurrent.Callable
 import kotlin.reflect.KClass
 
 private val dbVersions = mutableMapOf<Class<*>, Int>()
@@ -32,10 +33,16 @@ actual fun DoorDatabase.dbSchemaVersion(): Int {
     return thisVersion
 }
 
-actual suspend inline fun <T: DoorDatabase, R> T.doorWithTransaction(crossinline block: suspend(T) -> R): R {
+actual suspend fun <T: DoorDatabase, R> T.withDoorTransactionAsync(dbKClass: KClass<T>, block: suspend (T) -> R) : R{
     return withTransaction {
         block(this)
     }
+}
+
+actual fun <T: DoorDatabase, R> T.withDoorTransaction(dbKClass: KClass<T>, block: (T) -> R) : R {
+    return runInTransaction(Callable {
+        block(this)
+    })
 }
 
 /**

@@ -3,6 +3,7 @@ package repdb
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Update
 import com.ustadmobile.door.annotation.ReplicationRunOnChange
 import com.ustadmobile.door.entities.DoorNode
 
@@ -10,7 +11,10 @@ import com.ustadmobile.door.entities.DoorNode
 abstract class RepDao {
 
     @Insert
-    abstract suspend fun insertDoorNode(node: DoorNode)
+    abstract suspend fun insertDoorNodeAsync(node: DoorNode)
+
+    @Insert
+    abstract fun insertDoorNode(node: DoorNode)
 
     @Query("""
         INSERT INTO RepEntityTracker(trkrForeignKey, trkrVersionId, trkrDestination, trkrProcessed)
@@ -28,6 +32,17 @@ abstract class RepDao {
     abstract suspend fun updateReplicationTrackers()
 
     @Insert
-    abstract suspend fun insertAsync(repEntity: RepEntity)
+    abstract suspend fun insertAsync(repEntity: RepEntity): Long
+
+    @Insert
+    abstract fun insert(repEntity: RepEntity): Long
+
+    @Update
+    abstract fun update(repEntity: RepEntity)
+
+
+    @Update
+    abstract suspend fun updateAsync(repEntity: RepEntity)
+
 
 }

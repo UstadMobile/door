@@ -32,7 +32,7 @@ class RepTest1 {
         runBlocking {
             dispatcher.addReplicationPendingEventListener(42, repPendingListener)
 
-            db.repDao.insertDoorNode(DoorNode().apply {
+            db.repDao.insertDoorNodeAsync(DoorNode().apply {
                 this.nodeId = 42
                 this.auth = "magic"
             })

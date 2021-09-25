@@ -797,8 +797,11 @@ fun CodeBlock.Builder.addReplaceSyncableEntitiesIntoDbCode(resultVarName: String
     }
 
     takeIf { !isInSuspendContext }?.beginRunBlockingControlFlow()
-    beginControlFlow("_db.%M",
-            MemberName("com.ustadmobile.door.ext", "doorWithTransaction"))
+    add("//Important Note: This will be obsolete, hence the db class is not passed here\n")
+    beginControlFlow("_db.%M(%T::class)",
+            MemberName("com.ustadmobile.door.ext", "withDoorTransactionAsync"),
+            DoorDatabase::class
+        )
     add(transactionCodeBlock.build())
     endControlFlow()
     takeIf { !isInSuspendContext }?.endControlFlow()
