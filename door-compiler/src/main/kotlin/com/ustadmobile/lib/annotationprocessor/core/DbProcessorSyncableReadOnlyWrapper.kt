@@ -11,6 +11,8 @@ import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
 import javax.lang.model.type.DeclaredType
 import com.ustadmobile.door.DoorDatabaseSyncableReadOnlyWrapper
+import com.ustadmobile.door.SyncableDoorDatabase
+import kotlin.reflect.KClass
 
 /**
  * Add a DAO accessor for a database wrapper (e.g. property or function). If the given DAO
@@ -131,6 +133,18 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(dbTypeEl: TypeElement,
                                 .addCode("return _db.createAllTables()\n")
                                 .build())
                         addDataSourceProperty("_db")
+                        val typeVariableNameT = TypeVariableName.invoke("T", DoorDatabase::class)
+                        addFunction(FunSpec.builder("wrapNewTransaction")
+                            .addModifiers(KModifier.OVERRIDE, KModifier.PROTECTED, KModifier.OPEN)
+                            .addTypeVariable(typeVariableNameT)
+                            .addParameter("dbKClass", KClass::class.asClassName()
+                                .parameterizedBy(typeVariableNameT))
+                            .addParameter("transactionDb", typeVariableNameT)
+                            .addCode("return (transactionDb as %T).%M(dbKClass as KClass<%T>) as T\n",
+                                SyncableDoorDatabase::class, MemberName("com.ustadmobile.door", "wrap"),
+                                SyncableDoorDatabase::class)
+                            .returns(typeVariableNameT)
+                            .build())
                     }
                     .apply {
                         dbTypeEl.allDbClassDaoGetters(processingEnv).forEach {daoGetter ->

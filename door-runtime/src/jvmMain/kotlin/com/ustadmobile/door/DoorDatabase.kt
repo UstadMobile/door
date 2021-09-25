@@ -100,15 +100,29 @@ actual abstract class DoorDatabase actual constructor() : DoorDatabaseCommon(){
             throw IllegalArgumentException("withDoorTransactionInternal wrong class param!")
     }
 
+    /**
+     * This is overriden by SyncReadOnlyWrappers and Repositories
+     */
+    @Suppress("UNCHECKED_CAST")
+    protected open fun <T: DoorDatabase> wrapNewTransaction(dbKClass: KClass<T>, transactionDb: T) : T {
+        return transactionDb
+    }
 
-    internal open fun <T: DoorDatabase, R> withDoorTransactionInternal(dbKClass: KClass<T>, block: (T) -> R): R {
+    /**
+     * Unfortunately, this can't really be internal because it is overriden in generated code
+     */
+    @Suppress("UNCHECKED_CAST")
+    open fun <T: DoorDatabase, R> withDoorTransactionInternal(
+        dbKClass: KClass<T>,
+        block: (T) -> R
+    ): R {
         dbKClass.assertIsClassForThisDb()
 
         return when(transactionDepth.value) {
             0 -> {
                 val (transactionDs, transactionDb) = createTransactionDataSourceAndDb()
                 transactionDs.use {
-                    val result = block(transactionDb as T)
+                    val result = block(wrapNewTransaction(dbKClass, transactionDb as T))
                     transactionDb.fireTransactionTablesChanged()
                     result
                 }
@@ -125,14 +139,18 @@ actual abstract class DoorDatabase actual constructor() : DoorDatabaseCommon(){
         }
     }
 
-    internal open suspend fun <T: DoorDatabase, R> withDoorTransactionInternalAsync(dbKClass: KClass<T>, block: suspend (T) -> R): R {
+    @Suppress("UNCHECKED_CAST")
+    internal open suspend fun <T: DoorDatabase, R> withDoorTransactionInternalAsync(
+        dbKClass: KClass<T>,
+        block: suspend (T) -> R
+    ): R {
         dbKClass.assertIsClassForThisDb()
 
         return when(transactionDepth.value) {
             0 -> {
                 val (transactionDs, transactionDb) = createTransactionDataSourceAndDb()
                 transactionDs.useAsync {
-                    val result = block(transactionDb as T)
+                    val result = block(wrapNewTransaction(dbKClass, transactionDb as T))
                     transactionDb.fireTransactionTablesChanged()
                     result
                 }
