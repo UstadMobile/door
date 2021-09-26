@@ -5,8 +5,11 @@ import androidx.room.Delete
 import androidx.room.Update
 import androidx.room.Insert
 import com.squareup.kotlinpoet.*
+import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import com.ustadmobile.door.DoorDatabase
 import javax.annotation.processing.ProcessingEnvironment
 import javax.lang.model.element.TypeElement
+import kotlin.reflect.KClass
 
 /**
  * Simple shorthand function to check if the given function spec
@@ -134,4 +137,18 @@ fun FunSpec.Builder.removeAnnotations(): FunSpec.Builder {
 fun FunSpec.isSyncableInsert(processingEnv: ProcessingEnvironment): Boolean {
     return hasAnnotation(Insert::class.java) &&
             (entityParamComponentType as? ClassName)?.entityHasSyncableEntityTypes(processingEnv) ?: false
+}
+
+/**
+ * Turn this FunSpec into a function that will override wrapNewTransactionFor
+ */
+fun FunSpec.Builder.addOverrideWrapNewTransactionFun() : FunSpec.Builder {
+    val typeVariableNameT = TypeVariableName.invoke("T", DoorDatabase::class)
+    addModifiers(KModifier.OVERRIDE, KModifier.PROTECTED, KModifier.OPEN)
+    addTypeVariable(typeVariableNameT)
+    addParameter("dbKClass", KClass::class.asClassName()
+            .parameterizedBy(typeVariableNameT))
+    addParameter("transactionDb", typeVariableNameT)
+    returns(typeVariableNameT)
+    return this
 }

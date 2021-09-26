@@ -84,12 +84,12 @@ actual abstract class DoorDatabase actual constructor() : DoorDatabaseCommon(){
     private fun createTransactionDataSourceAndDb(): Pair<DoorTransactionDataSourceWrapper, DoorDatabase> {
         val transactionDataSource = DoorTransactionDataSourceWrapper(effectiveDatabase.dataSource)
         val transactionDb = if(this is SyncableDoorDatabase) {
-            constructorFun.newInstance(transactionDataSource, false)
+            effectiveDatabase.constructorFun.newInstance(transactionDataSource, false)
         }else {
-            constructorFun.newInstance(transactionDataSource)
+            effectiveDatabase.constructorFun.newInstance(transactionDataSource)
         }
 
-        transactionDb.sourceDatabase = this
+        transactionDb.sourceDatabase = effectiveDatabase
         transactionDb.transactionDepth.value = 1
 
         return Pair(transactionDataSource, transactionDb)
@@ -101,10 +101,20 @@ actual abstract class DoorDatabase actual constructor() : DoorDatabaseCommon(){
     }
 
     /**
-     * This is overriden by SyncReadOnlyWrappers and Repositories
+     * When a new transaction is started, a new database implementation object will be instantiated using the
+     * TransactionDataSourceWrapper. If the user is actually interacting with a ReadOnlyWrapper or Repository, then
+     * the new database implementation object itself should be wrapped as the same type (e.g. readonlywrapper, repo,
+     * etc).
+     *
+     * This function is overridden by generated code for ReadOnlyWrappers and Repositories
+     *
+     * @param dbKClass the KClass representing the database itself (the abstract db class e.g. MyDatabase::class ,
+     *                 not any generated implementation
+     * @param transactionDb the database object to wrap (e.g. as a ReadOnlyWrapper or Repository)
+     * @return transactionDb wrapped
      */
     @Suppress("UNCHECKED_CAST")
-    protected open fun <T: DoorDatabase> wrapNewTransaction(dbKClass: KClass<T>, transactionDb: T) : T {
+    protected open fun <T: DoorDatabase> wrapForNewTransaction(dbKClass: KClass<T>, transactionDb: T) : T {
         return transactionDb
     }
 
@@ -122,7 +132,8 @@ actual abstract class DoorDatabase actual constructor() : DoorDatabaseCommon(){
             0 -> {
                 val (transactionDs, transactionDb) = createTransactionDataSourceAndDb()
                 transactionDs.use {
-                    val result = block(wrapNewTransaction(dbKClass, transactionDb as T))
+                    val transactionWrappedDb = wrapForNewTransaction(dbKClass, transactionDb as T)
+                    val result = block(transactionWrappedDb)
                     transactionDb.fireTransactionTablesChanged()
                     result
                 }
@@ -150,7 +161,7 @@ actual abstract class DoorDatabase actual constructor() : DoorDatabaseCommon(){
             0 -> {
                 val (transactionDs, transactionDb) = createTransactionDataSourceAndDb()
                 transactionDs.useAsync {
-                    val result = block(wrapNewTransaction(dbKClass, transactionDb as T))
+                    val result = block(wrapForNewTransaction(dbKClass, transactionDb as T))
                     transactionDb.fireTransactionTablesChanged()
                     result
                 }

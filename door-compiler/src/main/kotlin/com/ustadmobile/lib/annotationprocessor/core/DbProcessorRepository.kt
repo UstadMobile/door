@@ -80,7 +80,8 @@ fun FileSpec.Builder.addDbRepoType(
     overrideOpenHelper: Boolean = false,
     addDbVersionProp: Boolean = false,
     overrideKtorHelpers: Boolean = false,
-    overrideDataSourceProp: Boolean = false
+    overrideDataSourceProp: Boolean = false,
+    overrideWrapDbForTransaction: Boolean = false
 ): FileSpec.Builder {
     addType(TypeSpec.classBuilder(dbTypeElement.asClassNameWithSuffix(SUFFIX_REPOSITORY2))
             .superclass(dbTypeElement.asClassName())
@@ -146,21 +147,29 @@ fun FileSpec.Builder.addDbRepoType(
                             MemberName("kotlinx.coroutines", "newSingleThreadContext"),
                             "Repo-${dbTypeElement.simpleName}")
                     .build())
-            .addProperty(PropertySpec.builder("_clientSyncManager",
+            .applyIf(dbTypeElement.isDbSyncable(processingEnv)) {
+                addProperty(PropertySpec.builder("_clientSyncManager",
                     ClientSyncManager::class.asClassName().copy(nullable = true))
                     .initializer(CodeBlock.builder().beginControlFlow("if(config.useClientSyncManager)")
-                            .add("%T(this, _db.%M(), _repositoryHelper.connectivityStatus, config.httpClient)\n",
-                                    ClientSyncManager::class, MemberName("com.ustadmobile.door.ext", "dbSchemaVersion"))
-                            .nextControlFlow("else")
-                            .add("null\n")
-                            .endControlFlow()
-                            .build())
+                        .add("%T(this, _db.%M(), _repositoryHelper.connectivityStatus, config.httpClient)\n",
+                            ClientSyncManager::class, MemberName("com.ustadmobile.door.ext", "dbSchemaVersion"))
+                        .nextControlFlow("else")
+                        .add("null\n")
+                        .endControlFlow()
+                        .build())
                     .build())
+            }
             .addProperty(PropertySpec.builder("tableIdMap",
                     Map::class.asClassName().parameterizedBy(String::class.asClassName(), INT))
                     .getter(FunSpec.getterBuilder().addCode("return TABLE_ID_MAP\n").build())
                     .addModifiers(KModifier.OVERRIDE)
                     .build())
+            .addProperty(PropertySpec.builder("clientId", INT)
+                .getter(FunSpec.getterBuilder().addCode("return config.nodeId\n").build())
+                .applyIf(dbTypeElement.isDbSyncable(processingEnv)) {
+                    addModifiers(KModifier.OVERRIDE)
+                }
+                .build())
             .addFunction(FunSpec.builder("clearAllTables")
                     .addModifiers(KModifier.OVERRIDE)
                     .addCode("throw %T(%S)\n", IllegalAccessException::class, "Cannot use a repository to clearAllTables!")
@@ -173,7 +182,7 @@ fun FileSpec.Builder.addDbRepoType(
             }
 
             .addRepositoryHelperDelegateCalls("_repositoryHelper",
-                    "_clientSyncManager")
+                    if(dbTypeElement.isDbSyncable(processingEnv)) "_clientSyncManager" else null)
             .applyIf(overrideClearAllTables) {
                 addFunction(FunSpec.builder("createAllTables")
                         .addModifiers(KModifier.OVERRIDE)
@@ -242,10 +251,6 @@ fun FileSpec.Builder.addDbRepoType(
                             .addCode("return _syncHelperEntitiesDao")
                             .build())
                     .build())
-                addProperty(PropertySpec.builder("clientId", INT)
-                        .getter(FunSpec.getterBuilder().addCode("return config.nodeId\n").build())
-                        .addModifiers(KModifier.OVERRIDE)
-                        .build())
                 addProperty(PropertySpec.builder("master", BOOLEAN)
                         .addModifiers(KModifier.OVERRIDE)
                         .getter(FunSpec.getterBuilder().addCode("return _db.master").build())
@@ -289,6 +294,21 @@ fun FileSpec.Builder.addDbRepoType(
                         .addCode("return _pkManager.nextIdAsync(tableId)\n")
                         .build())
 
+            }
+            .applyIf(!dbTypeElement.isDbSyncable(processingEnv)) {
+                //Add dummy
+                addFunction(FunSpec.builder("dispatchUpdateNotifications")
+                    .addParameter("tableId", INT)
+                    .addModifiers(KModifier.SUSPEND, KModifier.OVERRIDE)
+                    .build())
+            }
+            .applyIf(overrideWrapDbForTransaction) {
+                addFunction(FunSpec.builder("wrapForNewTransaction")
+                    .addOverrideWrapNewTransactionFun()
+                    .addCode("return transactionDb.%M(this as T, dbKClass as KClass<T>, this::class as KClass<T>) as T\n",
+                        MemberName("com.ustadmobile.door.ext", "wrapDbAsRepositoryForTransaction"),
+                        )
+                    .build())
             }
             .apply {
                 dbTypeElement.allDbClassDaoGetters(processingEnv).forEach { daoGetter ->
@@ -951,23 +971,6 @@ fun CodeBlock.Builder.addRepoDelegateToDaoCode(daoFunSpec: FunSpec, isAlwaysSqli
 
     }
 
-    //Check if a table is modified by this query
-    val tableChanged = if(daoFunSpec.hasAnyAnnotation(Update::class.java, Insert::class.java,
-            Delete::class.java)) {
-        (daoFunSpec.entityParamComponentType as ClassName).simpleName
-    }else if(daoFunSpec.isAQueryThatModifiesTables){
-        daoFunSpec.getDaoFunEntityModifiedByQuery(allKnownEntityTypesMap)?.simpleName
-    }else {
-        null
-    }
-
-    if(tableChanged != null) {
-        add("_repo")
-        if(daoFunSpec.isAQueryThatModifiesTables && daoFunSpec.hasReturnType)
-            add(".takeIf·{·_result·>·0·}?")
-        add(".handleTableChanged(%S)\n", tableChanged)
-    }
-
     if(daoFunSpec.hasReturnType && daoFunSpec.hasAnnotation(Insert::class.java)
             && syncableEntityInfo != null) {
         add("return ")
@@ -1049,7 +1052,8 @@ class DbProcessorRepository: AbstractDbProcessor() {
                     .addDbRepoType(dbTypeEl, processingEnv,
                         syncDaoMode = REPO_SYNCABLE_DAO_CONSTRUCT,
                         addDbVersionProp = true,
-                        overrideDataSourceProp = true)
+                        overrideDataSourceProp = true,
+                        overrideWrapDbForTransaction = true)
                     .build()
                     .writeToDirsFromArg(OPTION_JVM_DIRS)
             FileSpec.builder(dbTypeEl.packageName, "${dbTypeEl.simpleName}$SUFFIX_REPOSITORY2")
@@ -1059,7 +1063,7 @@ class DbProcessorRepository: AbstractDbProcessor() {
                         overrideKtorHelpers = true)
                     .build()
                     .writeToDirsFromArg(OPTION_ANDROID_OUTPUT)
-            dbTypeEl.allDbEntities(processingEnv).mapNotNull { it as? TypeElement }
+            dbTypeEl.allDbEntities(processingEnv)
                     .filter { it.entityHasAttachments }.forEach { entityEl ->
                         FileSpec.builder(entityEl.packageName, "${entityEl.simpleName}$SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER")
                                 .addEntityWithAttachmentAdapterType(entityEl, processingEnv)

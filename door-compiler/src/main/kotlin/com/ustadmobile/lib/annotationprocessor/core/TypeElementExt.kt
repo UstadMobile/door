@@ -179,6 +179,17 @@ fun TypeElement.isDbSyncable(processingEnv: ProcessingEnvironment): Boolean {
 }
 
 /**
+ * Indicates whether or not this database should have a read only wrapper generated. The ReadOnlyWrapper should be
+ * be generated for databses that have repositories and replicated entities.
+ */
+fun TypeElement.dbHasReadOnlyWrapper(processingEnv: ProcessingEnvironment) : Boolean {
+    val hasRepos = dbEnclosedDaos(processingEnv).any { it.hasAnnotation(Repository::class.java) }
+    val hasReplicatedEntities = allDbEntities(processingEnv).any { it.hasAnnotation(ReplicateEntity::class.java) }
+    return hasRepos && hasReplicatedEntities
+}
+
+
+/**
  * If the given TypeElement represents a Dao, this will return a map of the ClassNames for DAOs
  * for the primary and local KTOR Helper Daos that are required.
  */

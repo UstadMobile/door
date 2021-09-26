@@ -117,7 +117,8 @@ class ClientSyncManager(val repo: DoorDatabaseSyncRepository, val dbVersion: Int
             }
         }
 
-        repo.addTableChangeListener(this)
+        //This will be obsolete soon.
+        //repo.addTableChangeListener(this)
     }
 
     suspend fun checkEndpointEventSource() {

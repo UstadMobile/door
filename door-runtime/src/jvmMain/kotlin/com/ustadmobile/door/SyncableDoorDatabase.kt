@@ -2,7 +2,8 @@ package com.ustadmobile.door
 
 import kotlin.reflect.KClass
 
-actual inline fun <reified  T: SyncableDoorDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T {
+@Suppress("UNCHECKED_CAST")
+actual inline fun <reified  T: DoorDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T {
     val dbClass = T::class
     val repoImplClass = Class.forName("${dbClass.qualifiedName}_Repo") as Class<T>
 
@@ -24,12 +25,12 @@ actual inline fun <reified  T: SyncableDoorDatabase> T.asRepository(repositoryCo
  * the repo.
  */
 @Suppress("UNCHECKED_CAST")
-actual fun <T: SyncableDoorDatabase> T.wrap(dbClass: KClass<T>) : T {
+actual fun <T: DoorDatabase> T.wrap(dbClass: KClass<T>) : T {
     val wrapperClass = Class.forName("${dbClass.qualifiedName}${DoorDatabaseSyncableReadOnlyWrapper.SUFFIX}") as Class<T>
     return wrapperClass.getConstructor(dbClass.java).newInstance(this)
 }
 
 @Suppress("UNCHECKED_CAST")
-actual fun <T: SyncableDoorDatabase> T.unwrap(dbClass: KClass<T>): T {
+actual fun <T: DoorDatabase> T.unwrap(dbClass: KClass<T>): T {
     return (this as DoorDatabaseSyncableReadOnlyWrapper).realDatabase as T
 }

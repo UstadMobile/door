@@ -5,9 +5,11 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
 import com.ustadmobile.door.annotation.ReplicationRunOnChange
+import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.entities.DoorNode
 
 @Dao
+@Repository
 abstract class RepDao {
 
     @Insert

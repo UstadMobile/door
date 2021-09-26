@@ -22,7 +22,7 @@ import com.ustadmobile.door.SyncListener
  */
 fun TypeSpec.Builder.addAccessorOverride(methodName: String, returnType: TypeName, codeBlock: CodeBlock) {
     if(methodName.startsWith("get")) {
-        val propName = methodName.substring(3, 4).toLowerCase(Locale.ROOT) + methodName.substring(4)
+        val propName = methodName.substring(3, 4).lowercase() + methodName.substring(4)
         val getterFunSpec = FunSpec.getterBuilder().addCode(codeBlock)
         addProperty(PropertySpec.builder(propName, returnType,
                 KModifier.OVERRIDE).getter(getterFunSpec.build()).build())
@@ -87,21 +87,6 @@ internal fun TypeSpec.Builder.addRepositoryHelperDelegateCalls(delegatePropName:
             .addModifiers(KModifier.OVERRIDE)
             .addParameter("listener", RepositoryConnectivityListener::class)
             .addCode("$delegatePropName.removeWeakConnectivityListener(listener)\n")
-            .build())
-    addFunction(FunSpec.builder("addTableChangeListener")
-            .addModifiers(KModifier.OVERRIDE)
-            .addParameter("listener", TableChangeListener::class)
-            .addCode("$delegatePropName.addTableChangeListener(listener)\n")
-            .build())
-    addFunction(FunSpec.builder("removeTableChangeListener")
-            .addModifiers(KModifier.OVERRIDE)
-            .addParameter("listener", TableChangeListener::class)
-            .addCode("$delegatePropName.removeTableChangeListener(listener)\n")
-            .build())
-    addFunction(FunSpec.builder("handleTableChanged")
-            .addModifiers(KModifier.OVERRIDE)
-            .addParameter("tableName", String::class)
-            .addCode("$delegatePropName.handleTableChanged(tableName)\n")
             .build())
 
     val syncListenerTypeVar = TypeVariableName.Companion.invoke("T", Any::class)
@@ -183,8 +168,6 @@ fun TypeSpec.Builder.addRoomCreateInvalidationTrackerFunction() : TypeSpec.Build
  * preparedstatement insert with or without an autoincrement id can share the same code to set
  * all other parameters.
  *
- * @param entityTypeElement The TypeElement representing the entity, from which we wish to get
- * the field names
  * @param getAutoIncLast if true, then always return any field that is auto increment at the very end
  * @return List of VariableElement representing the entity fields that are persisted
  */

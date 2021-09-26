@@ -16,7 +16,10 @@ interface DoorDatabaseSyncableReadOnlyWrapper {
 
     companion object {
 
-        const val SUFFIX = "_DbSyncableReadOnlyWrapper"
+        /**
+         * This is the class name suffix that will be used by generated ReadOnlyWrappers
+         */
+        const val SUFFIX = "_ReadOnlyWrapper"
 
     }
 }

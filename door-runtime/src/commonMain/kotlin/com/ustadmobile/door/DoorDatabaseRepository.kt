@@ -64,25 +64,6 @@ interface DoorDatabaseRepository {
     suspend fun dispatchUpdateNotifications(tableId: Int)
 
     /**
-     * Add a listener that will be triggered whenever any table has been changed by the repository.
-     * The listener won't be triggered when changes are made directly to the database (e.g. incoming
-     * sync data). This is used by ClientSyncManager to watch for when changes have been made locally
-     * to trigger a sync.
-     *
-     * @param listener the TableChangeListener to call when any table has been changed
-     */
-    fun addTableChangeListener(listener: TableChangeListener)
-
-    /**
-     * Remove a listener that was added using addTableChangeListener
-     *
-     * @param listener TableChangeListener to remove
-     */
-    fun removeTableChangeListener(listener: TableChangeListener)
-
-    fun handleTableChanged(tableName: String)
-
-    /**
      * Add a listener that will be called when entities are received from another device.
      */
     fun <T : Any> addSyncListener(entityClass: KClass<T>, syncListener: SyncListener<T>)

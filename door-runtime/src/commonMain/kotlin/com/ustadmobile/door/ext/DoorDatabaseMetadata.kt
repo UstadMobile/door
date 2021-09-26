@@ -24,6 +24,11 @@ abstract class DoorDatabaseMetadata<T: DoorDatabase> {
 
     abstract val replicateEntities: Map<Int, ReplicationEntityMetaData>
 
+    /**
+     * If true, this database has a corresponding DoorDatabaseSyncableReadOnlyWrapper
+     */
+    abstract val hasReadOnlyWrapper: Boolean
+
     companion object {
 
         /**

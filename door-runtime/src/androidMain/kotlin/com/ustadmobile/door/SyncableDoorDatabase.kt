@@ -5,7 +5,7 @@ import kotlin.reflect.KClass
 //There is no alternative to the unchecked cast here. The cast is operating on generated code, so it will always
 //succeed
 @Suppress("UNCHECKED_CAST")
-actual inline fun <reified  T: SyncableDoorDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T {
+actual inline fun <reified  T: DoorDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T {
     val dbUnwrapped = if(this is DoorDatabaseSyncableReadOnlyWrapper) {
         this.unwrap(T::class)
     }else {
@@ -26,13 +26,13 @@ actual inline fun <reified  T: SyncableDoorDatabase> T.asRepository(repositoryCo
  * the repo.
  */
 @Suppress("UNCHECKED_CAST")
-actual fun <T: SyncableDoorDatabase> T.wrap(dbClass: KClass<T>) : T {
-    val wrapperClass = Class.forName("${dbClass.qualifiedName}_DbSyncableReadOnlyWrapper") as Class<T>
+actual fun <T: DoorDatabase> T.wrap(dbClass: KClass<T>) : T {
+    val wrapperClass = Class.forName("${dbClass.qualifiedName}${DoorDatabaseSyncableReadOnlyWrapper.SUFFIX}") as Class<T>
     return wrapperClass.getConstructor(dbClass.java).newInstance(this)
 }
 
 @Suppress("UNCHECKED_CAST")
-actual fun <T: SyncableDoorDatabase> T.unwrap(dbClass: KClass<T>): T {
+actual fun <T: DoorDatabase> T.unwrap(dbClass: KClass<T>): T {
     if(this is DoorDatabaseSyncableReadOnlyWrapper) {
         return this.realDatabase as T
     }else {

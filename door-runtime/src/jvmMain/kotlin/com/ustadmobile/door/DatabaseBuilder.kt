@@ -1,5 +1,6 @@
 package com.ustadmobile.door
 
+import com.ustadmobile.door.ext.doorDatabaseMetadata
 import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.migration.DoorMigrationAsync
 import com.ustadmobile.door.migration.DoorMigrationStatementList
@@ -95,8 +96,8 @@ actual class DatabaseBuilder<T: DoorDatabase> internal constructor(private var c
 
         callbacks.forEach { it.onOpen(doorDb.sqlDatabaseImpl)}
 
-        return if(doorDb is SyncableDoorDatabase) {
-            doorDb.wrap(dbClass as KClass<SyncableDoorDatabase>) as T
+        return if(doorDb::class.doorDatabaseMetadata().hasReadOnlyWrapper) {
+            doorDb.wrap(dbClass)
         }else {
             doorDb
         }

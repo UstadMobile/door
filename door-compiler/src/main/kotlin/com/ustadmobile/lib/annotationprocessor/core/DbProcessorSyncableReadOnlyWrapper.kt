@@ -133,17 +133,10 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(dbTypeEl: TypeElement,
                                 .addCode("return _db.createAllTables()\n")
                                 .build())
                         addDataSourceProperty("_db")
-                        val typeVariableNameT = TypeVariableName.invoke("T", DoorDatabase::class)
-                        addFunction(FunSpec.builder("wrapNewTransaction")
-                            .addModifiers(KModifier.OVERRIDE, KModifier.PROTECTED, KModifier.OPEN)
-                            .addTypeVariable(typeVariableNameT)
-                            .addParameter("dbKClass", KClass::class.asClassName()
-                                .parameterizedBy(typeVariableNameT))
-                            .addParameter("transactionDb", typeVariableNameT)
-                            .addCode("return (transactionDb as %T).%M(dbKClass as KClass<%T>) as T\n",
-                                SyncableDoorDatabase::class, MemberName("com.ustadmobile.door", "wrap"),
-                                SyncableDoorDatabase::class)
-                            .returns(typeVariableNameT)
+                        addFunction(FunSpec.builder("wrapForNewTransaction")
+                            .addOverrideWrapNewTransactionFun()
+                            .addCode("return transactionDb.%M(dbKClass) as T\n",
+                                MemberName("com.ustadmobile.door", "wrap"))
                             .build())
                     }
                     .apply {
@@ -251,7 +244,7 @@ class DbProcessorSyncableReadOnlyWrapper: AbstractDbProcessor()  {
     override fun process(annotations: MutableSet<out TypeElement>?, roundEnv: RoundEnvironment): Boolean {
         roundEnv.getElementsAnnotatedWith(Database::class.java).map { it as TypeElement }.forEach {dbTypeEl ->
             //jvm version
-            if(dbTypeEl.isDbSyncable(processingEnv)) {
+            if(dbTypeEl.dbHasReadOnlyWrapper(processingEnv)) {
                 FileSpec.builder(dbTypeEl.qualifiedPackageName(processingEnv),
                         "${dbTypeEl.simpleName}${DoorDatabaseSyncableReadOnlyWrapper.SUFFIX}")
                         .addDbWrapperTypeSpec(dbTypeEl, processingEnv, allKnownEntityTypesMap)

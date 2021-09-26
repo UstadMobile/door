@@ -81,21 +81,6 @@ class RepositoryHelper(private val coroutineDispatcher: CoroutineDispatcher = do
         weakConnectivityListeners.removeAll { it.get() == listener }
     }
 
-    fun addTableChangeListener(listener: TableChangeListener) {
-        tableChangeListeners += listener
-    }
-
-    fun removeTableChangeListener(listener: TableChangeListener) {
-        tableChangeListeners -= listener
-    }
-
-    fun handleTableChanged(tableName: String) {
-        tableChangeListeners.forEach {
-            //TODO: Call the update function to mark this table as having been changed.
-            it.onTableChanged(tableName)
-        }
-    }
-
     fun <T : Any> addSyncListener(entityClass: KClass<T>, listener: SyncListener<T>)  {
         syncListeners.getOrPut(entityClass) { mutableListOf<SyncListener<out Any>>() }.add(listener)
     }
