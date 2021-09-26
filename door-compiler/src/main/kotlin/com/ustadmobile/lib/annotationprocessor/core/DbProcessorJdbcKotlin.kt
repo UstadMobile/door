@@ -1170,11 +1170,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .addMember("%S, %S, %S, %S", "LocalVariableName", "RedundantVisibilityModifier", "unused", "ClassName")
                 .build())
             .primaryConstructor(FunSpec.constructorBuilder()
-                .addParameter("_repo", dbTypeElement.asClassName(), KModifier.PRIVATE)
                 .addParameter("_db", dbTypeElement.asClassName(), KModifier.PRIVATE)
-                .build())
-            .addProperty(PropertySpec.builder("_repo", dbTypeElement.asClassName())
-                .initializer("_repo")
                 .build())
             .addProperty(PropertySpec.builder("_db", dbTypeElement.asClassName())
                 .initializer("_db")
@@ -1183,6 +1179,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 //TODO: this should have an abstract super class to implement the MessageBus
                 replicatedEntitiesWithOnChangeFunctions.forEach { repEntity ->
                     addFunction(FunSpec.builder("handle${repEntity.simpleName}Changed")
+                        .receiver(dbTypeElement.asClassName())
                         .addModifiers(KModifier.SUSPEND)
                         .addModifiers(KModifier.PRIVATE)
                         .returns(Set::class.parameterizedBy(String::class))
@@ -1194,7 +1191,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                                         .filter { it.hasAnyAnnotation { it.getClassValue("value", processingEnv) == repEntity} }
                                     val daoAccessorCodeBlock = dbTypeElement.findDaoGetter(dao, processingEnv)
                                     daoFunsToRun.mapNotNull { it as? ExecutableElement}.forEach { funToRun ->
-                                        add("_db.%L.${funToRun.simpleName}()\n", daoAccessorCodeBlock)
+                                        add("%L.${funToRun.simpleName}()\n", daoAccessorCodeBlock)
                                         val checkingPendingRepTableNames = funToRun.annotationMirrors
                                             .filter { it.annotationType.asElement() == ReplicationRunOnChange::class.asTypeElement(processingEnv) }
                                             .map { it.getClassArrayValue("checkPendingReplicationsFor", processingEnv) }
@@ -1202,6 +1199,9 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                                         repTablesToCheck.addAll(checkingPendingRepTableNames)
                                     }
                                 }
+                                add("%M(%L)\n",
+                                    MemberName("com.ustadmobile.door.ext", "deleteFromChangeLog"),
+                                    repEntity.getAnnotation(ReplicateEntity::class.java).tableId)
 
                                 add("return setOf(${repTablesToCheck.joinToString { "\"$it\"" }})\n")
                             }
@@ -1216,12 +1216,18 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .addCode(CodeBlock.builder()
                     .apply {
                         add("val _checkPendingNotifications = mutableSetOf<String>()\n")
+                        beginControlFlow("_db.%M(%T::class)",
+                            MemberName("com.ustadmobile.door.ext", "withDoorTransactionAsync"),
+                            dbTypeElement)
+                        add("_transactionDb ->\n")
                         beginControlFlow("when")
                         replicatedEntitiesWithOnChangeFunctions.forEach { repEntity ->
                             beginControlFlow("%S in tableNames -> ", repEntity.simpleName)
-                            add("_checkPendingNotifications.addAll(handle${repEntity.simpleName}Changed())\n")
+                            add("_checkPendingNotifications.addAll(_transactionDb.handle${repEntity.simpleName}Changed())\n")
                             endControlFlow()
                         }
+                        endControlFlow()
+                        add("Unit\n")
                         endControlFlow()
                         add("return _checkPendingNotifications\n")
                     }

@@ -2,6 +2,7 @@ package com.ustadmobile.door.ext
 
 import com.ustadmobile.door.*
 import com.ustadmobile.door.jdbc.PreparedStatement
+import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 import kotlin.reflect.KClass
@@ -133,3 +134,13 @@ fun <R> DoorDatabase.prepareAndUseStatement(
     sql: String,
     block: (PreparedStatement) -> R
 ) = prepareAndUseStatement(PreparedStatementConfig(sql), block)
+
+/**
+ * This is used from generated code to delete ChangeLogs for the givne table id
+ */
+suspend fun DoorDatabase.deleteFromChangeLog(tableId: Int) {
+    prepareAndUseStatementAsync("DELETE FROM ChangeLog WHERE chTableId = ?") { stmt ->
+        stmt.setInt(1, tableId)
+        stmt.executeUpdateAsyncKmp()
+    }
+}

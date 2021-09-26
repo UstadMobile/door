@@ -26,7 +26,7 @@ abstract class RepDao {
                0 AS trkrProcessed
           FROM ChangeLog
                JOIN RepEntity 
-                    ON ChangeLog.chTableId = 42 AND ChangeLog.chEntityPk = RepEntity.rePrimaryKey
+                    ON ChangeLog.chTableId = 500 AND ChangeLog.chEntityPk = RepEntity.rePrimaryKey
                JOIN DoorNode 
                     ON DoorNode.nodeId != 0
     """)
