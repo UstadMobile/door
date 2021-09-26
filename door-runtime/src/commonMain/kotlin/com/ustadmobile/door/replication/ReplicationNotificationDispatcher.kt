@@ -35,6 +35,19 @@ class ReplicationNotificationDispatcher(
 
     private val replicationPendingListeners = concurrentSafeListOf<ReplicationPendingRequest>()
 
+    private val findAllTablesPendingReplicationByNodeIdSql: String by lazy {
+        dbMetaData.replicateEntities.values.joinToString(separator = "\nUNION\n") { repEntity ->
+            """
+            SELECT ${repEntity.tableId} AS tableId
+            WHERE EXISTS(
+                  SELECT ${repEntity.trackerTableName}.${repEntity.trackerDestNodeIdFieldName}
+                    FROM ${repEntity.trackerTableName}
+                   WHERE RepEntityTracker.trkrDestination = ?
+                     AND CAST(RepEntityTracker.trkrProcessed AS BOOLEAN) = false)
+            """
+        }
+    }
+
     override fun onTablesInvalidated(tableNames: List<String>) {
         eventCollator.receiveEvent(tableNames)
     }
@@ -78,9 +91,20 @@ class ReplicationNotificationDispatcher(
      */
     @Suppress("RedundantSuspendModifier")
     suspend fun addReplicationPendingEventListener(nodeId: Long, listener: ReplicationPendingListener) {
-        //TODO: run a query and find pending replications for this node (if any)
-
         replicationPendingListeners.add(ReplicationPendingRequest(nodeId, listener))
+
+        val pendingTableIds = db.prepareAndUseStatementAsync(findAllTablesPendingReplicationByNodeIdSql) { stmt ->
+            for(i in 1 .. dbMetaData.replicateEntities.size) {
+                stmt.setLong(i, nodeId)
+            }
+
+            stmt.executeQueryAsyncKmp().useResults {
+                it.mapRows { it.getInt(1) }
+            }
+        }
+
+        listener.takeIf { pendingTableIds.isNotEmpty() }
+            ?.onReplicationPending(ReplicationPendingEvent(nodeId, pendingTableIds))
     }
 
     fun removeReplicationPendingEventListener(nodeId: Long, listener: ReplicationPendingListener) {
