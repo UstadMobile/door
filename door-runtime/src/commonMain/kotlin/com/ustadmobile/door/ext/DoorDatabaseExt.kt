@@ -29,7 +29,7 @@ expect fun DoorDatabase.dbSchemaVersion(): Int
  * the given transaction.
  *
  */
-expect suspend fun <T: DoorDatabase, R> T.withDoorTransactionAsync(dbKClass: KClass<T>, block: suspend (T) -> R) : R
+expect suspend fun <T: DoorDatabase, R> T.withDoorTransactionAsync(dbKClass: KClass<out T>, block: suspend (T) -> R) : R
 
 /**
  * Execute the given block as part of a transaction. E.g.

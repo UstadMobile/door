@@ -9,7 +9,7 @@ actual fun DoorDatabase.dbType(): Int = this.jdbcDbType
 
 actual fun DoorDatabase.dbSchemaVersion(): Int = this.dbVersion
 
-actual suspend fun <T: DoorDatabase, R> T.withDoorTransactionAsync(dbKClass: KClass<T>, block: suspend (T) -> R): R {
+actual suspend fun <T: DoorDatabase, R> T.withDoorTransactionAsync(dbKClass: KClass<out T>, block: suspend (T) -> R): R {
     return withDoorTransactionInternalAsync(dbKClass, block)
 }
 

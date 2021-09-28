@@ -33,7 +33,7 @@ actual fun DoorDatabase.dbSchemaVersion(): Int {
     return thisVersion
 }
 
-actual suspend fun <T: DoorDatabase, R> T.withDoorTransactionAsync(dbKClass: KClass<T>, block: suspend (T) -> R) : R{
+actual suspend fun <T: DoorDatabase, R> T.withDoorTransactionAsync(dbKClass: KClass<out T>, block: suspend (T) -> R) : R{
     return withTransaction {
         block(this)
     }
@@ -53,7 +53,6 @@ fun DoorDatabase.resolveAttachmentAndroidUri(attachmentUri: String): Uri {
             ?: throw IllegalArgumentException("resolveAttachmentAndroidUri must be used on the repository, not the database!")
 
     val attachmentsDir = thisRepo.config.attachmentsDir
-            ?: throw IllegalArgumentException("Repo has a null attachments directory! Cannot resolve Uris.")
 
     if(attachmentUri.startsWith(DOOR_ATTACHMENT_URI_PREFIX)) {
         val attachmentFile = File(File(attachmentsDir),

@@ -16,7 +16,7 @@ suspend fun DoorDatabaseRepository.sendPendingReplications(
     //should return a result object of some kind
 }
 
-suspend fun DoorDatabase.fetchPendingReplications(
+suspend fun DoorDatabaseRepository.fetchPendingReplications(
     tableId: Int
 ) {
     //should return a result object of some kind

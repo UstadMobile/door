@@ -19,7 +19,7 @@ actual fun DoorDatabase.dbSchemaVersion(): Int = this.dbVersion
 /**
  * Run a transaction within a suspend coroutine context. Not really implemented at the moment.
  */
-actual suspend fun <T: DoorDatabase, R> T.withDoorTransactionAsync(dbKClass: KClass<T>, block: suspend (T) -> R) : R {
+actual suspend fun <T: DoorDatabase, R> T.withDoorTransactionAsync(dbKClass: KClass<out T>, block: suspend (T) -> R) : R {
     return block(this)
 }
 

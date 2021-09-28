@@ -11,4 +11,6 @@ class DoorNode {
 
     var auth: String? = null
 
+    var endpoint: String? = null
+
 }
