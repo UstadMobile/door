@@ -6,6 +6,8 @@ import com.ustadmobile.door.RepositoryConfig
 import com.ustadmobile.door.asRepository
 import com.ustadmobile.door.ext.doorDatabaseMetadata
 import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
+import com.ustadmobile.door.replication.ReplicationPendingEvent
+import com.ustadmobile.door.replication.ReplicationPendingListener
 import com.ustadmobile.door.replication.ReplicationSubscriptionManager
 import com.ustadmobile.door.sse.DoorEventSource
 import com.ustadmobile.door.sse.DoorEventSourceFactory
@@ -54,7 +56,7 @@ class TestReplicationSubscriptionManager {
     }
 
     @Test
-    fun givenMessageThenShouldCallReplicate() {
+    fun givenSubscriptionInitialized_whenRemoteInvalidateMessageReceived_thenShouldCallFetchReplications() {
         val dispatcher = mock<ReplicationNotificationDispatcher> { }
         val mockEventSource = mock<DoorEventSource> { }
         val mockEventSourceFactory = mock<DoorEventSourceFactory> {
@@ -70,9 +72,54 @@ class TestReplicationSubscriptionManager {
 
         subscriptionManager.onMessage(DoorServerSentEvent("1", "INIT", "0"))
 
-        verifyBlocking(mockSendReplications, timeout(5000 * 1000)) {
+        //Make sure that the first fetch replications runs
+        verifyBlocking(mockFetchReplications, timeout(5000).times(1)) {
+            replicate(repo as DoorDatabaseRepository, RepEntity.TABLE_ID)
+        }
+
+        subscriptionManager.onMessage(DoorServerSentEvent("2", "INVALIDATE", RepEntity.TABLE_ID.toString()))
+
+        verifyBlocking(mockFetchReplications, timeout(5000).times(2)) {
             replicate(repo as DoorDatabaseRepository, RepEntity.TABLE_ID)
         }
     }
+
+    @Suppress("RedundantUnitExpression")//When it's removed it won't compile
+    @Test
+    fun givenSubscriptionInitialized_whenLocalInvalidateReceived_thenShouldCallSendReplications() {
+        var remoteListener: ReplicationPendingListener? = null
+        val dispatcher = mock<ReplicationNotificationDispatcher> {
+            onBlocking { addReplicationPendingEventListener(eq(0L), any()) }.thenAnswer {
+                remoteListener = (it.arguments[1] as ReplicationPendingListener)
+                Unit
+            }
+        }
+
+        val mockEventSource = mock<DoorEventSource> { }
+        val mockEventSourceFactory = mock<DoorEventSourceFactory> {
+            on { makeNewDoorEventSource(any(), any(), any()) }.thenReturn(mockEventSource)
+        }
+
+        val mockSendReplications = mock<ReplicationSubscriptionManager.ReplicateRunner> { }
+        val mockFetchReplications = mock<ReplicationSubscriptionManager.ReplicateRunner> { }
+
+        val subscriptionManager = ReplicationSubscriptionManager(dispatcher, repo as DoorDatabaseRepository,
+            GlobalScope, RepDb::class.doorDatabaseMetadata(), RepDb::class, 5,mockEventSourceFactory,
+            mockSendReplications, mockFetchReplications)
+
+
+        subscriptionManager.onMessage(DoorServerSentEvent("1", "INIT", "0"))
+
+        verifyBlocking(mockSendReplications, timeout(5000)) {
+            replicate(any(), eq(RepEntity.TABLE_ID))
+        }
+        remoteListener!!.onReplicationPending(ReplicationPendingEvent(0L, listOf(RepEntity.TABLE_ID)))
+
+        verifyBlocking(mockSendReplications, timeout(5000 * 1000).times(2)) {
+            replicate(any(), eq(RepEntity.TABLE_ID))
+        }
+    }
+
+
 
 }
