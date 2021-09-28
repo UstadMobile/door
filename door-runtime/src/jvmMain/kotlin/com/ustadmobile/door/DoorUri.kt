@@ -5,7 +5,12 @@ import java.net.URI
 actual class DoorUri(val uri: URI) {
 
     actual suspend fun getFileName(context: Any): String {
-        return uri.path.substringAfterLast("/")
+        return if(uri.path.endsWith("/")) {
+            uri.path.removeSuffix("/").substringAfterLast("/")
+                .substringBeforeLast("?")
+        }else {
+            uri.path.substringAfterLast("/").substringBeforeLast("?")
+        }
     }
 
     actual companion object {
