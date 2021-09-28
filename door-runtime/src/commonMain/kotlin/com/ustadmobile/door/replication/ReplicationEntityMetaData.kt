@@ -15,20 +15,32 @@ class ReplicationEntityMetaData(
     val trackerFields: List<ReplicationFieldMetaData>
 ) {
 
+    val entityPrimaryKeyFieldType: Int by lazy(LazyThreadSafetyMode.NONE) {
+        entityFields.first { it.fieldName == entityPrimaryKeyFieldName }.fieldType
+    }
+
+    val versionIdFieldType: Int by lazy(LazyThreadSafetyMode.NONE) {
+        entityFields.first { it.fieldName == entityVersionIdFieldName }.fieldType
+    }
+
+    internal val pendingReplicationFieldTypesMap: Map<String, Int>
+        get() = mapOf(KEY_PRIMARY_KEY to entityPrimaryKeyFieldType,
+            KEY_VERSION_ID to versionIdFieldType)
+
     val findPendingTrackerSql: String by lazy(LazyThreadSafetyMode.NONE) {
         """
         SELECT $trackerForeignKeyFieldName AS primaryKey, 
                $trackerVersionFieldName AS versionId
           FROM $trackerTableName
-         WHERE nodeId = ?
+         WHERE $trackerDestNodeIdFieldName = ?
            AND CAST($trackerProcessedFieldName AS INTEGER) = 0      
     """
     }
 
     val findAlreadyUpToDateEntitiesSql: String by lazy(LazyThreadSafetyMode.NONE) {
         """
-        SELECT $entityPrimaryKeyFieldName, AS primaryKey,
-               $entityVersionIdFieldName AS versionId
+        SELECT $entityPrimaryKeyFieldName AS $KEY_PRIMARY_KEY,
+               $entityVersionIdFieldName AS $KEY_VERSION_ID
           FROM $entityTableName
          WHERE $entityPrimaryKeyFieldName = ?
            AND $entityVersionIdFieldName = ?
@@ -54,5 +66,11 @@ class ReplicationEntityMetaData(
          WHERE $trackerTableName.$trackerDestNodeIdFieldName = ?
            AND $trackerProcessedFieldName = 0 
         """
+    }
+
+    companion object {
+        const val KEY_PRIMARY_KEY = "primaryKey"
+
+        const val KEY_VERSION_ID = "versionId"
     }
 }

@@ -21,10 +21,10 @@ class RepEntity {
     @PrimaryKey(autoGenerate = true)
     var rePrimaryKey: Long = 0
 
-    @ReplicationVersionId
     @LastChangedBy
     var reLastChangedBy: Long = 0
 
+    @ReplicationVersionId
     @LastChangedTime
     var reLastChangeTime: Long = 0
 
