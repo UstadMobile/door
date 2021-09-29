@@ -46,5 +46,11 @@ abstract class RepDao {
     @Update
     abstract suspend fun updateAsync(repEntity: RepEntity)
 
+    @Query("""
+    SELECT COUNT(*)
+      FROM RepEntity
+    """)
+    abstract fun countEntities(): Int
+
 
 }

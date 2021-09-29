@@ -33,6 +33,7 @@ fun ResultSet.getJsonPrimitive(colName: String, colType: Int) : JsonPrimitive{
         TypesKmp.DOUBLE -> JsonPrimitive(getDouble(colName))
         TypesKmp.VARCHAR -> JsonPrimitive(getString(colName))
         TypesKmp.LONGVARCHAR -> JsonPrimitive(getString(colName))
+        TypesKmp.BOOLEAN -> JsonPrimitive(getBoolean(colName))
         else -> throw IllegalArgumentException("Unsupported type: $colType")
     }
 }

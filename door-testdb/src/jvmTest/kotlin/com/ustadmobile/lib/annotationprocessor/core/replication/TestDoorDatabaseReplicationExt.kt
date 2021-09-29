@@ -3,6 +3,7 @@ package com.ustadmobile.lib.annotationprocessor.core.replication
 import com.ustadmobile.door.DatabaseBuilder
 import com.ustadmobile.door.entities.DoorNode
 import com.ustadmobile.door.ext.*
+import com.ustadmobile.door.replication.*
 import com.ustadmobile.door.replication.ReplicationEntityMetaData.Companion.KEY_PRIMARY_KEY
 import com.ustadmobile.door.replication.ReplicationEntityMetaData.Companion.KEY_VERSION_ID
 import kotlinx.coroutines.runBlocking
@@ -10,12 +11,10 @@ import org.junit.Before
 import org.junit.Test
 import repdb.RepDb
 import repdb.RepEntity
-import com.ustadmobile.door.replication.findPendingReplicationTrackers
-import com.ustadmobile.door.replication.checkPendingReplicationTrackers
-import com.ustadmobile.door.replication.markReplicateTrackersAsProcessed
 import com.ustadmobile.door.util.systemTimeInMillis
 import kotlinx.serialization.json.*
 import org.junit.Assert
+import repdb.RepEntityTracker
 
 class TestDoorDatabaseReplicationExt {
 
@@ -170,5 +169,78 @@ class TestDoorDatabaseReplicationExt {
             getPendingTrackerCount())
     }
 
+    @Test
+    fun givenPendingReplications_whenFindPendingReplicationsCalled_thenShouldReturnJsonArray() {
+        db.repDao.insertDoorNode(DoorNode().apply {
+            nodeId = 42
+            auth = "secret"
+        })
 
+        //insert an entity into the rep entity table
+        db.repDao.insert(RepEntity().apply {
+            reNumField = 57
+            reString = "magic plus 15"
+            reLastChangeTime = systemTimeInMillis()
+        })
+
+        db.repDao.insert(RepEntity().apply {
+            reNumField = 57
+            reString = "magic plus 15"
+            reLastChangeTime = systemTimeInMillis()
+        })
+
+        runBlocking {
+            db.repDao.updateReplicationTrackers()
+        }
+
+        val pendingReplicationJsonArray = runBlocking {
+            db.findPendingReplications(RepDb::class.doorDatabaseMetadata(), 42L,
+                RepEntity.TABLE_ID)
+        }
+
+        Assert.assertEquals("Found two pending replications", 2, pendingReplicationJsonArray.size)
+    }
+
+
+    @Test
+    fun givenRepEntityJsonData_whenInsertReplicationsIntoReceiveViewCalled_thenShouldInsert() {
+        //IMPORTANT NOTE: We should update the logic so that missing column names fall back to default values.
+
+        val time = systemTimeInMillis()
+        val repEntity = RepEntity().apply {
+            rePrimaryKey = 1212
+            reNumField = 57
+            reString = "magic plus 15"
+            reLastChangeTime = time
+        }
+
+        val repTracker = RepEntityTracker().apply {
+            trkrPrimaryKey = 100
+            trkrForeignKey = 1212
+            trkrVersionId = time
+        }
+
+        val json = Json {
+            encodeDefaults = true
+        }
+
+        val entityJsonStr = json.encodeToString(RepEntity.serializer(), repEntity)
+        val trackerJsonStr = json.encodeToString(RepEntityTracker.serializer(), repTracker)
+
+        val entityJsonObj = json.decodeFromString(JsonObject.serializer(), entityJsonStr)
+        val trackerJsonObj = json.decodeFromString(JsonObject.serializer(), trackerJsonStr)
+
+        val combinedJsonObj = JsonObject(entityJsonObj.map { it.key to it.value }.toMap() +
+            trackerJsonObj.map { it.key to it.value }.toMap())
+
+        runBlocking {
+            db.insertReplicationsIntoReceiveView(RepDb::class.doorDatabaseMetadata(), RepDb::class,
+                100, RepEntity.TABLE_ID, JsonArray(listOf(combinedJsonObj))
+            )
+        }
+
+        val numEntities = db.repDao.countEntities()
+        Assert.assertEquals("One entity inserted", 1, numEntities)
+
+    }
 }

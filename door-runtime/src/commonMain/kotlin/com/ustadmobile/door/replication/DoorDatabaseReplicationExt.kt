@@ -98,3 +98,50 @@ suspend fun <T: DoorDatabase> DoorDatabase.markReplicateTrackersAsProcessed(
         }
     }
 }
+
+/**
+ *
+ */
+suspend fun DoorDatabase.findPendingReplications(
+    dbMetaData: DoorDatabaseMetadata<*>,
+    remoteNodeId: Long,
+    tableId: Int,
+) : JsonArray {
+    val repEntityMetaData = dbMetaData.replicateEntities[tableId] ?: throw IllegalArgumentException("No such table: $tableId")
+
+    return prepareAndUseStatementAsync(repEntityMetaData.findPendingReplicationSql) { stmt ->
+        stmt.setLong(1, remoteNodeId)
+        stmt.executeQueryAsyncKmp().useResults { results ->
+            results.rowsToJsonArray(repEntityMetaData.pendingReplicationColumnTypesMap)
+        }
+    }
+
+}
+
+
+suspend fun DoorDatabase.insertReplicationsIntoReceiveView(
+    dbMetaData: DoorDatabaseMetadata<*>,
+    dbKClass: KClass<out DoorDatabase>,
+    remoteNodeId: Long,
+    tableId: Int,
+    receivedEntities: JsonArray
+) {
+    val repEntityMetaData = dbMetaData.replicateEntities[tableId] ?: throw IllegalArgumentException("No such table: $tableId")
+    val receivedObjects = receivedEntities.map { it as JsonObject }
+
+    return withDoorTransactionAsync(dbKClass) {
+        prepareAndUseStatementAsync(repEntityMetaData.insertIntoReceiveViewSql) { stmt ->
+            receivedObjects.forEach { receivedObject ->
+                for(i in 0 until repEntityMetaData.insertIntoReceiveViewTypesList.size) {
+                    //HERE: Need to let objFieldVal default according to type if not in the JsonObject.
+                    val objFieldVal = receivedObject.get(repEntityMetaData.insertIntoReceiveViewTypeColNames[i]) as? JsonPrimitive
+                    stmt.setJsonPrimitive(i + 1, repEntityMetaData.insertIntoReceiveViewTypesList[i],
+                        receivedObject.get(repEntityMetaData.insertIntoReceiveViewTypeColNames[i]) as JsonPrimitive)
+                }
+
+                stmt.executeUpdateAsyncKmp()
+            }
+        }
+    }
+
+}

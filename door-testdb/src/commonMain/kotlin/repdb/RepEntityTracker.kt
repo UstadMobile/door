@@ -6,7 +6,9 @@ import com.ustadmobile.door.annotation.ReplicationDestinationNodeId
 import com.ustadmobile.door.annotation.ReplicationEntityForeignKey
 import com.ustadmobile.door.annotation.ReplicationTrackerProcessed
 import com.ustadmobile.door.annotation.ReplicationVersionId
+import kotlinx.serialization.Serializable
 
+@Serializable
 @Entity
 class RepEntityTracker {
 

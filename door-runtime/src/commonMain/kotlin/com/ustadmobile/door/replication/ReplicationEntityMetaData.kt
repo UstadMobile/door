@@ -29,6 +29,18 @@ class ReplicationEntityMetaData(
         get() = mapOf(KEY_PRIMARY_KEY to entityPrimaryKeyFieldType,
             KEY_VERSION_ID to versionIdFieldType)
 
+    /**
+     * Map of column name to column type for rows returned by the findPendingReplicationSql query.
+     */
+    internal val pendingReplicationColumnTypesMap: Map<String, Int>
+        get() = entityFields.map { it.fieldName to it.fieldType }.toMap() + trackerFields.map { it.fieldName to it.fieldType }
+
+    internal val insertIntoReceiveViewTypesList: List<Int>
+        get() = entityFields.map { it.fieldType } + trackerFields.map { it.fieldType }
+
+    internal val insertIntoReceiveViewTypeColNames: List<String>
+        get() = entityFields.map { it.fieldName } + trackerFields.map { it.fieldName }
+
     val findPendingTrackerSql: String by lazy(LazyThreadSafetyMode.NONE) {
         """
         SELECT $trackerForeignKeyFieldName AS primaryKey, 
@@ -82,7 +94,14 @@ class ReplicationEntityMetaData(
                LEFT JOIN $entityTableName 
                     ON $trackerTableName.$trackerForeignKeyFieldName = $entityTableName.$entityPrimaryKeyFieldName
          WHERE $trackerTableName.$trackerDestNodeIdFieldName = ?
-           AND $trackerProcessedFieldName = 0 
+           AND CAST($trackerProcessedFieldName AS BOOLEAN) = false 
+        """
+    }
+
+    val insertIntoReceiveViewSql: String by lazy(LazyThreadSafetyMode.NONE) {
+        """
+        INSERT INTO $receiveViewName (${entityFields.joinToString{ it.fieldName }}, ${trackerFields.joinToString { it.fieldName }})
+               VALUES (${(0 until (entityFields.size + trackerFields.size)).map { "?" }.joinToString()})
         """
     }
 
