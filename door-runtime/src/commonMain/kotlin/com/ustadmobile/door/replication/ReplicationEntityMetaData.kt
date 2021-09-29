@@ -1,5 +1,7 @@
 package com.ustadmobile.door.replication
 
+import com.ustadmobile.door.DoorDbType
+
 class ReplicationEntityMetaData(
     val tableId: Int,
     val entityTableName: String,
@@ -47,10 +49,26 @@ class ReplicationEntityMetaData(
         """
     }
 
+    fun updateSetTrackerProcessedSql(dbType: Int) = if(dbType == DoorDbType.SQLITE) {
+        updateSetTrackerProcessedSqlSqlite
+    }else {
+        updateSetTrackerProcessedSqlPostgres
+    }
+
     val updateSetTrackerProcessedSqlSqlite: String by lazy(LazyThreadSafetyMode.NONE) {
         """
         UPDATE $trackerTableName
            SET $trackerProcessedFieldName = 1
+         WHERE $trackerForeignKeyFieldName = ?
+           AND $trackerVersionFieldName = ?
+           AND $trackerDestNodeIdFieldName = ?     
+        """
+    }
+
+    val updateSetTrackerProcessedSqlPostgres: String by lazy(LazyThreadSafetyMode.NONE) {
+        """
+        UPDATE $trackerTableName
+           SET $trackerProcessedFieldName = true
          WHERE $trackerForeignKeyFieldName = ?
            AND $trackerVersionFieldName = ?
            AND $trackerDestNodeIdFieldName = ?     

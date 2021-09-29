@@ -3,6 +3,7 @@ package com.ustadmobile.door.replication
 import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
+import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
 import com.ustadmobile.door.replication.ReplicationEntityMetaData.Companion.KEY_PRIMARY_KEY
 import com.ustadmobile.door.replication.ReplicationEntityMetaData.Companion.KEY_VERSION_ID
 import kotlinx.serialization.json.JsonArray
@@ -63,4 +64,37 @@ suspend fun <T: DoorDatabase> DoorDatabase.checkPendingReplicationTrackers(
     }
 
     return JsonArray(alreadyUpdatedEntities)
+}
+
+/**
+ * Mark the given replication trackers as processed. This can happen when a client has received them and sent an
+ * acknowledgement, or before the main sync happens if the other side already has the updated version of the given
+ * entity.
+ *
+ * @param processedReplicateTrackers a JSON array of trackers that should be marked as processed e.g.
+ *  [ {primaryKey : 123, versionId: 456 }.. ]
+ */
+suspend fun <T: DoorDatabase> DoorDatabase.markReplicateTrackersAsProcessed(
+    dbKClass: KClass<out T>,
+    dbMetaData: DoorDatabaseMetadata<*>,
+    processedReplicateTrackers: JsonArray,
+    remoteNodeId: Long,
+    tableId: Int,
+) {
+    val repEntityMetaData = dbMetaData.replicateEntities[tableId] ?: throw IllegalArgumentException("No such table: $tableId")
+
+    val processedReplicateTrackersObjects = processedReplicateTrackers.map { it as JsonObject }
+
+    withDoorTransactionAsync(dbKClass) { transactionDb ->
+        transactionDb.prepareAndUseStatementAsync(repEntityMetaData.updateSetTrackerProcessedSql(transactionDb.dbType())) { stmt ->
+            processedReplicateTrackersObjects.forEach { replicateTracker ->
+                stmt.setJsonPrimitive(1, repEntityMetaData.entityPrimaryKeyFieldType,
+                    replicateTracker.get(KEY_PRIMARY_KEY) as JsonPrimitive)
+                stmt.setJsonPrimitive(2, repEntityMetaData.versionIdFieldType,
+                    replicateTracker.get(KEY_VERSION_ID) as JsonPrimitive)
+                stmt.setLong(3, remoteNodeId)
+                stmt.executeUpdateAsyncKmp()
+            }
+        }
+    }
 }
