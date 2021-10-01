@@ -29,6 +29,9 @@ abstract class DoorDatabaseMetadata<T: DoorDatabase> {
      */
     abstract val hasReadOnlyWrapper: Boolean
 
+    fun requireReplicateEntityMetaData(tableId: Int) = replicateEntities[tableId]
+        ?: throw IllegalArgumentException("No metadata for table id $tableId")
+
     companion object {
 
         /**

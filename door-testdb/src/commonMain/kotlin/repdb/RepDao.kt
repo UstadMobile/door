@@ -52,5 +52,11 @@ abstract class RepDao {
     """)
     abstract fun countEntities(): Int
 
+    @Query("""
+    SELECT RepEntity.*
+      FROM RepEntity
+     WHERE RepEntity.rePrimaryKey = :uid 
+    """)
+    abstract fun findByUid(uid: Long): RepEntity?
 
 }

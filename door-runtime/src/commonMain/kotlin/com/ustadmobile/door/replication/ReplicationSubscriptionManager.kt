@@ -36,7 +36,7 @@ class ReplicationSubscriptionManager(
     private val dbKClass: KClass<out DoorDatabase>,
     private val numProcessors: Int = 5,
     eventSourceFactory: DoorEventSourceFactory = DefaultDoorEventSourceFactoryImpl(),
-    private val sendReplicationRunner: ReplicateRunner = ReplicateRunner { repo, tableId -> repo.sendPendingReplications(tableId) },
+    private val sendReplicationRunner: ReplicateRunner = ReplicateRunner { repo, tableId -> },
     private val fetchReplicationRunner: ReplicateRunner = ReplicateRunner { repo, tableId -> repo.fetchPendingReplications(tableId) }
 ): DoorEventListener, ReplicationPendingListener {
 
@@ -192,7 +192,7 @@ class ReplicationSubscriptionManager(
 
     override fun onMessage(message: DoorServerSentEvent) {
         when(message.event) {
-            "INIT" -> coroutineScope.launch {
+            EVT_INIT -> coroutineScope.launch {
                 remoteNodeId.value = message.data.toLong()
                 initReplicationStatus()
                 initCompletable.complete(true)
@@ -208,7 +208,7 @@ class ReplicationSubscriptionManager(
                 }
                 checkQueueSignal.send(true)
             }
-            "INVALIDATE" -> coroutineScope.launch {
+            EVT_INVALIDATE -> coroutineScope.launch {
                 val tableIdsToInvalidate = message.data.split(",").mapNotNull { it.toIntOrNull() }
                 initCompletable.await()
                 val timeNow = systemTimeInMillis()
@@ -259,6 +259,15 @@ class ReplicationSubscriptionManager(
     }
 
     override fun onError(e: Exception) {
+
+    }
+
+    companion object {
+
+        const val EVT_INIT = "INIT"
+
+        const val EVT_INVALIDATE = "INVALIDATE"
+
 
     }
 }

@@ -1,0 +1,120 @@
+package com.ustadmobile.door.replication
+
+import com.ustadmobile.door.DoorDatabase
+import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_CHECK_FOR_ENTITIES_ALREADY_RECEIVED
+import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_RECEIVE_ENTITIES
+import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_SUBSCRIBE_SSE
+import com.ustadmobile.door.DoorDatabaseRepository.Companion.PATH_REPLICATION
+import com.ustadmobile.door.ext.DoorTag
+import com.ustadmobile.door.ext.doorDatabaseMetadata
+import com.ustadmobile.door.ext.requireRemoteNodeIdAndAuth
+import com.ustadmobile.door.sse.DoorServerSentEvent
+import io.github.aakira.napier.Napier
+import io.ktor.application.*
+import io.ktor.http.*
+import io.ktor.request.*
+import io.ktor.response.*
+import io.ktor.routing.*
+import kotlinx.coroutines.channels.Channel
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import org.kodein.di.DI
+import org.kodein.di.direct
+import org.kodein.di.instance
+import org.kodein.di.ktor.closestDI
+import org.kodein.di.on
+import org.kodein.type.TypeToken
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.reflect.KClass
+import com.ustadmobile.door.ext.withUtf8Charset
+
+
+@Suppress("BlockingMethodInNonBlockingContext") //Has to be done in Server Sent Events
+fun <T: DoorDatabase> Route.doorReplicationRoute(
+    typeToken: TypeToken<out T>,
+    dbKClass: KClass<out T>,
+    jsonSerializer: Json
+) {
+    route(PATH_REPLICATION) {
+
+        post(ENDPOINT_CHECK_FOR_ENTITIES_ALREADY_RECEIVED) {
+            try {
+                val di: DI by closestDI()
+                val db: DoorDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
+                val dbMetaData = dbKClass.doorDatabaseMetadata()
+                val tableId = call.request.queryParameters["tableId"]?.toInt() ?: 0
+
+                val pendingEntitiesStr = call.receive<String>()
+                val pendingEntitiesJsonArr = jsonSerializer.decodeFromString(JsonArray.serializer(), pendingEntitiesStr)
+                val alreadyReceivedTrackers = db.checkPendingReplicationTrackers(dbKClass,
+                    dbMetaData, pendingEntitiesJsonArr, tableId)
+
+                call.respondText(contentType = ContentType.Application.Json.withUtf8Charset(),
+                    text = jsonSerializer.encodeToString(JsonArray.serializer(), alreadyReceivedTrackers))
+            }catch(e: Exception) {
+                e.printStackTrace()
+                e.printStackTrace()
+            }
+
+        }
+
+        put(ENDPOINT_RECEIVE_ENTITIES) {
+            try {
+                val di: DI by closestDI()
+                val db: DoorDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
+                val dbMetaData = dbKClass.doorDatabaseMetadata()
+                val tableId = call.request.queryParameters["tableId"]?.toInt() ?: 0
+                val remoteNodeId = requireRemoteNodeIdAndAuth()
+
+                val receivedEntitiesStr = call.receive<String>()
+                val receivedEntitiesJsonArr = jsonSerializer.decodeFromString(JsonArray.serializer(),
+                    receivedEntitiesStr)
+                db.insertReplicationsIntoReceiveView(dbMetaData, dbKClass, remoteNodeId.first, tableId,
+                    receivedEntitiesJsonArr)
+                call.respondText(text = "", status = HttpStatusCode.NoContent)
+            }catch(e: Exception) {
+                e.printStackTrace()
+                e.printStackTrace()
+            }
+
+        }
+
+        get(ENDPOINT_SUBSCRIBE_SSE) {
+            call.response.cacheControl(CacheControl.NoCache(null))
+            val di: DI by closestDI()
+
+            val replicationNotificationDispatcher: ReplicationNotificationDispatcher = di.on(call).direct.instance()
+            val channel = Channel<DoorServerSentEvent>(capacity = Channel.UNLIMITED)
+            val nodeIdAndAuthVal = requireRemoteNodeIdAndAuth()
+            val evtIdCounter = AtomicInteger()
+            val pendingReplicationListener = ReplicationPendingListener {  repEvt ->
+                channel.trySend(repEvt.toDoorServerSentEvent(evtIdCounter.incrementAndGet().toString()))
+            }
+            try {
+                channel.send(DoorServerSentEvent("0", ReplicationSubscriptionManager.EVT_INIT, ""))
+                replicationNotificationDispatcher.addReplicationPendingEventListener(nodeIdAndAuthVal.first,
+                    pendingReplicationListener)
+
+                call.respondTextWriter(contentType = ContentType.Text.EventStream) {
+                    flush()
+                    for(notification in channel) {
+                        write("id: ${notification.id}\n")
+                        write("event: ${notification.event}\n")
+                        write("data: ${notification.data}\n\n")
+                        flush()
+                        Napier.d("Sent event ${notification.id} for data: ${notification.data}",
+                            tag = DoorTag.LOG_TAG)
+                    }
+                }
+
+            }catch(e: Exception) {
+                e.printStackTrace()
+            }finally {
+                replicationNotificationDispatcher.removeReplicationPendingEventListener(nodeIdAndAuthVal.first,
+                    pendingReplicationListener)
+                channel.close()
+            }
+
+        }
+    }
+}
