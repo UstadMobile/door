@@ -37,7 +37,7 @@ class ReplicationSubscriptionManager(
     private val numProcessors: Int = 5,
     eventSourceFactory: DoorEventSourceFactory = DefaultDoorEventSourceFactoryImpl(),
     private val sendReplicationRunner: ReplicateRunner = ReplicateRunner { repo, tableId -> },
-    private val fetchReplicationRunner: ReplicateRunner = ReplicateRunner { repo, tableId -> repo.fetchPendingReplications(tableId) }
+    private val fetchReplicationRunner: ReplicateRunner = ReplicateRunner { repo, tableId ->  }
 ): DoorEventListener, ReplicationPendingListener {
 
     fun interface ReplicateRunner {

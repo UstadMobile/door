@@ -112,7 +112,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         runBlocking { localRepDb.repDao.updateReplicationTrackers() }
 
         runBlocking {
-            (localDbRepo as DoorDatabaseRepository).sendPendingReplications(RepDb::class, jsonSerializer, REMOTE_NODE_ID,
+            (localDbRepo as DoorDatabaseRepository).sendPendingReplications(jsonSerializer, REMOTE_NODE_ID,
                 RepEntity.TABLE_ID)
         }
 

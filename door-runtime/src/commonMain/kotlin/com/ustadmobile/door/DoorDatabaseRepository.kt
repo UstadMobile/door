@@ -96,6 +96,10 @@ interface DoorDatabaseRepository {
 
         val ENDPOINT_CHECK_FOR_ENTITIES_ALREADY_RECEIVED = "checkForEntitiesAlreadyReceived"
 
+        val ENDPOINT_FIND_PENDING_REPLICATION_TRACKERS = "findPendingReplicationTrackers"
+
+
+
 
 
     }

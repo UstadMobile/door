@@ -2,6 +2,7 @@ package com.ustadmobile.door.replication
 
 import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_CHECK_FOR_ENTITIES_ALREADY_RECEIVED
+import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_FIND_PENDING_REPLICATION_TRACKERS
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_RECEIVE_ENTITIES
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_SUBSCRIBE_SSE
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.PATH_REPLICATION
@@ -77,6 +78,20 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
                 e.printStackTrace()
             }
 
+        }
+
+        get(ENDPOINT_FIND_PENDING_REPLICATION_TRACKERS) {
+            call.response.cacheControl(CacheControl.NoCache(null))
+            val di: DI by closestDI()
+
+            val db: DoorDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
+            val dbMetaData = dbKClass.doorDatabaseMetadata()
+            val tableId = call.request.queryParameters["tableId"]?.toInt() ?: 0
+            val (remoteNodeId, _) = requireRemoteNodeIdAndAuth()
+
+            val pendingTrackers = db.findPendingReplicationTrackers(dbMetaData, remoteNodeId, tableId)
+            call.respondText(contentType = ContentType.Application.Json.withUtf8Charset(),
+                text = jsonSerializer.encodeToString(JsonArray.serializer(), pendingTrackers))
         }
 
         get(ENDPOINT_SUBSCRIBE_SSE) {

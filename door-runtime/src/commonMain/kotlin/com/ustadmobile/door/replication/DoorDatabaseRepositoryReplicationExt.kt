@@ -3,6 +3,7 @@ package com.ustadmobile.door.replication
 import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_CHECK_FOR_ENTITIES_ALREADY_RECEIVED
+import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_FIND_PENDING_REPLICATION_TRACKERS
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_RECEIVE_ENTITIES
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.PATH_REPLICATION
 import com.ustadmobile.door.ext.doorDatabaseMetadata
@@ -24,14 +25,14 @@ private fun JsonObject.getOrThrow(key: String): JsonElement {
 }
 
 suspend fun DoorDatabaseRepository.sendPendingReplications(
-    dbKClass: KClass<out DoorDatabase>,
     jsonSerializer: Json,
     remoteNodeId: Long,
     tableId: Int
 ) {
     //should return a result object of some kind
 
-    val dbMetaData = dbKClass.doorDatabaseMetadata()
+    val dbMetaData = (this as DoorDatabase)::class.doorDatabaseMetadata()
+    val dbKClass = dbMetaData.dbClass
 
     val repEntityMetaData = dbMetaData.requireReplicateEntityMetaData(tableId)
 
@@ -81,9 +82,28 @@ suspend fun DoorDatabaseRepository.sendPendingReplications(
 
 @Suppress("RedundantSuspendModifier", "UNUSED_PARAMETER", "unused")
 suspend fun DoorDatabaseRepository.fetchPendingReplications(
-    tableId: Int
+    jsonSerializer: Json,
+    tableId: Int,
+    remoteNodeId: Long
 ) {
-    //should return a result object of some kind
+    val dbMetaData = (this as DoorDatabase)::class.doorDatabaseMetadata()
+    val dbKClass = dbMetaData.dbClass
+
+    val repEntityMetaData = dbMetaData.requireReplicateEntityMetaData(tableId)
+
+    //Get pending trackers from remote
+    val remotePendingTrackersStr = config.httpClient.get<String> {
+        url {
+            takeFrom(this@fetchPendingReplications.config.endpoint)
+            encodedPath = "$encodedPath$PATH_REPLICATION/$ENDPOINT_FIND_PENDING_REPLICATION_TRACKERS"
+        }
+
+        parameter("tableId", tableId)
+        doorNodeIdHeader(this@fetchPendingReplications)
+    }
+
+    val remotePendingTrackersJsonArray = jsonSerializer.decodeFromString(JsonArray.serializer(),
+        remotePendingTrackersStr)
 }
 
 
