@@ -16,6 +16,8 @@ import io.ktor.http.*
 import io.ktor.http.content.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlin.math.max
+import kotlin.math.min
 
 
 suspend fun DoorDatabaseRepository.sendPendingReplications(
@@ -30,44 +32,52 @@ suspend fun DoorDatabaseRepository.sendPendingReplications(
 
     val repEntityMetaData = dbMetaData.requireReplicateEntityMetaData(tableId)
 
-    val pendingReplicationTrackers = db.findPendingReplicationTrackers(dbMetaData, remoteNodeId, tableId)
+    var offset = 0
+    do {
+        val pendingReplicationTrackers = db.findPendingReplicationTrackers(dbMetaData, remoteNodeId, tableId, offset)
 
-    val alreadyUpdatedTrackers = config.httpClient.post<String> {
-        url {
-            takeFrom(this@sendPendingReplications.config.endpoint)
-            encodedPath = "${encodedPath}$PATH_REPLICATION/$ENDPOINT_CHECK_FOR_ENTITIES_ALREADY_RECEIVED"
-        }
+        val alreadyUpdatedTrackers = config.httpClient.post<String> {
+            url {
+                takeFrom(this@sendPendingReplications.config.endpoint)
+                encodedPath = "${encodedPath}$PATH_REPLICATION/$ENDPOINT_CHECK_FOR_ENTITIES_ALREADY_RECEIVED"
+            }
 
-        doorNodeIdHeader(this@sendPendingReplications)
-        parameter("tableId", tableId)
+            doorNodeIdHeader(this@sendPendingReplications)
+            parameter("tableId", tableId)
 
-        body = TextContent(jsonSerializer.encodeToString(JsonArray.serializer(), pendingReplicationTrackers),
+            body = TextContent(jsonSerializer.encodeToString(JsonArray.serializer(), pendingReplicationTrackers),
                 ContentType.Application.Json.withUtf8Charset())
-    }
-
-    val alreadyUpdatedTrackersJsonArr = jsonSerializer.decodeFromString(JsonArray.serializer(), alreadyUpdatedTrackers)
-
-    db.markReplicateTrackersAsProcessed(dbKClass, dbMetaData, alreadyUpdatedTrackersJsonArr, remoteNodeId, tableId)
-
-    val pendingReplicationToSend = db.findPendingReplications(dbMetaData, remoteNodeId, tableId)
-    config.httpClient.put<Unit> {
-        url {
-            takeFrom(this@sendPendingReplications.config.endpoint)
-            encodedPath = "${encodedPath}$PATH_REPLICATION/$ENDPOINT_RECEIVE_ENTITIES"
         }
 
-        parameter("tableId", tableId)
-        doorNodeIdHeader(this@sendPendingReplications)
+        val alreadyUpdatedTrackersJsonArr = jsonSerializer.decodeFromString(JsonArray.serializer(), alreadyUpdatedTrackers)
 
-        body = TextContent(jsonSerializer.encodeToString(JsonArray.serializer(), pendingReplicationToSend),
-            ContentType.Application.Json.withUtf8Charset())
-    }
+        db.markReplicateTrackersAsProcessed(dbKClass, dbMetaData, alreadyUpdatedTrackersJsonArr, remoteNodeId, tableId)
 
-    val pendingReplicationsProcessed = repEntityMetaData.entityJsonArrayToReplicationTrackSummaryArray(
-        pendingReplicationToSend)
+        offset += (pendingReplicationTrackers.size - min(alreadyUpdatedTrackersJsonArr.size, repEntityMetaData.batchSize))
+    }while(pendingReplicationTrackers.size == repEntityMetaData.batchSize)
 
-    db.markReplicateTrackersAsProcessed(dbKClass, dbMetaData, pendingReplicationsProcessed,
-        remoteNodeId, tableId)
+
+    do {
+        val pendingReplicationToSend = db.findPendingReplications(dbMetaData, remoteNodeId, tableId)
+        config.httpClient.put<Unit> {
+            url {
+                takeFrom(this@sendPendingReplications.config.endpoint)
+                encodedPath = "${encodedPath}$PATH_REPLICATION/$ENDPOINT_RECEIVE_ENTITIES"
+            }
+
+            parameter("tableId", tableId)
+            doorNodeIdHeader(this@sendPendingReplications)
+
+            body = TextContent(jsonSerializer.encodeToString(JsonArray.serializer(), pendingReplicationToSend),
+                ContentType.Application.Json.withUtf8Charset())
+        }
+
+        val pendingReplicationsProcessed = repEntityMetaData.entityJsonArrayToReplicationTrackSummaryArray(
+            pendingReplicationToSend)
+
+        db.markReplicateTrackersAsProcessed(dbKClass, dbMetaData, pendingReplicationsProcessed,
+            remoteNodeId, tableId)
+    }while(pendingReplicationsProcessed.size == repEntityMetaData.batchSize)
 }
 
 suspend inline fun <reified T> DoorDatabaseRepository.put(
@@ -99,53 +109,63 @@ suspend fun DoorDatabaseRepository.fetchPendingReplications(
     val repEntityMetaData = dbMetaData.requireReplicateEntityMetaData(tableId)
 
     //Get pending trackers from remote
-    val remotePendingTrackersStr = config.httpClient.get<String> {
-        url {
-            takeFrom(this@fetchPendingReplications.config.endpoint)
-            encodedPath = "$encodedPath${PATH_REPLICATION}/$ENDPOINT_FIND_PENDING_REPLICATION_TRACKERS"
+    var offset = 0
+    do {
+        val remotePendingTrackersStr = config.httpClient.get<String> {
+            url {
+                takeFrom(this@fetchPendingReplications.config.endpoint)
+                encodedPath = "$encodedPath${PATH_REPLICATION}/$ENDPOINT_FIND_PENDING_REPLICATION_TRACKERS"
+            }
+
+            parameter("tableId", tableId)
+            parameter("offset", offset)
+            doorNodeIdHeader(this@fetchPendingReplications)
         }
 
-        parameter("tableId", tableId)
-        doorNodeIdHeader(this@fetchPendingReplications)
-    }
+        val remotePendingTrackersJsonArray = jsonSerializer.decodeFromString(JsonArray.serializer(),
+            remotePendingTrackersStr)
 
-    val remotePendingTrackersJsonArray = jsonSerializer.decodeFromString(JsonArray.serializer(),
-        remotePendingTrackersStr)
+        val alreadyUpdatedTrackers = db.checkPendingReplicationTrackers(dbKClass, dbMetaData,
+            remotePendingTrackersJsonArray, tableId)
 
-    val alreadyUpdatedTrackers = db.checkPendingReplicationTrackers(dbKClass, dbMetaData,
-        remotePendingTrackersJsonArray, tableId)
+        config.httpClient.takeIf { alreadyUpdatedTrackers.isNotEmpty() }?.put<Unit> {
+            url {
+                takeFrom(this@fetchPendingReplications.config.endpoint)
+                encodedPath = "$encodedPath$PATH_REPLICATION/$ENDPOINT_MARK_REPLICATE_TRACKERS_AS_PROCESSED"
+            }
 
-    config.httpClient.takeIf { alreadyUpdatedTrackers.isNotEmpty() }?.put<Unit> {
-        url {
-            takeFrom(this@fetchPendingReplications.config.endpoint)
-            encodedPath = "$encodedPath$PATH_REPLICATION/$ENDPOINT_MARK_REPLICATE_TRACKERS_AS_PROCESSED"
+            parameter("tableId", tableId)
+            doorNodeIdHeader(this@fetchPendingReplications)
+
+            body = TextContent(jsonSerializer.encodeToString(JsonArray.serializer(), alreadyUpdatedTrackers),
+                ContentType.Application.Json.withUtf8Charset())
         }
 
-        parameter("tableId", tableId)
-        doorNodeIdHeader(this@fetchPendingReplications)
+        offset = max(0, (offset + repEntityMetaData.batchSize) - alreadyUpdatedTrackers.size)
+    }while(remotePendingTrackersJsonArray.size == repEntityMetaData.batchSize)
 
-        body = TextContent(jsonSerializer.encodeToString(JsonArray.serializer(), alreadyUpdatedTrackers),
-            ContentType.Application.Json.withUtf8Charset())
-    }
+    do {
+        val pendingReplicationsStr = config.httpClient.get<String> {
+            url {
+                takeFrom(this@fetchPendingReplications.config.endpoint)
+                encodedPath = "$encodedPath$PATH_REPLICATION/$ENDPOINT_FIND_PENDING_REPLICATIONS"
+            }
 
-    val pendingReplicationsStr = config.httpClient.get<String> {
-        url {
-            takeFrom(this@fetchPendingReplications.config.endpoint)
-            encodedPath = "$encodedPath$PATH_REPLICATION/$ENDPOINT_FIND_PENDING_REPLICATIONS"
+            parameter("tableId", tableId)
+            doorNodeIdHeader(this@fetchPendingReplications)
         }
 
-        parameter("tableId", tableId)
-        doorNodeIdHeader(this@fetchPendingReplications)
-    }
+        val pendingReplicationsJson = jsonSerializer.decodeFromString(JsonArray.serializer(), pendingReplicationsStr)
 
-    val pendingReplicationsJson = jsonSerializer.decodeFromString(JsonArray.serializer(), pendingReplicationsStr)
-    db.insertReplicationsIntoReceiveView(dbMetaData, dbKClass, remoteNodeId, tableId, pendingReplicationsJson)
+        db.insertReplicationsIntoReceiveView(dbMetaData, dbKClass, remoteNodeId, tableId, pendingReplicationsJson)
 
-    val replicationTrackersToMarkProcessed = repEntityMetaData.entityJsonArrayToReplicationTrackSummaryArray(
-        pendingReplicationsJson)
+        val replicationTrackersToMarkProcessed = repEntityMetaData.entityJsonArrayToReplicationTrackSummaryArray(
+            pendingReplicationsJson)
 
-    put<Unit>(ENDPOINT_MARK_REPLICATE_TRACKERS_AS_PROCESSED, tableId) {
-        body = TextContent(jsonSerializer.encodeToString(JsonArray.serializer(), replicationTrackersToMarkProcessed),
-            ContentType.Application.Json.withUtf8Charset())
-    }
+        put<Unit>(ENDPOINT_MARK_REPLICATE_TRACKERS_AS_PROCESSED, tableId) {
+            body = TextContent(jsonSerializer.encodeToString(JsonArray.serializer(), replicationTrackersToMarkProcessed),
+                ContentType.Application.Json.withUtf8Charset())
+        }
+
+    }while(pendingReplicationsJson.size == repEntityMetaData.batchSize)
 }

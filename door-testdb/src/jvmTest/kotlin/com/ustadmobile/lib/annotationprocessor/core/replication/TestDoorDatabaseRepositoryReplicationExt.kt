@@ -156,4 +156,55 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         Assert.assertNotNull("Entity now on local", localRepDb.repDao.findByUid(repEntity.rePrimaryKey))
     }
 
+    @Test
+    fun givenMoreEntitiesThanInBatchCreatedRemotely_whenFetchPendingReplicationsCalled_thenShouldAllBePresentOnLocal() {
+        remoteRepDb.repDao.insertDoorNode(DoorNode().apply {
+            auth = "secret"
+            nodeId = LOCAL_NODE_ID.toInt()
+        })
+
+        remoteRepDb.repDao.insertList((0..1500).map {
+            RepEntity().apply {
+                reString = "Fetch $it"
+                reNumField = it
+            }
+        })
+
+        runBlocking { remoteRepDb.repDao.updateReplicationTrackers() }
+
+        runBlocking {
+            (localDbRepo as DoorDatabaseRepository).fetchPendingReplications(jsonSerializer, RepEntity.TABLE_ID,
+                REMOTE_NODE_ID)
+        }
+
+        Assert.assertEquals("All entities transferred", remoteRepDb.repDao.countEntities(),
+            localRepDb.repDao.countEntities())
+    }
+
+
+    @Test
+    fun givenMoreEntitiesThanInBatchCreatedLocally_whenSendPendingReplicationsCalled_thenAllShouldBePresentOnRemote() {
+        localRepDb.repDao.insertDoorNode(DoorNode().apply {
+            auth = "secret"
+            nodeId = REMOTE_NODE_ID.toInt()
+        })
+
+        localRepDb.repDao.insertList((0..1500).map {
+            RepEntity().apply {
+                reString = "Hello World $it"
+                reNumField = it
+            }
+        })
+
+        runBlocking { localRepDb.repDao.updateReplicationTrackers() }
+
+        runBlocking {
+            (localDbRepo as DoorDatabaseRepository).sendPendingReplications(jsonSerializer, REMOTE_NODE_ID,
+                RepEntity.TABLE_ID)
+        }
+
+        Assert.assertEquals("All entities transferred", localRepDb.repDao.countEntities(),
+            remoteRepDb.repDao.countEntities())
+    }
+
 }

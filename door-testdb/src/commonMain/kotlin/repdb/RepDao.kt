@@ -39,6 +39,9 @@ abstract class RepDao {
     @Insert
     abstract fun insert(repEntity: RepEntity): Long
 
+    @Insert
+    abstract fun insertList(repEntityList: List<RepEntity>)
+
     @Update
     abstract fun update(repEntity: RepEntity)
 

@@ -17,7 +17,8 @@ class ReplicationEntityMetaData(
     val trackerVersionFieldName: String,
     val trackerProcessedFieldName: String,
     val entityFields: List<ReplicationFieldMetaData>,
-    val trackerFields: List<ReplicationFieldMetaData>
+    val trackerFields: List<ReplicationFieldMetaData>,
+    val batchSize: Int = 1000
 ) {
 
     val entityPrimaryKeyFieldType: Int by lazy(LazyThreadSafetyMode.NONE) {
@@ -50,7 +51,9 @@ class ReplicationEntityMetaData(
                $trackerVersionFieldName AS versionId
           FROM $trackerTableName
          WHERE $trackerDestNodeIdFieldName = ?
-           AND CAST($trackerProcessedFieldName AS INTEGER) = 0      
+           AND CAST($trackerProcessedFieldName AS INTEGER) = 0
+         LIMIT $batchSize 
+        OFFSET ?
     """
     }
 
@@ -61,6 +64,7 @@ class ReplicationEntityMetaData(
           FROM $entityTableName
          WHERE $entityPrimaryKeyFieldName = ?
            AND $entityVersionIdFieldName = ?
+         LIMIT $batchSize 
         """
     }
 
@@ -76,7 +80,7 @@ class ReplicationEntityMetaData(
            SET $trackerProcessedFieldName = 1
          WHERE $trackerForeignKeyFieldName = ?
            AND $trackerVersionFieldName = ?
-           AND $trackerDestNodeIdFieldName = ?     
+           AND $trackerDestNodeIdFieldName = ?
         """
     }
 
@@ -86,7 +90,7 @@ class ReplicationEntityMetaData(
            SET $trackerProcessedFieldName = true
          WHERE $trackerForeignKeyFieldName = ?
            AND $trackerVersionFieldName = ?
-           AND $trackerDestNodeIdFieldName = ?     
+           AND $trackerDestNodeIdFieldName = ?  
         """
     }
 
@@ -98,6 +102,7 @@ class ReplicationEntityMetaData(
                     ON $trackerTableName.$trackerForeignKeyFieldName = $entityTableName.$entityPrimaryKeyFieldName
          WHERE $trackerTableName.$trackerDestNodeIdFieldName = ?
            AND CAST($trackerProcessedFieldName AS BOOLEAN) = false 
+         LIMIT $batchSize  
         """
     }
 

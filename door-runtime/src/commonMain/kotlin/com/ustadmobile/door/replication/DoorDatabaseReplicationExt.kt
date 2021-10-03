@@ -18,11 +18,13 @@ import kotlin.reflect.KClass
 suspend fun DoorDatabase.findPendingReplicationTrackers(
     dbMetaData: DoorDatabaseMetadata<*>,
     remoteNodeId: Long,
-    tableId: Int
+    tableId: Int,
+    offset: Int
 ) : JsonArray {
     val repEntityMetaData = dbMetaData.replicateEntities[tableId] ?: throw IllegalArgumentException("No such table: $tableId")
     return prepareAndUseStatementAsync(repEntityMetaData.findPendingTrackerSql) { stmt ->
         stmt.setLong(1, remoteNodeId)
+        stmt.setInt(2, offset)
         stmt.executeQueryAsyncKmp().useResults {
             it.rowsToJsonArray(repEntityMetaData.pendingReplicationFieldTypesMap)
         }
@@ -129,8 +131,8 @@ suspend fun DoorDatabase.insertReplicationsIntoReceiveView(
     val repEntityMetaData = dbMetaData.replicateEntities[tableId] ?: throw IllegalArgumentException("No such table: $tableId")
     val receivedObjects = receivedEntities.map { it as JsonObject }
 
-    return withDoorTransactionAsync(dbKClass) {
-        prepareAndUseStatementAsync(repEntityMetaData.insertIntoReceiveViewSql) { stmt ->
+    return withDoorTransactionAsync(dbKClass) { transactionDb ->
+        transactionDb.prepareAndUseStatementAsync(repEntityMetaData.insertIntoReceiveViewSql) { stmt ->
             receivedObjects.forEach { receivedObject ->
                 for(i in 0 until repEntityMetaData.insertIntoReceiveViewTypesList.size) {
                     //HERE: Need to let objFieldVal default according to type if not in the JsonObject.

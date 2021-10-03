@@ -48,7 +48,7 @@ class TestDoorDatabaseReplicationExt {
 
         val pendingTrackers = runBlocking {
             db.findPendingReplicationTrackers(RepDb::class.doorDatabaseMetadata(),
-                42, RepEntity.TABLE_ID)
+                42, RepEntity.TABLE_ID, 0)
         }
 
         Assert.assertEquals("Found one pending tracker", 1, pendingTrackers.size)

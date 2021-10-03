@@ -30,6 +30,7 @@ import org.kodein.type.TypeToken
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.reflect.KClass
 import com.ustadmobile.door.ext.withUtf8Charset
+import com.ustadmobile.door.util.systemTimeInMillis
 
 
 @Suppress("BlockingMethodInNonBlockingContext") //Has to be done in Server Sent Events
@@ -107,14 +108,17 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
             val db: DoorDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
             val dbMetaData = dbKClass.doorDatabaseMetadata()
             val tableId = call.request.queryParameters["tableId"]?.toInt() ?: 0
+            val offset = call.request.queryParameters["offset"]?.toInt()  ?: 0
+
             val (remoteNodeId, _) = requireRemoteNodeIdAndAuth()
 
-            val pendingTrackers = db.findPendingReplicationTrackers(dbMetaData, remoteNodeId, tableId)
+            val pendingTrackers = db.findPendingReplicationTrackers(dbMetaData, remoteNodeId, tableId, offset)
             call.respondText(contentType = ContentType.Application.Json.withUtf8Charset(),
                 text = jsonSerializer.encodeToString(JsonArray.serializer(), pendingTrackers))
         }
 
         get(ENDPOINT_FIND_PENDING_REPLICATIONS) {
+            val startTime = systemTimeInMillis()
             call.response.cacheControl(CacheControl.NoCache(null))
             val di: DI by closestDI()
 
@@ -125,6 +129,7 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
             val pendingReplications = db.findPendingReplications(dbMetaData, requireRemoteNodeIdAndAuth().first, tableId)
             call.respondText(contentType = ContentType.Application.Json,
                 text = jsonSerializer.encodeToString(JsonArray.serializer(), pendingReplications))
+            println("Took ${systemTimeInMillis() - startTime}ms to provide http response")
         }
 
         get(ENDPOINT_SUBSCRIBE_SSE) {
