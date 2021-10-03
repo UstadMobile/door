@@ -98,6 +98,9 @@ interface DoorDatabaseRepository {
 
         val ENDPOINT_FIND_PENDING_REPLICATION_TRACKERS = "findPendingReplicationTrackers"
 
+        val ENDPOINT_FIND_PENDING_REPLICATIONS = "findPendingReplication"
+
+        val ENDPOINT_MARK_REPLICATE_TRACKERS_AS_PROCESSED = "markReplicateTrackersAsProcessed"
 
 
 

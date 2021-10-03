@@ -4,6 +4,7 @@ import com.ustadmobile.door.*
 import com.ustadmobile.door.entities.DoorNode
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.replication.doorReplicationRoute
+import com.ustadmobile.door.replication.fetchPendingReplications
 import com.ustadmobile.door.replication.sendPendingReplications
 import com.ustadmobile.lib.annotationprocessor.core.VirtualHostScope
 import io.ktor.application.*
@@ -16,7 +17,9 @@ import io.ktor.server.netty.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
+import org.junit.After
 import org.junit.Assert
+import org.junit.Before
 import org.junit.Test
 import org.kodein.di.*
 import org.kodein.di.ktor.DIFeature
@@ -44,11 +47,12 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     private lateinit var jsonSerializer: Json
 
-    /**
-     *
-     */
-    @Test
-    fun givenEntityCreatedLocally_whenSendPendingReplicationsCalled_thenShouldBePresenterOnRemote() {
+    val REMOTE_NODE_ID = 1234L
+
+    val LOCAL_NODE_ID = 1330L
+
+    @Before
+    fun setup() {
         jsonSerializer = Json {
             encodeDefaults = true
         }
@@ -63,7 +67,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         }
 
         remoteVirtualHostScope = VirtualHostScope()
-        val REMOTE_NODE_ID = 1234L
+
         remoteRepDb = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "RepDbRemote")
             .build().also {
                 it.clearAllTables()
@@ -96,8 +100,19 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
 
         localDbRepo = localRepDb.asRepository(RepositoryConfig.repositoryConfig(Any(), "http://localhost:8089/",
-            REMOTE_NODE_ID.toInt(), "secret", httpClient, okHttpClient))
+            LOCAL_NODE_ID.toInt(), "secret", httpClient, okHttpClient))
+    }
 
+    @After
+    fun tearDown() {
+        remoteServer.stop(1000, 1000)
+    }
+
+    /**
+     *
+     */
+    @Test
+    fun givenEntityCreatedLocally_whenSendPendingReplicationsCalled_thenShouldBePresenterOnRemote() {
         localRepDb.repDao.insertDoorNode(DoorNode().apply {
             auth = "secret"
             nodeId = REMOTE_NODE_ID.toInt()
@@ -117,6 +132,28 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         }
 
         Assert.assertNotNull("entity now on remote", remoteRepDb.repDao.findByUid(repEntity.rePrimaryKey))
+    }
+
+    @Test
+    fun givenEntityCreatedRemotely_whenFetchPendingReplicationsCalled_thenShouldBePresentOnLocal() {
+        remoteRepDb.repDao.insertDoorNode(DoorNode().apply {
+            auth = "secret"
+            nodeId = LOCAL_NODE_ID.toInt()
+        })
+
+        val repEntity = RepEntity().apply {
+            reString = "Fetch"
+            rePrimaryKey = remoteRepDb.repDao.insert(this)
+        }
+
+        runBlocking { remoteRepDb.repDao.updateReplicationTrackers() }
+
+        runBlocking {
+            (localDbRepo as DoorDatabaseRepository).fetchPendingReplications(jsonSerializer, RepEntity.TABLE_ID,
+                REMOTE_NODE_ID)
+        }
+
+        Assert.assertNotNull("Entity now on local", localRepDb.repDao.findByUid(repEntity.rePrimaryKey))
     }
 
 }

@@ -2,7 +2,9 @@ package com.ustadmobile.door.replication
 
 import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_CHECK_FOR_ENTITIES_ALREADY_RECEIVED
+import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_FIND_PENDING_REPLICATIONS
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_FIND_PENDING_REPLICATION_TRACKERS
+import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_MARK_REPLICATE_TRACKERS_AS_PROCESSED
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_RECEIVE_ENTITIES
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_SUBSCRIBE_SSE
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.PATH_REPLICATION
@@ -80,6 +82,24 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
 
         }
 
+        put(ENDPOINT_MARK_REPLICATE_TRACKERS_AS_PROCESSED) {
+            call.response.cacheControl(CacheControl.NoCache(null))
+            val di: DI by closestDI()
+
+            val db: DoorDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
+            val dbMetaData = dbKClass.doorDatabaseMetadata()
+            val tableId = call.request.queryParameters["tableId"]?.toInt() ?: 0
+
+            val trackersStr = call.receive<String>()
+            val trackersJson = jsonSerializer.decodeFromString(JsonArray.serializer(), trackersStr)
+            val (remoteNodeId, _) = requireRemoteNodeIdAndAuth()
+
+            db.markReplicateTrackersAsProcessed(dbMetaData.dbClass, dbMetaData, trackersJson,
+                remoteNodeId, tableId)
+            call.respondText(text = "", status = HttpStatusCode.NoContent)
+        }
+
+
         get(ENDPOINT_FIND_PENDING_REPLICATION_TRACKERS) {
             call.response.cacheControl(CacheControl.NoCache(null))
             val di: DI by closestDI()
@@ -92,6 +112,19 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
             val pendingTrackers = db.findPendingReplicationTrackers(dbMetaData, remoteNodeId, tableId)
             call.respondText(contentType = ContentType.Application.Json.withUtf8Charset(),
                 text = jsonSerializer.encodeToString(JsonArray.serializer(), pendingTrackers))
+        }
+
+        get(ENDPOINT_FIND_PENDING_REPLICATIONS) {
+            call.response.cacheControl(CacheControl.NoCache(null))
+            val di: DI by closestDI()
+
+            val db: DoorDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
+            val dbMetaData = dbKClass.doorDatabaseMetadata()
+            val tableId = call.request.queryParameters["tableId"]?.toInt() ?: 0
+
+            val pendingReplications = db.findPendingReplications(dbMetaData, requireRemoteNodeIdAndAuth().first, tableId)
+            call.respondText(contentType = ContentType.Application.Json,
+                text = jsonSerializer.encodeToString(JsonArray.serializer(), pendingReplications))
         }
 
         get(ENDPOINT_SUBSCRIBE_SSE) {

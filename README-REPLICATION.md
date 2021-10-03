@@ -185,7 +185,7 @@ If there are any matches, send acknowledgements to the remote server so that ent
 matching version are not included in the replication itself.
 
 ```
-PUT endpoint/replication/acknowledge?tableId=42
+PUT endpoint/replication/markReplicateTrackersAsProcessed?tableId=42
 Request BODY:
 [
    {'primaryKey': 456, versionId: 101},
@@ -273,7 +273,7 @@ VALES (?, ?, ?, ?, ?, ?, ?)
 ```
 Then post acknowledgements to server:
 ```
-PUT endpoint/replication/acknowledge?tableId=42
+PUT endpoint/replication/markReplicateTrackersAsProcessed?tableId=42
 Request Body:
 [
 {'primaryKey' : 123, versionId: 412},

@@ -1,6 +1,9 @@
 package com.ustadmobile.door.replication
 
 import com.ustadmobile.door.DoorDbType
+import com.ustadmobile.door.ext.getOrThrow
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 
 class ReplicationEntityMetaData(
     val tableId: Int,
@@ -103,6 +106,25 @@ class ReplicationEntityMetaData(
         INSERT INTO $receiveViewName (${entityFields.joinToString{ it.fieldName }}, ${trackerFields.joinToString { it.fieldName }})
                VALUES (${(0 until (entityFields.size + trackerFields.size)).map { "?" }.joinToString()})
         """
+    }
+
+    /**
+     * Converts a JsonObject representing the actual entity itself to a Replication Tracker Summary, which has only the
+     * primary key and version id. The field names of the Replication Tracker Summary are fixed as per KEY_PRIMARY_KEY
+     * and KEY_VERSION_ID.
+     */
+    internal fun entityToReplicationTrackerSummary(entityObject: JsonObject): JsonObject {
+        return JsonObject(mapOf(
+            KEY_PRIMARY_KEY to entityObject.getOrThrow(entityPrimaryKeyFieldName),
+            KEY_VERSION_ID to entityObject.getOrThrow(entityVersionIdFieldName)))
+    }
+
+    /**
+     * Converts a JsonArray (which must contain json representing the entity itself) to an array of Replication Tracker
+     * Summary objects as per entityToReplicationTrackerSummary
+     */
+    internal fun entityJsonArrayToReplicationTrackSummaryArray(entityArray: JsonArray): JsonArray {
+        return JsonArray(entityArray.map { entityToReplicationTrackerSummary(it as JsonObject) })
     }
 
     companion object {

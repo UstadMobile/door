@@ -3,26 +3,20 @@ package com.ustadmobile.door.replication
 import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_CHECK_FOR_ENTITIES_ALREADY_RECEIVED
+import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_FIND_PENDING_REPLICATIONS
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_FIND_PENDING_REPLICATION_TRACKERS
+import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_MARK_REPLICATE_TRACKERS_AS_PROCESSED
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_RECEIVE_ENTITIES
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.PATH_REPLICATION
 import com.ustadmobile.door.ext.doorDatabaseMetadata
 import com.ustadmobile.door.ext.doorNodeIdHeader
 import com.ustadmobile.door.ext.withUtf8Charset
-import com.ustadmobile.door.replication.ReplicationEntityMetaData.Companion.KEY_PRIMARY_KEY
-import com.ustadmobile.door.replication.ReplicationEntityMetaData.Companion.KEY_VERSION_ID
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.http.content.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlin.reflect.KClass
 
-private fun JsonObject.getOrThrow(key: String): JsonElement {
-    return get(key) ?: throw IllegalArgumentException("JsonObject.getOrThrow: no key $key")
-}
 
 suspend fun DoorDatabaseRepository.sendPendingReplications(
     jsonSerializer: Json,
@@ -69,15 +63,28 @@ suspend fun DoorDatabaseRepository.sendPendingReplications(
             ContentType.Application.Json.withUtf8Charset())
     }
 
-    val pendingReplicationsProcessed = JsonArray(pendingReplicationToSend.map {
-        val jsonObj = it as JsonObject
-        JsonObject(mapOf(
-            KEY_PRIMARY_KEY to jsonObj.getOrThrow(repEntityMetaData.entityPrimaryKeyFieldName),
-            KEY_VERSION_ID to jsonObj.getOrThrow(repEntityMetaData.entityVersionIdFieldName)))
-    })
+    val pendingReplicationsProcessed = repEntityMetaData.entityJsonArrayToReplicationTrackSummaryArray(
+        pendingReplicationToSend)
 
     db.markReplicateTrackersAsProcessed(dbKClass, dbMetaData, pendingReplicationsProcessed,
         remoteNodeId, tableId)
+}
+
+suspend inline fun <reified T> DoorDatabaseRepository.put(
+    repEndpointName: String,
+    tableId: Int,
+    block: HttpRequestBuilder.() -> Unit = {}
+) : T {
+    return config.httpClient.put<T> {
+        url {
+            takeFrom(this@put.config.endpoint)
+            encodedPath = "${encodedPath}$PATH_REPLICATION/$repEndpointName"
+        }
+
+        parameter("tableId", tableId)
+        doorNodeIdHeader(this@put)
+        block()
+    }
 }
 
 @Suppress("RedundantSuspendModifier", "UNUSED_PARAMETER", "unused")
@@ -95,7 +102,7 @@ suspend fun DoorDatabaseRepository.fetchPendingReplications(
     val remotePendingTrackersStr = config.httpClient.get<String> {
         url {
             takeFrom(this@fetchPendingReplications.config.endpoint)
-            encodedPath = "$encodedPath$PATH_REPLICATION/$ENDPOINT_FIND_PENDING_REPLICATION_TRACKERS"
+            encodedPath = "$encodedPath${PATH_REPLICATION}/$ENDPOINT_FIND_PENDING_REPLICATION_TRACKERS"
         }
 
         parameter("tableId", tableId)
@@ -104,6 +111,41 @@ suspend fun DoorDatabaseRepository.fetchPendingReplications(
 
     val remotePendingTrackersJsonArray = jsonSerializer.decodeFromString(JsonArray.serializer(),
         remotePendingTrackersStr)
+
+    val alreadyUpdatedTrackers = db.checkPendingReplicationTrackers(dbKClass, dbMetaData,
+        remotePendingTrackersJsonArray, tableId)
+
+    config.httpClient.takeIf { alreadyUpdatedTrackers.isNotEmpty() }?.put<Unit> {
+        url {
+            takeFrom(this@fetchPendingReplications.config.endpoint)
+            encodedPath = "$encodedPath$PATH_REPLICATION/$ENDPOINT_MARK_REPLICATE_TRACKERS_AS_PROCESSED"
+        }
+
+        parameter("tableId", tableId)
+        doorNodeIdHeader(this@fetchPendingReplications)
+
+        body = TextContent(jsonSerializer.encodeToString(JsonArray.serializer(), alreadyUpdatedTrackers),
+            ContentType.Application.Json.withUtf8Charset())
+    }
+
+    val pendingReplicationsStr = config.httpClient.get<String> {
+        url {
+            takeFrom(this@fetchPendingReplications.config.endpoint)
+            encodedPath = "$encodedPath$PATH_REPLICATION/$ENDPOINT_FIND_PENDING_REPLICATIONS"
+        }
+
+        parameter("tableId", tableId)
+        doorNodeIdHeader(this@fetchPendingReplications)
+    }
+
+    val pendingReplicationsJson = jsonSerializer.decodeFromString(JsonArray.serializer(), pendingReplicationsStr)
+    db.insertReplicationsIntoReceiveView(dbMetaData, dbKClass, remoteNodeId, tableId, pendingReplicationsJson)
+
+    val replicationTrackersToMarkProcessed = repEntityMetaData.entityJsonArrayToReplicationTrackSummaryArray(
+        pendingReplicationsJson)
+
+    put<Unit>(ENDPOINT_MARK_REPLICATE_TRACKERS_AS_PROCESSED, tableId) {
+        body = TextContent(jsonSerializer.encodeToString(JsonArray.serializer(), replicationTrackersToMarkProcessed),
+            ContentType.Application.Json.withUtf8Charset())
+    }
 }
-
-
