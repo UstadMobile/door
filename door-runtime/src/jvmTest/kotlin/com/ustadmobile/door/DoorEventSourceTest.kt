@@ -39,11 +39,11 @@ class DoorEventSourceTest {
         okHttpClient.dispatcher.executorService.shutdown()
     }
 
+    @Suppress("BlockingMethodInNonBlockingContext")
     @Test
     fun givenEventSourceCreated_whenEventSent_thenOnMessageIsCalled() {
-        if(!Napier.isEnable(Napier.Level.DEBUG, null)) {
-            Napier.base(DebugAntilog())
-        }
+        Napier.takeLogarithm()
+        Napier.base(DebugAntilog())
 
 
         val eventChannel = Channel<DoorServerSentEvent>(Channel.UNLIMITED)
@@ -76,12 +76,12 @@ class DoorEventSourceTest {
         }
 
         val eventSource = DoorEventSource(mockRepoConfig, "http://localhost:8094/subscribe", eventListener)
-        eventChannel.offer(DoorServerSentEvent("42", "UPDATE", "Hello World"))
+        eventChannel.trySend(DoorServerSentEvent("42", "UPDATE", "Hello World"))
         verify(eventListener, timeout(5000)).onMessage(argWhere { it.id == "42" })
 
         GlobalScope.launch {
             delay(10000)
-            eventChannel.offer(DoorServerSentEvent("50", "UPDATE", "Hello World"))
+            eventChannel.trySend(DoorServerSentEvent("50", "UPDATE", "Hello World"))
         }
 
         verify(eventListener, timeout(20000)).onMessage(argWhere { it.id == "50" })
