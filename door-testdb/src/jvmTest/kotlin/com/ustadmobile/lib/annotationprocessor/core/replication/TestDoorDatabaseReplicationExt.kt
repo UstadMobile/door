@@ -137,7 +137,7 @@ class TestDoorDatabaseReplicationExt {
 
         fun getPendingTrackerCount() = db.prepareAndUseStatement(
             """
-            "SELECT COUNT(*) 
+             SELECT COUNT(*) 
                FROM RepEntityTracker
               WHERE trkrDestination = ?   
                 AND CAST(trkrProcessed AS INTEGER) = 0

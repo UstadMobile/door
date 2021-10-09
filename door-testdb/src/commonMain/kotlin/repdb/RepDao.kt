@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
+import com.ustadmobile.door.DoorLiveData
 import com.ustadmobile.door.annotation.ReplicationRunOnChange
 import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.entities.DoorNode
@@ -61,5 +62,12 @@ abstract class RepDao {
      WHERE RepEntity.rePrimaryKey = :uid 
     """)
     abstract fun findByUid(uid: Long): RepEntity?
+
+    @Query("""
+    SELECT RepEntity.*
+      FROM RepEntity
+     WHERE RepEntity.rePrimaryKey = :uid 
+    """)
+    abstract fun findByUidLive(uid: Long): DoorLiveData<RepEntity?>
 
 }

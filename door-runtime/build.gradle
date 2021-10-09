@@ -108,7 +108,11 @@ kotlin {
         }
 
         commonJvmJs {
+            dependsOn commonMain
 
+            dependencies {
+                implementation kotlin('stdlib-common')
+            }
         }
 
 

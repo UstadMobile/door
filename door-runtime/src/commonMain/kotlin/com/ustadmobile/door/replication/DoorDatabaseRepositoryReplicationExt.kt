@@ -22,8 +22,8 @@ import kotlin.math.min
 
 suspend fun DoorDatabaseRepository.sendPendingReplications(
     jsonSerializer: Json,
+    tableId: Int,
     remoteNodeId: Long,
-    tableId: Int
 ) {
     //should return a result object of some kind
 

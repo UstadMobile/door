@@ -25,6 +25,7 @@ abstract class DoorDatabaseCommon {
      * Convenience variable that will be the sourceDatabase if it is not null, or this database
      * itself otherwise
      */
+    @Suppress("CAST_NEVER_SUCCEEDS") // This is incorrect
     protected val effectiveDatabase: DoorDatabase
         get() = sourceDatabase ?: (this as DoorDatabase)
 
@@ -37,7 +38,7 @@ abstract class DoorDatabaseCommon {
 
     abstract val tableNames: List<String>
 
-    val changeListeners = concurrentSafeListOf<ChangeListenerRequest>() as MutableList<ChangeListenerRequest>
+    val changeListeners = concurrentSafeListOf<ChangeListenerRequest>()
 
     inner class DoorSqlDatabaseImpl : DoorSqlDatabase {
 
@@ -129,7 +130,7 @@ abstract class DoorDatabaseCommon {
             !stmtConfig.hasListParams -> prepareStatement(stmtConfig.sql, stmtConfig.generatedKeys)
             jdbcArraySupported -> prepareStatement(adjustQueryWithSelectInParam(stmtConfig.sql))
             else -> PreparedStatementArrayProxy(stmtConfig.sql, this)
-        } ?: throw IllegalStateException("Null statement")
+        }
     }
 
 
@@ -137,6 +138,7 @@ abstract class DoorDatabaseCommon {
      * Wrapper for Connection.createArrayOf. If the underlying database supports jdbc arrays, that support will be
      * used. Otherwise the PreparedStatementArrayProxy type will be used
      */
+    @Suppress("RemoveRedundantQualifierName") // It's important to be sure which one we are referring to here
     fun createArrayOf(connection: Connection, arrayType: String, objects: kotlin.Array<out Any?>): com.ustadmobile.door.jdbc.Array {
         return if(jdbcArraySupported) {
             connection.createArrayOf(arrayType, objects)

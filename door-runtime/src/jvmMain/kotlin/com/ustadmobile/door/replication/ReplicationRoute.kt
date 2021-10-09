@@ -144,7 +144,8 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
                 channel.trySend(repEvt.toDoorServerSentEvent(evtIdCounter.incrementAndGet().toString()))
             }
             try {
-                channel.send(DoorServerSentEvent("0", ReplicationSubscriptionManager.EVT_INIT, ""))
+                //FIX ME - this is bad...
+                channel.send(DoorServerSentEvent("0", ReplicationSubscriptionManager.EVT_INIT, "1234"))
                 replicationNotificationDispatcher.addReplicationPendingEventListener(nodeIdAndAuthVal.first,
                     pendingReplicationListener)
 

@@ -2,7 +2,6 @@ package com.ustadmobile.lib.annotationprocessor.core.transaction
 
 import com.ustadmobile.door.ChangeListenerRequest
 import com.ustadmobile.door.DatabaseBuilder
-import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.TablesInvalidationListener
 import com.ustadmobile.door.entities.DoorNode
 import com.ustadmobile.door.ext.withDoorTransaction
@@ -34,7 +33,7 @@ class TestWithDoorTransaction {
 
     private lateinit var db: RepDb
 
-    var dbIndex = 0
+    private var dbIndex = 0
 
     private var connectionCountBefore = 0
 
@@ -48,9 +47,9 @@ class TestWithDoorTransaction {
         datasourceSpy = spy(initContext.lookup("java:/comp/env/jdbc/RepDb") as DataSource)
 
         datasourceSpy.stub {
-            on { connection }.thenAnswer {
+            on { connection }.thenAnswer { invocation ->
                 connectionCount.incrementAndGet()
-                spy(it.callRealMethod()).also {
+                spy(invocation.callRealMethod()).also {
                     lastConnection.set(it as Connection)
                 }
             }

@@ -1,7 +1,10 @@
 package com.ustadmobile.door.replication
 
+import com.ustadmobile.door.DoorConstants
 import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.DoorDatabaseRepository
+import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_SUBSCRIBE_SSE
+import com.ustadmobile.door.DoorDatabaseRepository.Companion.PATH_REPLICATION
 import com.ustadmobile.door.entities.ReplicationStatus
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
@@ -16,9 +19,11 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.produce
+import kotlinx.serialization.json.Json
 import kotlin.jvm.Volatile
 import kotlin.math.min
 import kotlin.reflect.KClass
+import com.ustadmobile.door.ext.toUrlQueryString
 
 //Class that is responsible to listen for local and remote changes, then send/receive replication accordingly.
 // There will be one repository instance per endpoint (e.g. for the cloud and any local mirrors).
@@ -29,6 +34,7 @@ import kotlin.reflect.KClass
 // of remote changes, and will then call fetchPendingReplications as needed.
 
 class ReplicationSubscriptionManager(
+    private val json: Json,
     private val dbNotificationDispatcher: ReplicationNotificationDispatcher,
     private val repository: DoorDatabaseRepository,
     private val coroutineScope: CoroutineScope,
@@ -36,14 +42,24 @@ class ReplicationSubscriptionManager(
     private val dbKClass: KClass<out DoorDatabase>,
     private val numProcessors: Int = 5,
     eventSourceFactory: DoorEventSourceFactory = DefaultDoorEventSourceFactoryImpl(),
-    private val sendReplicationRunner: ReplicateRunner = ReplicateRunner { repo, tableId -> },
-    private val fetchReplicationRunner: ReplicateRunner = ReplicateRunner { repo, tableId ->  }
+    private val sendReplicationRunner: ReplicateRunner = DefaultReplicationSender(json),
+    private val fetchReplicationRunner: ReplicateRunner = DefaultReplicationFetcher(json)
 ): DoorEventListener, ReplicationPendingListener {
 
     fun interface ReplicateRunner {
+        suspend fun replicate(repo: DoorDatabaseRepository, tableId: Int, remoteNodeId: Long)
+    }
 
-        suspend fun replicate(repo: DoorDatabaseRepository, tableId: Int)
+    private class DefaultReplicationSender(private val json: Json): ReplicateRunner {
+        override suspend fun replicate(repo: DoorDatabaseRepository, tableId: Int, remoteNodeId: Long) {
+            repo.sendPendingReplications(json, tableId, remoteNodeId)
+        }
+    }
 
+    private class DefaultReplicationFetcher(private val json: Json): ReplicateRunner {
+        override suspend fun replicate(repo: DoorDatabaseRepository, tableId: Int, remoteNodeId: Long) {
+            repo.fetchPendingReplications(json, tableId, remoteNodeId)
+        }
     }
 
     private val eventSource: AtomicRef<DoorEventSource?> = atomic(null)
@@ -62,10 +78,12 @@ class ReplicationSubscriptionManager(
     init {
         //start the subscription to the endpoint. When the endpoint replies, it can provide the node id as a header or
         // as a message itself.
+        val queryParams = mapOf(
+            DoorConstants.HEADER_DBVERSION to "1234",
+            DoorConstants.HEADER_NODE to "${repository.config.nodeId}/${repository.config.auth}")
 
         eventSource.value = eventSourceFactory.makeNewDoorEventSource(repository.config,
-            repository.config.endpoint + "replication/subscribe",this)
-
+            "${repository.config.endpoint}$PATH_REPLICATION/$ENDPOINT_SUBSCRIBE_SSE?${queryParams.toUrlQueryString()}",this)
     }
 
     override fun onOpen() {
@@ -157,7 +175,7 @@ class ReplicationSubscriptionManager(
             if(item.lastLocalChangeTime > item.lastSendReplicationCompleteTime) {
                 val timeNow = systemTimeInMillis()
                 try {
-                    sendReplicationRunner.replicate(repository, item.tableId)
+                    sendReplicationRunner.replicate(repository, item.tableId, item.nodeId)
                     repository.db.prepareAndUseStatementAsync(
                         "UPDATE ReplicationStatus SET lastSendReplicationCompleteTime = ? WHERE tableId = ? AND nodeId = ?") { stmt ->
                         stmt.setLong(1, timeNow)
@@ -175,7 +193,7 @@ class ReplicationSubscriptionManager(
             if(item.lastRemoteChangeTime > item.lastFetchReplicationCompleteTime) {
                 val timeNow = systemTimeInMillis()
 
-                fetchReplicationRunner.replicate(repository, item.tableId)
+                fetchReplicationRunner.replicate(repository, item.tableId, item.nodeId)
                 repository.db.prepareAndUseStatementAsync(
                     "UPDATE ReplicationStatus SET lastFetchReplicationCompleteTime = ? WHERE tableId = ? AND nodeId = ?") { stmt ->
                     stmt.setLong(1, timeNow)
@@ -259,7 +277,7 @@ class ReplicationSubscriptionManager(
     }
 
     override fun onError(e: Exception) {
-
+        e.printStackTrace()
     }
 
     companion object {
