@@ -8,9 +8,11 @@ import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_FIND_PENDI
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_MARK_REPLICATE_TRACKERS_AS_PROCESSED
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_RECEIVE_ENTITIES
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.PATH_REPLICATION
+import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.doorDatabaseMetadata
 import com.ustadmobile.door.ext.doorNodeIdHeader
 import com.ustadmobile.door.ext.withUtf8Charset
+import io.github.aakira.napier.Napier
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -19,14 +21,13 @@ import kotlinx.serialization.json.JsonArray
 import kotlin.math.max
 import kotlin.math.min
 
-
 suspend fun DoorDatabaseRepository.sendPendingReplications(
     jsonSerializer: Json,
     tableId: Int,
     remoteNodeId: Long,
 ) {
     //should return a result object of some kind
-
+    Napier.d("$this : tableId $tableId : sendPendingReplications - start", tag = DoorTag.LOG_TAG)
     val dbMetaData = (this as DoorDatabase)::class.doorDatabaseMetadata()
     val dbKClass = dbMetaData.dbClass
 
@@ -35,6 +36,8 @@ suspend fun DoorDatabaseRepository.sendPendingReplications(
     var offset = 0
     do {
         val pendingReplicationTrackers = db.findPendingReplicationTrackers(dbMetaData, remoteNodeId, tableId, offset)
+        Napier.d("$this : tableId $tableId : sendPendingReplications - found " +
+                "${pendingReplicationTrackers.size} pending trackers", tag = DoorTag.LOG_TAG)
 
         val alreadyUpdatedTrackers = config.httpClient.post<String> {
             url {
@@ -51,6 +54,8 @@ suspend fun DoorDatabaseRepository.sendPendingReplications(
 
         val alreadyUpdatedTrackersJsonArr = jsonSerializer.decodeFromString(JsonArray.serializer(), alreadyUpdatedTrackers)
 
+        Napier.d("$this : tableId $tableId : sendPendingReplications - marking " +
+                "${alreadyUpdatedTrackersJsonArr.size} pending trackers as already processed", tag = DoorTag.LOG_TAG)
         db.markReplicateTrackersAsProcessed(dbKClass, dbMetaData, alreadyUpdatedTrackersJsonArr, remoteNodeId, tableId)
 
         offset += (pendingReplicationTrackers.size - min(alreadyUpdatedTrackersJsonArr.size, repEntityMetaData.batchSize))
@@ -59,6 +64,8 @@ suspend fun DoorDatabaseRepository.sendPendingReplications(
 
     do {
         val pendingReplicationToSend = db.findPendingReplications(dbMetaData, remoteNodeId, tableId)
+        Napier.d("$this : tableId $tableId : sendPendingReplications - sending " +
+                "${pendingReplicationToSend.size} entities to remote", tag = DoorTag.LOG_TAG)
         config.httpClient.put<Unit> {
             url {
                 takeFrom(this@sendPendingReplications.config.endpoint)
@@ -75,9 +82,12 @@ suspend fun DoorDatabaseRepository.sendPendingReplications(
         val pendingReplicationsProcessed = repEntityMetaData.entityJsonArrayToReplicationTrackSummaryArray(
             pendingReplicationToSend)
 
+        Napier.d("$this : tableId $tableId : sendPendingReplications - marking " +
+                "${pendingReplicationToSend.size} entities as processed", tag = DoorTag.LOG_TAG)
         db.markReplicateTrackersAsProcessed(dbKClass, dbMetaData, pendingReplicationsProcessed,
             remoteNodeId, tableId)
     }while(pendingReplicationsProcessed.size == repEntityMetaData.batchSize)
+    Napier.d("$this : tableId $tableId : sendPendingReplications - done", tag = DoorTag.LOG_TAG)
 }
 
 suspend inline fun <reified T> DoorDatabaseRepository.put(
@@ -103,6 +113,7 @@ suspend fun DoorDatabaseRepository.fetchPendingReplications(
     tableId: Int,
     remoteNodeId: Long
 ) {
+    Napier.d("$this : tableId $tableId : fetchPendingReplications - start", tag = DoorTag.LOG_TAG)
     val dbMetaData = (this as DoorDatabase)::class.doorDatabaseMetadata()
     val dbKClass = dbMetaData.dbClass
 
@@ -110,6 +121,8 @@ suspend fun DoorDatabaseRepository.fetchPendingReplications(
 
     //Get pending trackers from remote
     var offset = 0
+    var pendingTrackerCount = 0
+
     do {
         val remotePendingTrackersStr = config.httpClient.get<String> {
             url {
@@ -125,8 +138,14 @@ suspend fun DoorDatabaseRepository.fetchPendingReplications(
         val remotePendingTrackersJsonArray = jsonSerializer.decodeFromString(JsonArray.serializer(),
             remotePendingTrackersStr)
 
+        Napier.d("$this : tableId $tableId : fetchPendingReplications - received pending trackers - " +
+                "${remotePendingTrackersJsonArray.size} trackers from remote", tag = DoorTag.LOG_TAG)
+
         val alreadyUpdatedTrackers = db.checkPendingReplicationTrackers(dbKClass, dbMetaData,
             remotePendingTrackersJsonArray, tableId)
+
+        Napier.d("$this : tableId $tableId : fetchPendingReplications - check already updated - " +
+                "${alreadyUpdatedTrackers.size} are already updated here", tag = DoorTag.LOG_TAG)
 
         config.httpClient.takeIf { alreadyUpdatedTrackers.isNotEmpty() }?.put<Unit> {
             url {
@@ -142,7 +161,11 @@ suspend fun DoorDatabaseRepository.fetchPendingReplications(
         }
 
         offset = max(0, (offset + repEntityMetaData.batchSize) - alreadyUpdatedTrackers.size)
+        pendingTrackerCount += (remotePendingTrackersJsonArray.size - alreadyUpdatedTrackers.size)
     }while(remotePendingTrackersJsonArray.size == repEntityMetaData.batchSize)
+
+    if(pendingTrackerCount == 0)
+        return //nothing to do
 
     do {
         val pendingReplicationsStr = config.httpClient.get<String> {
@@ -156,8 +179,12 @@ suspend fun DoorDatabaseRepository.fetchPendingReplications(
         }
 
         val pendingReplicationsJson = jsonSerializer.decodeFromString(JsonArray.serializer(), pendingReplicationsStr)
+        Napier.d("$this : tableId $tableId : fetchPendingReplications - received - " +
+                "${pendingReplicationsJson.size} entities from remote", tag = DoorTag.LOG_TAG)
 
         db.insertReplicationsIntoReceiveView(dbMetaData, dbKClass, remoteNodeId, tableId, pendingReplicationsJson)
+        Napier.d("$this : tableId $tableId : fetchPendingReplications - received - " +
+                "${pendingReplicationsJson.size} entities inserted into receive view", tag = DoorTag.LOG_TAG)
 
         val replicationTrackersToMarkProcessed = repEntityMetaData.entityJsonArrayToReplicationTrackSummaryArray(
             pendingReplicationsJson)
@@ -166,6 +193,9 @@ suspend fun DoorDatabaseRepository.fetchPendingReplications(
             body = TextContent(jsonSerializer.encodeToString(JsonArray.serializer(), replicationTrackersToMarkProcessed),
                 ContentType.Application.Json.withUtf8Charset())
         }
+        Napier.d("$this : tableId $tableId : fetchPendingReplications - marked as processed - " +
+                "${replicationTrackersToMarkProcessed.size} trackers", tag = DoorTag.LOG_TAG)
 
     }while(pendingReplicationsJson.size == repEntityMetaData.batchSize)
+    Napier.d("$this : tableId $tableId : fetchPendingReplications - done", tag = DoorTag.LOG_TAG)
 }

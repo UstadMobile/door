@@ -1253,11 +1253,15 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                         .defaultValue("false")
                         .addModifiers(KModifier.OVERRIDE).build())
                 }
+                .addParameter("dbName", String::class, KModifier.OVERRIDE)
                 .addCode("setupFromDataSource()\n")
                 .build())
             .addDbVersionProperty(dbTypeElement)
             .addProperty(PropertySpec.builder("dataSource", CLASSNAME_DATASOURCE)
                 .initializer("dataSource")
+                .build())
+            .addProperty(PropertySpec.builder("dbName", String::class)
+                .initializer("dbName")
                 .build())
             .applyIf(dbTypeElement.isDbSyncable(processingEnv)) {
                 addProperty(PropertySpec.builder("master", BOOLEAN)

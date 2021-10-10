@@ -7,6 +7,8 @@ import com.ustadmobile.door.ext.doorDatabaseMetadata
 import com.ustadmobile.door.ext.waitUntilWithTimeout
 import com.ustadmobile.door.replication.*
 import com.ustadmobile.lib.annotationprocessor.core.VirtualHostScope
+import io.github.aakira.napier.DebugAntilog
+import io.github.aakira.napier.Napier
 import io.ktor.application.*
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
@@ -59,6 +61,9 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     @Before
     fun setup() {
+        Napier.takeLogarithm()
+        Napier.base(DebugAntilog())
+
         jsonSerializer = Json {
             encodeDefaults = true
         }
@@ -229,7 +234,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
 
     //This needs a fix to invalidate the table so the live data will trigger
-    //@Test
+    @Test
     fun givenReplicationSubscriptionEnabled_whenChangeMadeOnRemote_thenShouldTransferToLocal() {
         localRepDb.repDao.insertDoorNode(DoorNode().apply {
             auth = "secret"

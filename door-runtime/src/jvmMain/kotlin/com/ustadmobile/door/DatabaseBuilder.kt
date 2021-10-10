@@ -45,10 +45,10 @@ actual class DatabaseBuilder<T: DoorDatabase> internal constructor(private var c
                 System.err.println("Warning: could not check if $dbName is master or not, assuming false")
             }
 
-            dbImplClass.getConstructor(DataSource::class.java, Boolean::class.javaPrimitiveType)
-                    .newInstance(dataSource, isMaster)
+            dbImplClass.getConstructor(DataSource::class.java, Boolean::class.javaPrimitiveType, String::class.java)
+                    .newInstance(dataSource, isMaster, dbName)
         }else {
-            dbImplClass.getConstructor(DataSource::class.java).newInstance(dataSource)
+            dbImplClass.getConstructor(DataSource::class.java, String::class.java).newInstance(dataSource, dbName)
         }
 
         if(!doorDb.tableNames.any {it.lowercase() == DoorDatabaseCommon.DBINFO_TABLENAME}) {

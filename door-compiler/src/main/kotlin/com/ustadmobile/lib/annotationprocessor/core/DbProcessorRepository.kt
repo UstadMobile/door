@@ -170,6 +170,11 @@ fun FileSpec.Builder.addDbRepoType(
                     addModifiers(KModifier.OVERRIDE)
                 }
                 .build())
+            .addProperty(PropertySpec.builder("dbName", String::class, KModifier.OVERRIDE)
+                .getter(FunSpec.getterBuilder()
+                    .addCode("return \"Repository for [\${_db.toString()}] - \${config.endpoint}\"\n")
+                    .build())
+                .build())
             .addFunction(FunSpec.builder("clearAllTables")
                     .addModifiers(KModifier.OVERRIDE)
                     .addCode("throw %T(%S)\n", IllegalAccessException::class, "Cannot use a repository to clearAllTables!")
@@ -529,8 +534,8 @@ fun FileSpec.Builder.addDaoRepoType(daoTypeSpec: TypeSpec,
                         .addModifiers(KModifier.OVERRIDE)
                         .returns(BOUNDARY_CALLBACK_CLASSNAME
                                 .parameterizedBy(TypeVariableName("T")).copy(nullable = true))
-                        .addCode("return ${DbProcessorRepository.DATASOURCEFACTORY_TO_BOUNDARYCALLBACK_VARNAME}[dataSource] as %T\n",
-                                DbProcessorRepository.BOUNDARY_CALLBACK_CLASSNAME
+                        .addCode("return ${DATASOURCEFACTORY_TO_BOUNDARYCALLBACK_VARNAME}[dataSource] as %T\n",
+                                BOUNDARY_CALLBACK_CLASSNAME
                                 .parameterizedBy(TypeVariableName("T")).copy(nullable = true))
                         .build())
 

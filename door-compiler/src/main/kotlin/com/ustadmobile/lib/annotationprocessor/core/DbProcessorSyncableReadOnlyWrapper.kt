@@ -138,6 +138,11 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(dbTypeEl: TypeElement,
                             .addCode("return transactionDb.%M(dbKClass) as T\n",
                                 MemberName("com.ustadmobile.door", "wrap"))
                             .build())
+                        addProperty(PropertySpec.builder("dbName", String::class, KModifier.OVERRIDE)
+                            .getter(FunSpec.getterBuilder()
+                                .addCode("return \"DoorWrapper for [\${_db.toString()}]\"\n")
+                                .build())
+                            .build())
                     }
                     .apply {
                         dbTypeEl.allDbClassDaoGetters(processingEnv).forEach {daoGetter ->

@@ -1,9 +1,12 @@
 package com.ustadmobile.door
+import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.jdbc.*
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Runnable
 import com.ustadmobile.door.ext.concurrentSafeListOf
+import com.ustadmobile.door.ext.doorIdentityHashCode
+import io.github.aakira.napier.Napier
 
 abstract class DoorDatabaseCommon {
 
@@ -12,6 +15,8 @@ abstract class DoorDatabaseCommon {
     abstract val dbVersion: Int
 
     abstract val jdbcDbType: Int
+
+    abstract val dbName: String
 
     /**
      * Sometimes we want to create a new instance of the database that is just a wrapper e.g.
@@ -88,12 +93,21 @@ abstract class DoorDatabaseCommon {
     }
 
 
-    open fun handleTableChanged(changeTableNames: List<String>) = effectiveDatabase.apply {
+    open fun handleTableChanged(changeTableNames: List<String>) : DoorDatabase{
         GlobalScope.launch {
-            changeListeners.filter { it.tableNames.isEmpty() || it.tableNames.any { changeTableNames.contains(it) } }.forEach {
-                it.onInvalidated.onTablesInvalidated(changeTableNames)
+            effectiveDatabase.apply {
+                val affectedChangeListeners = changeListeners.filter {
+                    it.tableNames.isEmpty() || it.tableNames.any { changeTableNames.contains(it) }
+                }
+                Napier.d("$this notifying ${affectedChangeListeners.size} listeners of changes to " +
+                        changeTableNames.joinToString(), tag = DoorTag.LOG_TAG)
+                affectedChangeListeners.forEach {
+                    it.onInvalidated.onTablesInvalidated(changeTableNames)
+                }
             }
         }
+
+        return effectiveDatabase
     }
 
     /**
@@ -156,6 +170,7 @@ abstract class DoorDatabaseCommon {
             RegexOption.IGNORE_CASE)
     }
 
-
-
+    override fun toString(): String {
+        return "${this::class.simpleName}: $dbName@${this.doorIdentityHashCode}"
+    }
 }

@@ -6,6 +6,7 @@ import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
 import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
 import com.ustadmobile.door.replication.ReplicationEntityMetaData.Companion.KEY_PRIMARY_KEY
 import com.ustadmobile.door.replication.ReplicationEntityMetaData.Companion.KEY_VERSION_ID
+import io.github.aakira.napier.Napier
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -124,10 +125,14 @@ suspend fun DoorDatabase.findPendingReplications(
 suspend fun DoorDatabase.insertReplicationsIntoReceiveView(
     dbMetaData: DoorDatabaseMetadata<*>,
     dbKClass: KClass<out DoorDatabase>,
+    @Suppress("UNUSED_PARAMETER") //This is reserved for future usage (e.g. to set when doing the insert to help with permission checking)
     remoteNodeId: Long,
     tableId: Int,
     receivedEntities: JsonArray
 ) {
+    if(receivedEntities.isEmpty())
+        return //do nothing, nothing was received
+
     val repEntityMetaData = dbMetaData.replicateEntities[tableId] ?: throw IllegalArgumentException("No such table: $tableId")
     val receivedObjects = receivedEntities.map { it as JsonObject }
 
@@ -143,6 +148,9 @@ suspend fun DoorDatabase.insertReplicationsIntoReceiveView(
 
                 stmt.executeUpdateAsyncKmp()
             }
+
+            Napier.d("$transactionDb - notifying of changes to ${repEntityMetaData.entityTableName}")
+            transactionDb.handleTableChanged(listOf(repEntityMetaData.entityTableName))
         }
     }
 

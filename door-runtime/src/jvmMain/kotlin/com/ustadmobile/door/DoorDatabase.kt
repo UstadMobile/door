@@ -34,10 +34,11 @@ actual abstract class DoorDatabase actual constructor() : DoorDatabaseCommon(){
     private val constructorFun: Constructor<DoorDatabase> by lazy(LazyThreadSafetyMode.NONE) {
         if(this is SyncableDoorDatabase) {
             @Suppress("UNCHECKED_CAST")
-            this::class.java.getConstructor(DataSource::class.java, Boolean::class.javaPrimitiveType) as Constructor<DoorDatabase>
+            this::class.java.getConstructor(DataSource::class.java, Boolean::class.javaPrimitiveType,
+                String::class.java) as Constructor<DoorDatabase>
         }else {
             @Suppress("UNCHECKED_CAST")
-            this::class.java.getConstructor(DataSource::class.java) as Constructor<DoorDatabase>
+            this::class.java.getConstructor(DataSource::class.java, String::class.java) as Constructor<DoorDatabase>
         }
     }
 
@@ -48,7 +49,7 @@ actual abstract class DoorDatabase actual constructor() : DoorDatabaseCommon(){
         }else {
             var con = null as Connection?
             val tableNamesList = mutableListOf<String>()
-            var tableResult = null as ResultSet?
+            var tableResult: ResultSet? = null
             try {
                 con = openConnection()
                 val metadata = con.getMetaData()
@@ -59,6 +60,7 @@ actual abstract class DoorDatabase actual constructor() : DoorDatabaseCommon(){
                     }
                 }
             }finally {
+                tableResult?.close()
                 con?.close()
             }
 
@@ -84,9 +86,9 @@ actual abstract class DoorDatabase actual constructor() : DoorDatabaseCommon(){
     private fun createTransactionDataSourceAndDb(): Pair<DoorTransactionDataSourceWrapper, DoorDatabase> {
         val transactionDataSource = DoorTransactionDataSourceWrapper(effectiveDatabase.dataSource)
         val transactionDb = if(this is SyncableDoorDatabase) {
-            effectiveDatabase.constructorFun.newInstance(transactionDataSource, false)
+            effectiveDatabase.constructorFun.newInstance(transactionDataSource, false, "Transaction for $this")
         }else {
-            effectiveDatabase.constructorFun.newInstance(transactionDataSource)
+            effectiveDatabase.constructorFun.newInstance(transactionDataSource, "Transaction wrapper for $this")
         }
 
         transactionDb.sourceDatabase = effectiveDatabase
@@ -181,17 +183,23 @@ actual abstract class DoorDatabase actual constructor() : DoorDatabaseCommon(){
     override fun handleTableChanged(changeTableNames: List<String>): DoorDatabase {
         //If this a transaction, then changes need to be collected together and only fired once the transaction is
         //complete.
-        if(!isImplementation || transactionDepth.value == 0) {
-            super.handleTableChanged(changeTableNames)
-        }else {
+        val sourceDbVal = this.sourceDatabase
+        if(!isImplementation && sourceDbVal != null)
+            sourceDbVal.handleTableChanged(changeTableNames)
+        else if(isImplementation && transactionDepth.value > 0) {
             transactionTablesChanged.putAll(changeTableNames.associateWith { key -> key })
+        }else {
+            super.handleTableChanged(changeTableNames)
         }
 
         return this
     }
 
-    internal fun fireTransactionTablesChanged() {
-        super.handleTableChanged(transactionTablesChanged.values.toList())
+    private fun fireTransactionTablesChanged() {
+        val changedTablesList = transactionTablesChanged.values.toList()
+        if(changedTablesList.isNotEmpty())
+            super.handleTableChanged(changedTablesList)
+
         transactionTablesChanged.clear()
     }
 
