@@ -2,6 +2,7 @@ package com.ustadmobile.lib.annotationprocessor.core.replication
 
 import com.ustadmobile.door.*
 import com.ustadmobile.door.entities.DoorNode
+import com.ustadmobile.door.entities.NodeIdAndAuth
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.doorDatabaseMetadata
 import com.ustadmobile.door.ext.waitUntilWithTimeout
@@ -55,10 +56,6 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     private lateinit var localNotificationDispatcher: ReplicationNotificationDispatcher
 
-    val REMOTE_NODE_ID = 1234L
-
-    val LOCAL_NODE_ID = 1330L
-
     @Before
     fun setup() {
         Napier.takeLogarithm()
@@ -111,7 +108,11 @@ class TestDoorDatabaseRepositoryReplicationExt  {
                 remoteNotificationDispatcher
             }
 
-            registerContextTranslator { call: ApplicationCall -> "localhost" }
+            bind<NodeIdAndAuth>() with scoped(remoteVirtualHostScope).singleton {
+                NodeIdAndAuth(REMOTE_NODE_ID.toInt(), "secret")
+            }
+
+            registerContextTranslator { _: ApplicationCall -> "localhost" }
         }
 
         remoteServer = embeddedServer(Netty, 8089) {
@@ -250,7 +251,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         localRepDb.addChangeListener(ChangeListenerRequest(listOf(), localNotificationDispatcher))
 
         //Just create it - this will need a close
-        ReplicationSubscriptionManager(jsonSerializer, localNotificationDispatcher,
+        ReplicationSubscriptionManager(localRepDb.dbVersion, jsonSerializer, localNotificationDispatcher,
             localDbRepo as DoorDatabaseRepository, GlobalScope, RepDb::class.doorDatabaseMetadata(), RepDb::class)
 
 
@@ -266,6 +267,13 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         }
 
         Assert.assertNotNull(entityOnLocal)
+    }
+
+    companion object {
+
+        private const val REMOTE_NODE_ID = 1234L
+
+        private const val LOCAL_NODE_ID = 1330L
     }
 
 }

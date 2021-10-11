@@ -8,6 +8,7 @@ import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_MARK_REPLI
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_RECEIVE_ENTITIES
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_SUBSCRIBE_SSE
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.PATH_REPLICATION
+import com.ustadmobile.door.entities.NodeIdAndAuth
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.doorDatabaseMetadata
 import com.ustadmobile.door.ext.requireRemoteNodeIdAndAuth
@@ -138,15 +139,16 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
 
             val replicationNotificationDispatcher: ReplicationNotificationDispatcher = di.on(call).direct.instance()
             val channel = Channel<DoorServerSentEvent>(capacity = Channel.UNLIMITED)
-            val nodeIdAndAuthVal = requireRemoteNodeIdAndAuth()
+            val remoteNodeIdAndAuth = requireRemoteNodeIdAndAuth()
+            val localNodeIdAndAuth: NodeIdAndAuth = di.on(call).direct.instance()
             val evtIdCounter = AtomicInteger()
             val pendingReplicationListener = ReplicationPendingListener {  repEvt ->
                 channel.trySend(repEvt.toDoorServerSentEvent(evtIdCounter.incrementAndGet().toString()))
             }
             try {
-                //FIX ME - this is bad...
-                channel.send(DoorServerSentEvent("0", ReplicationSubscriptionManager.EVT_INIT, "1234"))
-                replicationNotificationDispatcher.addReplicationPendingEventListener(nodeIdAndAuthVal.first,
+                channel.send(DoorServerSentEvent("0", ReplicationSubscriptionManager.EVT_INIT,
+                    localNodeIdAndAuth.nodeId.toString()))
+                replicationNotificationDispatcher.addReplicationPendingEventListener(remoteNodeIdAndAuth.first,
                     pendingReplicationListener)
 
                 call.respondTextWriter(contentType = ContentType.Text.EventStream) {
@@ -164,7 +166,7 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
             }catch(e: Exception) {
                 e.printStackTrace()
             }finally {
-                replicationNotificationDispatcher.removeReplicationPendingEventListener(nodeIdAndAuthVal.first,
+                replicationNotificationDispatcher.removeReplicationPendingEventListener(remoteNodeIdAndAuth.first,
                     pendingReplicationListener)
                 channel.close()
             }

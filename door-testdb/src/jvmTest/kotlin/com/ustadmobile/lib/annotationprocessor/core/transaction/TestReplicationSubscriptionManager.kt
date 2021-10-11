@@ -75,9 +75,9 @@ class TestReplicationSubscriptionManager {
         val mockSendReplications = mock<ReplicationSubscriptionManager.ReplicateRunner> { }
         val mockFetchReplications = mock<ReplicationSubscriptionManager.ReplicateRunner> { }
 
-        val subscriptionManager = ReplicationSubscriptionManager(json, dispatcher, repo as DoorDatabaseRepository,
-            GlobalScope, RepDb::class.doorDatabaseMetadata(), RepDb::class, 5,mockEventSourceFactory,
-            mockSendReplications, mockFetchReplications)
+        val subscriptionManager = ReplicationSubscriptionManager(1, json, dispatcher,
+            repo as DoorDatabaseRepository, GlobalScope, RepDb::class.doorDatabaseMetadata(), RepDb::class,
+            5, mockEventSourceFactory, mockSendReplications, mockFetchReplications)
 
         subscriptionManager.onMessage(DoorServerSentEvent("1", "INIT", "$testRemoteNodeId"))
 
@@ -114,9 +114,9 @@ class TestReplicationSubscriptionManager {
         val mockSendReplications = mock<ReplicationSubscriptionManager.ReplicateRunner> { }
         val mockFetchReplications = mock<ReplicationSubscriptionManager.ReplicateRunner> { }
 
-        val subscriptionManager = ReplicationSubscriptionManager(json, dispatcher, repo as DoorDatabaseRepository,
-            GlobalScope, RepDb::class.doorDatabaseMetadata(), RepDb::class, 5,mockEventSourceFactory,
-            mockSendReplications, mockFetchReplications)
+        val subscriptionManager = ReplicationSubscriptionManager(1, json, dispatcher,
+            repo as DoorDatabaseRepository, GlobalScope, RepDb::class.doorDatabaseMetadata(), RepDb::class,
+            5, mockEventSourceFactory, mockSendReplications, mockFetchReplications)
 
 
         subscriptionManager.onMessage(DoorServerSentEvent("1", "INIT", "$testRemoteNodeId"))

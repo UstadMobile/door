@@ -34,6 +34,7 @@ import com.ustadmobile.door.ext.toUrlQueryString
 // of remote changes, and will then call fetchPendingReplications as needed.
 
 class ReplicationSubscriptionManager(
+    dbSchemaVersion: Int,
     private val json: Json,
     private val dbNotificationDispatcher: ReplicationNotificationDispatcher,
     private val repository: DoorDatabaseRepository,
@@ -79,7 +80,7 @@ class ReplicationSubscriptionManager(
         //start the subscription to the endpoint. When the endpoint replies, it can provide the node id as a header or
         // as a message itself.
         val queryParams = mapOf(
-            DoorConstants.HEADER_DBVERSION to "1234",
+            DoorConstants.HEADER_DBVERSION to dbSchemaVersion.toString(),
             DoorConstants.HEADER_NODE to "${repository.config.nodeId}/${repository.config.auth}")
 
         eventSource.value = eventSourceFactory.makeNewDoorEventSource(repository.config,
