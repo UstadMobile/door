@@ -14,7 +14,7 @@ import repdb.RepEntity.Companion.TABLE_ID
     on = Trigger.On.RECEIVEVIEW,
     events = [Trigger.Event.INSERT, Trigger.Event.UPDATE],
     sqlStatements = [
-        """INSERT INTO RepEntity(rePrimaryKey, reLastChangedBy, reLastChangeTime, reNumField, reString)
+        """REPLACE INTO RepEntity(rePrimaryKey, reLastChangedBy, reLastChangeTime, reNumField, reString)
            VALUES (NEW.rePrimaryKey, NEW.reLastChangedBy, NEW.reLastChangeTime, NEW.reNumField, NEW.reString)
         """])
 class RepEntity {

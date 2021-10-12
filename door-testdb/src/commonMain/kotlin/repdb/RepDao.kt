@@ -37,6 +37,12 @@ abstract class RepDao {
     @Insert
     abstract suspend fun insertAsync(repEntity: RepEntity): Long
 
+    @Query("""
+        SELECT RepEntityTracker.*
+          FROM RepEntityTracker
+    """)
+    abstract fun findAllTrackers(): DoorLiveData<List<RepEntityTracker>>
+
     @Insert
     abstract fun insert(repEntity: RepEntity): Long
 

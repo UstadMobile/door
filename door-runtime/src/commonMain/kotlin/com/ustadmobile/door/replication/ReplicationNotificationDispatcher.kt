@@ -5,6 +5,7 @@ import com.ustadmobile.door.TablesInvalidationListener
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
 import com.ustadmobile.door.util.DoorEventCollator
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 
 /**
@@ -52,8 +53,10 @@ class ReplicationNotificationDispatcher(
         eventCollator.receiveEvent(tableNames)
     }
 
-    suspend fun onDispatch(event: List<List<String>>) {
+    private suspend fun onDispatch(event: List<List<String>>) {
         val changedTables = event.flatten().toSet()
+        Napier.d("ReplicationNotificationDispatcher for [$db]: processing changes to ${changedTables.joinToString()}",
+            tag = DoorTag.LOG_TAG)
         val replicationsToCheck = replicationRunOnChangeRunner.runReplicationRunOnChange(changedTables)
         replicationsToCheck.forEach { tableName ->
             val repMetaData = dbMetaData.replicateEntities.values
@@ -68,7 +71,10 @@ class ReplicationNotificationDispatcher(
 
             db.prepareAndUseStatementAsync(sql) { stmt ->
                 stmt.executeQueryAsyncKmp().useResults { result ->
-                    val devicesToNotify = result.mapRows { it.getLong(1) }
+                    Napier.d("ReplicationNotificationDispatcher for [$db]: sending notifications for changes to table " +
+                            "${repMetaData.entityTableName}.", tag = DoorTag.LOG_TAG)
+                    val devicesToNotify = result.mapRows{ it.getLong(1) }
+
                     devicesToNotify.forEach { deviceId ->
                         fire(ReplicationPendingEvent(deviceId, listOf(repMetaData.tableId)))
                     }

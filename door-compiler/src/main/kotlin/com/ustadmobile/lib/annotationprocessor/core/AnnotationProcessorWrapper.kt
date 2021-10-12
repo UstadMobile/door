@@ -312,7 +312,7 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
 
 
         //cleanup postgres so it can be used next time:
-        pgConnection?.createStatement()!!.use { pgStmt ->
+        pgConnection?.createStatement()?.use { pgStmt ->
             dbs.flatMap { it.allDbEntities(processingEnv) }.toSet().forEach { entity ->
                 pgStmt.executeUpdate("DROP TABLE IF EXISTS ${entity.entityTableName}")
 

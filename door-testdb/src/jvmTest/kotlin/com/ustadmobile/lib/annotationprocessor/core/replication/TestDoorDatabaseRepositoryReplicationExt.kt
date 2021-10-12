@@ -17,6 +17,7 @@ import io.ktor.client.features.json.*
 import io.ktor.routing.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import io.ktor.utils.io.*
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -55,6 +56,8 @@ class TestDoorDatabaseRepositoryReplicationExt  {
     private lateinit var remoteNotificationDispatcher :ReplicationNotificationDispatcher
 
     private lateinit var localNotificationDispatcher: ReplicationNotificationDispatcher
+
+    private lateinit var localReplicationSubscriptionManager: ReplicationSubscriptionManager
 
     @Before
     fun setup() {
@@ -95,7 +98,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
             RepDb::class.doorDatabaseMetadata())
 
         localNotificationDispatcher = ReplicationNotificationDispatcher(
-            localRepDb, RepDb_ReplicationRunOnChangeRunner(remoteRepDb), GlobalScope,
+            localRepDb, RepDb_ReplicationRunOnChangeRunner(localRepDb), GlobalScope,
             RepDb::class.doorDatabaseMetadata())
 
 
@@ -115,7 +118,10 @@ class TestDoorDatabaseRepositoryReplicationExt  {
             registerContextTranslator { _: ApplicationCall -> "localhost" }
         }
 
-        remoteServer = embeddedServer(Netty, 8089) {
+        remoteServer = embeddedServer(Netty, 8089, configure = {
+            requestReadTimeoutSeconds = 600
+            responseWriteTimeoutSeconds = 600
+        }) {
             install(DIFeature){
                 extend(remoteDi)
             }
@@ -131,6 +137,8 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     @After
     fun tearDown() {
+        if(::localReplicationSubscriptionManager.isInitialized)
+            localReplicationSubscriptionManager.close()
         remoteServer.stop(1000, 1000)
     }
 
@@ -234,9 +242,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
     }
 
 
-    //This needs a fix to invalidate the table so the live data will trigger
-    @Test
-    fun givenReplicationSubscriptionEnabled_whenChangeMadeOnRemote_thenShouldTransferToLocal() {
+    private fun setupLocalAndRemoteReplicationManager() {
         localRepDb.repDao.insertDoorNode(DoorNode().apply {
             auth = "secret"
             nodeId = REMOTE_NODE_ID.toInt()
@@ -250,11 +256,15 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         remoteRepDb.addChangeListener(ChangeListenerRequest(listOf(), remoteNotificationDispatcher))
         localRepDb.addChangeListener(ChangeListenerRequest(listOf(), localNotificationDispatcher))
 
-        //Just create it - this will need a close
-        ReplicationSubscriptionManager(localRepDb.dbVersion, jsonSerializer, localNotificationDispatcher,
+        localReplicationSubscriptionManager = ReplicationSubscriptionManager(localRepDb.dbVersion, jsonSerializer, localNotificationDispatcher,
             localDbRepo as DoorDatabaseRepository, GlobalScope, RepDb::class.doorDatabaseMetadata(), RepDb::class)
+    }
 
+    @Test
+    fun givenReplicationSubscriptionEnabled_whenChangeMadeOnRemote_thenShouldTransferToLocal() {
+        setupLocalAndRemoteReplicationManager()
 
+        //Just create it - this will need a close
         val entity = RepEntity().apply {
             reString = "Subscribe and replicate"
             rePrimaryKey = remoteRepDb.repDao.insert(this)
@@ -265,6 +275,58 @@ class TestDoorDatabaseRepositoryReplicationExt  {
                 it != null
             }
         }
+
+        Assert.assertNotNull(entityOnLocal)
+    }
+
+    @Test
+    fun givenReplicationSubscriptionEnabled_whenInsertedOnLocal_thenShouldTransferToRemote() {
+        setupLocalAndRemoteReplicationManager()
+
+        //Just create it - this will need a close
+        val entity = RepEntity().apply {
+            reString = "Subscribe and replicate"
+            rePrimaryKey = localRepDb.repDao.insert(this)
+        }
+
+        val entityOnRemote = runBlocking {
+            remoteRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000 * 1000) {
+                it != null
+            }
+        }
+
+        Assert.assertNotNull(entityOnRemote)
+    }
+
+    @Test
+    fun givenReplicationSubscriptionEnabled_whenChangeMadeOnRemoteThenLocal_thenShouldTransferToLocalAndUpdateOnRemote() {
+        setupLocalAndRemoteReplicationManager()
+
+        //Just create it - this will need a close
+        val entity = RepEntity().apply {
+            reString = "Subscribe and replicate"
+            rePrimaryKey = remoteRepDb.repDao.insert(this)
+        }
+
+        val entityOnLocal = runBlocking {
+            localRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000) {
+                it != null
+            }
+        } ?: throw IllegalStateException("Entity not transferred to local")
+
+        entityOnLocal.reLastChangeTime = 1
+        entityOnLocal.reString = "Updated"
+
+        localRepDb.repDao.update(entityOnLocal)
+
+        val entityUpdatedOnRemote = runBlocking {
+            remoteRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000) {
+                (it?.reLastChangeTime ?: 0) == 1L
+            }
+        }
+
+        Assert.assertEquals("Got updated entity back on remote", 1L,
+            entityUpdatedOnRemote?.reLastChangeTime)
 
         Assert.assertNotNull(entityOnLocal)
     }

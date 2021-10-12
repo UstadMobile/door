@@ -281,6 +281,10 @@ class ReplicationSubscriptionManager(
         e.printStackTrace()
     }
 
+    fun close() {
+        eventSource.value?.close()
+    }
+
     companion object {
 
         const val EVT_INIT = "INIT"
