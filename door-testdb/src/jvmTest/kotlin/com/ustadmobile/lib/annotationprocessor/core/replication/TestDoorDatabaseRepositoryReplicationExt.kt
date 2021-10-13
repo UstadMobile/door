@@ -290,7 +290,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         }
 
         val entityOnRemote = runBlocking {
-            remoteRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000 * 1000) {
+            remoteRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000) {
                 it != null
             }
         }
@@ -330,6 +330,40 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
         Assert.assertNotNull(entityOnLocal)
     }
+
+    @Test
+    fun givenReplicationSubscriptionEnabled_whenChangeMadeOnLocalThenRemote_thenShouldTransferToRemoteAndUpdateOnLocal() {
+        setupLocalAndRemoteReplicationManager()
+
+        //Just create it - this will need a close
+        val entity = RepEntity().apply {
+            reString = "Subscribe and replicate"
+            rePrimaryKey = localRepDb.repDao.insert(this)
+        }
+
+        val entityOnRemote = runBlocking {
+            remoteRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000) {
+                it != null
+            }
+        } ?: throw IllegalStateException("Entity not transferred to local")
+
+        entityOnRemote.reLastChangeTime = 1
+        entityOnRemote.reString = "Updated"
+
+        remoteRepDb.repDao.update(entityOnRemote)
+
+        val entityUpdatedOnLocal = runBlocking {
+            localRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000) {
+                (it?.reLastChangeTime ?: 0) == 1L
+            }
+        }
+
+        Assert.assertEquals("Got updated entity back on remote", 1L,
+            entityUpdatedOnLocal?.reLastChangeTime)
+
+        Assert.assertNotNull(entityOnRemote)
+    }
+
 
     companion object {
 

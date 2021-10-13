@@ -48,7 +48,7 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
 
     lateinit var messager: MessagerWrapper
 
-    protected var dbConnection: Connection? = null
+    private var dbConnection: Connection? = null
 
     /**
      * When we generate the code for a Query annotation function that performs an update or delete,

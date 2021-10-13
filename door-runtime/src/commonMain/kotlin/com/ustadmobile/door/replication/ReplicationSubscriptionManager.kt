@@ -157,9 +157,9 @@ class ReplicationSubscriptionManager(
                 dbMetadata.replicateEntities.values.forEach { repEntity ->
                     stmt.setInt(1, repEntity.tableId)
                     stmt.setLong(2, remoteNodeIdVal)
-                    stmt.setLong(3, timeNow)
+                    stmt.setLong(3, 0)
                     stmt.setLong(4, 0)
-                    stmt.setLong(5, timeNow)
+                    stmt.setLong(5, 0)
                     stmt.setLong(6, 0)
                     stmt.setInt(7, repEntity.tableId)
                     stmt.setLong(8, remoteNodeIdVal)
