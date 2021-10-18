@@ -1,7 +1,6 @@
 package com.ustadmobile.door.ext
 
-import com.ustadmobile.door.DoorDatabase
-import com.ustadmobile.door.PreparedStatementConfig
+import com.ustadmobile.door.*
 import com.ustadmobile.door.jdbc.*
 
 actual suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
@@ -36,3 +35,15 @@ actual fun <R> DoorDatabase.prepareAndUseStatement(
         connection?.close()
     }
 }
+
+actual val DoorDatabase.sourceDatabase: DoorDatabase?
+    get() {
+        return when {
+            (this is DoorDatabaseJdbc && isInTransaction) -> this.doorJdbcSourceDatabase
+            (this is DoorDatabaseJdbc && !isInTransaction) -> null
+            (this is DoorDatabaseRepository) -> this.db
+            (this is DoorDatabaseSyncableReadOnlyWrapper) -> this.realDatabase
+            else -> throw IllegalStateException("SourceDatabase : Not a recognized implementation: ${this::class.qualifiedName}")
+        }
+    }
+

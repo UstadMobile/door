@@ -76,3 +76,9 @@ expect fun <R> DoorDatabase.prepareAndUseStatement(
     block: (PreparedStatement) -> R
 ) : R
 
+/**
+ * Sometimes we want to create a new instance of the database that is just a wrapper e.g.
+ * SyncableReadOnlyWrapper, possibly a transaction wrapper. When this happens, all calls to
+ * listen for changes, opening connections, etc. should be redirected to the source database
+ */
+expect val DoorDatabase.sourceDatabase: DoorDatabase?

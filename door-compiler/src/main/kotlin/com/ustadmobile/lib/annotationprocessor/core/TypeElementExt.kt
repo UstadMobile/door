@@ -130,8 +130,12 @@ fun <A: Annotation> TypeElement.allMethodsWithAnnotation(annotationList: List<Cl
 /**
  * Get a list of all the methods on this DAO that have a query that could modify the database
  */
-fun TypeElement.allDaoClassModifyingQueryMethods() : List<ExecutableElement> {
-    val annotations = listOf(Query::class.java, Update::class.java, Delete::class.java, Insert::class.java)
+fun TypeElement.allDaoClassModifyingQueryMethods(
+    checkQueryAnnotation: Boolean = true
+) : List<ExecutableElement> {
+    val annotations = listOf(Update::class.java, Delete::class.java, Insert::class.java) +
+            if(checkQueryAnnotation) listOf(Query::class.java) else listOf()
+
     return allMethodsWithAnnotation(annotations).filter {
         if(it.hasAnnotation(Query::class.java)) {
             it.getAnnotation(Query::class.java).value.isSQLAModifyingQuery()

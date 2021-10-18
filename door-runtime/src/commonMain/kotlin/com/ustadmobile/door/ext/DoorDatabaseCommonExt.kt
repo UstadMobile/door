@@ -144,3 +144,16 @@ suspend fun DoorDatabase.deleteFromChangeLog(tableId: Int) {
         stmt.executeUpdateAsyncKmp()
     }
 }
+
+/**
+ * Get the real, one and only, root database. This will get out of any wrappers, transactions, etc.
+ */
+val DoorDatabase.rootDatabase: DoorDatabase
+    get() {
+        var db = this
+        while (true) {
+            db = db.sourceDatabase ?: break
+        }
+
+        return db
+    }

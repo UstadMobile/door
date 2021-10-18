@@ -1,7 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import androidx.room.Database
-import androidx.room.Dao
+import androidx.room.*
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.ustadmobile.door.DoorDatabase
@@ -11,8 +10,7 @@ import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
 import javax.lang.model.type.DeclaredType
 import com.ustadmobile.door.DoorDatabaseSyncableReadOnlyWrapper
-import com.ustadmobile.door.SyncableDoorDatabase
-import kotlin.reflect.KClass
+import com.ustadmobile.door.annotation.ReplicateEntity
 
 /**
  * Add a DAO accessor for a database wrapper (e.g. property or function). If the given DAO
@@ -20,12 +18,11 @@ import kotlin.reflect.KClass
  * then the original DAO from the database will be returned by the generated code.
  */
 fun TypeSpec.Builder.addWrapperAccessorFunction(daoGetter: ExecutableElement,
-                                                processingEnv: ProcessingEnvironment,
-                                                allKnownEntityTypesMap: Map<String, TypeElement>) : TypeSpec.Builder {
-    val daoModifiesSyncableEntities = daoGetter.returnType.asTypeElement(processingEnv)
-            ?.daoHasSyncableWriteMethods(processingEnv, allKnownEntityTypesMap) == true
+                                                processingEnv: ProcessingEnvironment) : TypeSpec.Builder {
+    val daoModifiesReplicateEntities = daoGetter.returnType.asTypeElement(processingEnv)
+            ?.daoHasRepositoryWriteFunctions(processingEnv) == true
 
-    if(!daoModifiesSyncableEntities) {
+    if(!daoModifiesReplicateEntities) {
         addAccessorOverride(daoGetter, CodeBlock.of("return _db.${daoGetter.accessAsPropertyOrFunctionInvocationCall()}\n"))
     }else {
         val daoType = daoGetter.returnType.asTypeElement(processingEnv)
@@ -78,23 +75,22 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(daoMethod: ExecutableElement,
             forceNullableParameterTypeArgs = returnTypeName.isNullableParameterTypeAsSelectReturnResult)
             .build()
 
-    if(daoMethod.isDaoMethodModifyingSyncableEntity(daoTypeEl, processingEnv, allKnownEntityTypesMap)) {
-        addFunction(overridingFunction.toBuilder()
-                .addCode("throw %T(%S)\n", IllegalStateException::class,
-                        "Cannot use DB to modify syncable entity")
+    addFunction(overridingFunction.toBuilder()
+        .addCode(CodeBlock.builder()
+                .apply {
+
+                    if(daoMethod.hasAnyAnnotation(Insert::class.java, Update::class.java, Delete::class.java) &&
+                        (overridingFunction.entityParamComponentType as? ClassName)?.isReplicateEntity(processingEnv) == true) {
+                        add("//must set versionid and/or primary key here\n")
+                    }
+
+                    if(overridingFunction.returnType != null && overridingFunction.returnType != UNIT) {
+                        add("return ")
+                    }
+                }
+                .addDelegateFunctionCall("_dao", overridingFunction)
                 .build())
-    }else {
-        addFunction(overridingFunction.toBuilder()
-                .addCode(CodeBlock.builder()
-                        .apply {
-                            if(overridingFunction.returnType != null && overridingFunction.returnType != UNIT) {
-                                add("return ")
-                            }
-                        }
-                        .addDelegateFunctionCall("_dao", overridingFunction)
-                        .build())
-                .build())
-    }
+        .build())
 
     return this
 }
@@ -123,9 +119,6 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(dbTypeEl: TypeElement,
                     .addProperty(PropertySpec.builder("_db", dbClassName, KModifier.PRIVATE)
                             .initializer("_db").build())
                     .applyIf(addJdbcOverrides) {
-                        addInitializerBlock(CodeBlock.builder()
-                                .add("sourceDatabase = _db\n")
-                                .build())
                         addDbVersionProperty(dbTypeEl)
                         addFunction(FunSpec.builder("createAllTables")
                                 .addModifiers(KModifier.OVERRIDE)
@@ -225,17 +218,17 @@ fun FileSpec.Builder.addDaoWrapperTypeSpec(daoTypeElement: TypeElement,
 }
 
 
-
 /**
- * Determine if this TypeElement (or any of it's ancestors) representing a DAO has any methods that
- * modify a syncable entity
+ * Determine if this TypeElement (or any of its ancestors) representing a DAO has any functions with the Insert,
+ * Delete, or Update annotation that are acting on a ReplicateEntity
  */
-private fun TypeElement.daoHasSyncableWriteMethods(
-        processingEnv: ProcessingEnvironment, allKnownEntityTypesMap: Map<String, TypeElement>): Boolean {
-
+private fun TypeElement.daoHasRepositoryWriteFunctions(
+    processingEnv: ProcessingEnvironment
+) : Boolean {
     return ancestorsAsList(processingEnv).any {
-        it.allDaoClassModifyingQueryMethods().any { daoMethodEl ->
-            daoMethodEl.isDaoMethodModifyingSyncableEntity(this, processingEnv, allKnownEntityTypesMap)
+        it.allDaoClassModifyingQueryMethods(checkQueryAnnotation = false).any { daoMethodEl ->
+            val paramType = daoMethodEl.parameters.first().asType().unwrapListOrArrayComponentType()
+            paramType.asTypeElement(processingEnv)?.hasAnnotation(ReplicateEntity::class.java) == true
         }
     }
 }
@@ -269,7 +262,7 @@ class DbProcessorSyncableReadOnlyWrapper: AbstractDbProcessor()  {
         }
 
         roundEnv.getElementsAnnotatedWith(Dao::class.java).map { it as TypeElement }.forEach {daoTypeEl ->
-            if(daoTypeEl.daoHasSyncableWriteMethods(processingEnv, allKnownEntityTypesMap)) {
+            if(daoTypeEl.daoHasRepositoryWriteFunctions(processingEnv)) {
                 FileSpec.builder(daoTypeEl.packageName,
                         "${daoTypeEl.simpleName}${DoorDatabaseSyncableReadOnlyWrapper.SUFFIX}")
                         .addDaoWrapperTypeSpec(daoTypeEl, processingEnv, allKnownEntityTypesMap)

@@ -2,6 +2,7 @@ package com.ustadmobile.door
 
 
 import com.ustadmobile.door.ext.concurrentSafeMapOf
+import com.ustadmobile.door.ext.sourceDatabase
 import com.ustadmobile.door.jdbc.*
 import com.ustadmobile.door.transaction.DoorTransactionDataSourceWrapper
 import kotlinx.atomicfu.atomic
@@ -9,7 +10,7 @@ import java.lang.reflect.Constructor
 import kotlin.reflect.KClass
 
 @Suppress("unused") //Some functions are used by generated code
-actual abstract class DoorDatabase actual constructor() : DoorDatabaseCommon(){
+actual abstract class DoorDatabase : DoorDatabaseCommon(){
 
     override var jdbcDbType: Int = -1
         get() = sourceDatabase?.jdbcDbType ?: field
@@ -21,6 +22,9 @@ actual abstract class DoorDatabase actual constructor() : DoorDatabaseCommon(){
         protected set
 
     private val transactionDepth = atomic(0)
+
+    protected val currentTransactionDepth: Int
+        get() = transactionDepth.value
 
     private val transactionTablesChanged = concurrentSafeMapOf<String, String>()
 
@@ -34,11 +38,11 @@ actual abstract class DoorDatabase actual constructor() : DoorDatabaseCommon(){
     private val constructorFun: Constructor<DoorDatabase> by lazy(LazyThreadSafetyMode.NONE) {
         if(this is SyncableDoorDatabase) {
             @Suppress("UNCHECKED_CAST")
-            this::class.java.getConstructor(DataSource::class.java, Boolean::class.javaPrimitiveType,
+            this::class.java.getConstructor(DoorDatabase::class.java, DataSource::class.java, Boolean::class.javaPrimitiveType,
                 String::class.java) as Constructor<DoorDatabase>
         }else {
             @Suppress("UNCHECKED_CAST")
-            this::class.java.getConstructor(DataSource::class.java, String::class.java) as Constructor<DoorDatabase>
+            this::class.java.getConstructor(DoorDatabase::class.java, DataSource::class.java, String::class.java) as Constructor<DoorDatabase>
         }
     }
 
@@ -86,12 +90,13 @@ actual abstract class DoorDatabase actual constructor() : DoorDatabaseCommon(){
     private fun createTransactionDataSourceAndDb(): Pair<DoorTransactionDataSourceWrapper, DoorDatabase> {
         val transactionDataSource = DoorTransactionDataSourceWrapper(effectiveDatabase.dataSource)
         val transactionDb = if(this is SyncableDoorDatabase) {
-            effectiveDatabase.constructorFun.newInstance(transactionDataSource, false, "Transaction for $this")
+            effectiveDatabase.constructorFun.newInstance(effectiveDatabase, transactionDataSource, false,
+                "Transaction for $this")
         }else {
-            effectiveDatabase.constructorFun.newInstance(transactionDataSource, "Transaction wrapper for $this")
+            effectiveDatabase.constructorFun.newInstance(effectiveDatabase, transactionDataSource,
+                "Transaction wrapper for $this")
         }
 
-        transactionDb.sourceDatabase = effectiveDatabase
         transactionDb.transactionDepth.value = 1
 
         return Pair(transactionDataSource, transactionDb)

@@ -2,10 +2,10 @@ package com.ustadmobile.lib.annotationprocessor.core
 
 import androidx.room.Embedded
 import com.squareup.kotlinpoet.*
+import com.ustadmobile.door.annotation.ReplicateEntity
 import com.ustadmobile.door.annotation.SyncableEntity
 import javax.annotation.processing.ProcessingEnvironment
 import javax.lang.model.element.TypeElement
-import javax.tools.Diagnostic
 
 /**
  * Replaces AbstractDbProcessor.findEntitiesWithAnnotation
@@ -109,3 +109,22 @@ fun ClassName.asEntityTypeSpec(processingEnv: ProcessingEnvironment): TypeSpec? 
 fun ClassName.asTypeElement(processingEnv: ProcessingEnvironment): TypeElement? {
     return processingEnv.elementUtils.getTypeElement(canonicalName) as? TypeElement
 }
+
+/**
+ * Where the ClassName represents something that we can find as a TypeElement,
+ * check if the actual declaration of the class has any of the given annotations.
+ */
+fun <A : Annotation> ClassName.hasAnyAnnotation(
+    processingEnv: ProcessingEnvironment,
+    vararg annotationsClasses: Class<out A>
+): Boolean {
+    return asTypeElement(processingEnv)?.hasAnyAnnotation(*annotationsClasses) ?: false
+}
+
+/**
+ * Returns true if the given ClassName represents the ReplicateEntity itself, NOT if it is a child class of a
+ * ReplicateEntity etc
+ */
+fun ClassName.isReplicateEntity(
+    processingEnv: ProcessingEnvironment
+) = hasAnyAnnotation(processingEnv, ReplicateEntity::class.java)

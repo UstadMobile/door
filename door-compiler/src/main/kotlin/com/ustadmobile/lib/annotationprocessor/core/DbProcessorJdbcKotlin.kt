@@ -1245,7 +1245,10 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         addImport("com.ustadmobile.door.util", "systemTimeInMillis")
         addType(TypeSpec.classBuilder(dbTypeElement.asClassNameWithSuffix(SUFFIX_JDBC_KT2))
             .superclass(dbTypeElement.asClassName())
+            .addSuperinterface(DoorDatabaseJdbc::class)
             .primaryConstructor(FunSpec.constructorBuilder()
+                .addParameter("doorJdbcSourceDatabase", DoorDatabase::class.asTypeName().copy(nullable = true),
+                    KModifier.OVERRIDE)
                 .addParameter(ParameterSpec("dataSource",  CLASSNAME_DATASOURCE,
                     KModifier.OVERRIDE))
                 .applyIf(dbTypeElement.isDbSyncable(processingEnv)) {
@@ -1260,8 +1263,18 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             .addProperty(PropertySpec.builder("dataSource", CLASSNAME_DATASOURCE)
                 .initializer("dataSource")
                 .build())
+            .addProperty(PropertySpec.builder("doorJdbcSourceDatabase",
+                    DoorDatabase::class.asTypeName().copy(nullable = true))
+                .initializer("doorJdbcSourceDatabase")
+                .build())
             .addProperty(PropertySpec.builder("dbName", String::class)
                 .initializer("dbName")
+                .build())
+            .addProperty(PropertySpec.builder("isInTransaction", Boolean::class,
+                KModifier.OVERRIDE)
+                .getter(FunSpec.getterBuilder()
+                    .addCode("return currentTransactionDepth > 0\n")
+                    .build())
                 .build())
             .applyIf(dbTypeElement.isDbSyncable(processingEnv)) {
                 addProperty(PropertySpec.builder("master", BOOLEAN)

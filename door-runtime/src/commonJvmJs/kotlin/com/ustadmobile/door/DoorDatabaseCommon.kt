@@ -7,6 +7,7 @@ import kotlinx.coroutines.Runnable
 import com.ustadmobile.door.ext.concurrentSafeListOf
 import com.ustadmobile.door.ext.doorIdentityHashCode
 import io.github.aakira.napier.Napier
+import com.ustadmobile.door.ext.sourceDatabase
 
 abstract class DoorDatabaseCommon {
 
@@ -19,24 +20,17 @@ abstract class DoorDatabaseCommon {
     abstract val dbName: String
 
     /**
-     * Sometimes we want to create a new instance of the database that is just a wrapper e.g.
-     * SyncableReadOnlyWrapper, possibly a transaction wrapper. When this happens, all calls to
-     * listen for changes, opening connections, etc. should be redirected to the source database
-     */
-    var sourceDatabase: DoorDatabase? = null
-        protected set
-
-    /**
      * Convenience variable that will be the sourceDatabase if it is not null, or this database
      * itself otherwise
      */
     @Suppress("CAST_NEVER_SUCCEEDS") // This is incorrect
     protected val effectiveDatabase: DoorDatabase
-        get() = sourceDatabase ?: (this as DoorDatabase)
+        get() = (this as DoorDatabase).sourceDatabase ?: (this as DoorDatabase)
 
 
+    @Suppress("CAST_NEVER_SUCCEEDS")
     var arraySupported: Boolean = false
-        get() = sourceDatabase?.arraySupported ?: field
+        get() = (this as DoorDatabase).sourceDatabase?.arraySupported ?: field
         private set
 
     abstract val jdbcArraySupported: Boolean

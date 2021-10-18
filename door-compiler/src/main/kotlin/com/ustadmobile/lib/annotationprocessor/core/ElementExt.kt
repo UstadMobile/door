@@ -19,6 +19,10 @@ fun Element.hasAnyAnnotation(annotationChecker: (AnnotationMirror) -> Boolean) :
     return annotationMirrors.any(annotationChecker)
 }
 
+fun <A: Annotation> Element.hasAnyAnnotation(vararg annotationClasses: Class<out A>): Boolean {
+    return annotationClasses.any { getAnnotation(it) != null }
+}
+
 /**
  * Shorthand to get the package name of a given element
  */
