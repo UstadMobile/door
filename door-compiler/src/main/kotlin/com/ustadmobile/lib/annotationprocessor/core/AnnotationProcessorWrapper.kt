@@ -17,13 +17,10 @@ import com.squareup.kotlinpoet.BOOLEAN
 import com.squareup.kotlinpoet.LONG
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asTypeName
-import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import com.squareup.kotlinpoet.metadata.toImmutableKmClass
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.DoorDbType.Companion.PRODUCT_INT_TO_NAME_MAP
 import com.ustadmobile.door.annotation.*
-import kotlinx.metadata.jvm.KotlinClassHeader
-import kotlinx.metadata.jvm.KotlinClassMetadata
 import org.sqlite.SQLiteDataSource
 import java.io.File
 import java.sql.Connection
@@ -44,7 +41,7 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
 
     val processors = listOf(DbProcessorJdbcKotlin(), DbProcessorKtorServer(),
             DbProcessorRepository(), DbProcessorSync(), DbProcessorAndroid(),
-            DbProcessorSyncableReadOnlyWrapper(), DbProcessorSyncPushMigration())
+            DbProcessorReplicateWrapper(), DbProcessorSyncPushMigration())
 
     lateinit var messager: MessagerWrapper
 

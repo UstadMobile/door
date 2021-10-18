@@ -20,7 +20,7 @@ import java.util.concurrent.atomic.AtomicReference
 class ServerChangeLogMonitor(database: DoorDatabase, private val repo: DoorDatabaseRepository,
                              val numProcessors: Int = 5) {
 
-    private val db = if(database is DoorDatabaseSyncableReadOnlyWrapper) {
+    private val db = if(database is DoorDatabaseReplicateWrapper) {
         database.realDatabase
     }else {
         database

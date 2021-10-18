@@ -42,7 +42,7 @@ actual val DoorDatabase.sourceDatabase: DoorDatabase?
             (this is DoorDatabaseJdbc && isInTransaction) -> this.doorJdbcSourceDatabase
             (this is DoorDatabaseJdbc && !isInTransaction) -> null
             (this is DoorDatabaseRepository) -> this.db
-            (this is DoorDatabaseSyncableReadOnlyWrapper) -> this.realDatabase
+            (this is DoorDatabaseReplicateWrapper) -> this.realDatabase
             else -> throw IllegalStateException("SourceDatabase : Not a recognized implementation: ${this::class.qualifiedName}")
         }
     }

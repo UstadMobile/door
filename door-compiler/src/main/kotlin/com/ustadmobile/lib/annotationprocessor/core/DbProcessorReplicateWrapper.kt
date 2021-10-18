@@ -9,7 +9,7 @@ import javax.annotation.processing.RoundEnvironment
 import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
 import javax.lang.model.type.DeclaredType
-import com.ustadmobile.door.DoorDatabaseSyncableReadOnlyWrapper
+import com.ustadmobile.door.DoorDatabaseReplicateWrapper
 import com.ustadmobile.door.annotation.ReplicateEntity
 
 /**
@@ -27,7 +27,7 @@ fun TypeSpec.Builder.addWrapperAccessorFunction(daoGetter: ExecutableElement,
     }else {
         val daoType = daoGetter.returnType.asTypeElement(processingEnv)
                 ?: throw IllegalStateException("Dao return type is not TypeElement")
-        val wrapperClassName = daoType.asClassNameWithSuffix(DoorDatabaseSyncableReadOnlyWrapper.SUFFIX)
+        val wrapperClassName = daoType.asClassNameWithSuffix(DoorDatabaseReplicateWrapper.SUFFIX)
         addProperty(PropertySpec.builder("_${daoType.simpleName}",
                 daoType.asClassName()).delegate(
                 CodeBlock.builder().beginControlFlow("lazy ")
@@ -107,12 +107,12 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(dbTypeEl: TypeElement,
                                          addRoomOverrides: Boolean = false): FileSpec.Builder {
     val dbClassName = dbTypeEl.asClassName()
     addType(
-            TypeSpec.classBuilder("${dbTypeEl.simpleName}${DoorDatabaseSyncableReadOnlyWrapper.SUFFIX}")
+            TypeSpec.classBuilder("${dbTypeEl.simpleName}${DoorDatabaseReplicateWrapper.SUFFIX}")
                     .addAnnotation(AnnotationSpec.builder(Suppress::class)
                             .addMember("%S, %S", "REDUNDANT_PROJECTION", "ClassName")
                             .build())
                     .superclass(dbClassName)
-                    .addSuperinterface(DoorDatabaseSyncableReadOnlyWrapper::class.asClassName())
+                    .addSuperinterface(DoorDatabaseReplicateWrapper::class.asClassName())
                     .primaryConstructor(FunSpec.constructorBuilder()
                             .addParameter("_db", dbClassName)
                             .build())
@@ -197,7 +197,7 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(dbTypeEl: TypeElement,
 fun FileSpec.Builder.addDaoWrapperTypeSpec(daoTypeElement: TypeElement,
                                             processingEnv: ProcessingEnvironment,
                                             allKnownEntityTypesMap: Map<String, TypeElement>): FileSpec.Builder {
-    addType(TypeSpec.classBuilder(daoTypeElement.asClassNameWithSuffix(DoorDatabaseSyncableReadOnlyWrapper.SUFFIX))
+    addType(TypeSpec.classBuilder(daoTypeElement.asClassNameWithSuffix(DoorDatabaseReplicateWrapper.SUFFIX))
             .superclass(daoTypeElement.asClassName())
             .primaryConstructor(FunSpec.constructorBuilder()
                     .addParameter("_dao", daoTypeElement.asClassName())
@@ -234,23 +234,22 @@ private fun TypeElement.daoHasRepositoryWriteFunctions(
 }
 
 /**
- * Generates the DbWrapper class to prevent accidental usage of insert, update, and delete functions
- * for syncable entities on the database which must be routed via the repository for sync to work.
+ * Generates an implementation of DoorDatabaseReplicateWrapper for databases and daos being processed.
  */
-class DbProcessorSyncableReadOnlyWrapper: AbstractDbProcessor()  {
+class DbProcessorReplicateWrapper: AbstractDbProcessor()  {
 
     override fun process(annotations: MutableSet<out TypeElement>?, roundEnv: RoundEnvironment): Boolean {
         roundEnv.getElementsAnnotatedWith(Database::class.java).map { it as TypeElement }.forEach {dbTypeEl ->
             //jvm version
             if(dbTypeEl.dbHasReadOnlyWrapper(processingEnv)) {
                 FileSpec.builder(dbTypeEl.qualifiedPackageName(processingEnv),
-                        "${dbTypeEl.simpleName}${DoorDatabaseSyncableReadOnlyWrapper.SUFFIX}")
+                        "${dbTypeEl.simpleName}${DoorDatabaseReplicateWrapper.SUFFIX}")
                         .addDbWrapperTypeSpec(dbTypeEl, processingEnv, allKnownEntityTypesMap)
                         .build()
                         .writeToDirsFromArg(AnnotationProcessorWrapper.OPTION_JVM_DIRS)
 
                 FileSpec.builder(dbTypeEl.packageName,
-                        "${dbTypeEl.simpleName}${DoorDatabaseSyncableReadOnlyWrapper.SUFFIX}")
+                        "${dbTypeEl.simpleName}${DoorDatabaseReplicateWrapper.SUFFIX}")
                         .addDbWrapperTypeSpec(dbTypeEl, processingEnv, allKnownEntityTypesMap,
                             overrideKtorHelperDaos = true,
                             addJdbcOverrides = false,
@@ -264,7 +263,7 @@ class DbProcessorSyncableReadOnlyWrapper: AbstractDbProcessor()  {
         roundEnv.getElementsAnnotatedWith(Dao::class.java).map { it as TypeElement }.forEach {daoTypeEl ->
             if(daoTypeEl.daoHasRepositoryWriteFunctions(processingEnv)) {
                 FileSpec.builder(daoTypeEl.packageName,
-                        "${daoTypeEl.simpleName}${DoorDatabaseSyncableReadOnlyWrapper.SUFFIX}")
+                        "${daoTypeEl.simpleName}${DoorDatabaseReplicateWrapper.SUFFIX}")
                         .addDaoWrapperTypeSpec(daoTypeEl, processingEnv, allKnownEntityTypesMap)
                         .build().apply {
                             writeToDirsFromArg(AnnotationProcessorWrapper.OPTION_JVM_DIRS)

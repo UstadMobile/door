@@ -6,7 +6,7 @@ import kotlin.reflect.KClass
 //succeed
 @Suppress("UNCHECKED_CAST")
 actual inline fun <reified  T: DoorDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T {
-    val dbUnwrapped = if(this is DoorDatabaseSyncableReadOnlyWrapper) {
+    val dbUnwrapped = if(this is DoorDatabaseReplicateWrapper) {
         this.unwrap(T::class)
     }else {
         this
@@ -27,13 +27,13 @@ actual inline fun <reified  T: DoorDatabase> T.asRepository(repositoryConfig: Re
  */
 @Suppress("UNCHECKED_CAST")
 actual fun <T: DoorDatabase> T.wrap(dbClass: KClass<T>) : T {
-    val wrapperClass = Class.forName("${dbClass.qualifiedName}${DoorDatabaseSyncableReadOnlyWrapper.SUFFIX}") as Class<T>
+    val wrapperClass = Class.forName("${dbClass.qualifiedName}${DoorDatabaseReplicateWrapper.SUFFIX}") as Class<T>
     return wrapperClass.getConstructor(dbClass.java).newInstance(this)
 }
 
 @Suppress("UNCHECKED_CAST")
 actual fun <T: DoorDatabase> T.unwrap(dbClass: KClass<T>): T {
-    if(this is DoorDatabaseSyncableReadOnlyWrapper) {
+    if(this is DoorDatabaseReplicateWrapper) {
         return this.realDatabase as T
     }else {
         return this

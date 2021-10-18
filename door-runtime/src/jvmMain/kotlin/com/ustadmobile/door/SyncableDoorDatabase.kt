@@ -7,7 +7,7 @@ actual inline fun <reified  T: DoorDatabase> T.asRepository(repositoryConfig: Re
     val dbClass = T::class
     val repoImplClass = Class.forName("${dbClass.qualifiedName}_Repo") as Class<T>
 
-    val dbUnwrapped = if(this is DoorDatabaseSyncableReadOnlyWrapper) {
+    val dbUnwrapped = if(this is DoorDatabaseReplicateWrapper) {
         this.unwrap(dbClass)
     }else {
         this
@@ -26,11 +26,11 @@ actual inline fun <reified  T: DoorDatabase> T.asRepository(repositoryConfig: Re
  */
 @Suppress("UNCHECKED_CAST")
 actual fun <T: DoorDatabase> T.wrap(dbClass: KClass<T>) : T {
-    val wrapperClass = Class.forName("${dbClass.qualifiedName}${DoorDatabaseSyncableReadOnlyWrapper.SUFFIX}") as Class<T>
+    val wrapperClass = Class.forName("${dbClass.qualifiedName}${DoorDatabaseReplicateWrapper.SUFFIX}") as Class<T>
     return wrapperClass.getConstructor(dbClass.java).newInstance(this)
 }
 
 @Suppress("UNCHECKED_CAST")
 actual fun <T: DoorDatabase> T.unwrap(dbClass: KClass<T>): T {
-    return (this as DoorDatabaseSyncableReadOnlyWrapper).realDatabase as T
+    return (this as DoorDatabaseReplicateWrapper).realDatabase as T
 }

@@ -32,7 +32,7 @@ actual abstract class DoorDatabase : DoorDatabaseCommon(){
      * This is true where this class is the actual JDBC implementation, false if it is a Repository or SyncReadOnlyWrapper etc
      */
     private val isImplementation: Boolean by lazy(LazyThreadSafetyMode.NONE) {
-        (this !is DoorDatabaseSyncableReadOnlyWrapper && this !is DoorDatabaseRepository)
+        (this !is DoorDatabaseReplicateWrapper && this !is DoorDatabaseRepository)
     }
 
     private val constructorFun: Constructor<DoorDatabase> by lazy(LazyThreadSafetyMode.NONE) {
