@@ -43,7 +43,13 @@ actual val DoorDatabase.sourceDatabase: DoorDatabase?
             (this is DoorDatabaseJdbc && !isInTransaction) -> null
             (this is DoorDatabaseRepository) -> this.db
             (this is DoorDatabaseReplicateWrapper) -> this.realDatabase
-            else -> throw IllegalStateException("SourceDatabase : Not a recognized implementation: ${this::class.qualifiedName}")
+            else -> throw IllegalStateException("SourceDatabase : Not a recognized implementation: ${this::class}")
         }
     }
 
+actual val DoorDatabase.doorPrimaryKeyManager: DoorPrimaryKeyManager
+    get() = (rootDatabase as DoorDatabaseJdbc).realPrimaryKeyManager
+
+actual fun DoorDatabase.handleTablesChanged(changeTableNames: List<String>) {
+    handleTableChangedInternal(changeTableNames)
+}

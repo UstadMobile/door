@@ -133,6 +133,11 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(
                                 endControlFlow()
                             }
 
+                            if(setLastChangedField.isNotEmpty()) {
+                                add("$varName.${setLastChangedField.first().simpleName} = %M()\n",
+                                    MemberName("com.ustadmobile.door.util", "systemTimeInMillis"))
+                            }
+
                             if(overridingFunction.parameters.first().type.isListOrArray()) {
                                 endControlFlow()
                             }

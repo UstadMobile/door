@@ -35,7 +35,7 @@ actual class DatabaseBuilder<T: DoorDatabase>(
     fun build(): T {
         val db = roomBuilder.build()
         return if(db is SyncableDoorDatabase) {
-            db.wrap(dbClass as KClass<SyncableDoorDatabase>) as T
+            db.wrap(dbClass)
         }else {
             db
         }

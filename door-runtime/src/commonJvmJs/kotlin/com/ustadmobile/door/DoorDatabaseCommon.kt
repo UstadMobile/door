@@ -87,7 +87,7 @@ abstract class DoorDatabaseCommon {
     }
 
 
-    open fun handleTableChanged(changeTableNames: List<String>) : DoorDatabase{
+    open fun handleTableChangedInternal(changeTableNames: List<String>) : DoorDatabase{
         GlobalScope.launch {
             effectiveDatabase.apply {
                 val affectedChangeListeners = changeListeners.filter {

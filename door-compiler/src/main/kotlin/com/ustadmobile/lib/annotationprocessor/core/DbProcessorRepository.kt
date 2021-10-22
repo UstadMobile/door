@@ -263,7 +263,7 @@ fun FileSpec.Builder.addDbRepoType(
                 addProperty(PropertySpec.builder(dbTypeElement.syncDaoPropName,
                             dbTypeElement.asClassNameWithSuffix("$SUFFIX_SYNCDAO_ABSTRACT$SUFFIX_REPOSITORY2"))
                         .delegate(CodeBlock.builder().beginControlFlow("lazy")
-                                .add("%T(_db, this, _syncDao, _httpClient, clientId, _endpoint," +
+                                .add("%T(db, this, _syncDao, _httpClient, clientId, _endpoint," +
                                         " ${DbProcessorRepository.DB_NAME_VAR}, config.attachmentsDir," +
                                         " _syncDao) ",
                                         dbTypeElement
@@ -422,7 +422,7 @@ private fun TypeSpec.Builder.addRepoDbDaoAccessor(daoGetter: ExecutableElement,
     addProperty(PropertySpec.builder("_${daoTypeEl.simpleName}",
                 daoTypeEl.asClassNameWithSuffix(SUFFIX_REPOSITORY2))
             .delegate(CodeBlock.builder().beginControlFlow("lazy")
-                    .add("%T(_db, this, _db.%L, _httpClient, clientId, _endpoint, ${DbProcessorRepository.DB_NAME_VAR}, " +
+                    .add("%T(db, this, db.%L, _httpClient, clientId, _endpoint, ${DbProcessorRepository.DB_NAME_VAR}, " +
                             "config.attachmentsDir $syncDaoParam) ",
                             daoTypeEl.asClassNameWithSuffix(SUFFIX_REPOSITORY2),
                             daoGetter.makeAccessorCodeBlock())
@@ -602,8 +602,8 @@ fun TypeSpec.Builder.addDaoRepoFun(daoFunSpec: FunSpec,
                         if(generateBoundaryCallback) {
                             addBoundaryCallbackCode(daoFunSpec, daoName, processingEnv)
                         }else {
-                            addRepoDelegateToDaoCode(daoFunSpec, isAlwaysSqlite, processingEnv,
-                                    allKnownEntityTypesMap)
+                            addRepoDelegateToDaoCode(daoFunSpec, isAlwaysSqlite, processingEnv
+                            )
                         }
 
                     }
@@ -869,11 +869,11 @@ private fun CodeBlock.Builder.endAttachmentStorageFlow(daoFunSpec: FunSpec) {
  *
  * TODO: Update last changed by field, return primary key values from pk manager if applicable
  */
-fun CodeBlock.Builder.addRepoDelegateToDaoCode(daoFunSpec: FunSpec, isAlwaysSqlite: Boolean,
-                                   processingEnv: ProcessingEnvironment,
-                                   allKnownEntityTypesMap: Map<String, TypeElement>) : CodeBlock.Builder{
-
-    var syncableEntityInfo: SyncableEntityInfo? = null
+fun CodeBlock.Builder.addRepoDelegateToDaoCode(
+    daoFunSpec: FunSpec,
+    isAlwaysSqlite: Boolean,
+    processingEnv: ProcessingEnvironment
+) : CodeBlock.Builder{
 
     if(daoFunSpec.hasAnyAnnotation(Update::class.java, Delete::class.java, Insert::class.java)) {
         val entityParam = daoFunSpec.parameters.first()
@@ -893,57 +893,6 @@ fun CodeBlock.Builder.addRepoDelegateToDaoCode(daoFunSpec: FunSpec, isAlwaysSqli
                     MemberName(entityClassName.packageName, "asEntityWithAttachment"))
 
             endAttachmentStorageFlow(daoFunSpec)
-        }
-
-        if(entityComponentType.hasSyncableEntities(processingEnv)) {
-            syncableEntityInfo = SyncableEntityInfo(entityComponentType as ClassName, processingEnv)
-            if(daoFunSpec.hasAnyAnnotation(Update::class.java)) {
-                add("val _isSyncablePrimary = _db.%M\n",
-                        MemberName("com.ustadmobile.door.ext", "syncableAndPrimary"))
-            }
-
-            if(daoFunSpec.hasAnnotation(Update::class.java)) {
-                var entityVarName = entityParam.name
-                if(entityParam.type.isListOrArray()) {
-                    beginControlFlow("${entityParam.name}.forEach")
-                    entityVarName = "it"
-                }
-
-                add("$entityVarName.${syncableEntityInfo.entityLastChangedByField.name} = _clientId\n")
-                beginControlFlow("if(_isSyncablePrimary)")
-                add("$entityVarName.${syncableEntityInfo.entityMasterCsnField.name} = 0\n")
-                nextControlFlow("else")
-                add("$entityVarName.${syncableEntityInfo.entityLocalCsnField.name} = 0\n")
-                endControlFlow()
-
-                if(entityParam.type.isListOrArray()) {
-                    endControlFlow()
-                }
-            }
-
-
-
-            //Use the SQLite Primary key manager if this is an SQLite insert
-            if(daoFunSpec.hasAnnotation(Insert::class.java)) {
-                if(entityParam.type.isListOrArray()) {
-                    beginControlFlow("${entityParam.name}.forEach")
-                    add("it.${syncableEntityInfo.entityLastChangedByField.name} = _clientId\n")
-                    add("it.takeIf { it.${syncableEntityInfo.entityPkField.name} == 0L}?." +
-                            "${syncableEntityInfo.entityPkField.name} = (_repo as %T).nextId(${syncableEntityInfo.tableId})\n",
-                            DoorDatabaseSyncRepository::class)
-                    endControlFlow()
-                }else {
-                    add("${entityParam.name}.${syncableEntityInfo.entityLastChangedByField.name}·=·_clientId\n")
-                    add("${entityParam.name}.takeIf·{·it.${syncableEntityInfo.entityPkField.name}·==·0L·}" +
-                            "?.${syncableEntityInfo.entityPkField.name}·=·")
-
-                    add("(_repo·as·%T).nextId", DoorDatabaseSyncRepository::class)
-                    if(daoFunSpec.isSuspended)
-                        add("Async")
-
-                    add("(${syncableEntityInfo.tableId})\n")
-                }
-            }
         }
     }
 
@@ -976,21 +925,7 @@ fun CodeBlock.Builder.addRepoDelegateToDaoCode(daoFunSpec: FunSpec, isAlwaysSqli
 
     }
 
-    if(daoFunSpec.hasReturnType && daoFunSpec.hasAnnotation(Insert::class.java)
-            && syncableEntityInfo != null) {
-        add("return ")
-
-        if(daoFunSpec.parameters.first().type.isListOrArray()) {
-            add("${daoFunSpec.parameters[0].name}.map·{·it.${syncableEntityInfo.entityPkField.name}·}")
-            if(daoFunSpec.returnType?.isArrayType() == true)
-                add(".%M()", MemberName("kotlin.collections", "toTypedArray"))
-
-            add("\n")
-        }else {
-            add("${daoFunSpec.parameters[0].name}.${syncableEntityInfo.entityPkField.name}·\n")
-        }
-
-    }else if(daoFunSpec.hasReturnType) {
+    if(daoFunSpec.hasReturnType) {
         add("return _result\n")
     }
 

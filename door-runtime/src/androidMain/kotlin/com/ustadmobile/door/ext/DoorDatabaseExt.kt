@@ -11,6 +11,7 @@ import com.ustadmobile.door.PreparedStatementConfig
 import com.ustadmobile.door.roomjdbc.ConnectionRoomJdbc
 import java.io.File
 import java.util.concurrent.Callable
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KClass
 
 private val dbVersions = mutableMapOf<Class<*>, Int>()
@@ -111,3 +112,30 @@ actual fun <R> DoorDatabase.prepareAndUseStatement(
         stmt?.close()
     }
 }
+
+actual val DoorDatabase.sourceDatabase: DoorDatabase?
+    get() {
+        return when {
+            (this is DoorDatabaseRepository) -> this.db
+            (this is DoorDatabaseReplicateWrapper) -> this.realDatabase
+            else -> null
+        }
+    }
+
+actual fun DoorDatabase.handleTablesChanged(changeTableNames: List<String>)  {
+    invalidationTracker.refreshVersionsAsync()
+}
+
+private val pkManagersMap = ConcurrentHashMap<RoomDatabase, DoorPrimaryKeyManager>()
+
+actual val DoorDatabase.doorPrimaryKeyManager : DoorPrimaryKeyManager
+    get() {
+        if(pkManagersMap[this] == null) {
+            synchronized(this){
+                pkManagersMap.putIfAbsent(this,
+                    DoorPrimaryKeyManager(this::class.doorDatabaseMetadata().replicateEntities.keys))
+            }
+        }
+
+        return pkManagersMap[this] ?: throw IllegalStateException("doorPrimaryKeyManager, What The?")
+    }

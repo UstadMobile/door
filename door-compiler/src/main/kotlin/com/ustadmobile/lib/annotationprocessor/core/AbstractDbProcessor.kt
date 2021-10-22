@@ -892,7 +892,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                 val entityModified = findEntityModifiedByQuery(execStmtSql!!, allKnownEntityNames)
 
                 beginControlFlow("if(_numUpdates > 0)")
-                        .add("_db.handleTableChanged(listOf(%S))\n", entityModified)
+                        .add("_db.%M(listOf(%S))\n", MEMBERNAME_HANDLE_TABLES_CHANGED, entityModified)
                         .endControlFlow()
 
                 if(resultType != UNIT) {
@@ -1084,7 +1084,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
 
         codeBlock.add("\n")
 
-        codeBlock.add("_db.handleTableChanged(listOf(%S))\n", entityTypeSpec.name)
+        codeBlock.add("_db.%M(listOf(%S))\n", MEMBERNAME_HANDLE_TABLES_CHANGED, entityTypeSpec.name)
 
         if(addReturnStmt) {
             if(returnType != UNIT) {
@@ -1340,6 +1340,8 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
             MEMBERNAME_PREPARE_AND_USE_STMT
 
         const val SUFFIX_DEFAULT_RECEIVEVIEW = "_ReceiveView"
+
+        val MEMBERNAME_HANDLE_TABLES_CHANGED = MemberName("com.ustadmobile.door.ext", "handleTablesChanged")
     }
 
 }

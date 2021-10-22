@@ -847,7 +847,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     add("_con.setAutoCommit(true)\n")
                 }
                 .beginControlFlow("if(_numChanges > 0)")
-                .add("_db.handleTableChanged(listOf(%S))\n", entityTypeEl.simpleName)
+                .add("_db.%M(listOf(%S))\n", MEMBERNAME_HANDLE_TABLES_CHANGED, entityTypeEl.simpleName)
                 .endControlFlow()
                 .nextControlFlow("catch(_e: %T)", CLASSNAME_SQLEXCEPTION)
                 .add("_e.printStackTrace()\n")
@@ -919,7 +919,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 }
                 .apply {
                     endControlFlow()
-                    add("_db.handleTableChanged(listOf(%S))\n", entityTypeEl.simpleName)
+                    add("_db.%M(listOf(%S))\n", MEMBERNAME_HANDLE_TABLES_CHANGED, entityTypeEl.simpleName)
                 }
                 .applyIf(funSpec.hasReturnType) {
                     add("return _result")
@@ -1125,7 +1125,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
 
         add("\n")
 
-        add("_db.handleTableChanged(listOf(%S))\n", entityTypeSpec.name)
+        add("_db.%M(listOf(%S))\n", MEMBERNAME_HANDLE_TABLES_CHANGED, entityTypeSpec.name)
 
         if(addReturnStmt) {
             if(returnType != UNIT) {

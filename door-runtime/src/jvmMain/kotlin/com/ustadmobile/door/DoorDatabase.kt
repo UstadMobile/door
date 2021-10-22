@@ -185,16 +185,16 @@ actual abstract class DoorDatabase : DoorDatabaseCommon(){
         }
     }
 
-    override fun handleTableChanged(changeTableNames: List<String>): DoorDatabase {
+    override fun handleTableChangedInternal(changeTableNames: List<String>): DoorDatabase {
         //If this a transaction, then changes need to be collected together and only fired once the transaction is
         //complete.
         val sourceDbVal = this.sourceDatabase
         if(!isImplementation && sourceDbVal != null)
-            sourceDbVal.handleTableChanged(changeTableNames)
+            sourceDbVal.handleTableChangedInternal(changeTableNames)
         else if(isImplementation && transactionDepth.value > 0) {
             transactionTablesChanged.putAll(changeTableNames.associateWith { key -> key })
         }else {
-            super.handleTableChanged(changeTableNames)
+            super.handleTableChangedInternal(changeTableNames)
         }
 
         return this
@@ -203,7 +203,7 @@ actual abstract class DoorDatabase : DoorDatabaseCommon(){
     private fun fireTransactionTablesChanged() {
         val changedTablesList = transactionTablesChanged.values.toList()
         if(changedTablesList.isNotEmpty())
-            super.handleTableChanged(changedTablesList)
+            super.handleTableChangedInternal(changedTablesList)
 
         transactionTablesChanged.clear()
     }

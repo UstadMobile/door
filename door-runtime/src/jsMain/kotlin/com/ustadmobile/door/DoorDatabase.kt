@@ -1,5 +1,6 @@
 package com.ustadmobile.door
 
+import com.ustadmobile.door.ext.sourceDatabase
 import com.ustadmobile.door.jdbc.ResultSet
 import com.ustadmobile.door.jdbc.SQLException
 import kotlinx.coroutines.Runnable
@@ -8,7 +9,7 @@ import com.ustadmobile.door.sqljsjdbc.SQLiteDatabaseMetadataJs
 import com.ustadmobile.door.sqljsjdbc.SQLiteStatementJs
 import kotlin.jvm.Volatile
 
-actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon() {
+actual abstract class DoorDatabase(): DoorDatabaseCommon() {
 
     override val jdbcDbType: Int = DoorDbType.SQLITE
 

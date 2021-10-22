@@ -86,3 +86,4 @@ expect val DoorDatabase.sourceDatabase: DoorDatabase?
 
 expect val DoorDatabase.doorPrimaryKeyManager: DoorPrimaryKeyManager
 
+expect fun DoorDatabase.handleTablesChanged(changeTableNames: List<String>)
