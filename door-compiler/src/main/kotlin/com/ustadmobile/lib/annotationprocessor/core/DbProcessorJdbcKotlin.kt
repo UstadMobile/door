@@ -23,7 +23,6 @@ import com.ustadmobile.lib.annotationprocessor.core.DbProcessorSync.Companion.TR
 import com.ustadmobile.door.ext.DoorDatabaseMetadata
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
 import com.ustadmobile.door.ext.minifySql
-import com.ustadmobile.door.ext.mutableLinkedListOf
 import com.ustadmobile.door.replication.ReplicationRunOnChangeRunner
 import com.ustadmobile.door.replication.ReplicationEntityMetaData
 import com.ustadmobile.door.replication.ReplicationFieldMetaData
@@ -209,7 +208,6 @@ fun resolveQueryResultType(returnTypeName: TypeName)  =
 fun makeInsertAdapterMethodName(
     paramType: TypeName,
     returnType: TypeName,
-    processingEnv: ProcessingEnvironment,
     async: Boolean = false
 ): String {
     var methodName = "insert"
@@ -284,7 +282,7 @@ fun FileSpec.Builder.addDatabaseMetadataType(dbTypeElement: TypeElement, process
         .addProperty(PropertySpec.builder("hasReadOnlyWrapper", Boolean::class)
             .addModifiers(KModifier.OVERRIDE)
             .getter(FunSpec.getterBuilder()
-                .addCode("return %L\n", dbTypeElement.dbHasReadOnlyWrapper(processingEnv))
+                .addCode("return %L\n", dbTypeElement.dbHasReplicateWrapper(processingEnv))
                 .build())
             .build())
         .addProperty(PropertySpec.builder("syncableTableIdMap", Map::class.parameterizedBy(String::class, Int::class))
@@ -1112,7 +1110,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         }
 
 
-        val insertMethodName = makeInsertAdapterMethodName(paramType, returnType, processingEnv, suspended)
+        val insertMethodName = makeInsertAdapterMethodName(paramType, returnType, suspended)
         add("$entityInserterPropName.$insertMethodName(${parameterSpec.name})")
 
         if(returnType != UNIT) {
@@ -1280,6 +1278,19 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 addProperty(PropertySpec.builder("master", BOOLEAN)
                     .initializer("master").build())
             }
+            .addProperty(PropertySpec.builder("realPrimaryKeyManager", DoorPrimaryKeyManager::class,
+                    KModifier.OVERRIDE)
+                .delegate(CodeBlock.builder()
+                    .beginControlFlow("lazy")
+                    .beginControlFlow("if(isInTransaction)")
+                    .add("throw %T(%S)\n", IllegalStateException::class,
+                        "doorPrimaryKeyManager must be used on root database ONLY, not transaction wrapper!")
+                    .endControlFlow()
+                    .add("%T(%T::class.%M().replicateEntities.keys)\n", DoorPrimaryKeyManager::class,
+                        dbTypeElement, MemberName("com.ustadmobile.door.ext", "doorDatabaseMetadata"))
+                    .endControlFlow()
+                    .build())
+                .build())
             .addCreateAllTablesFunction(dbTypeElement)
             .addClearAllTablesFunction(dbTypeElement)
             .apply {

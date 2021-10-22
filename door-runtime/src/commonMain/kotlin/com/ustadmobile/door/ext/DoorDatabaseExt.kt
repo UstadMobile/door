@@ -1,6 +1,7 @@
 package com.ustadmobile.door.ext
 
 import com.ustadmobile.door.DoorDatabase
+import com.ustadmobile.door.DoorPrimaryKeyManager
 import com.ustadmobile.door.PreparedStatementConfig
 import kotlin.reflect.KClass
 import com.ustadmobile.door.jdbc.*
@@ -82,3 +83,6 @@ expect fun <R> DoorDatabase.prepareAndUseStatement(
  * listen for changes, opening connections, etc. should be redirected to the source database
  */
 expect val DoorDatabase.sourceDatabase: DoorDatabase?
+
+expect val DoorDatabase.doorPrimaryKeyManager: DoorPrimaryKeyManager
+

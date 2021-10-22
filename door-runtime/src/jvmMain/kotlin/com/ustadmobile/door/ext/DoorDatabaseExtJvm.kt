@@ -61,3 +61,6 @@ actual fun <T: DoorDatabase> KClass<T>.doorDatabaseMetadata(): DoorDatabaseMetad
         as DoorDatabaseMetadata<*>
     } as DoorDatabaseMetadata<T>
 }
+
+actual val DoorDatabase.doorPrimaryKeyManager: DoorPrimaryKeyManager
+    get() = (rootDatabase as DoorDatabaseJdbc).realPrimaryKeyManager

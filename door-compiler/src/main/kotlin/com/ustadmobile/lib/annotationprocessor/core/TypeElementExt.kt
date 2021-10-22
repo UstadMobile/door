@@ -186,7 +186,7 @@ fun TypeElement.isDbSyncable(processingEnv: ProcessingEnvironment): Boolean {
  * Indicates whether or not this database should have a read only wrapper generated. The ReadOnlyWrapper should be
  * be generated for databses that have repositories and replicated entities.
  */
-fun TypeElement.dbHasReadOnlyWrapper(processingEnv: ProcessingEnvironment) : Boolean {
+fun TypeElement.dbHasReplicateWrapper(processingEnv: ProcessingEnvironment) : Boolean {
     val hasRepos = dbEnclosedDaos(processingEnv).any { it.hasAnnotation(Repository::class.java) }
     val hasReplicatedEntities = allDbEntities(processingEnv).any { it.hasAnnotation(ReplicateEntity::class.java) }
     return hasRepos && hasReplicatedEntities
@@ -349,3 +349,13 @@ fun TypeElement.findDaoGetter(daoTypeElement: TypeElement, processingEnv: Proces
         .first { it.kind == ElementKind.METHOD && (it as ExecutableElement).returnType.asTypeElement(processingEnv) == daoTypeElement }
     return (executableFunEl as ExecutableElement).makeAccessorCodeBlock()
 }
+
+val TypeElement.isReplicateEntityWithAutoIncPrimaryKey: Boolean
+    get() {
+        if(!hasAnnotation(ReplicateEntity::class.java))
+            return false
+
+        val pkEntity = enclosedElementsWithAnnotation(PrimaryKey::class.java, ElementKind.FIELD).firstOrNull() ?: return false
+
+        return pkEntity.getAnnotation(PrimaryKey::class.java).autoGenerate
+    }

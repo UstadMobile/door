@@ -20,4 +20,11 @@ interface DoorDatabaseJdbc {
      */
     val isInTransaction: Boolean
 
+    /**
+     * If this database is the root database, e.g. doorJdbcSourceDatabase == null, then it will hold a primary key
+     * manager
+     */
+    val realPrimaryKeyManager: DoorPrimaryKeyManager
+
+
 }

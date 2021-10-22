@@ -1069,7 +1069,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         }
 
 
-        val insertMethodName = makeInsertAdapterMethodName(paramType, returnType, processingEnv)
+        val insertMethodName = makeInsertAdapterMethodName(paramType, returnType)
         codeBlock.add("$entityInserterPropName.$insertMethodName(${parameterSpec.name})")
 
         if(returnType != UNIT) {
