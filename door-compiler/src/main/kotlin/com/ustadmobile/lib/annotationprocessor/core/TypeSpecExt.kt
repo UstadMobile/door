@@ -206,10 +206,15 @@ fun TypeSpec.Builder.addOverrideGetRoomInvalidationTracker(realDbVarName: String
  *
  * @param dbType Integer constant as per DoorDbType
  */
-fun TypeSpec.toCreateTableSql(dbType: Int): String {
+fun TypeSpec.toCreateTableSql(
+    dbType: Int,
+    packageName: String,
+    processingEnv: ProcessingEnvironment
+): String {
     var sql = "CREATE TABLE IF NOT EXISTS ${name} ("
     var commaNeeded = false
 
+    var fieldAnnotatedPk: PropertySpec? = null
     entityFields(getAutoIncLast = true).forEach {fieldEl ->
         sql += """${if(commaNeeded) "," else " "} ${fieldEl.name} """
         val pkAutoGenerate = fieldEl.annotations
@@ -225,6 +230,7 @@ fun TypeSpec.toCreateTableSql(dbType: Int): String {
         }
 
         if(fieldEl.annotations.any { it.className == PrimaryKey::class.asClassName()} ) {
+            fieldAnnotatedPk = fieldEl
             sql += " PRIMARY KEY "
             if(pkAutoGenerate && dbType == DoorDbType.SQLITE)
                 sql += " AUTOINCREMENT "
@@ -237,6 +243,13 @@ fun TypeSpec.toCreateTableSql(dbType: Int): String {
 
         commaNeeded = true
     }
+
+    val typeEl = processingEnv.elementUtils.getTypeElement("$packageName.${this.name}")
+    val typeElPrimaryKeyFields = typeEl?.entityPrimaryKeys
+    if(typeElPrimaryKeyFields != null && typeElPrimaryKeyFields.isNotEmpty() && fieldAnnotatedPk == null) {
+        sql += ", PRIMARY KEY (${typeElPrimaryKeyFields.joinToString()}) "
+    }
+
 
     sql += ")"
 

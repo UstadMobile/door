@@ -297,6 +297,26 @@ val TypeElement.entityPrimaryKey: Element?
         it.kind == ElementKind.FIELD && it.hasAnnotation(PrimaryKey::class.java)
     }
 
+/**
+ * The preferred shorthand to get a list of the primary keys for a given table. The primary key could be
+ */
+val TypeElement.entityPrimaryKeys: List<VariableElement>
+    get() {
+        val entityPkVarNames = getAnnotation(Entity::class.java).primaryKeys
+        val annotatedPkVar = enclosedElements.firstOrNull {
+            it.kind == ElementKind.FIELD && it.hasAnnotation(PrimaryKey::class.java)
+        } as? VariableElement
+
+        if(annotatedPkVar != null) {
+            return listOf(annotatedPkVar)
+        }else {
+            return entityPkVarNames.map { varName ->
+                enclosedElements.find { it.kind == ElementKind.FIELD && it.simpleName.toString() == varName } as VariableElement
+            }
+        }
+    }
+
+
 val TypeElement.entityFields: List<Element>
     get() = enclosedElements.filter {
         it.kind == ElementKind.FIELD && it.simpleName.toString() != "Companion"

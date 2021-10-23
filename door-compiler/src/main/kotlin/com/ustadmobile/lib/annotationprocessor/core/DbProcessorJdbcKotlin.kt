@@ -816,9 +816,9 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         val entityType = funSpec.parameters.first().type.unwrapListOrArrayComponentType()
         val entityTypeEl = (entityType as ClassName).asTypeElement(processingEnv)
             ?: throw IllegalStateException("Could not resolve ${entityType.canonicalName}")
-        val pkEl = entityTypeEl.entityPrimaryKey
-            ?: throw IllegalStateException("Could not find primary key for ${entityType.canonicalName}")
-        val stmtSql = "DELETE FROM ${entityTypeEl.simpleName} WHERE ${pkEl.simpleName} = ?"
+        val pkEls = entityTypeEl.entityPrimaryKeys
+        val stmtSql = "DELETE FROM ${entityTypeEl.simpleName} WHERE " +
+                pkEls.joinToString(separator = " AND ") { "${it.simpleName} = ?" }
         val firstParam = funSpec.parameters.first()
         var entityVarName = firstParam.name
 
@@ -838,8 +838,12 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     beginControlFlow("for(_entity in ${firstParam.name})")
                     entityVarName = "_entity"
                 }
-                .add("_stmt.set${pkEl.asType().asTypeName().preparedStatementSetterGetterTypeName}(1, %L)\n",
-                    "$entityVarName.${pkEl.simpleName}")
+                .apply {
+                    pkEls.forEachIndexed { index, pkEl ->
+                        add("_stmt.set${pkEl.asType().asTypeName().preparedStatementSetterGetterTypeName}(%L, %L)\n",
+                            index + 1, "$entityVarName.${pkEl.simpleName}")
+                    }
+                }
                 .add("_numChanges += _stmt.executeUpdate()\n")
                 .applyIf(firstParam.type.isListOrArray()) {
                     endControlFlow()
@@ -874,11 +878,13 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         val entityType = funSpec.parameters.first().type.unwrapListOrArrayComponentType()
         val entityTypeEl = (entityType as ClassName).asTypeElement(processingEnv)
             ?: throw IllegalStateException("Could not resolve ${entityType.canonicalName}")
-        val pkEl = entityTypeEl.entityPrimaryKey
-            ?: throw IllegalStateException("Could not find primary key for ${entityType.canonicalName}")
-        val nonPkFields = entityTypeEl.entityFields.filter { !it.hasAnnotation(PrimaryKey::class.java) }
+        val pkEls = entityTypeEl.entityPrimaryKeys
+        val nonPkFields = entityTypeEl.entityFields.filter {
+            it.simpleName !in pkEls.map { it.simpleName }
+        }
         val sqlSetPart = nonPkFields.map { "${it.simpleName} = ?" }.joinToString()
-        val sqlStmt  = "UPDATE ${entityTypeEl.simpleName} SET $sqlSetPart WHERE ${pkEl.simpleName} = ?"
+        val sqlStmt  = "UPDATE ${entityTypeEl.simpleName} SET $sqlSetPart " +
+                "WHERE ${pkEls.joinToString(separator = " AND ") { "${it.simpleName} = ?" }}"
         val firstParam = funSpec.parameters.first()
         var entityVarName = firstParam.name
 
@@ -904,8 +910,10 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                         add("_stmt.set${it.asType().asTypeName().preparedStatementSetterGetterTypeName}")
                         add("(%L, %L)\n", fieldIndex++, "$entityVarName.${it.simpleName}")
                     }
-                    add("_stmt.set${pkEl.asType().asTypeName().preparedStatementSetterGetterTypeName}")
-                    add("(%L, %L)\n", fieldIndex++, "$entityVarName.${pkEl.simpleName}")
+                    pkEls.forEach { pkEl ->
+                        add("_stmt.set${pkEl.asType().asTypeName().preparedStatementSetterGetterTypeName}")
+                        add("(%L, %L)\n", fieldIndex++, "$entityVarName.${pkEl.simpleName}")
+                    }
                 }
                 .applyIf(funSpec.hasReturnType) {
                     add("_result += ")
@@ -969,11 +977,14 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         entityClassName: ClassName,
         propertyName: String,
         upsertMode: Boolean,
+        processingEnv: ProcessingEnvironment,
         supportedDbTypes: List<Int>,
         pgOnConflict: String? = null
     ) : TypeSpec.Builder {
         val entityFields = entityTypeSpec.entityFields(getAutoIncLast = false)
-        val pkField = entityFields.first { it.annotations.any { it.typeName == PrimaryKey::class.asClassName() } }
+        val pkFields = entityClassName.asTypeElement(processingEnv)?.entityPrimaryKeys?.map {
+                PropertySpec.builder(it.simpleName.toString(), it.asType().asTypeName()).build()
+            } ?: listOf(entityFields.first { it.annotations.any { it.typeName == PrimaryKey::class.asClassName() } })
         val insertAdapterSpec = TypeSpec.anonymousClassBuilder()
             .superclass(EntityInsertionAdapter::class.asClassName().parameterizedBy(entityClassName))
             .addSuperclassConstructorParameter("_db")
@@ -1025,14 +1036,14 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                                 insertSql += pgOnConflict.replace(" ", " ")
                             }
                             upsertMode -> {
-                                insertSql += " ON CONFLICT (${pkField.name}) DO UPDATE SET "
+                                insertSql += " ON CONFLICT (${pkFields.joinToString()}) DO UPDATE SET "
                                 insertSql += entityFields.filter { !it.annotations.any { it.typeName == PrimaryKey::class.asTypeName() } }
                                     .joinToString(separator = ",") {
                                         "${it.name} = excluded.${it.name}"
                                     }
                             }
                         }
-                        add("%S·+·if(returnsId)·{·%S·}·else·\"\"·", insertSql, " RETURNING ${pkField.name}")
+                        add("%S·+·if(returnsId)·{·%S·}·else·\"\"·", insertSql, " RETURNING ${pkFields.first().name}")
                     }
                     .applyIf(supportedDbTypes.size != 1 && DoorDbType.POSTGRES in supportedDbTypes) {
                         add("\n")
@@ -1102,7 +1113,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         val entityInserterPropName = "_insertAdapter${entityTypeSpec.name}_${if(upsertMode) "upsert" else ""}$pgOnConflictHash"
         if(!daoTypeBuilder.propertySpecs.any { it.name == entityInserterPropName }) {
             daoTypeBuilder.addDaoJdbcEntityInsertAdapter(entityTypeSpec, entityClassName, entityInserterPropName,
-                upsertMode, supportedDbTypes, pgOnConflict)
+                upsertMode, processingEnv, supportedDbTypes, pgOnConflict)
         }
 
         if(returnType != UNIT) {
@@ -1338,8 +1349,8 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                                 .add("_stmt.executeUpdate(%S)\n",
                                     "ALTER TABLE ${entityType.simpleName} RENAME to ${entityType.simpleName}_OLD")
                                 .add("END MIGRATION */\n")
-                            addCreateTableCode(entityType.asEntityTypeSpec(),
-                                "_stmt.executeUpdate", dbProductType,
+                            addCreateTableCode(entityType.asEntityTypeSpec(), entityType.packageName,
+                                "_stmt.executeUpdate", dbProductType, processingEnv,
                                 entityType.indicesAsIndexMirrorList(), sqlListVar = "_stmtList")
                             add("/* START MIGRATION: \n")
                             add("_stmt.executeUpdate(%S)\n", "INSERT INTO ${entityType.simpleName} ($fieldListStr) " +
@@ -1364,7 +1375,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
 
                                 val trackerEntityClassName = generateTrackerEntity(entityType, processingEnv)
                                 add("_stmtList += %S\n", makeCreateTableStatement(
-                                    trackerEntityClassName, dbProductType))
+                                    trackerEntityClassName, dbProductType, entityType.packageName))
 
                                 add(generateCreateIndicesCodeBlock(
                                     arrayOf(IndexMirror(value = arrayOf(DbProcessorSync.TRACKER_DESTID_FIELDNAME,

@@ -593,7 +593,11 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
     }
 
     //In reality this is only used for the TRK entities
-    protected fun makeCreateTableStatement(entitySpec: TypeSpec, dbType: Int): String {
+    protected fun makeCreateTableStatement(
+        entitySpec: TypeSpec,
+        dbType: Int,
+        packageName: String
+    ): String {
         var sql = "CREATE TABLE IF NOT EXISTS ${entitySpec.name} ("
         var commaNeeded = false
         for (fieldEl in getEntityFieldElements(entitySpec, true)) {
@@ -623,6 +627,13 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
 
             commaNeeded = true
         }
+
+        val typeEl = processingEnv.elementUtils.getTypeElement("$packageName.${entitySpec.name}")
+        val typeElPrimaryKeyFields = typeEl?.entityPrimaryKeys
+        if(typeElPrimaryKeyFields != null && typeElPrimaryKeyFields.size > 1){
+            sql += ", PRIMARY KEY (${typeElPrimaryKeyFields.joinToString()}) "
+        }
+
         sql += ")"
 
         return sql

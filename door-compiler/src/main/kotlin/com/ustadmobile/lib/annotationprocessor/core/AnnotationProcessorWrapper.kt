@@ -6,7 +6,6 @@ import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.C
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_KTOR_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_MIGRATIONS_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_SOURCE_PATH
-import com.ustadmobile.lib.annotationprocessor.core.migrations.DbProcessorSyncPushMigration
 import javax.annotation.processing.*
 import javax.lang.model.SourceVersion
 import javax.lang.model.element.TypeElement
@@ -41,7 +40,7 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
 
     val processors = listOf(DbProcessorJdbcKotlin(), DbProcessorKtorServer(),
             DbProcessorRepository(), DbProcessorSync(), DbProcessorAndroid(),
-            DbProcessorReplicateWrapper(), DbProcessorSyncPushMigration())
+            DbProcessorReplicateWrapper())
 
     lateinit var messager: MessagerWrapper
 
@@ -211,9 +210,9 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
                     entity)
             }
 
-            if(!entity.enclosedElements.any { it.getAnnotation(PrimaryKey::class.java) != null }) {
+            if(entity.entityPrimaryKeys.isEmpty()) {
                 messager.printMessage(Diagnostic.Kind.ERROR,
-                    "Class ${entity.simpleName} used as entity does not have a field annotated @PrimaryKey",
+                    "Class ${entity.simpleName} used as entity does not have a field(s) annotated @PrimaryKey or primaryKeys set",
                     entity)
             }
 
@@ -224,7 +223,7 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
                 val dbType = stmtEntry.key
                 stmtEntry.value?.use { stmt ->
                     val typeEntitySpec: TypeSpec = entity.asEntityTypeSpec()
-                    val createTableSql = typeEntitySpec.toCreateTableSql(dbType)
+                    val createTableSql = typeEntitySpec.toCreateTableSql(dbType, entity.packageName, processingEnv)
                     try {
                         stmt.execute(createTableSql)
                     }catch(sqle: SQLException) {
@@ -239,7 +238,7 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
 
                     if(entity.getAnnotation(SyncableEntity::class.java) != null) {
                         val trackerEntitySpec = generateTrackerEntity(entity, processingEnv)
-                        stmt.execute(trackerEntitySpec.toCreateTableSql(dbType))
+                        stmt.execute(trackerEntitySpec.toCreateTableSql(dbType, entity.packageName, processingEnv))
                         if(dbType == DoorDbType.SQLITE) {
                             allKnownEntityNames.add(trackerEntitySpec.name!!)
                         }

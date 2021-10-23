@@ -7,10 +7,13 @@ import com.ustadmobile.door.entities.DoorNode
 import com.ustadmobile.door.entities.ReplicationStatus
 
 @Database(version  = 1, entities = [
-    RepEntity::class, RepEntityTracker::class, ChangeLog::class, DoorNode::class, ReplicationStatus::class
+    RepEntity::class, RepEntityTracker::class, ChangeLog::class, DoorNode::class, ReplicationStatus::class,
+    CompositePkEntity::class,
 ])
 abstract class RepDb: DoorDatabase() {
 
     abstract val repDao: RepDao
+
+    abstract val compositePkDao: CompositePkDao
 
 }

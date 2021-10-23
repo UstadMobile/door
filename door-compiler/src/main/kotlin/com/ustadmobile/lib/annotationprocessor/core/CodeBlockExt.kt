@@ -135,12 +135,14 @@ fun CodeBlock.Builder.addSql(
  */
 fun CodeBlock.Builder.addCreateTableCode(
     entityTypeSpec: TypeSpec,
+    packageName: String,
     execSqlFn: String,
     dbProductType: Int,
+    processingEnv: ProcessingEnvironment,
     indices: List<IndexMirror> = listOf(),
     sqlListVar: String? = null
 ) : CodeBlock.Builder {
-    addSql(execSqlFn, sqlListVar, entityTypeSpec.toCreateTableSql(dbProductType))
+    addSql(execSqlFn, sqlListVar, entityTypeSpec.toCreateTableSql(dbProductType, packageName, processingEnv))
     indices.forEach {
         val indexName = if(it.name != "") {
             it.name
