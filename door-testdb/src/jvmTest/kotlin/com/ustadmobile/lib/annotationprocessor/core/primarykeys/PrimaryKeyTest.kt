@@ -7,11 +7,12 @@ import com.ustadmobile.door.ext.withDoorTransaction
 import org.junit.Assert
 import org.junit.Before
 import org.junit.Test
+import repdb.CompositePkEntity
 import repdb.RepDb
 import repdb.RepEntity
 
 /**
- * Tests to ensure primary keys on replicate entities behave as expected
+ * Tests to ensure primary keys on replicate entities behave as expected and composite primary keys work as expected
  */
 class PrimaryKeyTest {
 
@@ -52,6 +53,38 @@ class PrimaryKeyTest {
 
         Assert.assertTrue("Transaction and db itself use exactly the same instance for primary key manager",
             dbPkManager === transactionPkManager)
+    }
+
+    @Test
+    fun givenEntityWithCompositePk_whenInsertedAndUpdated_thenShouldBeUpdatedInDb() {
+        val compositePkEntity = CompositePkEntity().apply {
+            code1 = 42
+            code2 = 6
+        }
+
+        db.compositePkDao.insert(compositePkEntity)
+
+        compositePkEntity.name = "Updated"
+        db.compositePkDao.update(compositePkEntity)
+
+        val compositePkSelected = db.compositePkDao.findByPKs(compositePkEntity.code1, compositePkEntity.code2)
+        Assert.assertEquals("Composite pk entity updated", compositePkEntity.name,
+            compositePkSelected?.name)
+    }
+
+    @Test
+    fun givenEntityWithCompositePk_whenInsertedThenDeleted_thenShouldNotBeFound() {
+        val compositePkEntity = CompositePkEntity().apply {
+            code1 = 42
+            code2 = 6
+        }
+
+        db.compositePkDao.insert(compositePkEntity)
+
+        db.compositePkDao.delete(compositePkEntity)
+
+        val compositePkSelected = db.compositePkDao.findByPKs(compositePkEntity.code1, compositePkEntity.code2)
+        Assert.assertEquals("Composite pk entity updated", null, compositePkSelected)
     }
 
 }

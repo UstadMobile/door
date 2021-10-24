@@ -20,7 +20,7 @@ abstract class RepDao {
     abstract fun insertDoorNode(node: DoorNode)
 
     @Query("""
-        INSERT INTO RepEntityTracker(trkrForeignKey, trkrVersionId, trkrDestination, trkrProcessed)
+        REPLACE INTO RepEntityTracker(trkrForeignKey, trkrVersionId, trkrDestination, trkrProcessed)
         SELECT RepEntity.rePrimaryKey AS trkrForeignKey,
                RepEntity.reLastChangeTime AS trkrVersionId,
                DoorNode.nodeId AS trkrDestination,

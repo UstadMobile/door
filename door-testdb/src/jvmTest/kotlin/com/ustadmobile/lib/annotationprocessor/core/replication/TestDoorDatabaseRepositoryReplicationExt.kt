@@ -314,18 +314,17 @@ class TestDoorDatabaseRepositoryReplicationExt  {
             }
         } ?: throw IllegalStateException("Entity not transferred to local")
 
-        entityOnLocal.reLastChangeTime = 1
         entityOnLocal.reString = "Updated"
 
         localRepDb.repDao.update(entityOnLocal)
 
         val entityUpdatedOnRemote = runBlocking {
             remoteRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000) {
-                (it?.reLastChangeTime ?: 0) == 1L
+                (it?.reLastChangeTime ?: 0) == entityOnLocal.reLastChangeTime
             }
         }
 
-        Assert.assertEquals("Got updated entity back on remote", 1L,
+        Assert.assertEquals("Got updated entity back on remote", entityOnLocal.reLastChangeTime,
             entityUpdatedOnRemote?.reLastChangeTime)
 
         Assert.assertNotNull(entityOnLocal)
@@ -347,18 +346,17 @@ class TestDoorDatabaseRepositoryReplicationExt  {
             }
         } ?: throw IllegalStateException("Entity not transferred to local")
 
-        entityOnRemote.reLastChangeTime = 1
         entityOnRemote.reString = "Updated"
 
         remoteRepDb.repDao.update(entityOnRemote)
 
         val entityUpdatedOnLocal = runBlocking {
             localRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000) {
-                (it?.reLastChangeTime ?: 0) == 1L
+                (it?.reLastChangeTime ?: 0) == entityOnRemote.reLastChangeTime
             }
         }
 
-        Assert.assertEquals("Got updated entity back on remote", 1L,
+        Assert.assertEquals("Got updated entity back on remote", entityOnRemote.reLastChangeTime,
             entityUpdatedOnLocal?.reLastChangeTime)
 
         Assert.assertNotNull(entityOnRemote)

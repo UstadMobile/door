@@ -65,33 +65,29 @@ class TestDoorDatabaseReplicationExt {
             auth = "secret"
         })
 
-        val time1 = systemTimeInMillis()
-
-        val time2 = time1 + 1000
-
         //insert an entity into the rep entity table
-        val repEntityUid1 = db.repDao.insert(RepEntity().apply {
+        val repEntity1 = RepEntity().apply {
             reNumField = 57
             reString = "magic plus 15"
-            reLastChangeTime = time1
-        })
+            rePrimaryKey = db.repDao.insert(this)
+        }
 
-        val repEntityUid2 = db.repDao.insert(RepEntity().apply {
+        val repEntity2 = RepEntity().apply {
             reNumField = 57
             reString = "magic plus 15"
-            reLastChangeTime = time2
-        })
+            rePrimaryKey = db.repDao.insert(this)
+        }
 
         runBlocking {
             db.repDao.updateReplicationTrackers()
         }
 
         val pendingReplicationJson = JsonArray(listOf(
-            JsonObject(mapOf(KEY_PRIMARY_KEY to JsonPrimitive(repEntityUid1),
-                KEY_VERSION_ID to JsonPrimitive(time1)
+            JsonObject(mapOf(KEY_PRIMARY_KEY to JsonPrimitive(repEntity1.rePrimaryKey),
+                KEY_VERSION_ID to JsonPrimitive(repEntity1.reLastChangeTime)
             )),
-            JsonObject(mapOf(KEY_PRIMARY_KEY to JsonPrimitive(repEntityUid2),
-                KEY_VERSION_ID to JsonPrimitive(time1 - 1000)))
+            JsonObject(mapOf(KEY_PRIMARY_KEY to JsonPrimitive(repEntity2.rePrimaryKey),
+                KEY_VERSION_ID to JsonPrimitive(repEntity2.reLastChangeTime - 1000)))
         ))
 
         val alreadyUpdatedResult = runBlocking {
@@ -101,7 +97,7 @@ class TestDoorDatabaseReplicationExt {
         }
 
         Assert.assertEquals("Found one entity already up to date", 1, alreadyUpdatedResult.size)
-        Assert.assertEquals("Entity pk is first item", repEntityUid1,
+        Assert.assertEquals("Entity pk is first item", repEntity1.rePrimaryKey,
             (alreadyUpdatedResult[0] as JsonObject).get(KEY_PRIMARY_KEY)?.jsonPrimitive?.long)
     }
 
@@ -114,22 +110,19 @@ class TestDoorDatabaseReplicationExt {
             auth = "secret"
         })
 
-        val time1 = systemTimeInMillis()
-
-        val time2 = time1 + 1000
-
         //insert an entity into the rep entity table
-        val repEntityUid1 = db.repDao.insert(RepEntity().apply {
+        val repEntity1 = RepEntity().apply {
             reNumField = 57
             reString = "magic plus 15"
-            reLastChangeTime = time1
-        })
+            rePrimaryKey = db.repDao.insert(this)
+        }
 
-        val repEntityUid2 = db.repDao.insert(RepEntity().apply {
+
+        val repEntity2 = RepEntity().apply {
             reNumField = 57
             reString = "magic plus 15"
-            reLastChangeTime = time2
-        })
+            rePrimaryKey = db.repDao.insert(this)
+        }
 
         runBlocking {
             db.repDao.updateReplicationTrackers()
@@ -154,10 +147,10 @@ class TestDoorDatabaseReplicationExt {
         runBlocking {
             db.markReplicateTrackersAsProcessed(RepDb::class, RepDb::class.doorDatabaseMetadata(),
                 JsonArray(listOf(
-                    JsonObject(mapOf(KEY_PRIMARY_KEY to JsonPrimitive(repEntityUid1),
-                        KEY_VERSION_ID to JsonPrimitive(time1))),
-                    JsonObject(mapOf(KEY_PRIMARY_KEY to JsonPrimitive(repEntityUid2),
-                        KEY_VERSION_ID to JsonPrimitive(time2)))
+                    JsonObject(mapOf(KEY_PRIMARY_KEY to JsonPrimitive(repEntity1.rePrimaryKey),
+                        KEY_VERSION_ID to JsonPrimitive(repEntity1.reLastChangeTime))),
+                    JsonObject(mapOf(KEY_PRIMARY_KEY to JsonPrimitive(repEntity2.rePrimaryKey),
+                        KEY_VERSION_ID to JsonPrimitive(repEntity2.reLastChangeTime)))
                 )), 42L, RepEntity.TABLE_ID)
 
         }
@@ -215,7 +208,6 @@ class TestDoorDatabaseReplicationExt {
         }
 
         val repTracker = RepEntityTracker().apply {
-            trkrPrimaryKey = 100
             trkrForeignKey = 1212
             trkrVersionId = time
         }

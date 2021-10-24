@@ -10,11 +10,9 @@ import com.ustadmobile.door.annotation.ReplicationVersionId
 import kotlinx.serialization.Serializable
 
 @Serializable
-@Entity(indices = arrayOf(Index(value = arrayOf("trkrDestination", "trkrProcessed", "trkrForeignKey"))))
+@Entity(primaryKeys = arrayOf("trkrForeignKey", "trkrDestination"),
+    indices = arrayOf(Index(value = arrayOf("trkrDestination", "trkrProcessed", "trkrForeignKey"))))
 class RepEntityTracker {
-
-    @PrimaryKey(autoGenerate = true)
-    var trkrPrimaryKey: Long = 0
 
     @ReplicationEntityForeignKey
     var trkrForeignKey: Long = 0

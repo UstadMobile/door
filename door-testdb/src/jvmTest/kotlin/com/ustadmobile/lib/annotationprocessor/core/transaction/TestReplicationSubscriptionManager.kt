@@ -23,6 +23,8 @@ import org.junit.Test
 import repdb.RepDb
 import org.mockito.kotlin.*
 import repdb.RepEntity
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 
 class TestReplicationSubscriptionManager {
@@ -81,14 +83,9 @@ class TestReplicationSubscriptionManager {
 
         subscriptionManager.onMessage(DoorServerSentEvent("1", "INIT", "$testRemoteNodeId"))
 
-        //Make sure that the first fetch replications runs
-        verifyBlocking(mockFetchReplications, timeout(5000).times(1)) {
-            replicate(repo as DoorDatabaseRepository, RepEntity.TABLE_ID, testRemoteNodeId)
-        }
-
         subscriptionManager.onMessage(DoorServerSentEvent("2", "INVALIDATE", RepEntity.TABLE_ID.toString()))
 
-        verifyBlocking(mockFetchReplications, timeout(5000).times(2)) {
+        verifyBlocking(mockFetchReplications, timeout(5000)) {
             replicate(repo as DoorDatabaseRepository, RepEntity.TABLE_ID, testRemoteNodeId)
         }
     }
@@ -97,9 +94,11 @@ class TestReplicationSubscriptionManager {
     @Test
     fun givenSubscriptionInitialized_whenLocalInvalidateReceived_thenShouldCallSendReplications() {
         var remoteListener: ReplicationPendingListener? = null
+        val addReplicationListenerLatch = CountDownLatch(1)
         val dispatcher = mock<ReplicationNotificationDispatcher> {
             onBlocking { addReplicationPendingEventListener(eq(testRemoteNodeId), any()) }.thenAnswer {
                 remoteListener = (it.arguments[1] as ReplicationPendingListener)
+                addReplicationListenerLatch.countDown()
                 Unit
             }
         }
@@ -121,12 +120,10 @@ class TestReplicationSubscriptionManager {
 
         subscriptionManager.onMessage(DoorServerSentEvent("1", "INIT", "$testRemoteNodeId"))
 
-        verifyBlocking(mockSendReplications, timeout(5000)) {
-            replicate(any(), eq(RepEntity.TABLE_ID), eq(testRemoteNodeId))
-        }
+        addReplicationListenerLatch.await(5, TimeUnit.SECONDS)
         remoteListener!!.onReplicationPending(ReplicationPendingEvent(0L, listOf(RepEntity.TABLE_ID)))
 
-        verifyBlocking(mockSendReplications, timeout(5000).times(2)) {
+        verifyBlocking(mockSendReplications, timeout(5000).times(1)) {
             replicate(any(), eq(RepEntity.TABLE_ID), eq(testRemoteNodeId))
         }
     }
