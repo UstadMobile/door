@@ -249,15 +249,46 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
 
         //After all tables have been created, check that the SQL in all triggers is actually valid
         dbs.flatMap { it.allDbEntities(processingEnv) }.toSet()
-        .filter { it.hasAnnotation(Trigger::class.java) }
+        .filter { it.hasAnnotation(Triggers::class.java) }
         .forEach { entity ->
-            entity.getAnnotationsByType(Trigger::class.java).forEach { trigger ->
+            entity.getAnnotationsByType(Triggers::class.java).firstOrNull()?.value?.forEach { trigger ->
                 val stmt = connectionVal.createStatement()!!
                 val pgStmt = pgConnection?.createStatement()
                 val stmtsMap = mapOf(DoorDbType.SQLITE to stmt, DoorDbType.POSTGRES to pgStmt)
+                val repTrkr = entity.getReplicationTracker(processingEnv)
+
+                //When the trigger SQL runs it will have access to NEW.(fieldName). We won't have that when we try and
+                //test the validity of the SQL statement here. Therefor NEW.(fieldname) and OLD.(fieldname) will be
+                //replaced with 0, null, or false based on the column type.
+                fun String.substituteTriggerPrefixes(dbProductType: Int) : String {
+                    var sqlFormatted = this
+
+                    val availablePrefixes = mutableListOf<String>()
+                    if(!trigger.events.any { it == Trigger.Event.DELETE })
+                        availablePrefixes += "NEW"
+
+                    if(!trigger.events.any { it == Trigger.Event.INSERT })
+                        availablePrefixes += "OLD"
+
+                    availablePrefixes.forEach { prefix ->
+                        entity.entityFields.forEach { field ->
+                            sqlFormatted = sqlFormatted.replace("$prefix.${field.simpleName}",
+                                field.asType().asTypeName().defaultSqlValue(dbProductType))
+                        }
+                        repTrkr.takeIf { trigger.on == Trigger.On.RECEIVEVIEW }?.entityFields?.forEach { field ->
+                            sqlFormatted = sqlFormatted.replace("$prefix.${field.simpleName}",
+                                field.asType().asTypeName().defaultSqlValue(dbProductType))
+                        }
+                    }
+
+                    return sqlFormatted
+                }
+
+
                 stmtsMap.forEach {entry ->
                     try {
-                        stmt.takeIf { trigger.conditionSql != "" }?.executeUpdate(trigger.conditionSql)
+                        entry.value.takeIf { trigger.conditionSql != "" }?.executeQuery(
+                            trigger.conditionSql.substituteTriggerPrefixes(entry.key))
                     }catch(e: SQLException) {
                         messager.printMessage(Diagnostic.Kind.ERROR,
                             "Trigger ${trigger.name} condition SQL using ${entry.key.dbProductName} error on: ${e.message}",
@@ -269,32 +300,13 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
                 if(trigger.sqlStatements.isEmpty())
                     messager.printMessage(Diagnostic.Kind.ERROR, "Trigger ${trigger.name} has no SQL statements", entity)
 
-                val repTrkr = entity.getReplicationTracker(processingEnv)
+
                 var dbType = 0
                 trigger.sqlStatements.forEach { sql ->
-
                     try {
-                        val availablePrefixes = mutableListOf<String>()
-                        if(!trigger.events.any { it == Trigger.Event.DELETE })
-                            availablePrefixes += "NEW"
-
-                        if(!trigger.events.any { it == Trigger.Event.INSERT })
-                            availablePrefixes += "OLD"
-
                         stmtsMap.forEach { stmtEntry ->
                             dbType = stmtEntry.key
-                            var sqlFormatted: String = sql
-                            availablePrefixes.forEach { prefix ->
-                                entity.entityFields.forEach { field ->
-                                    sqlFormatted = sqlFormatted.replace("$prefix.${field.simpleName}",
-                                        field.asType().asTypeName().defaultSqlValue(stmtEntry.key))
-                                }
-                                repTrkr.takeIf { trigger.on == Trigger.On.RECEIVEVIEW }?.entityFields?.forEach { field ->
-                                    sqlFormatted = sqlFormatted.replace("$prefix.${field.simpleName}",
-                                        field.asType().asTypeName().defaultSqlValue(stmtEntry.key))
-                                }
-                            }
-                            stmtEntry.value?.executeUpdate(sqlFormatted)
+                            stmtEntry.value?.executeUpdate(sql.substituteTriggerPrefixes(dbType))
                         }
                     }catch(e: SQLException) {
                         messager.printMessage(Diagnostic.Kind.ERROR,
@@ -317,7 +329,6 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
                 }
             }
         }
-
     }
 
     companion object {

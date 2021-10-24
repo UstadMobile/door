@@ -9,14 +9,29 @@ import repdb.RepEntity.Companion.TABLE_ID
 @Serializable
 @Entity
 @ReplicateEntity(tableId = TABLE_ID, tracker = RepEntityTracker::class)
-@Trigger(name = "repent_remote_insert",
-    order = Trigger.Order.INSTEAD_OF,
-    on = Trigger.On.RECEIVEVIEW,
-    events = [Trigger.Event.INSERT, Trigger.Event.UPDATE],
-    sqlStatements = [
-        """REPLACE INTO RepEntity(rePrimaryKey, reLastChangedBy, reLastChangeTime, reNumField, reString)
-           VALUES (NEW.rePrimaryKey, NEW.reLastChangedBy, NEW.reLastChangeTime, NEW.reNumField, NEW.reString)
-        """])
+@Triggers(arrayOf(
+    Trigger(name = "repent_remote_insert",
+        order = Trigger.Order.INSTEAD_OF,
+        on = Trigger.On.RECEIVEVIEW,
+        events = [Trigger.Event.INSERT],
+        conditionSql = "SELECT NOT EXISTS(SELECT rePrimaryKey FROM RepEntity WHERE rePrimaryKey = NEW.rePrimaryKey)",
+        sqlStatements = [
+            """INSERT INTO RepEntity(rePrimaryKey, reLastChangedBy, reLastChangeTime, reNumField, reString)
+               VALUES (NEW.rePrimaryKey, NEW.reLastChangedBy, NEW.reLastChangeTime, NEW.reNumField, NEW.reString)
+            """]),
+    Trigger(name = "repent_remote_update",
+        order = Trigger.Order.INSTEAD_OF,
+        on = Trigger.On.RECEIVEVIEW,
+        events = [Trigger.Event.INSERT],
+        conditionSql = "SELECT EXISTS(SELECT rePrimaryKey FROM RepEntity WHERE rePrimaryKey = NEW.rePrimaryKey)",
+        sqlStatements = [
+            """UPDATE RepEntity
+            SET reLastChangedBy = NEW.reLastChangedBy,
+                reLastChangeTime = NEW.reLastChangeTime,
+                reNumField = NEW.reNumField,
+                reString = NEW.reString
+          WHERE rePrimaryKey = NEW.rePrimaryKey
+        """])))
 class RepEntity {
 
     @PrimaryKey(autoGenerate = true)

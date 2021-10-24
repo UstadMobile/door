@@ -1,8 +1,6 @@
 package com.ustadmobile.door.annotation
 
-@Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)
-
 /**
  * Attempt to implement a common trigger wrapper that works on both SQL and Postgres.
  *

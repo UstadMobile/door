@@ -53,7 +53,7 @@ SELECT Entity_ReplicationTracker.*, Entity.*
 /*
  *  Now use the triggers to determine how to handle incoming data from another node.
  */ 
-@Trigger(
+@Triggers(arrayOf(Trigger(
 name = "remove_insert_trig",
 order = Trigger.Order.INSTEAD_OF
 events = [Trigger.Event.INSERT],
@@ -67,7 +67,7 @@ REPLACE INTO Entity(entityPrimaryKey, entityLastChangedTime, aNumberField)
 END
 """]
 //Optionally: add conditionSql to control if the SQL statements execute.
-)
+)))
 class Entity {
    @PrimaryKey(autoGenerate = true)
    var entityPrimaryKey: Long = 0

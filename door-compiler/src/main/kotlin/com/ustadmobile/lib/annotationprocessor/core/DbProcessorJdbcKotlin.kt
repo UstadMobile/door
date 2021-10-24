@@ -1294,7 +1294,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .delegate(CodeBlock.builder()
                     .beginControlFlow("lazy")
                     .beginControlFlow("if(isInTransaction)")
-                    .add("throw %T(%S)\n", IllegalStateException::class,
+                    .add("throw %T(%S)\n", ClassName("kotlin", "IllegalStateException"),
                         "doorPrimaryKeyManager must be used on root database ONLY, not transaction wrapper!")
                     .endControlFlow()
                     .add("%T(%T::class.%M().replicateEntities.keys)\n", DoorPrimaryKeyManager::class,
