@@ -20,7 +20,7 @@ abstract class RepDao {
     abstract fun insertDoorNode(node: DoorNode)
 
     @Query("""
-        REPLACE INTO RepEntityTracker(trkrForeignKey, trkrVersionId, trkrDestination, trkrProcessed)
+       REPLACE INTO RepEntityTracker(trkrForeignKey, trkrVersionId, trkrDestination, trkrProcessed)
         SELECT RepEntity.rePrimaryKey AS trkrForeignKey,
                RepEntity.reLastChangeTime AS trkrVersionId,
                DoorNode.nodeId AS trkrDestination,
@@ -30,6 +30,11 @@ abstract class RepDao {
                     ON ChangeLog.chTableId = 500 AND ChangeLog.chEntityPk = RepEntity.rePrimaryKey
                JOIN DoorNode 
                     ON DoorNode.nodeId != 0
+         WHERE RepEntity.reLastChangeTime != COALESCE(
+                (SELECT trkrVersionId
+                  FROM RepEntityTracker
+                 WHERE RepEntityTracker.trkrForeignKey = RepEntity.rePrimaryKey
+                   AND RepEntityTracker.trkrDestination = DoorNode.nodeId), 0)
     """)
     @ReplicationRunOnChange(value = [RepEntity::class], checkPendingReplicationsFor = [RepEntity::class])
     abstract suspend fun updateReplicationTrackers()

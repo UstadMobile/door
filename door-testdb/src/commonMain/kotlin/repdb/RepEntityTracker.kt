@@ -2,11 +2,7 @@ package repdb
 
 import androidx.room.Entity
 import androidx.room.Index
-import androidx.room.PrimaryKey
-import com.ustadmobile.door.annotation.ReplicationDestinationNodeId
-import com.ustadmobile.door.annotation.ReplicationEntityForeignKey
-import com.ustadmobile.door.annotation.ReplicationTrackerProcessed
-import com.ustadmobile.door.annotation.ReplicationVersionId
+import com.ustadmobile.door.annotation.*
 import kotlinx.serialization.Serializable
 
 @Serializable

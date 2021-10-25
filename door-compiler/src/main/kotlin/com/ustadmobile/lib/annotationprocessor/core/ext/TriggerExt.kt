@@ -33,16 +33,17 @@ fun Trigger.toSql(entityTypeEl: TypeElement, dbProductType: Int) : List<String>{
                     append("""
                        DECLARE
                          whereVar boolean;
-                         curs1 CURSOR FOR $conditionSql \n""")
+                         curs1 CURSOR FOR $conditionSql ;
+                         """)
                 }
-                .append("BEGIN ")
+                .append("BEGIN \n")
                 .applyIf(conditionSql != "") {
                     append("""
                         OPEN curs1;
                         FETCH curs1 INTO whereVar;
                         IF whereVar = true THEN """)
                 }
-                .append(sqlStatements.joinToString(separator = ";"))
+                .append(sqlStatements.joinToString(separator = ";", postfix = ";"))
                 .applyIf(conditionSql != "") {
                     append("END IF; CLOSE curs1;")
                 }

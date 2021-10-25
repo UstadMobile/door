@@ -1342,42 +1342,47 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                                 "·(dbVersion·int·primary·key,·dbHash·varchar(255))\"\n")
                         add(" _stmtList += \"INSERT·INTO·${DoorDatabaseCommon.DBINFO_TABLENAME}·" +
                                 "VALUES·($initDbVersion,·'')\"\n")
+
+                        //All entities MUST be created first, triggers etc. can only be created after all entities exist
+                        val createEntitiesCodeBlock = CodeBlock.builder()
+                        val createTriggersAndViewsBlock = CodeBlock.builder()
+
                         dbTypeElement.allDbEntities(processingEnv).forEach { entityType ->
                             val fieldListStr = entityType.entityFields.joinToString { it.simpleName.toString() }
-                            add("//Begin: Create table ${entityType.simpleName} for $dbTypeName\n")
-                            add("/* START MIGRATION: \n")
+                            createEntitiesCodeBlock.add("//Begin: Create table ${entityType.simpleName} for $dbTypeName\n")
+                                .add("/* START MIGRATION: \n")
                                 .add("_stmt.executeUpdate(%S)\n",
                                     "ALTER TABLE ${entityType.simpleName} RENAME to ${entityType.simpleName}_OLD")
                                 .add("END MIGRATION */\n")
-                            addCreateTableCode(entityType.asEntityTypeSpec(), entityType.packageName,
-                                "_stmt.executeUpdate", dbProductType, processingEnv,
-                                entityType.indicesAsIndexMirrorList(), sqlListVar = "_stmtList")
-                            add("/* START MIGRATION: \n")
-                            add("_stmt.executeUpdate(%S)\n", "INSERT INTO ${entityType.simpleName} ($fieldListStr) " +
+                                .addCreateTableCode(entityType.asEntityTypeSpec(), entityType.packageName,
+                                    "_stmt.executeUpdate", dbProductType, processingEnv,
+                                    entityType.indicesAsIndexMirrorList(), sqlListVar = "_stmtList")
+                                .add("/* START MIGRATION: \n")
+                                .add("_stmt.executeUpdate(%S)\n", "INSERT INTO ${entityType.simpleName} ($fieldListStr) " +
                                     "SELECT $fieldListStr FROM ${entityType.simpleName}_OLD")
-                            add("_stmt.executeUpdate(%S)\n", "DROP TABLE ${entityType.simpleName}_OLD")
-                            add("END MIGRATION*/\n")
+                                .add("_stmt.executeUpdate(%S)\n", "DROP TABLE ${entityType.simpleName}_OLD")
+                                .add("END MIGRATION*/\n")
 
                             if(entityType.hasAnnotation(SyncableEntity::class.java)) {
                                 val syncableEntityInfo = SyncableEntityInfo(entityType.asClassName(),
                                     processingEnv)
-                                addSyncableEntityTriggers(entityType.asClassName(),
+                                createTriggersAndViewsBlock.addSyncableEntityTriggers(entityType.asClassName(),
                                     "_stmt.executeUpdate", dbProductType, sqlListVar = "_stmtList")
 
                                 if(dbProductType == DoorDbType.POSTGRES) {
-                                    add("/* START MIGRATION: \n")
-                                    add("_stmt.executeUpdate(%S)\n",
+                                    createTriggersAndViewsBlock.add("/* START MIGRATION: \n")
+                                    createTriggersAndViewsBlock.add("_stmt.executeUpdate(%S)\n",
                                         "DROP FUNCTION IF EXISTS inc_csn_${syncableEntityInfo.tableId}_fn")
-                                    add("_stmt.executeUpdate(%S)\n",
+                                    createTriggersAndViewsBlock.add("_stmt.executeUpdate(%S)\n",
                                         "DROP SEQUENCE IF EXISTS spk_seq_${syncableEntityInfo.tableId}")
-                                    add("END MIGRATION*/\n")
+                                    createTriggersAndViewsBlock.add("END MIGRATION*/\n")
                                 }
 
                                 val trackerEntityClassName = generateTrackerEntity(entityType, processingEnv)
-                                add("_stmtList += %S\n", makeCreateTableStatement(
+                                createEntitiesCodeBlock.add("_stmtList += %S\n", makeCreateTableStatement(
                                     trackerEntityClassName, dbProductType, entityType.packageName))
 
-                                add(generateCreateIndicesCodeBlock(
+                                createEntitiesCodeBlock.add(generateCreateIndicesCodeBlock(
                                     arrayOf(IndexMirror(value = arrayOf(DbProcessorSync.TRACKER_DESTID_FIELDNAME,
                                         DbProcessorSync.TRACKER_ENTITY_PK_FIELDNAME,
                                         DbProcessorSync.TRACKER_CHANGESEQNUM_FIELDNAME)),
@@ -1387,23 +1392,29 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                             }
 
                             if(entityType.hasAnnotation(ReplicateEntity::class.java)) {
-                                addReplicateEntityChangeLogTrigger(entityType, "_stmtList", dbProductType)
-                                addCreateReceiveView(entityType, "_stmtList")
+                                createTriggersAndViewsBlock
+                                    .addReplicateEntityChangeLogTrigger(entityType, "_stmtList", dbProductType)
+                                    .addCreateReceiveView(entityType, "_stmtList")
                             }
 
-                            addCreateTriggersCode(entityType, "_stmtList", dbProductType)
+                            createTriggersAndViewsBlock.addCreateTriggersCode(entityType, "_stmtList",
+                                dbProductType)
+
 
                             if(entityType.entityHasAttachments) {
                                 if(dbProductType == DoorDbType.SQLITE) {
-                                    addGenerateAttachmentTriggerSqlite(entityType,
+                                    createTriggersAndViewsBlock.addGenerateAttachmentTriggerSqlite(entityType,
                                         "_stmt.executeUpdate", "_stmtList")
                                 }else {
-                                    addGenerateAttachmentTriggerPostgres(entityType, "_stmtList")
+                                    createTriggersAndViewsBlock.addGenerateAttachmentTriggerPostgres(entityType, "_stmtList")
                                 }
                             }
 
-                            add("//End: Create table ${entityType.simpleName} for $dbTypeName\n\n")
+                            createEntitiesCodeBlock.add("//End: Create table ${entityType.simpleName} for $dbTypeName\n\n")
                         }
+                        add(createEntitiesCodeBlock.build())
+                        add(createTriggersAndViewsBlock.build())
+
                         endControlFlow()
                     }
                 }

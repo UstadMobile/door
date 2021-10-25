@@ -490,7 +490,7 @@ fun findEntityModifiedByQuery(querySql: String, allKnownEntityNames: List<String
     // INSERT INTO TableName(fieldName)
     // Therefor the regex will split by space or open bracket
     val stmtSplit = querySql.trim().split(Regex("(\\s|\\()+"), limit = 4)
-    val sqlKeyword = stmtSplit[0].toUpperCase(Locale.ROOT)
+    val sqlKeyword = stmtSplit[0].uppercase()
     val tableModified = if(sqlKeyword == "UPDATE") {
         stmtSplit[1] // in case it is an update statement, will be the second word (e.g. update tablename)
     }else if(sqlKeyword == "DELETE"){
@@ -744,7 +744,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
             CREATE TRIGGER ch_${params.opPrefix}_${replicateEntity.tableId}_trig 
                    AFTER ${params.opName} ON RepEntity
                    FOR EACH ROW
-                   EXECUTE PROCEDURE ch_ups_${replicateEntity.tableId}_fn();
+                   EXECUTE PROCEDURE ch_${params.opPrefix}_${replicateEntity.tableId}_fn();
             """.minifySql())
             }
 
