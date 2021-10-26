@@ -228,46 +228,6 @@ fun makeInsertAdapterMethodName(
 }
 
 /**
- * For SQL with named parameters (e.g. "SELECT * FROM Table WHERE uid = :paramName") return a
- * list of all named parameters.
- *
- * @param querySql SQL that may contain named parameters
- * @return String list of named parameters (e.g. "paramName"). Empty if no named parameters are present.
- */
-fun getQueryNamedParameters(querySql: String): List<String> {
-    val namedParams = mutableListOf<String>()
-    var insideQuote = false
-    var insideDoubleQuote = false
-    var lastC: Char = 0.toChar()
-    var startNamedParam = -1
-    for (i in 0 until querySql.length) {
-        val c = querySql[i]
-        if (c == '\'' && lastC != '\\')
-            insideQuote = !insideQuote
-        if (c == '\"' && lastC != '\\')
-            insideDoubleQuote = !insideDoubleQuote
-
-        if (!insideQuote && !insideDoubleQuote) {
-            if (c == ':') {
-                startNamedParam = i
-            } else if (!(Character.isLetterOrDigit(c) || c == '_') && startNamedParam != -1) {
-                //process the parameter
-                namedParams.add(querySql.substring(startNamedParam + 1, i))
-                startNamedParam = -1
-            } else if (i == querySql.length - 1 && startNamedParam != -1) {
-                namedParams.add(querySql.substring(startNamedParam + 1, i + 1))
-                startNamedParam = -1
-            }
-        }
-
-
-        lastC = c
-    }
-
-    return namedParams
-}
-
-/**
  * Generate the DatabaseMetadata object for the given database.
  */
 fun FileSpec.Builder.addDatabaseMetadataType(dbTypeElement: TypeElement, processingEnv: ProcessingEnvironment): FileSpec.Builder {

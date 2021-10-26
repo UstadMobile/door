@@ -11,7 +11,6 @@ import java.io.File
 import javax.annotation.processing.RoundEnvironment
 import javax.lang.model.element.*
 import com.ustadmobile.door.annotation.*
-import java.util.*
 import javax.lang.model.type.DeclaredType
 import javax.lang.model.type.ExecutableType
 import kotlinx.coroutines.GlobalScope
@@ -792,7 +791,8 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         method: ExecutableElement?,
         resultVarName: String = "_result",
         rawQueryVarName: String? = null,
-        suspended: Boolean = false
+        suspended: Boolean = false,
+        querySqlPostgres: String? = null
     ): CodeBlock.Builder {
         // The result, with any wrapper (e.g. LiveData or DataSource.Factory) removed
         val resultType = resolveQueryResultType(returnType)
@@ -816,36 +816,50 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         val isUpdateOrDelete = querySql != null && querySql.isSQLAModifyingQuery()
 
 
-        var preparedStatementSql = querySql
-        var execStmtSql = querySql
-        if(preparedStatementSql != null) {
-            val namedParams = getQueryNamedParameters(querySql!!)
-            namedParams.forEach { preparedStatementSql = preparedStatementSql!!.replace(":$it", "?") }
-            namedParams.forEach {
-                val queryVarTypeName = queryVars[it]
-                if(queryVarTypeName != null) {
-                    execStmtSql = execStmtSql!!.replace(":$it",
-                            defaultSqlQueryVal(queryVarTypeName))
-                }else {
-                    messager.printMessage(Diagnostic.Kind.ERROR,
-                            "On ${enclosing?.qualifiedName}.${method?.simpleName} Variable $it in query name but not in function parameters: " +
-                                    "SQL = '$preparedStatementSql' function params = ${queryVars.keys.joinToString()}\n",
-                            enclosing)
-                }
+        val preparedStatementSql = querySql?.replaceQueryNamedParamsWithQuestionMarks()
 
+        if(preparedStatementSql != null) {
+            val namedParams = preparedStatementSql.getSqlQueryNamedParameters()
+
+            val missingParams = namedParams.filter { it !in queryVars.keys }
+            if(missingParams.isNotEmpty()) {
+                messager.printMessage(Diagnostic.Kind.ERROR,
+                        "On ${enclosing?.qualifiedName}.${method?.simpleName} has the following named " +
+                        "params in query that are not parameters of the function: ${missingParams.joinToString()}")
             }
         }
+
+        val preparedStatementSqlPostgres = querySqlPostgres ?: querySql?.let { sql ->
+            var newSql = sql.replaceQueryNamedParamsWithQuestionMarks()
+            val uppercaseSql = sql.uppercase()
+            if(uppercaseSql.trimStart().startsWith("REPLACE INTO"))
+                newSql = "INSERT INTO" + sql.substring(newSql.indexOf("REPLACE INTO") + "REPLACE INTO".length)
+
+            var pgSectionIndex: Int
+            while(newSql.indexOf(PGSECTION_COMMENT_PREFIX).also { pgSectionIndex = it } != -1) {
+                val pgSectionEnd = newSql.indexOf("*/", pgSectionIndex)
+                newSql = newSql.substring(0, pgSectionIndex) +
+                        newSql.substring(pgSectionIndex + PGSECTION_COMMENT_PREFIX.length, pgSectionEnd) +
+                        newSql.substring(pgSectionEnd + 2)
+            }
+
+            newSql
+        }
+
 
         if(resultType != UNIT)
             add("var $resultVarName = ${defaultVal(resultType)}\n")
 
         if(rawQueryVarName == null) {
-            if(queryVars.any { it.value.javaToKotlinType().isListOrArray() }) {
-                add("val _stmtConfig = %T(%S, hasListParams = true)\n", PreparedStatementConfig::class,
-                    preparedStatementSql)
-            }else {
-                add("val _stmtConfig = %T(%S)\n", PreparedStatementConfig::class, preparedStatementSql)
-            }
+            add("val _stmtConfig = %T(%S ", PreparedStatementConfig::class, preparedStatementSql)
+            if(queryVars.any { it.value.javaToKotlinType().isListOrArray() })
+                add(",hasListParams = true")
+
+            if(preparedStatementSql != preparedStatementSqlPostgres)
+                add(", postgreSql = %S", preparedStatementSqlPostgres)
+
+            add(")\n")
+
         }else {
             add("val _stmtConfig = %T($rawQueryVarName.getSql(), hasListParams = $rawQueryVarName.%M())\n",
                 PreparedStatementConfig::class, MemberName("com.ustadmobile.door.ext", "hasListOrArrayParams"))
@@ -858,7 +872,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         if(querySql != null) {
             var paramIndex = 1
             val queryVarsNotSubstituted = mutableListOf<String>()
-            getQueryNamedParameters(querySql).forEach {
+            querySql.getSqlQueryNamedParameters().forEach {
                 val paramType = queryVars[it]
                 if(paramType == null ) {
                     queryVarsNotSubstituted.add(it)
@@ -889,10 +903,14 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
             execStmt = dbConnection?.createStatement()
 
             if(isUpdateOrDelete) {
+                //This can't be. An update will not be done using a RawQuery (that would just be done using execSQL)
+                if(querySql == null)
+                    throw IllegalStateException("QuerySql cannot be null")
+
                 /*
                  Run this query now so that we would get an exception if there is something wrong with it.
                  */
-                execStmt?.executeUpdate(execStmtSql)
+                execStmt?.executeUpdate(querySql.replaceQueryNamedParamsWithDefaultValues(queryVars))
                 add("val _numUpdates = _stmt.")
                 if(suspended) {
                     add("%M()\n", MemberName("com.ustadmobile.door.jdbc.ext", "executeUpdateAsyncKmp"))
@@ -900,7 +918,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                     add("executeUpdate()\n")
                 }
 
-                val entityModified = findEntityModifiedByQuery(execStmtSql!!, allKnownEntityNames)
+                val entityModified = findEntityModifiedByQuery(querySql, allKnownEntityNames)
 
                 beginControlFlow("if(_numUpdates > 0)")
                         .add("_db.%M(listOf(%S))\n", MEMBERNAME_HANDLE_TABLES_CHANGED, entityModified)
@@ -921,8 +939,8 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                 add(" _resultSet ->\n")
 
                 val colNames = mutableListOf<String>()
-                if(execStmtSql != null) {
-                    resultSet = execStmt?.executeQuery(execStmtSql)
+                if(querySql != null) {
+                    resultSet = execStmt?.executeQuery(querySql.replaceQueryNamedParamsWithDefaultValues(queryVars))
                     val metaData = resultSet!!.metaData
                     for(i in 1 .. metaData.columnCount) {
                         colNames.add(metaData.getColumnName(i))
@@ -961,7 +979,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
             }
         }catch(e: SQLException) {
             logMessage(Diagnostic.Kind.ERROR,
-                    "Exception running query SQL '$execStmtSql' : ${e.message}",
+                    "Exception running query SQL '$querySql' : ${e.message}",
                     enclosing = enclosing, element = method,
                     annotation = method?.annotationMirrors?.firstOrNull {it.annotationType.asTypeName() == Query::class.asTypeName()})
         }
@@ -1353,6 +1371,8 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         const val SUFFIX_DEFAULT_RECEIVEVIEW = "_ReceiveView"
 
         val MEMBERNAME_HANDLE_TABLES_CHANGED = MemberName("com.ustadmobile.door.ext", "handleTablesChanged")
+
+        const val PGSECTION_COMMENT_PREFIX = "/*psql"
     }
 
 }

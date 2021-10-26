@@ -1,6 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import java.util.*
+import com.squareup.kotlinpoet.TypeName
 
 /**
  * Determine if the given SQL runs a query that could modify a table. This will return true
@@ -45,4 +45,69 @@ fun String.withSuffixIf(suffix: String, condition: (String) -> Boolean) : String
         return "$this$suffix"
     else
         return this
+}
+
+/**
+ * Shorthand to replace all named parameters in a query (e.g. :param) with ? placeholders
+ */
+fun String.replaceQueryNamedParamsWithQuestionMarks(
+    queryNamedParams: List<String> = getSqlQueryNamedParameters()
+): String {
+    var newSql = this
+    queryNamedParams.forEach { newSql = newSql.replace(":$it", "?") }
+    return newSql
+}
+
+/**
+ * Shorthand to replace all named parameters
+ */
+fun String.replaceQueryNamedParamsWithDefaultValues(
+    queryNamedParams: Map<String, TypeName>
+) : String{
+    var newSql = this
+    queryNamedParams.forEach {
+        newSql = newSql.replace(":${it.key}", defaultSqlQueryVal(it.value))
+    }
+
+    return newSql
+}
+
+/**
+ * For SQL with named parameters (e.g. "SELECT * FROM Table WHERE uid = :paramName") return a
+ * list of all named parameters.
+ *
+ * @receiver String representing SQL that may have named parameters e.g. :paramName
+ * @returns list of named parameters contained within the query
+ */
+fun String.getSqlQueryNamedParameters(): List<String> {
+    val namedParams = mutableListOf<String>()
+    var insideQuote = false
+    var insideDoubleQuote = false
+    var lastC: Char = 0.toChar()
+    var startNamedParam = -1
+    for (i in 0 until this.length) {
+        val c = this[i]
+        if (c == '\'' && lastC != '\\')
+            insideQuote = !insideQuote
+        if (c == '\"' && lastC != '\\')
+            insideDoubleQuote = !insideDoubleQuote
+
+        if (!insideQuote && !insideDoubleQuote) {
+            if (c == ':') {
+                startNamedParam = i
+            } else if (!(Character.isLetterOrDigit(c) || c == '_') && startNamedParam != -1) {
+                //process the parameter
+                namedParams.add(this.substring(startNamedParam + 1, i))
+                startNamedParam = -1
+            } else if (i == this.length - 1 && startNamedParam != -1) {
+                namedParams.add(this.substring(startNamedParam + 1, i + 1))
+                startNamedParam = -1
+            }
+        }
+
+
+        lastC = c
+    }
+
+    return namedParams
 }

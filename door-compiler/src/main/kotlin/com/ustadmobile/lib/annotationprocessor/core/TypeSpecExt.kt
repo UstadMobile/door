@@ -1,5 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
+import androidx.room.ColumnInfo
 import androidx.room.Database
 import androidx.room.PrimaryKey
 import com.squareup.kotlinpoet.*
@@ -239,6 +240,21 @@ fun TypeSpec.toCreateTableSql(
 
         if(!fieldEl.type.isNullableAsSelectReturnResult) {
             sql += " NOT NULL "
+        }
+
+        val columnInfoSpec = fieldEl.annotations.getAnnotationSpec(ColumnInfo::class.asClassName())
+        val defaultVal = columnInfoSpec?.memberToString("defaultValue")
+        if(defaultVal != null && defaultVal != ColumnInfo.VALUE_UNSPECIFIED) {
+            //Postgres uses an actual boolean type. SQLite / Room is using an Integer with a 0 or 1 value.
+            if(dbType == DoorDbType.POSTGRES && fieldEl.type == BOOLEAN) {
+                sql += " DEFAULT " + if(defaultVal == "1") {
+                    "true"
+                }else {
+                    "false"
+                }
+            }else {
+                sql += " DEFAULT $defaultVal "
+            }
         }
 
         commaNeeded = true

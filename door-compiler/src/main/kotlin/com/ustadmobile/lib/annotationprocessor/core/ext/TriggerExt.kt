@@ -47,7 +47,7 @@ fun Trigger.toSql(entityTypeEl: TypeElement, dbProductType: Int) : List<String>{
                 .applyIf(conditionSql != "") {
                     append("END IF; CLOSE curs1;")
                 }
-                .append("RETURN NULL; END $$ LANGUAGE plpgsql")
+                .append("RETURN NEW; END $$ LANGUAGE plpgsql")
                 .toString().minifySql(),
             """
                 CREATE TRIGGER ${name}_trig ${order.sqlStr} ${events.joinToString(separator = " OR ") { it.sqlKeyWord } }

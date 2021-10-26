@@ -134,10 +134,17 @@ abstract class DoorDatabaseCommon {
      * PreparedStatementArrayProxy otherwise.
      */
     internal fun Connection.prepareStatement(stmtConfig: PreparedStatementConfig) : PreparedStatement {
+        val pgSql = stmtConfig.postgreSql
+        val sqlToUse = if(pgSql != null && jdbcDbType == DoorDbType.POSTGRES ) {
+            pgSql
+        }else {
+            stmtConfig.sql
+        }
+
         return when {
-            !stmtConfig.hasListParams -> prepareStatement(stmtConfig.sql, stmtConfig.generatedKeys)
-            jdbcArraySupported -> prepareStatement(adjustQueryWithSelectInParam(stmtConfig.sql))
-            else -> PreparedStatementArrayProxy(stmtConfig.sql, this)
+            !stmtConfig.hasListParams -> prepareStatement(sqlToUse, stmtConfig.generatedKeys)
+            jdbcArraySupported -> prepareStatement(adjustQueryWithSelectInParam(sqlToUse))
+            else -> PreparedStatementArrayProxy(sqlToUse, this)
         }
     }
 

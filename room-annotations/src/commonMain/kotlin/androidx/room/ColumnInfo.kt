@@ -67,7 +67,48 @@ annotation class ColumnInfo(
          * @return The collation sequence of the column. This is either [.UNSPECIFIED],
          * [.BINARY], [.NOCASE], [.RTRIM], [.LOCALIZED] or [.UNICODE].
          */
-        @Collate val collate: Int = UNSPECIFIED) {
+        @Collate val collate: Int = UNSPECIFIED,
+
+        /**
+         * The default value for this column.
+         * <pre>
+         *   {@literal @}ColumnInfo(defaultValue = "No name")
+         *   public String name;
+         *
+         *  {@literal @}ColumnInfo(defaultValue = "0")
+         *   public int flag;
+         * </pre>
+         * <p>
+         * Note that the default value you specify here will <em>NOT</em> be used if you simply
+         * insert the {@link Entity} with {@link Insert @Insert}. In that case, any value assigned in
+         * Java/Kotlin will be used. Use {@link Query @Query} with an <code>INSERT</code> statement
+         * and skip this column there in order to use this default value.
+         * </p>
+         * <p>
+         * NULL, CURRENT_TIMESTAMP and other SQLite constant values are interpreted as such. If you want
+         * to use them as strings for some reason, surround them with single-quotes.
+         * </p>
+         * <pre>
+         *   {@literal @}ColumnInfo(defaultValue = "NULL")
+         *   {@literal @}Nullable
+         *   public String description;
+         *
+         *   {@literal @}ColumnInfo(defaultValue = "'NULL'")
+         *   {@literal @}NonNull
+         *   public String name;
+         * </pre>
+         * <p>
+         * You can also use constant expressions by surrounding them with parentheses.
+         * </p>
+         * <pre>
+         *   {@literal @}CoumnInfo(defaultValue = "('Created at' || CURRENT_TIMESTAMP)")
+         *   public String notice;
+         * </pre>
+         *
+         * @return The default value for this column.
+         * @see #VALUE_UNSPECIFIED
+         */
+        val defaultValue: String = VALUE_UNSPECIFIED) {
     /**
      * The SQLite column type constants that can be used in [.typeAffinity]
      */
@@ -152,5 +193,7 @@ annotation class ColumnInfo(
          */
         @RequiresApi(21)
         const val UNICODE = 6
+
+        const val VALUE_UNSPECIFIED = "[value-unspecified]"
     }
 }

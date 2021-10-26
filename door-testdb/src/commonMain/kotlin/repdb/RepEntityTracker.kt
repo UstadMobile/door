@@ -1,5 +1,6 @@
 package repdb
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import com.ustadmobile.door.annotation.*
@@ -19,6 +20,7 @@ class RepEntityTracker {
     @ReplicationDestinationNodeId
     var trkrDestination: Long = 0
 
+    @ColumnInfo(defaultValue = "0")
     @ReplicationTrackerProcessed
     var trkrProcessed: Boolean = false
 

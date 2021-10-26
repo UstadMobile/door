@@ -20,11 +20,10 @@ abstract class RepDao {
     abstract fun insertDoorNode(node: DoorNode)
 
     @Query("""
-       REPLACE INTO RepEntityTracker(trkrForeignKey, trkrVersionId, trkrDestination, trkrProcessed)
+       REPLACE INTO RepEntityTracker(trkrForeignKey, trkrVersionId, trkrDestination)
         SELECT RepEntity.rePrimaryKey AS trkrForeignKey,
                RepEntity.reLastChangeTime AS trkrVersionId,
-               DoorNode.nodeId AS trkrDestination,
-               0 AS trkrProcessed
+               DoorNode.nodeId AS trkrDestination
           FROM ChangeLog
                JOIN RepEntity 
                     ON ChangeLog.chTableId = 500 AND ChangeLog.chEntityPk = RepEntity.rePrimaryKey
@@ -35,7 +34,11 @@ abstract class RepDao {
                   FROM RepEntityTracker
                  WHERE RepEntityTracker.trkrForeignKey = RepEntity.rePrimaryKey
                    AND RepEntityTracker.trkrDestination = DoorNode.nodeId), 0)
+        /*psql ON CONFLICT(trkrForeignKey, trkrDestination) DO UPDATE 
+              SET trkrProcessed = false
+        */
     """)
+    //Note UPDATE does not need a WHERE check - this was already checked in the insert using the where clause there
     @ReplicationRunOnChange(value = [RepEntity::class], checkPendingReplicationsFor = [RepEntity::class])
     abstract suspend fun updateReplicationTrackers()
 
