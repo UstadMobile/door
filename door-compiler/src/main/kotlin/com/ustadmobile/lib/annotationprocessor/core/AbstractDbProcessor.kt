@@ -1375,6 +1375,8 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         val MEMBERNAME_HANDLE_TABLES_CHANGED = MemberName("com.ustadmobile.door.ext", "handleTablesChanged")
 
         const val PGSECTION_COMMENT_PREFIX = "/*psql"
+
+        val MEMBERNAME_EXEC_UPDATE_ASYNC = MemberName("com.ustadmobile.door.jdbc.ext", "executeUpdateAsyncKmp")
     }
 
 }
