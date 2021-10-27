@@ -47,9 +47,16 @@ fun Trigger.toSql(entityTypeEl: TypeElement, dbProductType: Int) : List<String>{
                 .applyIf(conditionSql != "") {
                     append("END IF; CLOSE curs1;")
                 }
-                .append("RETURN NEW; END $$ LANGUAGE plpgsql")
+                .append("""
+                    IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN
+                        RETURN NEW;
+                    ELSE
+                        RETURN OLD;
+                    END IF;
+                """)
+                .append("END $$ LANGUAGE plpgsql")
                 .toString().minifySql(),
-            """
+                """
                 CREATE TRIGGER ${name}_trig ${order.sqlStr} ${events.joinToString(separator = " OR ") { it.sqlKeyWord } }
                        ON $tableOrViewName
                        FOR EACH ROW EXECUTE PROCEDURE ${name}_fn()
