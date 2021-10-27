@@ -140,10 +140,10 @@ suspend fun DoorDatabase.insertReplicationsIntoReceiveView(
         transactionDb.prepareAndUseStatementAsync(repEntityMetaData.insertIntoReceiveViewSql) { stmt ->
             receivedObjects.forEach { receivedObject ->
                 for(i in 0 until repEntityMetaData.insertIntoReceiveViewTypesList.size) {
-                    //HERE: Need to let objFieldVal default according to type if not in the JsonObject.
-                    val objFieldVal = receivedObject.get(repEntityMetaData.insertIntoReceiveViewTypeColNames[i]) as? JsonPrimitive
+                    val objFieldVal = (receivedObject.get(repEntityMetaData.insertIntoReceiveViewTypeColNames[i]) as? JsonPrimitive)
+                        .toDefaultValIfNull(repEntityMetaData.insertIntoReceiveViewTypesList[i])
                     stmt.setJsonPrimitive(i + 1, repEntityMetaData.insertIntoReceiveViewTypesList[i],
-                        receivedObject.get(repEntityMetaData.insertIntoReceiveViewTypeColNames[i]) as JsonPrimitive)
+                        objFieldVal)
                 }
 
                 stmt.executeUpdateAsyncKmp()
