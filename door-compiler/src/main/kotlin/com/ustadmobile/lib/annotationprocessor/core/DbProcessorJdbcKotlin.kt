@@ -580,9 +580,14 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
 
         for(dbTypeEl in dbs) {
             FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_JDBC_KT2)
-                .addJdbcDbImplType(dbTypeEl as TypeElement)
+                .addJdbcDbImplType(dbTypeEl as TypeElement, DoorTarget.JVM)
                 .build()
-                .writeToDirsFromArg(listOf(OPTION_JVM_DIRS, OPTION_JS_OUTPUT))
+                .writeToDirsFromArg(listOf(OPTION_JVM_DIRS))
+
+            FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_JDBC_KT2)
+                .addJdbcDbImplType(dbTypeEl, DoorTarget.JS)
+                .build()
+                .writeToDirsFromArg(listOf(OPTION_JS_OUTPUT))
 
             FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_DOOR_METADATA)
                 .addDatabaseMetadataType(dbTypeEl, processingEnv)
@@ -1209,7 +1214,8 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
 
 
     fun FileSpec.Builder.addJdbcDbImplType(
-        dbTypeElement: TypeElement
+        dbTypeElement: TypeElement,
+        target: DoorTarget
     ) : FileSpec.Builder {
         addImport("com.ustadmobile.door.util", "systemTimeInMillis")
         addType(TypeSpec.classBuilder(dbTypeElement.asClassNameWithSuffix(SUFFIX_JDBC_KT2))
@@ -1239,12 +1245,22 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             .addProperty(PropertySpec.builder("dbName", String::class)
                 .initializer("dbName")
                 .build())
-            .addProperty(PropertySpec.builder("isInTransaction", Boolean::class,
-                KModifier.OVERRIDE)
-                .getter(FunSpec.getterBuilder()
-                    .addCode("return currentTransactionDepth > 0\n")
+            .applyIf(target == DoorTarget.JVM) {
+                addProperty(PropertySpec.builder("isInTransaction", Boolean::class,
+                    KModifier.OVERRIDE)
+                    .getter(FunSpec.getterBuilder()
+                        .addCode("return currentTransactionDepth > 0\n")
+                        .build())
                     .build())
-                .build())
+            }
+            .applyIf(target == DoorTarget.JS) {
+                addProperty(PropertySpec.builder("isInTransaction", Boolean::class,
+                    KModifier.OVERRIDE)
+                    .getter(FunSpec.getterBuilder()
+                        .addCode("return false\n")
+                        .build())
+                    .build())
+            }
             .applyIf(dbTypeElement.isDbSyncable(processingEnv)) {
                 addProperty(PropertySpec.builder("master", BOOLEAN)
                     .initializer("master").build())
