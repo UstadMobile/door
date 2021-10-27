@@ -8,7 +8,7 @@ import com.ustadmobile.door.util.systemTimeInMillis
  * Callback class. This class will set the nodeId, and insert required rows into SqliteChangeSeqNums and
  * TableSyncStatus
  */
-class DoorSyncableDatabaseCallback2(val nodeId: Int, val tableMap: Map<String, Int>, val primary: Boolean): DoorDatabaseCallback {
+class DoorSyncableDatabaseCallback2(val nodeId: Long, val tableMap: Map<String, Int>, val primary: Boolean): DoorDatabaseCallback {
 
     private fun setSyncNode(dbType: Int, execSqlFn: (Array<String>) -> Unit) {
         val primaryStr = if(dbType == DoorDbType.SQLITE) {

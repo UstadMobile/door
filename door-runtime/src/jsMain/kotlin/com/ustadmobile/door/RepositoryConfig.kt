@@ -10,7 +10,7 @@ import io.ktor.client.*
 actual class RepositoryConfig internal constructor(actual val context: Any,
                                                    actual val endpoint: String,
                                                    actual val auth: String,
-                                                   actual val nodeId: Int,
+                                                   actual val nodeId: Long,
                                                    actual val httpClient: HttpClient,
                                                    actual val attachmentsDir: String,
                                                    actual val updateNotificationManager: ServerUpdateNotificationManager?,
@@ -19,7 +19,7 @@ actual class RepositoryConfig internal constructor(actual val context: Any,
 
     companion object {
 
-        class Builder internal constructor(val context: Any, val endpoint: String, val auth: String, val nodeId: Int, val httpClient: HttpClient) {
+        class Builder internal constructor(val context: Any, val endpoint: String, val auth: String, val nodeId: Long, val httpClient: HttpClient) {
 
             var attachmentsDir: String? = null
 
@@ -37,7 +37,7 @@ actual class RepositoryConfig internal constructor(actual val context: Any,
 
         }
 
-        fun repositoryConfig(context: Any, endpoint: String, auth: String, nodeId: Int, httpClient: HttpClient, block: Builder.() -> Unit = {}) : RepositoryConfig {
+        fun repositoryConfig(context: Any, endpoint: String, auth: String, nodeId: Long, httpClient: HttpClient, block: Builder.() -> Unit = {}) : RepositoryConfig {
             val builder = Builder(context, endpoint,auth, nodeId, httpClient)
             block(builder)
             return builder.build()

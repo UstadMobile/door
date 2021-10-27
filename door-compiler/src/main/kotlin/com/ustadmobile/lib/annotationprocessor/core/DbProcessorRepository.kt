@@ -164,7 +164,7 @@ fun FileSpec.Builder.addDbRepoType(
                     .getter(FunSpec.getterBuilder().addCode("return TABLE_ID_MAP\n").build())
                     .addModifiers(KModifier.OVERRIDE)
                     .build())
-            .addProperty(PropertySpec.builder("clientId", INT)
+            .addProperty(PropertySpec.builder("clientId", LONG)
                 .getter(FunSpec.getterBuilder().addCode("return config.nodeId\n").build())
                 .applyIf(dbTypeElement.isDbSyncable(processingEnv)) {
                     addModifiers(KModifier.OVERRIDE)
@@ -478,7 +478,7 @@ fun FileSpec.Builder.addDaoRepoType(daoTypeSpec: TypeSpec,
                     daoClassName).initializer("_dao").build())
             .addProperty(PropertySpec.builder("_httpClient",
                     HttpClient::class).initializer("_httpClient").build())
-            .addProperty(PropertySpec.builder("_clientId", Int::class)
+            .addProperty(PropertySpec.builder("_clientId", Long::class)
                     .initializer("_clientId").build())
             .addProperty(PropertySpec.builder("_endpoint", String::class)
                     .initializer("_endpoint").build())
@@ -502,7 +502,7 @@ fun FileSpec.Builder.addDaoRepoType(daoTypeSpec: TypeSpec,
                     .addParameter("_repo", DoorDatabaseRepository::class)
                     .addParameter("_dao", daoClassName)
                     .addParameter("_httpClient", HttpClient::class)
-                    .addParameter("_clientId", Int::class)
+                    .addParameter("_clientId", Long::class)
                     .addParameter("_endpoint", String::class)
                     .addParameter("_dbPath", String::class)
                     .addParameter("_attachmentsDir", String::class)

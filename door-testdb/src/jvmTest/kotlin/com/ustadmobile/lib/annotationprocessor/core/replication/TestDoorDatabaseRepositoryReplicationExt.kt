@@ -88,7 +88,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
             }
 
         localDbRepo = localRepDb.asRepository(RepositoryConfig.repositoryConfig(Any(), "http://localhost:8089/",
-            LOCAL_NODE_ID.toInt(), "secret", httpClient, okHttpClient))
+            LOCAL_NODE_ID, "secret", httpClient, okHttpClient))
 
 
         remoteVirtualHostScope = VirtualHostScope()
@@ -112,7 +112,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
             }
 
             bind<NodeIdAndAuth>() with scoped(remoteVirtualHostScope).singleton {
-                NodeIdAndAuth(REMOTE_NODE_ID.toInt(), "secret")
+                NodeIdAndAuth(REMOTE_NODE_ID, "secret")
             }
 
             registerContextTranslator { _: ApplicationCall -> "localhost" }

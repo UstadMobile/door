@@ -28,7 +28,7 @@ fun CodeBlock.Builder.addDelegateFunctionCall(varName: String, funSpec: FunSpec)
  * from the header.
  *
  * e.g.
- * val clientIdVarName = call.request.header("X-nid")?.toInt() ?: 0
+ * val clientIdVarName = call.request.header("X-nid")?.toLong() ?: 0
  *
  * @param varName the varname to create in the CodeBlock
  * @param serverType SERVER_TYPE_KTOR or SERVER_TYPE_NANOHTTPD
@@ -36,12 +36,12 @@ fun CodeBlock.Builder.addDelegateFunctionCall(varName: String, funSpec: FunSpec)
  */
 fun CodeBlock.Builder.addGetClientIdHeader(varName: String, serverType: Int) : CodeBlock.Builder {
     takeIf { serverType == DbProcessorKtorServer.SERVER_TYPE_KTOR }
-            ?.add("val $varName = %M.request.%M(%S)?.toInt() ?: 0\n",
+            ?.add("val $varName = %M.request.%M(%S)?.toLong() ?: 0\n",
                     DbProcessorKtorServer.CALL_MEMBER,
                     MemberName("io.ktor.request","header"),
                     "x-nid")
     takeIf { serverType == DbProcessorKtorServer.SERVER_TYPE_NANOHTTPD }
-            ?.add("val $varName = _session.headers.get(%S)?.toInt() ?: 0\n",
+            ?.add("val $varName = _session.headers.get(%S)?.toLong() ?: 0\n",
                 "x-nid")
 
     return this
@@ -309,13 +309,13 @@ internal fun CodeBlock.Builder.addKtorRequestForFunction(
     val httpResultType = funSpec.returnType?.unwrapLiveDataOrDataSourceFactory() ?: UNIT
 
     val httpMemberFn = if(nonQueryParams.isEmpty()) {
-        if(httpResultType.isNullable == true) {
+        if(httpResultType.isNullable) {
             CLIENT_GET_NULLABLE_MEMBER_NAME
         }else {
             CLIENT_GET_MEMBER_NAME
         }
     }else {
-        if(httpResultType.isNullable == true) {
+        if(httpResultType.isNullable) {
             CLIENT_POST_NULLABLE_MEMBER_NAME
         }else {
             CLIENT_POST_MEMBER_NAME

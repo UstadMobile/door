@@ -362,7 +362,7 @@ fun CodeBlock.Builder.addKtorRouteSelectCodeBlock(daoMethod: FunSpec, processing
         //it is possible that clientId is already a parameter of the function (eg synchelper etc).
         // We should not add it twice.
         if(!daoMethod.parameters.any { it.name == "clientId" })
-            queryVarsList  += ParameterSpec.builder("clientId", INT).build()
+            queryVarsList  += ParameterSpec.builder("clientId", LONG).build()
     }
 
     if(serverType != SERVER_TYPE_NANOHTTPD)
@@ -644,7 +644,7 @@ fun FunSpec.toKtorHelperFunSpec(overrides: Boolean = false,
                 addParameter(PARAM_NAME_OFFSET, INT)
                 addParameter(PARAM_NAME_LIMIT, INT)
             }.applyIf(!parameters.any { it.name == "clientId" }) {
-                addParameter("clientId", INT)
+                addParameter("clientId", LONG)
             }
             .apply {
                 if(resultType != null)

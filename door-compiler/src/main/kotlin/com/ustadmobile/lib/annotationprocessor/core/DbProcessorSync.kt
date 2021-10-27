@@ -39,7 +39,7 @@ internal fun generateTrackerEntity(entityClass: TypeElement, processingEnv: Proc
                     PropertySpec.builder(DbProcessorSync.TRACKER_ENTITY_PK_FIELDNAME, pkFieldTypeName)
                             .initializer(DbProcessorSync.TRACKER_ENTITY_PK_FIELDNAME)
                             .build(),
-                    PropertySpec.builder(DbProcessorSync.TRACKER_DESTID_FIELDNAME, INT)
+                    PropertySpec.builder(DbProcessorSync.TRACKER_DESTID_FIELDNAME, LONG)
                             .initializer(DbProcessorSync.TRACKER_DESTID_FIELDNAME)
                             .build(),
                     PropertySpec.builder(DbProcessorSync.TRACKER_CHANGESEQNUM_FIELDNAME, INT)
@@ -73,7 +73,7 @@ internal fun generateTrackerEntity(entityClass: TypeElement, processingEnv: Proc
                     .addParameter(ParameterSpec.builder(DbProcessorSync.TRACKER_ENTITY_PK_FIELDNAME,
                             pkFieldTypeName).defaultValue("0L").build())
                     .addParameter(ParameterSpec.builder(DbProcessorSync.TRACKER_DESTID_FIELDNAME,
-                            INT).defaultValue("0").build())
+                            LONG).defaultValue("0").build())
                     .addParameter(ParameterSpec.builder(DbProcessorSync.TRACKER_CHANGESEQNUM_FIELDNAME,
                             INT).defaultValue("0").build())
                     .addParameter(ParameterSpec.builder(DbProcessorSync.TRACKER_RECEIVED_FIELDNAME,
@@ -96,7 +96,7 @@ fun FileSpec.Builder.addSyncableEntityToTrackFunction(entityClass: TypeElement, 
             .addParameter(ParameterSpec.builder("primary", BOOLEAN)
                     .defaultValue("false")
                     .build())
-            .addParameter(ParameterSpec.builder("clientId", INT)
+            .addParameter(ParameterSpec.builder("clientId", LONG)
                     .defaultValue("0")
                     .build())
             .returns(List::class.asClassName().parameterizedBy(syncEntityInfo.tracker))
@@ -231,7 +231,7 @@ fun TypeSpec.Builder.addSyncDaoFunsForEntity(entityType: TypeElement, isOverride
                         .addAnnotation(SyncableLimitParam::class)
                         .build())
             }.applyIf(findAllRemoteSql.contains(":clientId")) {
-                addParameter("clientId", INT)
+                addParameter("clientId", LONG)
             }
             .returns(List::class.asClassName().parameterizedBy(entityType.asClassName()))
             .addAnnotation(AnnotationSpec.builder(Query::class)

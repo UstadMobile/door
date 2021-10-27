@@ -4,20 +4,22 @@ import com.ustadmobile.door.attachments.AttachmentFilter
 import io.ktor.client.*
 import okhttp3.OkHttpClient
 
-actual class RepositoryConfig internal constructor(actual val context: Any,
-                                                   actual val endpoint: String,
-                                                   actual val auth: String,
-                                                   actual val nodeId: Int,
-                                                   actual val httpClient: HttpClient,
-                                                   val okHttpClient: OkHttpClient,
-                                                   actual val attachmentsDir: String,
-                                                   actual val updateNotificationManager: ServerUpdateNotificationManager?,
-                                                   actual val useClientSyncManager: Boolean,
-                                                   actual val attachmentFilters: List<AttachmentFilter>) {
+actual class RepositoryConfig internal constructor(
+    actual val context: Any,
+    actual val endpoint: String,
+    actual val auth: String,
+    actual val nodeId: Long,
+    actual val httpClient: HttpClient,
+    val okHttpClient: OkHttpClient,
+    actual val attachmentsDir: String,
+    actual val updateNotificationManager: ServerUpdateNotificationManager?,
+    actual val useClientSyncManager: Boolean,
+    actual val attachmentFilters: List<AttachmentFilter>
+) {
 
     companion object {
 
-        class Builder internal constructor(val context: Any, val endpoint: String, val nodeId: Int,
+        class Builder internal constructor(val context: Any, val endpoint: String, val nodeId: Long,
                                            val auth: String, val httpClient: HttpClient, val okHttpClient: OkHttpClient) {
 
             var attachmentsDir: String? = null
@@ -38,7 +40,7 @@ actual class RepositoryConfig internal constructor(actual val context: Any,
 
         fun repositoryConfig(context: Any,
                              endpoint: String,
-                             nodeId: Int,
+                             nodeId: Long,
                              auth: String,
                              httpClient: HttpClient,
                              okHttpClient: OkHttpClient,

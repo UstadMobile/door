@@ -97,7 +97,7 @@ fun <T: DoorDatabase> T.requireDbAndRepo(): Pair<T, T> {
  * After clearing all the table data, the sync tables (e.g. TableSyncStatus,
  * The nodeId on SyncNode, etc) need to be setup again.
  */
-fun <T:DoorDatabase> T.clearAllTablesAndResetSync(nodeId: Int, isPrimary: Boolean = false) : T {
+fun <T:DoorDatabase> T.clearAllTablesAndResetSync(nodeId: Long, isPrimary: Boolean = false) : T {
     clearAllTables()
     val metadata = this::class.doorDatabaseMetadata()
     DoorSyncableDatabaseCallback2(nodeId, metadata.syncableTableIdMap, isPrimary)

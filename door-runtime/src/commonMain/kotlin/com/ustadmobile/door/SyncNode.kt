@@ -6,4 +6,4 @@ import kotlinx.serialization.Serializable
 
 @Entity
 @Serializable
-data class SyncNode(@PrimaryKey var nodeClientId: Int = 0, var master: Boolean = false)
+data class SyncNode(@PrimaryKey var nodeClientId: Long = 0, var master: Boolean = false)

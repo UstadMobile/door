@@ -9,7 +9,6 @@ import com.ustadmobile.door.entities.ReplicationStatus
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
 import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
-import com.ustadmobile.door.replication.ReplicationSubscriptionManager.ReplicateRunner
 import com.ustadmobile.door.sse.*
 import com.ustadmobile.door.util.systemTimeInMillis
 import io.github.aakira.napier.Napier
@@ -142,7 +141,6 @@ class ReplicationSubscriptionManager(
      * id
      */
     private suspend fun initReplicationStatus() {
-        val timeNow = systemTimeInMillis()
         val remoteNodeIdVal = remoteNodeId.value
         repository.db.withDoorTransactionAsync(dbKClass) { transactionDb ->
             transactionDb.prepareAndUseStatementAsync("""
