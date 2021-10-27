@@ -717,7 +717,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                 CREATE TRIGGER ch_${params.opPrefix}_${replicateEntity.tableId}
                        AFTER ${params.opName} ON ${entityType.entityTableName}
                 BEGIN
-                       INSERT INTO ChangeLog(chTableId, chEntityPk, chType)
+                       REPLACE INTO ChangeLog(chTableId, chEntityPk, chType)
                        VALUES (${replicateEntity.tableId}, ${params.prefix}.${primaryKeyEl.simpleName}, ${params.opCode});
                 END       
                 """.minifySql())
@@ -733,7 +733,9 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                ch_${params.opPrefix}_${replicateEntity.tableId}_fn() RETURNS TRIGGER AS $$
                BEGIN
                INSERT INTO ChangeLog(chTableId, chEntityPk, chType)
-                       VALUES (${replicateEntity.tableId}, ${params.prefix}.${primaryKeyEl.simpleName}, ${params.opCode});
+                       VALUES (${replicateEntity.tableId}, ${params.prefix}.${primaryKeyEl.simpleName}, ${params.opCode})
+               ON CONFLICT(chTableId, chEntityPk) DO UPDATE
+                       SET chType = ${params.opCode};
                RETURN NULL;
                END $$
                LANGUAGE plpgsql         
