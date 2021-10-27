@@ -841,7 +841,10 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .applyIf(funSpec.hasReturnType) {
                     add("_result += ")
                 }
-                .apply {
+                .applyIf(funSpec.isSuspended) {
+                    add("_stmt.%M()\n", MEMBERNAME_EXEC_UPDATE_ASYNC)
+                }
+                .applyIf(!funSpec.isSuspended) {
                     add("_stmt.executeUpdate()\n")
                 }
                 .applyIf(firstParam.type.isListOrArray()) {
