@@ -94,7 +94,7 @@ suspend fun ApplicationCall.respondUpdateNotifications(repo: DoorDatabaseSyncRep
  * @param repo The DoorDatabaseSyncRepository we are responding for
  */
 suspend fun ApplicationCall.respondUpdateNotificationReceived(repo: DoorDatabaseSyncRepository) {
-    val deviceId = request.queryParameters["deviceId"]?.toInt() ?: 0
+    val deviceId = request.queryParameters["deviceId"]?.toLong() ?: 0
     val tableId = request.queryParameters["tableId"]?.toInt() ?: 0
     val lastModTimestamp = request.queryParameters["lastModTimestamp"]?.toLong() ?: 0
 

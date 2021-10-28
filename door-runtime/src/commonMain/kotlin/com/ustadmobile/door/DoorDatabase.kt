@@ -3,7 +3,7 @@ package com.ustadmobile.door
 import kotlinx.coroutines.Runnable
 
 
-expect abstract class DoorDatabase {
+expect abstract class DoorDatabase() {
 
     abstract fun clearAllTables()
 

@@ -45,7 +45,7 @@ abstract class SyncHelperEntitiesDao : ISyncHelperEntitiesDao {
      * @param lastModTimestamp The pnTimestamp as per the UpdateNotification
      */
     @Query("DELETE FROM UpdateNotification WHERE pnDeviceId = :deviceId AND pnTableId = :tableId AND pnTimestamp = :lastModTimestamp")
-    override abstract suspend fun deleteUpdateNotification(deviceId: Int, tableId: Int, lastModTimestamp: Long)
+    override abstract suspend fun deleteUpdateNotification(deviceId: Long, tableId: Int, lastModTimestamp: Long)
 
     @Query("""
         DELETE FROM ChangeLog

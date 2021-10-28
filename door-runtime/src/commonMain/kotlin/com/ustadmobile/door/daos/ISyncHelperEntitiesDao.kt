@@ -30,7 +30,7 @@ interface ISyncHelperEntitiesDao {
      * @param tableId The tableId as per the UpdateNotification
      * @param lastModTimestamp The pnTimestamp as per the UpdateNotification
      */
-    suspend fun deleteUpdateNotification(deviceId: Int, tableId: Int, lastModTimestamp: Long)
+    suspend fun deleteUpdateNotification(deviceId: Long, tableId: Int, lastModTimestamp: Long)
 
     /**
      * Delete the ChangeLogs for the given table. This should be called after all notifyOnUpdate

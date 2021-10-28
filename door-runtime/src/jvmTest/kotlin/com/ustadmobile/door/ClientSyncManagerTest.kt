@@ -125,7 +125,7 @@ class ClientSyncManagerTest {
             on { findTablesToSync() }.thenReturn(listOf())
         }
 
-        val repoConfig = repositoryConfig(Any(), "http://localhost:8089/", Random.nextInt(),
+        val repoConfig = repositoryConfig(Any(), "http://localhost:8089/", Random.nextLong(),
             UUID.randomUUID().toString(), httpClient, okHttpClient)
 
         val mockRepo = mock<DoorDatabaseSyncRepository>() {

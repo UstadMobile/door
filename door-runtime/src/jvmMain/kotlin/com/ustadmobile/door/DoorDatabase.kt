@@ -10,7 +10,7 @@ import java.lang.reflect.Constructor
 import kotlin.reflect.KClass
 
 @Suppress("unused") //Some functions are used by generated code
-actual abstract class DoorDatabase : DoorDatabaseCommon(){
+actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
 
     override var jdbcDbType: Int = -1
         get() = sourceDatabase?.jdbcDbType ?: field

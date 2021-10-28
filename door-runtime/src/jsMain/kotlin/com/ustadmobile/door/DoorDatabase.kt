@@ -9,7 +9,7 @@ import com.ustadmobile.door.sqljsjdbc.SQLiteDatabaseMetadataJs
 import com.ustadmobile.door.sqljsjdbc.SQLiteStatementJs
 import kotlin.jvm.Volatile
 
-actual abstract class DoorDatabase(): DoorDatabaseCommon() {
+actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon() {
 
     override val jdbcDbType: Int = DoorDbType.SQLITE
 
