@@ -45,6 +45,7 @@ import com.ustadmobile.door.attachments.retrieveAttachment
 import com.ustadmobile.door.entities.NodeIdAndAuth
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.util.NodeIdAuthCache
+import io.github.aakira.napier.LogLevel
 import okhttp3.OkHttpClient
 import java.util.*
 import kotlin.random.Random
@@ -88,7 +89,7 @@ class DbRepoTest {
         tmpServerAttachmentsDir = temporaryFolder.newFolder("testserverattachments")
         mockUpdateNotificationManager = mock {}
 
-        if(!Napier.isEnable(Napier.Level.DEBUG, null)) {
+        if(!Napier.isEnable(LogLevel.DEBUG, null)) {
             Napier.base(DebugAntilog())
         }
 

@@ -1,17 +1,16 @@
-import com.ccfraser.muirwik.components.*
-import com.ccfraser.muirwik.components.button.*
-import com.ccfraser.muirwik.components.form.MFormControlVariant
-import com.ccfraser.muirwik.components.list.mList
-import com.ccfraser.muirwik.components.list.mListItem
 import com.ustadmobile.door.DoorLifecycleObserver
 import com.ustadmobile.door.DoorLifecycleOwner
 import db2.ExampleEntity2
 import kotlinx.css.*
+import kotlinx.css.properties.border
+import kotlinx.html.ButtonType
+import kotlinx.html.InputType
+import kotlinx.html.js.onChangeFunction
+import kotlinx.html.js.onClickFunction
 import react.*
-import styled.css
-import styled.styledDiv
+import styled.*
 
-class ExampleComponent(mProps: RProps): RComponent<RProps, RState>(mProps),
+class ExampleComponent(mProps: PropsWithChildren): RComponent<PropsWithChildren, State>(mProps),
     ExampleView, DoorLifecycleOwner {
 
     private var mPresenter: ExamplePresenter<*>? = null
@@ -47,96 +46,83 @@ class ExampleComponent(mProps: RProps): RComponent<RProps, RState>(mProps),
     }
 
     override fun RBuilder.render() {
-        styledDiv {
-            mGridContainer(MGridSpacing.spacing4) {
-                mGridItem(MGridSize.cells8){
-                    mTextField(label = "Entity name",
-                        helperText = "",
-                        value = entity.name ?: "",
-                        variant = MFormControlVariant.outlined,
-                        onChange = {
-                            it.persist()
+            styledDiv {
+                css{
+                    display = Display.flex
+                    flexDirection = FlexDirection.column
+                }
+
+                styledDiv {
+                    css{
+                        display = Display.flex
+                        flexDirection = FlexDirection.row
+                    }
+
+                    styledInput(type = InputType.text){
+                        attrs.onChangeFunction = {
                             setState {
-                                entity.name = it.targetInputValue
+                               entity.name = it.target.asDynamic().value.toString()
                             }
-                        }){
+                        }
+                        attrs.placeholder = "Enter name"
+
+                        css {
+                            flex(2.0)
+                            padding = "16px"
+                            fontSize = LinearDimension("1.7em")
+                            border(width = LinearDimension("1px"), style = BorderStyle.solid, color = Color.black)
+                        }
+                    }
+
+                    styledButton(type = ButtonType.button) {
+                        attrs.text("Save")
+                        attrs.onClickFunction = {
+                            if(!entity.name.isNullOrEmpty()){
+                                mPresenter?.handleSaveEntity(entity)
+                            }
+                        }
                         css{
-                            width = LinearDimension("100%")
+                            flex(1.0)
+                            padding = "16px"
+                            fontSize = LinearDimension("1.8em")
+                            marginLeft = LinearDimension("20px")
+                            backgroundColor = if(entity.name.isNullOrEmpty()) Color.grey.lighten(200) else Color.black
+                            color = if(entity.name.isNullOrEmpty()) Color.black else Color.white
                         }
                     }
                 }
 
-                mGridItem(MGridSize.cells4){
-                    mButton(if(entity.uid == 0L) "Save Now" else "Update Now", size = MButtonSize.large,
-                        disabled = entity.name.isNullOrEmpty(),
-                        variant = MButtonVariant.contained,
-                        onClick = {
-                           if(entity.name.isNullOrEmpty()){
-                               return@mButton
-                           }
-                            mPresenter?.handleSaveEntity(entity)
-                        }
-                    ){
-                        css{
-                            marginTop = 3.spacingUnits
-                            if(entity.name.isNullOrEmpty()){
-                                backgroundColor = Color.green
-                                color = Color.white
-                            }else{
-                                color = Color.black
-                            }
-                        }
+
+                styledDiv {
+                    css {
+                        marginTop = LinearDimension("30px")
                     }
-                }
-
-                mGridItem(MGridSize.cells12){
-                    mList {
-                        mListItem {
-                            mGridContainer(MGridSpacing.spacing4) {
-                                mGridItem(MGridSize.cells3){
-                                    mTypography("#", variant = MTypographyVariant.body2)
-                                }
-
-                                mGridItem(MGridSize.cells5){
-                                    mTypography("Name", variant = MTypographyVariant.body2)
-                                }
-
-                                mGridItem(MGridSize.cells3){
-                                    mTypography("Number", variant = MTypographyVariant.body2)
-                                }
-
-                                mGridItem(MGridSize.cells1){
-                                }
+                    list?.forEach {
+                        styledDiv {
+                            css {
+                                margin = "20px"
+                                flexDirection = FlexDirection.row
+                                display = Display.flex
                             }
-                        }
-                        list?.forEach { entry ->
-                            mListItem {
-                                mGridContainer(MGridSpacing.spacing4) {
-                                    mGridItem(MGridSize.cells3){
-                                        mTypography(entry.uid.toString(), variant = MTypographyVariant.body2)
-                                    }
-
-                                    mGridItem(MGridSize.cells5){
-                                        mTypography(entry.name, variant = MTypographyVariant.body2)
-                                    }
-
-                                    mGridItem(MGridSize.cells3){
-                                        mTypography(entry.someNumber.toString(), variant = MTypographyVariant.body2)
-                                    }
-
-                                    mGridItem(MGridSize.cells1){
-                                        mIconButton("edit",size = MIconButtonSize.medium, onClick = {
-                                            mPresenter?.handleEditEntity(entry)
-                                        })
-                                    }
-                                }
-                            }
+                            renderData(it.uid, 1.0)
+                            renderData(it.name, 3.0)
+                            renderData(it.someNumber, 1.0)
                         }
                     }
                 }
             }
+    }
+
+    private fun RBuilder.renderData(data: Any?, flex: Double){
+        styledH6 {
+            attrs.text("$data")
+            css {
+                flex(flexGrow= flex, flexBasis = FlexBasis.auto)
+                fontSize = LinearDimension("1.9em")
+            }
         }
     }
+
 
     override val currentState: Int
         get() = observerStatus
@@ -160,4 +146,6 @@ class ExampleComponent(mProps: RProps): RComponent<RProps, RState>(mProps),
     }
 }
 
-fun RBuilder.renderApp() = child(ExampleComponent::class) {}
+fun RBuilder.renderApp(){
+    child(ExampleComponent::class) {}
+}
