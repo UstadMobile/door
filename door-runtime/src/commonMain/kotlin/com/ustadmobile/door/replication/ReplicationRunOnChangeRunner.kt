@@ -16,4 +16,6 @@ interface ReplicationRunOnChangeRunner {
      */
     suspend fun runReplicationRunOnChange(tableNames: Set<String>): Set<String>
 
+    suspend fun runOnNewNode(newNodeId: Long): Set<String>
+
 }

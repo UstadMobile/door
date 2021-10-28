@@ -158,7 +158,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         }
 
 
-        runBlocking { localRepDb.repDao.updateReplicationTrackers() }
+        runBlocking { localRepDb.repDao.updateReplicationTrackers(0) }
 
         runBlocking {
             (localDbRepo as DoorDatabaseRepository).sendPendingReplications(jsonSerializer, RepEntity.TABLE_ID,
@@ -180,7 +180,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
             rePrimaryKey = remoteRepDb.repDao.insert(this)
         }
 
-        runBlocking { remoteRepDb.repDao.updateReplicationTrackers() }
+        runBlocking { remoteRepDb.repDao.updateReplicationTrackers(0) }
 
         runBlocking {
             (localDbRepo as DoorDatabaseRepository).fetchPendingReplications(jsonSerializer, RepEntity.TABLE_ID,
@@ -204,7 +204,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
             }
         })
 
-        runBlocking { remoteRepDb.repDao.updateReplicationTrackers() }
+        runBlocking { remoteRepDb.repDao.updateReplicationTrackers(0) }
 
         runBlocking {
             (localDbRepo as DoorDatabaseRepository).fetchPendingReplications(jsonSerializer, RepEntity.TABLE_ID,
@@ -230,7 +230,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
             }
         })
 
-        runBlocking { localRepDb.repDao.updateReplicationTrackers() }
+        runBlocking { localRepDb.repDao.updateReplicationTrackers(0) }
 
         runBlocking {
             (localDbRepo as DoorDatabaseRepository).sendPendingReplications(jsonSerializer, RepEntity.TABLE_ID,

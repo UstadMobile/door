@@ -44,7 +44,7 @@ class TestDoorDatabaseReplicationExt {
         })
 
         //Make it generate the replication tracker for the given DoorNode
-        runBlocking { db.repDao.updateReplicationTrackers() }
+        runBlocking { db.repDao.updateReplicationTrackers(0) }
 
         val pendingTrackers = runBlocking {
             db.findPendingReplicationTrackers(RepDb::class.doorDatabaseMetadata(),
@@ -79,7 +79,7 @@ class TestDoorDatabaseReplicationExt {
         }
 
         runBlocking {
-            db.repDao.updateReplicationTrackers()
+            db.repDao.updateReplicationTrackers(0)
         }
 
         val pendingReplicationJson = JsonArray(listOf(
@@ -125,7 +125,7 @@ class TestDoorDatabaseReplicationExt {
         }
 
         runBlocking {
-            db.repDao.updateReplicationTrackers()
+            db.repDao.updateReplicationTrackers(0)
         }
 
         fun getPendingTrackerCount() = db.prepareAndUseStatement(
@@ -183,7 +183,7 @@ class TestDoorDatabaseReplicationExt {
         })
 
         runBlocking {
-            db.repDao.updateReplicationTrackers()
+            db.repDao.updateReplicationTrackers(0)
         }
 
         val pendingReplicationJsonArray = runBlocking {

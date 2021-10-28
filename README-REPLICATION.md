@@ -122,8 +122,19 @@ type on both the entity itself and the replication tracker entity.
 @Dao
 class EntityDao { 
     /* Indicate that this function should be run when any of the given Entity tables are changed.  */
-    @ReplicationRunOnChange(value = [Entity::class], 
-        notify = Entity::class /*by default, otherwise specify another entity*/)
+    @ReplicationRunOnChange([Entity::class])
+    /* By default, a check will be made to see if there are pending replications for remote 
+     * devices for the same entity (e.g. Entity::class). To check for other entities, they 
+     * should be given in the ReplicationCheckPendingNotificationsFor annotation
+     */
+    @ReplicationCheckPendingNotificationsFor([Entity::class])for changes
+    /*
+     * This annotation can be used to indicate this function should run when a new node
+     * is added (e.g. a new client connects to the server). The function must then accept
+     * a parameter annotated as @NewNodeIdParam. This parameter will be 0 if the same 
+     * function is run for any reason other than a new node connecting.
+     */
+    @ReplicationRunOnNewNode
     @Query("""
 REPLACE INTO Entity_ReplicationTracker(tkrEntityPrimaryKey, trkrEntityPrimaryKey, trkrDestinationNode,
              trkrVersionId, trkrProcessed)
@@ -138,7 +149,7 @@ SELECT Entity.entityPrimaryKey AS trkrEntityPrimaryKey,
  /*Postgres- ON CONFLICT(...) DO UPDATE  -*/:
  ")
     @PgQuery(
-    fun updateEntityReplicationTrackers()
+    fun updateEntityReplicationTrackers(@NewNodeIdParam newNodeId: Long)
 }
 
 ```

@@ -1130,6 +1130,8 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         //find all DAOs on the database that contain a ReplicationRunOnChange annotation
         val daosWithRunOnChange = dbTypeElement.dbEnclosedDaos(processingEnv)
             .filter { it.enclosedElementsWithAnnotation(ReplicationRunOnChange::class.java).isNotEmpty() }
+        val daosWithRunOnNewNode = dbTypeElement.dbEnclosedDaos(processingEnv)
+            .filter { it.enclosedElementsWithAnnotation(ReplicationRunOnNewNode::class.java).isNotEmpty() }
 
         val replicatedEntitiesWithOnChangeFunctions = daosWithRunOnChange
             .flatMap {
@@ -1168,11 +1170,16 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                                         .filter { it.hasAnyAnnotation { it.getClassValue("value", processingEnv) == repEntity} }
                                     val daoAccessorCodeBlock = dbTypeElement.findDaoGetter(dao, processingEnv)
                                     daoFunsToRun.mapNotNull { it as? ExecutableElement}.forEach { funToRun ->
-                                        add("%L.${funToRun.simpleName}()\n", daoAccessorCodeBlock)
+                                        add("%L.${funToRun.simpleName}(", daoAccessorCodeBlock)
+                                        if(funToRun.parameters.first().hasAnnotation(NewNodeIdParam::class.java)) {
+                                            add("0L")
+                                        }
+
+                                        add(")\n")
                                         val checkingPendingRepTableNames = funToRun.annotationMirrors
-                                            .filter { it.annotationType.asElement() == ReplicationRunOnChange::class.asTypeElement(processingEnv) }
-                                            .map { it.getClassArrayValue("checkPendingReplicationsFor", processingEnv) }
-                                            .flatten().map { it.simpleName.toString() }
+                                            .firstOrNull() { it.annotationType.asElement() == ReplicationCheckPendingNotificationsFor::class.asTypeElement(processingEnv) }
+                                            ?.getClassArrayValue("value", processingEnv)
+                                            ?.map { it.simpleName.toString() }  ?: listOf(repEntity.simpleName.toString())
                                         repTablesToCheck.addAll(checkingPendingRepTableNames)
                                     }
                                 }
@@ -1207,6 +1214,33 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                         add("Unit\n")
                         endControlFlow()
                         add("return _checkPendingNotifications\n")
+                    }
+                    .build())
+                .build())
+            .addFunction(FunSpec.builder("runOnNewNode")
+                .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
+                .addParameter("newNodeId", LONG)
+                .returns(Set::class.parameterizedBy(String::class))
+                .addCode(CodeBlock.builder()
+                    .apply {
+                        val entitiesChanged = mutableSetOf<String>()
+                        beginControlFlow("_db.%M(%T::class)",
+                            MemberName("com.ustadmobile.door.ext", "withDoorTransactionAsync"),
+                            dbTypeElement)
+                        add("_transactionDb -> \n")
+                        daosWithRunOnNewNode.forEach { dao ->
+                            val daoAccessorCodeBlock = dbTypeElement.findDaoGetter(dao, processingEnv)
+                            dao.enclosedElementsWithAnnotation(ReplicationRunOnNewNode::class.java, ElementKind.METHOD).forEach { daoFun ->
+                                add("_transactionDb.%L.${daoFun.simpleName}(newNodeId)\n", daoAccessorCodeBlock)
+                                val funEntitiesChanged = daoFun.annotationMirrors
+                                    .firstOrNull() { it.annotationType.asElement() == ReplicationCheckPendingNotificationsFor::class.asTypeElement(processingEnv) }
+                                    ?.getClassArrayValue("value", processingEnv)  ?: listOf()
+
+                                entitiesChanged += funEntitiesChanged.map { it.entityTableName }
+                            }
+                        }
+                        endControlFlow()
+                        add("return setOf(${entitiesChanged.joinToString(separator = "\",\"", prefix = "\"", postfix = "\"")})\n")
                     }
                     .build())
                 .build())

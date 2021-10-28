@@ -5,8 +5,7 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
 import com.ustadmobile.door.DoorLiveData
-import com.ustadmobile.door.annotation.ReplicationRunOnChange
-import com.ustadmobile.door.annotation.Repository
+import com.ustadmobile.door.annotation.*
 import com.ustadmobile.door.entities.DoorNode
 
 @Dao
@@ -26,9 +25,9 @@ abstract class RepDao {
                DoorNode.nodeId AS trkrDestination
           FROM ChangeLog
                JOIN RepEntity 
-                    ON ChangeLog.chTableId = 500 AND ChangeLog.chEntityPk = RepEntity.rePrimaryKey
+                    ON (:newNodeId != 0) OR (ChangeLog.chTableId = 500 AND ChangeLog.chEntityPk = RepEntity.rePrimaryKey)
                JOIN DoorNode 
-                    ON DoorNode.nodeId != 0
+                    ON :newNodeId = 0 OR DoorNode.nodeId = :newNodeId
          WHERE RepEntity.reLastChangeTime != COALESCE(
                 (SELECT trkrVersionId
                   FROM RepEntityTracker
@@ -39,8 +38,10 @@ abstract class RepDao {
         */
     """)
     //Note UPDATE does not need a WHERE check - this was already checked in the insert using the where clause there
-    @ReplicationRunOnChange(value = [RepEntity::class], checkPendingReplicationsFor = [RepEntity::class])
-    abstract suspend fun updateReplicationTrackers()
+    @ReplicationRunOnChange(value = [RepEntity::class])
+    @ReplicationRunOnNewNode
+    @ReplicationCheckPendingNotificationsFor([RepEntity::class])
+    abstract suspend fun updateReplicationTrackers(@NewNodeIdParam newNodeId: Long)
 
     @Insert
     abstract suspend fun insertAsync(repEntity: RepEntity): Long
