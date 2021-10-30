@@ -5,8 +5,10 @@ import com.ustadmobile.door.TablesInvalidationListener
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
 import com.ustadmobile.door.util.DoorEventCollator
+import com.ustadmobile.door.util.NodeIdAuthCache
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 /**
  * 1) ReplicationNotificationDispatcher will listen to the database for table invalidations
@@ -22,11 +24,11 @@ class ReplicationNotificationDispatcher(
      */
     private val replicationRunOnChangeRunner: ReplicationRunOnChangeRunner,
 
-    coroutineScope: CoroutineScope,
+    private val coroutineScope: CoroutineScope,
 
     private val dbMetaData: DoorDatabaseMetadata<*> = db::class.doorDatabaseMetadata()
 
-) : TablesInvalidationListener {
+) : TablesInvalidationListener, NodeIdAuthCache.OnNewDoorNode {
 
     private data class ReplicationPendingRequest(val nodeId: Long, val listener: ReplicationPendingListener)
 
@@ -51,6 +53,20 @@ class ReplicationNotificationDispatcher(
 
     override fun onTablesInvalidated(tableNames: List<String>) {
         eventCollator.receiveEvent(tableNames)
+    }
+
+    override fun onNewDoorNode(newNodeId: Long, auth: String) {
+        coroutineScope.launch {
+            replicationRunOnChangeRunner.runOnNewNode(newNodeId)
+        }
+    }
+
+    /**
+     * Connect with the given nodeIdAndAuthCache to receive
+     */
+    fun setupWithNodeIdAndAuthCache(nodeIdAuthCache: NodeIdAuthCache): ReplicationNotificationDispatcher {
+        nodeIdAuthCache.addNewNodeListener(this)
+        return this
     }
 
     private suspend fun onDispatch(event: List<List<String>>) {

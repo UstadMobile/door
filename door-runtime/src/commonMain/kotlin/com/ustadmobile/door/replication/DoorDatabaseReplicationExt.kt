@@ -1,6 +1,7 @@
 package com.ustadmobile.door.replication
 
 import com.ustadmobile.door.DoorDatabase
+import com.ustadmobile.door.entities.DoorNode
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
 import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
@@ -154,4 +155,26 @@ suspend fun DoorDatabase.insertReplicationsIntoReceiveView(
         }
     }
 
+}
+
+internal suspend fun DoorDatabase.getDoorNodeAuth(nodeId : Long): String? {
+    return prepareAndUseStatementAsync("""SELECT auth
+          FROM DoorNode
+         WHERE nodeId = :nodeId""") { stmt ->
+
+        stmt.setLong(1, nodeId)
+
+        stmt.executeQueryAsyncKmp().useResults { results ->
+            results.mapRows { it.getString(1) }.firstOrNull()
+        }
+    }
+}
+
+internal suspend fun DoorDatabase.insertNewDoorNode(node: DoorNode) {
+    prepareAndUseStatementAsync("INSERT INTO DoorNode(nodeId, auth, endpoint) VALUES(?, ?, ?)") { stmt ->
+        stmt.setLong(1, node.nodeId)
+        stmt.setString(2, node.auth)
+        stmt.setString(3, node.endpoint)
+        stmt.executeUpdateAsyncKmp()
+    }
 }

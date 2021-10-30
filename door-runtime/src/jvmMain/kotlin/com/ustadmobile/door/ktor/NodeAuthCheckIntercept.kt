@@ -25,7 +25,7 @@ fun Route.addNodeIdAndAuthCheckInterceptor(){
             val nodeIdAuthCache: NodeIdAuthCache = di.direct.on(call).instance()
             val remoteNodeIdAndAuth = requireRemoteNodeIdAndAuth()
 
-            if(!nodeIdAuthCache.verify(remoteNodeIdAndAuth.first.toInt(), remoteNodeIdAndAuth.second)) {
+            if(!nodeIdAuthCache.verify(remoteNodeIdAndAuth.first, remoteNodeIdAndAuth.second)) {
                 context.request.call.respond(
                     HttpStatusCode.Unauthorized, "Invalid nodeId / nodeauth combo")
                 return@intercept finish()

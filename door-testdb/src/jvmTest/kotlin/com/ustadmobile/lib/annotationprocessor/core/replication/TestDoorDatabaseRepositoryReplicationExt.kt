@@ -149,7 +149,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
     fun givenEntityCreatedLocally_whenSendPendingReplicationsCalled_thenShouldBePresenterOnRemote() {
         localRepDb.repDao.insertDoorNode(DoorNode().apply {
             auth = "secret"
-            nodeId = REMOTE_NODE_ID.toInt()
+            nodeId = REMOTE_NODE_ID
         })
 
         val repEntity = RepEntity().apply {
@@ -172,7 +172,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
     fun givenEntityCreatedRemotely_whenFetchPendingReplicationsCalled_thenShouldBePresentOnLocal() {
         remoteRepDb.repDao.insertDoorNode(DoorNode().apply {
             auth = "secret"
-            nodeId = LOCAL_NODE_ID.toInt()
+            nodeId = LOCAL_NODE_ID
         })
 
         val repEntity = RepEntity().apply {
@@ -194,7 +194,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
     fun givenMoreEntitiesThanInBatchCreatedRemotely_whenFetchPendingReplicationsCalled_thenShouldAllBePresentOnLocal() {
         remoteRepDb.repDao.insertDoorNode(DoorNode().apply {
             auth = "secret"
-            nodeId = LOCAL_NODE_ID.toInt()
+            nodeId = LOCAL_NODE_ID
         })
 
         remoteRepDb.repDao.insertList((0..1500).map {
@@ -220,7 +220,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
     fun givenMoreEntitiesThanInBatchCreatedLocally_whenSendPendingReplicationsCalled_thenAllShouldBePresentOnRemote() {
         localRepDb.repDao.insertDoorNode(DoorNode().apply {
             auth = "secret"
-            nodeId = REMOTE_NODE_ID.toInt()
+            nodeId = REMOTE_NODE_ID
         })
 
         localRepDb.repDao.insertList((0..1500).map {
@@ -245,12 +245,12 @@ class TestDoorDatabaseRepositoryReplicationExt  {
     private fun setupLocalAndRemoteReplicationManager() {
         localRepDb.repDao.insertDoorNode(DoorNode().apply {
             auth = "secret"
-            nodeId = REMOTE_NODE_ID.toInt()
+            nodeId = REMOTE_NODE_ID
         })
 
         remoteRepDb.repDao.insertDoorNode(DoorNode().apply {
             auth = "secret"
-            nodeId = LOCAL_NODE_ID.toInt()
+            nodeId = LOCAL_NODE_ID
         })
 
         remoteRepDb.addChangeListener(ChangeListenerRequest(listOf(), remoteNotificationDispatcher))

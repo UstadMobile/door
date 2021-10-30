@@ -7,7 +7,7 @@ import androidx.room.PrimaryKey
 class DoorNode {
 
     @PrimaryKey(autoGenerate = true)
-    var nodeId: Int = 0
+    var nodeId: Long = 0
 
     var auth: String? = null
 
