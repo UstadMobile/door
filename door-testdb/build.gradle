@@ -51,8 +51,6 @@ kotlin {
 
     sourceSets {
         commonMain {
-            kotlin.srcDir("../door-runtime/src/commonMain/resources/daos")
-
             dependencies {
                 implementation kotlin('stdlib-common')
                 implementation project(":door-runtime")

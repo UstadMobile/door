@@ -5,6 +5,8 @@ import androidx.room.Room
 import kotlin.reflect.KClass
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.ustadmobile.door.ext.isWrappable
+import com.ustadmobile.door.ext.wrap
 import com.ustadmobile.door.migration.DoorMigration
 
 @Suppress("UNCHECKED_CAST", "unused") //This is used as an API

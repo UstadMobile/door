@@ -5,7 +5,6 @@ import com.ustadmobile.door.jdbc.PreparedStatement
 import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
-import kotlin.reflect.KClass
 
 /**
  * If this DoorDatabase represents a repository, then run the given block on the repository first
@@ -90,27 +89,14 @@ fun <T: DoorDatabase> T.requireDbAndRepo(): Pair<T, T> {
  * After clearing all the table data, the sync tables (e.g. TableSyncStatus,
  * The nodeId on SyncNode, etc) need to be setup again.
  */
-fun <T:DoorDatabase> T.clearAllTablesAndResetSync(nodeId: Long, isPrimary: Boolean = false) : T {
+fun <T:DoorDatabase> T.clearAllTablesAndResetNodeId(nodeId: Long) : T {
     clearAllTables()
-    val metadata = this::class.doorDatabaseMetadata()
-    DoorSyncableDatabaseCallback2(nodeId, metadata.syncableTableIdMap, isPrimary)
-        .initSyncTables(dbType(), forceReset = true)  {
+    SyncNodeIdCallback(nodeId)
+        .initSyncTables(forceReset = true)  {
             this.execSqlBatch(*it)
         }
     return this
 }
-
-/**
- * Shorthand to get the Syncable Table Id map using the DoorDatabaseMetadata
- */
-val DoorDatabase.syncableTableIdMap: Map<String, Int>
-    get() = this::class.doorDatabaseMetadata().syncableTableIdMap
-
-/**
- * Shorthand to get the Syncable Table Id map using the DoorDatabaseMetadata
- */
-val <T: DoorDatabase> KClass<T>.syncableTableIdMap: Map<String, Int>
-    get() = doorDatabaseMetadata().syncableTableIdMap
 
 /**
  * Suspended wrapper that will prepare a Statement, execute a code block, and return the code block result

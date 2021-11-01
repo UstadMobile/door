@@ -3,7 +3,7 @@ package com.ustadmobile.lib.annotationprocessor.core.transaction
 import com.ustadmobile.door.DatabaseBuilder
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.RepositoryConfig
-import com.ustadmobile.door.asRepository
+import com.ustadmobile.door.ext.asRepository
 import com.ustadmobile.door.ext.doorDatabaseMetadata
 import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
 import com.ustadmobile.door.replication.ReplicationPendingEvent

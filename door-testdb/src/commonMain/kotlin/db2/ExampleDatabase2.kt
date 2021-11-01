@@ -3,28 +3,26 @@ package db2
 import androidx.room.Database
 import com.ustadmobile.door.*
 import com.ustadmobile.door.annotation.DoorNodeIdAuthRequired
-import com.ustadmobile.door.annotation.MinSyncVersion
+import com.ustadmobile.door.annotation.MinReplicationVersion
 import com.ustadmobile.door.entities.*
 import db2.ExampleDatabase2.Companion.DB_VERSION
 
 @Database(version = DB_VERSION, entities = [ExampleEntity2::class, ExampleLinkEntity::class,
-    ExampleEntityPkInt::class, DoorDatabaseSyncInfo::class,
+    ExampleEntityPkInt::class,
     SyncNode::class,
-    SyncResult::class,
     ExampleSyncableEntity::class,
     OtherSyncableEntity::class,
     ExampleAttachmentEntity::class,
     ChangeLog::class,
     AccessGrant::class,
     UpdateNotification::class,
-    TableSyncStatus::class,
     SqliteChangeSeqNums::class,
     ZombieAttachmentData::class,
     DoorNode::class,
     //#DOORDB_TRACKER_ENTITIES
 
 ])
-@MinSyncVersion(1)
+@MinReplicationVersion(1)
 @DoorNodeIdAuthRequired
 abstract class ExampleDatabase2 : DoorDatabase() {
 

@@ -541,7 +541,7 @@ fun FileSpec.Builder.addDbKtorRouteFunction(
                             MemberName("io.ktor.routing", "route"),
                             dbClassName.simpleName)
                     .apply {
-                        dbTypeEl.getAnnotation(MinSyncVersion::class.java)?.also {
+                        dbTypeEl.getAnnotation(MinReplicationVersion::class.java)?.also {
                             add("%M(${it.value})\n",
                                     MemberName("com.ustadmobile.door.ktor",
                                             "addDbVersionCheckIntercept"))

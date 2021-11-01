@@ -4,6 +4,7 @@ import com.ustadmobile.door.*
 import com.ustadmobile.door.entities.DoorNode
 import com.ustadmobile.door.entities.NodeIdAndAuth
 import com.ustadmobile.door.ext.DoorTag
+import com.ustadmobile.door.ext.asRepository
 import com.ustadmobile.door.ext.doorDatabaseMetadata
 import com.ustadmobile.door.ext.waitUntilWithTimeout
 import com.ustadmobile.door.replication.*
