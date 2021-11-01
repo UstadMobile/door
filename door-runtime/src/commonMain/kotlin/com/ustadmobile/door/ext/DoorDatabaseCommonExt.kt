@@ -8,13 +8,6 @@ import kotlinx.coroutines.withTimeout
 import kotlin.reflect.KClass
 
 /**
- * Extension property that will be true if this database is both syncable and the primary (eg. server)
- * instance, false otherwise
- */
-val DoorDatabase.syncableAndPrimary: Boolean
-        get() = (this as? SyncableDoorDatabase)?.master ?: false
-
-/**
  * If this DoorDatabase represents a repository, then run the given block on the repository first
  * with a timeout. If the operation times out (e.g. due to network issues), then the operation will
  * be retried on the database. This can be useful to lookup values from the repo if possible with a

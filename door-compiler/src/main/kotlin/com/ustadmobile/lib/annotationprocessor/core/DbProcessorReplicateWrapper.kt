@@ -205,7 +205,7 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
                         addFunction(FunSpec.builder("wrapForNewTransaction")
                             .addOverrideWrapNewTransactionFun()
                             .addCode("return transactionDb.%M(dbKClass) as T\n",
-                                MemberName("com.ustadmobile.door", "wrap"))
+                                MemberName("com.ustadmobile.door.ext", "wrap"))
                             .build())
                         addProperty(PropertySpec.builder("dbName", String::class, KModifier.OVERRIDE)
                             .getter(FunSpec.getterBuilder()
@@ -238,24 +238,6 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
                                     "Runnable"))
                             .addCode("_db.runInTransaction(body)\n")
                             .build())
-                    .applyIf(dbTypeEl.isDbSyncable(processingEnv)) {
-                        addProperty(PropertySpec.builder("master", Boolean::class)
-                                .addModifiers(KModifier.OVERRIDE)
-                                .getter(FunSpec.getterBuilder()
-                                        .addCode("return _db.master\n")
-                                        .build())
-                                .build())
-                    }
-                    .applyIf(overrideSyncDao && dbTypeEl.isDbSyncable(processingEnv)) {
-                        addFunction(FunSpec.builder("_syncDao")
-                                .addModifiers(KModifier.OVERRIDE)
-                                .addCode("return _db._syncDao()\n")
-                                .build())
-                        addFunction(FunSpec.builder("_syncHelperEntitiesDao")
-                                .addModifiers(KModifier.OVERRIDE)
-                                .addCode("return _db._syncHelperEntitiesDao()\n")
-                                .build())
-                    }
                     .applyIf(addRoomOverrides) {
                         addRoomDatabaseCreateOpenHelperFunction()
                         addRoomCreateInvalidationTrackerFunction()

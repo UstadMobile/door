@@ -9,7 +9,6 @@ import javax.lang.model.type.ExecutableType
 import androidx.room.*
 import com.squareup.kotlinpoet.metadata.ImmutableKmProperty
 import com.squareup.kotlinpoet.metadata.toImmutableKmClass
-import com.ustadmobile.door.SyncableDoorDatabase
 import com.ustadmobile.door.annotation.*
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.SUFFIX_DEFAULT_RECEIVEVIEW
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SUFFIX_KTOR_HELPER
@@ -157,13 +156,6 @@ fun TypeElement.allDbEntities(processingEnv: ProcessingEnvironment): List<TypeEl
 }
 
 /**
- * Where this TypeElement represents a database class, get a list of all the entities
- * that are syncable (e.g. annotated with @SyncableEntity).
- */
-fun TypeElement.allSyncableDbEntities(processingEnv: ProcessingEnvironment) =
-        allDbEntities(processingEnv).filter { it.hasAnnotation(SyncableEntity::class.java) }
-
-/**
  * Where this TypeElement represents a database class, get a list of all entities that have
  * an attachment.
  */
@@ -176,11 +168,6 @@ fun TypeElement.allEntitiesWithAttachments(processingEnv: ProcessingEnvironment)
 fun TypeElement.asClassNameWithSuffix(suffix: String) =
         ClassName(packageName, "$simpleName$suffix")
 
-
-fun TypeElement.isDbSyncable(processingEnv: ProcessingEnvironment): Boolean {
-    return processingEnv.typeUtils.isAssignable(asType(),
-            processingEnv.elementUtils.getTypeElement(SyncableDoorDatabase::class.java.canonicalName).asType())
-}
 
 /**
  * Indicates whether or not this database should have a read only wrapper generated. The ReadOnlyWrapper should be
@@ -255,34 +242,12 @@ val TypeElement.isDaoThatRequiresKtorHelper: Boolean
     get() = isDaoWithRepository
 
 
-fun TypeElement.daoSyncableEntitiesInSelectResults(processingEnv: ProcessingEnvironment) : List<ClassName> {
-    return asTypeSpecStub(processingEnv).daoSyncableEntitiesInSelectResults(processingEnv)
-}
-
-fun TypeElement.isDaoThatRequiresSyncHelper(processingEnv: ProcessingEnvironment): Boolean {
-    return daoSyncableEntitiesInSelectResults(processingEnv).isNotEmpty()
-}
-
 fun TypeElement.dbEnclosedDaos(processingEnv: ProcessingEnvironment) : List<TypeElement> {
     return enclosedElements
             .filter { it.kind == ElementKind.METHOD && Modifier.ABSTRACT in it.modifiers}
             .mapNotNull { (it as ExecutableElement).returnType.asTypeElement(processingEnv) }
             .filter { it.hasAnnotation(Dao::class.java) }
 }
-
-/**
- * The SyncableEntity find all for a specific client may (or may not) have a clientId as a
- * parameter in the query itself.
- */
-val TypeElement.syncableEntityFindAllHasClientIdParam: Boolean
-    get() = getAnnotation(SyncableEntity::class.java).syncFindAllQuery.contains(":clientId")
-
-
-val TypeElement.syncableEntityFindAllHasMaxResultsParam: Boolean
-    get() = getAnnotation(SyncableEntity::class.java).syncFindAllQuery.let {
-        it.contains(":maxResults") || it == "" //A blank query would automatically have maxResults added
-    }
-
 
 /**
  * Shorthand to check if this is an entity that has attachments

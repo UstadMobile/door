@@ -43,8 +43,7 @@ fun TypeSpec.Builder.addAccessorOverride(executableElement: ExecutableElement, c
  * Implement the DoorDatabaseRepository methods for add/remove mirror etc. by delegating to a
  * RepositoryHelper.
  */
-internal fun TypeSpec.Builder.addRepositoryHelperDelegateCalls(delegatePropName: String,
-    clientSyncMgrVarName: String? = null): TypeSpec.Builder {
+internal fun TypeSpec.Builder.addRepositoryHelperDelegateCalls(delegatePropName: String): TypeSpec.Builder {
     addProperty(PropertySpec.builder("connectivityStatus", INT)
             .addModifiers(KModifier.OVERRIDE)
             .mutable(true)
@@ -54,8 +53,6 @@ internal fun TypeSpec.Builder.addRepositoryHelperDelegateCalls(delegatePropName:
             .setter(FunSpec.setterBuilder()
                     .addParameter("newValue", INT)
                     .addCode("$delegatePropName.connectivityStatus = newValue\n")
-                    .apply { takeIf { clientSyncMgrVarName != null }
-                            ?.addCode("$clientSyncMgrVarName?.connectivityStatus = newValue\n") }
                     .build())
             .build())
     addFunction(FunSpec.builder("addMirror")
@@ -273,40 +270,10 @@ fun TypeSpec.toCreateTableSql(
 }
 
 /**
- * Where the given TypeSpec represents a DAO, get a list of all the syncable entities that are
- * part of this DAO
- */
-fun TypeSpec.daoSyncableEntitiesInSelectResults(processingEnv: ProcessingEnvironment) : List<ClassName> {
-    val syncableEntities = mutableSetOf<ClassName>()
-    funSpecs.filter { it.hasAnnotation(Query::class.java) }.forEach { funSpec ->
-        val returnType = funSpec.returnType?.unwrapQueryResultComponentType()
-        if (!funSpec.daoQuerySql().isSQLAModifyingQuery() && returnType is ClassName) {
-            syncableEntities += returnType.entitySyncableTypes(processingEnv)
-        }
-    }
-
-    return syncableEntities.toList()
-}
-
-/**
- * Returns whether or not this DAO has Syncable Entities in select results. If there are syncable
- * entities in the return type, then a SyncHelper is required.
- */
-fun TypeSpec.isDaoWithSyncableEntitiesInSelectResults(processingEnv: ProcessingEnvironment): Boolean =
-        daoSyncableEntitiesInSelectResults(processingEnv).isNotEmpty()
-
-/**
  * Provide a list of all functions that require implementation (e.g. DAO functions etc)
  */
 fun TypeSpec.functionsToImplement() = funSpecs.filter { KModifier.ABSTRACT in it.modifiers }
 
-
-/**
- * Convenience wrapper to get a list of all FunSpecs that represent a function annotated with
- * Query that have SyncableEntity in their results
- */
-fun TypeSpec.funSpecsWithSyncableSelectResults(processingEnv: ProcessingEnvironment): List<FunSpec>
-        = funSpecs.filter { it.isQueryWithSyncableResults(processingEnv) }
 
 //Add a property that will provide the required datasource abstract val by delegating to the 'real' database
 fun TypeSpec.Builder.addDataSourceProperty(dbVarName: String): TypeSpec.Builder {

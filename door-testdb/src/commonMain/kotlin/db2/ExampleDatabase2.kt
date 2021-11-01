@@ -26,7 +26,7 @@ import db2.ExampleDatabase2.Companion.DB_VERSION
 ])
 @MinSyncVersion(1)
 @DoorNodeIdAuthRequired
-abstract class ExampleDatabase2 : DoorDatabase(), SyncableDoorDatabase {
+abstract class ExampleDatabase2 : DoorDatabase() {
 
     abstract fun exampleSyncableDao(): ExampleSyncableDao
 

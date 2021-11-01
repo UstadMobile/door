@@ -5,7 +5,6 @@ import androidx.room.PrimaryKey
 import com.ustadmobile.door.annotation.*
 
 @Entity
-@SyncableEntity(tableId = 57, receiveBatchSize = 1, sendBatchSize = 1)
 class ExampleAttachmentEntity(@PrimaryKey(autoGenerate = true) var eaUid: Long = 0,
                               @LocalChangeSeqNum var eaLcsn: Int = 0,
                               @MasterChangeSeqNum var eaMcsn: Int = 0,

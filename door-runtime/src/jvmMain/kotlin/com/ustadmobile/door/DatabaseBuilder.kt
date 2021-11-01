@@ -1,6 +1,7 @@
 package com.ustadmobile.door
 
 import com.ustadmobile.door.ext.doorDatabaseMetadata
+import com.ustadmobile.door.ext.wrap
 import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.migration.DoorMigrationAsync
 import com.ustadmobile.door.migration.DoorMigrationStatementList
@@ -36,22 +37,9 @@ actual class DatabaseBuilder<T: DoorDatabase> internal constructor(private var c
         val dataSource = iContext.lookup("java:/comp/env/jdbc/${dbName}") as DataSource
         val dbImplClass = Class.forName("${dbClass.java.canonicalName}_JdbcKt") as Class<T>
 
-        val doorDb = if(SyncableDoorDatabase::class.java.isAssignableFrom(dbImplClass)) {
-            var isMaster = false
-            try {
-                val isMasterObj = iContext.lookup("java:/comp/env/doordb/$dbName/master")
-                isMaster = if(isMasterObj != null && isMasterObj is Boolean) { isMasterObj } else { false }
-            }catch(namingException: NamingException) {
-                System.err.println("Warning: could not check if $dbName is master or not, assuming false")
-            }
-
-            dbImplClass.getConstructor(DoorDatabase::class.java, DataSource::class.java,
-                        Boolean::class.javaPrimitiveType, String::class.java)
-                    .newInstance(null, dataSource, isMaster, dbName)
-        }else {
-            dbImplClass.getConstructor(DoorDatabase::class.java, DataSource::class.java,
+        val doorDb = dbImplClass.getConstructor(DoorDatabase::class.java, DataSource::class.java,
                 String::class.java).newInstance(null, dataSource, dbName)
-        }
+
 
         if(!doorDb.tableNames.any {it.lowercase() == DoorDatabaseCommon.DBINFO_TABLENAME}) {
             doorDb.sqlDatabaseImpl.execSQLBatch(doorDb.createAllTables().toTypedArray())

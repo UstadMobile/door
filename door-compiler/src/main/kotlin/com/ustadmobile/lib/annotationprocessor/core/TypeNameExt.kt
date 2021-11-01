@@ -163,22 +163,6 @@ fun TypeName.unwrapQueryResultComponentType() = unwrapLiveDataOrDataSourceFactor
  */
 fun TypeName.isLiveData() = this is ParameterizedTypeName && rawType == DoorLiveData::class.asClassName()
 
-/**
- * Finds any syncable entities that are part of this TypeName. This works even if the TypeName
- * represents a parameterized type (e.g. List, LiveData, DataSource.Factory etc).
- */
-fun TypeName.syncableEntities(processingEnv: ProcessingEnvironment) : List<ClassName>{
-    val unwrappedType = unwrapQueryResultComponentType()
-    return (unwrappedType as? ClassName)?.findAllSyncableEntities(processingEnv)?.values?.toList() ?: listOf()
-}
-
-/**
- * Checks if the given TypeName is an entity that is either annotated with SyncableEntity
- * itself, is the descendant of any class with the syncable entity annotation, or contains
- * embedded syncable entities
- */
-fun TypeName.hasSyncableEntities(processingEnv: ProcessingEnvironment) = syncableEntities(processingEnv).isNotEmpty()
-
 fun TypeName.hasAttachments(processingEnv: ProcessingEnvironment): Boolean {
     if(this is ClassName){
         return processingEnv.elementUtils.getTypeElement(canonicalName)?.entityHasAttachments == true

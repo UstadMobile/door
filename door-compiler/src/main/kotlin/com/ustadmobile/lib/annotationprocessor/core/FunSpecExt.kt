@@ -39,14 +39,6 @@ fun <A: Annotation> FunSpec.getAnnotationSpec(annotationClass: Class<A>): Annota
 fun FunSpec.daoQuerySql() = annotations.daoQuerySql()
 
 /**
- * Determines if this FunSpec represents a DAO query function that where the return result
- * includes syncable entities
- */
-fun FunSpec.isQueryWithSyncableResults(processingEnv: ProcessingEnvironment) =
-        hasAnnotation(Query::class.java) &&
-        returnType?.hasSyncableEntities(processingEnv) == true
-
-/**
  * Shorthand to check if this FunSpec is annotated with @Query and is a query that will
  * modify the database (e.g. it runs UPDATE, DELETE, or INSERT)
  */
@@ -66,36 +58,6 @@ fun FunSpec.getDaoFunEntityModifiedByQuery(allKnownEntityTypesMap: Map<String, T
     }
 }
 
-
-/**
- * Gets a list of the syncable entities that are used in the given FunSpec where this is a DAO
- * function.
- * For functions annotated with Query, this will return any syncable entities that are in the
- * return result of a select query,
- */
-fun FunSpec.daoFunSyncableEntityTypes(processingEnv: ProcessingEnvironment,
-                                      allKnownEntityTypesMap: Map<String, TypeElement>) : List<ClassName>{
-    if(hasAnnotation(Query::class.java)) {
-        val querySql = daoQuerySql()
-        if(querySql.isSQLAModifyingQuery()) {
-            val modifiedEntity = findEntityModifiedByQuery(querySql,
-                    allKnownEntityTypesMap.keys.toList())
-            if(modifiedEntity != null) {
-                val modifiedTypeEl = allKnownEntityTypesMap[modifiedEntity]
-                        ?: throw IllegalArgumentException("${this.name} is modifying an unknown entity!")
-                return modifiedTypeEl.asClassName().syncableEntities(processingEnv)
-            }else {
-                return listOf()
-            }
-        }else {
-            return returnType?.unwrapQueryResultComponentType()?.syncableEntities(processingEnv) ?: listOf()
-        }
-    }else if(hasAnyAnnotation(Delete::class.java, Update::class.java, Insert::class.java)) {
-        return parameters[0].type.unwrapListOrArrayComponentType().syncableEntities(processingEnv)
-    }else {
-        return listOf()
-    }
-}
 
 //Shorthand to check if this function is suspended
 val FunSpec.isSuspended: Boolean
@@ -129,14 +91,6 @@ fun FunSpec.Builder.removeAbstractModifier(): FunSpec.Builder {
 fun FunSpec.Builder.removeAnnotations(): FunSpec.Builder {
     annotations.clear()
     return this
-}
-
-/**
- * Shorthand to determine if this FunSpec represents an insert function where the entity is syncable
- */
-fun FunSpec.isSyncableInsert(processingEnv: ProcessingEnvironment): Boolean {
-    return hasAnnotation(Insert::class.java) &&
-            (entityParamComponentType as? ClassName)?.entityHasSyncableEntityTypes(processingEnv) ?: false
 }
 
 /**

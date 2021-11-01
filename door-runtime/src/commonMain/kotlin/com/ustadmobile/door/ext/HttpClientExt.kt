@@ -43,26 +43,3 @@ suspend inline fun <reified T> HttpClient.postOrNull(block: HttpRequestBuilder.(
     return httpStatement.receiveOrNull<T>()
 }
 
-/**
- * Send a list of entity acknowledgements to the server
- *
- * @param endpoint the server endpoint URL to send the acknowledgement to
- * @param path the path from the endpoint base url to post to
- * @param repo the repo for which entity acknowledgements are being sent
- */
-suspend fun HttpClient.postEntityAck(ackList: List<EntityAck>, endpoint: String, path: String,
-                                     repo: DoorDatabaseRepository) {
-    post<Unit> {
-        url {
-            takeFrom(endpoint)
-            encodedPath = "$encodedPath$path"
-        }
-        doorNodeAndVersionHeaders(repo)
-
-        if(repo is DoorDatabaseSyncRepository) {
-            header("x-nid", repo.clientId)
-        }
-
-        body = defaultSerializer().write(ackList, ContentType.Application.Json.withUtf8Charset())
-    }
-}

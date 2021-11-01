@@ -19,7 +19,6 @@ import javax.lang.model.util.SimpleTypeVisitor7
 import javax.tools.Diagnostic
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.annotation.*
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorSync.Companion.TRACKER_SUFFIX
 import com.ustadmobile.door.ext.DoorDatabaseMetadata
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
 import com.ustadmobile.door.ext.minifySql
@@ -1263,11 +1262,6 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     KModifier.OVERRIDE)
                 .addParameter(ParameterSpec("dataSource",  CLASSNAME_DATASOURCE,
                     KModifier.OVERRIDE))
-                .applyIf(dbTypeElement.isDbSyncable(processingEnv)) {
-                    addParameter(ParameterSpec.builder("master", BOOLEAN)
-                        .defaultValue("false")
-                        .addModifiers(KModifier.OVERRIDE).build())
-                }
                 .addParameter("dbName", String::class, KModifier.OVERRIDE)
                 .addCode("setupFromDataSource()\n")
                 .build())
@@ -1297,10 +1291,6 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                         .addCode("return false\n")
                         .build())
                     .build())
-            }
-            .applyIf(dbTypeElement.isDbSyncable(processingEnv)) {
-                addProperty(PropertySpec.builder("master", BOOLEAN)
-                    .initializer("master").build())
             }
             .addProperty(PropertySpec.builder("realPrimaryKeyManager", DoorPrimaryKeyManager::class,
                     KModifier.OVERRIDE)
@@ -1376,33 +1366,6 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                                 .add("_stmt.executeUpdate(%S)\n", "DROP TABLE ${entityType.simpleName}_OLD")
                                 .add("END MIGRATION*/\n")
 
-                            if(entityType.hasAnnotation(SyncableEntity::class.java)) {
-                                val syncableEntityInfo = SyncableEntityInfo(entityType.asClassName(),
-                                    processingEnv)
-                                createTriggersAndViewsBlock.addSyncableEntityTriggers(entityType.asClassName(),
-                                    "_stmt.executeUpdate", dbProductType, sqlListVar = "_stmtList")
-
-                                if(dbProductType == DoorDbType.POSTGRES) {
-                                    createTriggersAndViewsBlock.add("/* START MIGRATION: \n")
-                                    createTriggersAndViewsBlock.add("_stmt.executeUpdate(%S)\n",
-                                        "DROP FUNCTION IF EXISTS inc_csn_${syncableEntityInfo.tableId}_fn")
-                                    createTriggersAndViewsBlock.add("_stmt.executeUpdate(%S)\n",
-                                        "DROP SEQUENCE IF EXISTS spk_seq_${syncableEntityInfo.tableId}")
-                                    createTriggersAndViewsBlock.add("END MIGRATION*/\n")
-                                }
-
-                                val trackerEntityClassName = generateTrackerEntity(entityType, processingEnv)
-                                createEntitiesCodeBlock.add("_stmtList += %S\n", makeCreateTableStatement(
-                                    trackerEntityClassName, dbProductType, entityType.packageName))
-
-                                createEntitiesCodeBlock.add(generateCreateIndicesCodeBlock(
-                                    arrayOf(IndexMirror(value = arrayOf(DbProcessorSync.TRACKER_DESTID_FIELDNAME,
-                                        DbProcessorSync.TRACKER_ENTITY_PK_FIELDNAME,
-                                        DbProcessorSync.TRACKER_CHANGESEQNUM_FIELDNAME)),
-                                        IndexMirror(value = arrayOf(DbProcessorSync.TRACKER_ENTITY_PK_FIELDNAME,
-                                            DbProcessorSync.TRACKER_DESTID_FIELDNAME), unique = true)),
-                                    trackerEntityClassName.name!!, "_stmtList"))
-                            }
 
                             if(entityType.hasAnnotation(ReplicateEntity::class.java)) {
                                 createTriggersAndViewsBlock
@@ -1473,10 +1436,6 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             .apply {
                 dbTypeElement.allDbEntities(processingEnv).forEach {  entityType ->
                     addCode("_stmt.executeUpdate(%S)\n", "DELETE FROM ${entityType.simpleName}")
-                    if(entityType.hasAnnotation(SyncableEntity::class.java)) {
-                        addCode("_stmt.executeUpdate(%S)\n",
-                            "DELETE FROM ${entityType.simpleName}$TRACKER_SUFFIX")
-                    }
                 }
             }
             .nextControlFlow("finally")

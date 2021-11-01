@@ -2,7 +2,6 @@ package com.ustadmobile.door.attachments
 
 import com.ustadmobile.door.DoorConstants
 import com.ustadmobile.door.DoorDatabaseRepository
-import com.ustadmobile.door.DoorDatabaseSyncRepository
 import com.ustadmobile.door.ext.dbSchemaVersion
 import com.ustadmobile.door.ext.doorNodeAndVersionHeaders
 import com.ustadmobile.door.ext.writeToFile
@@ -18,13 +17,13 @@ import java.net.HttpURLConnection
 
 
 fun DoorDatabaseRepository.requireAttachmentDirFile(): File {
-    return config.attachmentsDir?.let { File(it) }
-            ?: throw IllegalStateException("requireAttachmentDirFile called on repository with null attachment dir")
+    return File(config.attachmentsDir)
 }
 
 /**
  * Upload the given attachment uri to the endpoint.
  */
+@Suppress("BlockingMethodInNonBlockingContext")
 actual suspend fun DoorDatabaseRepository.uploadAttachment(entityWithAttachment: EntityWithAttachment) {
     val attachmentUri = entityWithAttachment.attachmentUri
             ?: throw IllegalArgumentException("uploadAttachment: Entity with attachment uri must not be null")
@@ -73,7 +72,8 @@ actual suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<E
 }
 
 actual suspend fun DoorDatabaseRepository.deleteZombieAttachments(entityWithAttachment: EntityWithAttachment) {
-    //TODO: transaction support for this
+    //TODO: transaction support for this, rework to use replicateentities instead.
+    /*
     val syncRepo = this as? DoorDatabaseSyncRepository ?: throw IllegalStateException("Database hosting attachments must be syncable")
     val zombieAttachmentDataList = syncRepo.syncHelperEntitiesDao.findZombieAttachments(
             entityWithAttachment.tableName, 0)
@@ -84,4 +84,5 @@ actual suspend fun DoorDatabaseRepository.deleteZombieAttachments(entityWithAtta
     }
 
     syncRepo.syncHelperEntitiesDao.deleteZombieAttachments(zombieAttachmentDataList)
+     */
 }

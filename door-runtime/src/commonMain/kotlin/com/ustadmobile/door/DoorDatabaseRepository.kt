@@ -49,21 +49,6 @@ interface DoorDatabaseRepository {
     val tableIdMap: Map<String, Int>
 
     /**
-     * This function will be generated on all repositories. It is intended to be used on the primary
-     * server side.  It will dispatch update notifications
-     * for values that are in the changelog for that table. It will use the notifyOnUpdate query
-     * that is on the SyncableEntity annotation of an entity to find which devices should be
-     * notified of changes. This will result in creating / updating the UpdateNotification table.
-     *
-     * It will also call the UpdateNotificationManager (if provided) so that any client which is
-     * currently subscribed for updates will be notified.
-     *
-     * This function is used by ChangeLogMonitor to tell the repository on the server side when to
-     * go and look at tables for purposes of dispatching notifications.
-     */
-    suspend fun dispatchUpdateNotifications(tableId: Int)
-
-    /**
      * Add a listener that will be called when entities are received from another device.
      */
     fun <T : Any> addSyncListener(entityClass: KClass<T>, syncListener: SyncListener<T>)

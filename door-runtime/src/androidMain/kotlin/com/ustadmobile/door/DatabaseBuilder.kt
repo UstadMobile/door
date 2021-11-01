@@ -34,7 +34,7 @@ actual class DatabaseBuilder<T: DoorDatabase>(
 
     fun build(): T {
         val db = roomBuilder.build()
-        return if(db is SyncableDoorDatabase) {
+        return if(db.isWrappable(dbClass)) {
             db.wrap(dbClass)
         }else {
             db

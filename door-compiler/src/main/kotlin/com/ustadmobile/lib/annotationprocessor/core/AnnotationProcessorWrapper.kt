@@ -39,8 +39,7 @@ import javax.tools.Diagnostic
 class AnnotationProcessorWrapper: AbstractProcessor() {
 
     val processors = listOf(DbProcessorJdbcKotlin(), DbProcessorKtorServer(),
-            DbProcessorRepository(), DbProcessorSync(), DbProcessorAndroid(),
-            DbProcessorReplicateWrapper())
+            DbProcessorRepository(), DbProcessorAndroid(), DbProcessorReplicateWrapper())
 
     lateinit var messager: MessagerWrapper
 
@@ -235,14 +234,6 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
                         allKnownEntityNames.add(typeEntitySpec.name!!)
                         allKnownEntityTypesMap[typeEntitySpec.name!!] = entity
                     }
-
-                    if(entity.getAnnotation(SyncableEntity::class.java) != null) {
-                        val trackerEntitySpec = generateTrackerEntity(entity, processingEnv)
-                        stmt.execute(trackerEntitySpec.toCreateTableSql(dbType, entity.packageName, processingEnv))
-                        if(dbType == DoorDbType.SQLITE) {
-                            allKnownEntityNames.add(trackerEntitySpec.name!!)
-                        }
-                    }
                 }
             }
         }
@@ -323,10 +314,6 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
         pgConnection?.createStatement()?.use { pgStmt ->
             dbs.flatMap { it.allDbEntities(processingEnv) }.toSet().forEach { entity ->
                 pgStmt.executeUpdate("DROP TABLE IF EXISTS ${entity.entityTableName}")
-
-                if(entity.getAnnotation(SyncableEntity::class.java) != null) {
-                    pgStmt.executeUpdate("DROP TABLE IF EXISTS ${entity.entityTableName}_trk")
-                }
             }
         }
     }

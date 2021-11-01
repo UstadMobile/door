@@ -3,6 +3,7 @@ package com.ustadmobile.door.ext
 import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.DoorSqlDatabase
+import com.ustadmobile.door.RepositoryConfig
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlin.reflect.KClass
@@ -58,4 +59,16 @@ actual fun DoorDatabase.execSqlBatch(vararg sqlStatements: String) {
 
 actual fun <T : DoorDatabase> KClass<T>.doorDatabaseMetadata(): DoorDatabaseMetadata<T> {
     TODO("Not yet implemented")
+}
+
+actual fun <T : DoorDatabase> T.wrap(dbClass: KClass<T>): T {
+    TODO("wrap: Not yet implemented")
+}
+
+actual fun <T : DoorDatabase> T.unwrap(dbClass: KClass<T>): T {
+    TODO("unwrap: Not yet implemented")
+}
+
+actual inline fun <reified T : DoorDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T {
+    TODO("asRepository: Not yet implemented")
 }

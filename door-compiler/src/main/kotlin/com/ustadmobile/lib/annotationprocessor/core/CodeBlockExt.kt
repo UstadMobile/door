@@ -57,15 +57,6 @@ fun CodeBlock.Builder.beginIfNotNullOrEmptyControlFlow(varName: String, isList: 
     return this
 }
 
-fun CodeBlock.Builder.addInsertTableSyncStatus(syncableEntityInfo: SyncableEntityInfo,
-                                               execSqlFunName: String = "_stmt.executeUpdate",
-                                               processingEnv: ProcessingEnvironment): CodeBlock.Builder {
-    add("$execSqlFunName(\"INSERT·INTO·TableSyncStatus(tsTableId,·tsLastChanged,·tsLastSynced)·" +
-            "VALUES(${syncableEntityInfo.tableId},·\${%M()},·0)\")\n",
-            MemberName("com.ustadmobile.door.util", "systemTimeInMillis"))
-    return this
-}
-
 
 /**
  * When generating code for a parameter we often want to add some statements that would run directly
@@ -161,118 +152,6 @@ fun CodeBlock.Builder.addCreateTableCode(
                     "CREATE INDEX index_${entityTypeSpec.name}_${field.name} ON ${entityTypeSpec.name} (${field.name})")
         }
     }
-
-    return this
-}
-
-/**
- * Adds code that will create the triggers (to increment change sequence numbers and, if
- * required, insert into ChangeLog) on SQLite when a row on the given syncableEntityInfo is
- * inserted.
- *
- * @param syncableEntityInfo SyncableEntityInfo for the entity annotated @SyncableEntity
- * @param execSqlFn the code to run an SQL statement e.g. "db.execSQL"
- * @return this
- */
-fun CodeBlock.Builder.addSyncableEntityInsertTriggersSqlite(
-    execSqlFn: String,
-    syncableEntityInfo: SyncableEntityInfo,
-    sqlListVar: String? = null
-): CodeBlock.Builder {
-    val localCsnFieldName = syncableEntityInfo.entityLocalCsnField.name
-    val primaryCsnFieldName = syncableEntityInfo.entityMasterCsnField.name
-    val entityName = syncableEntityInfo.syncableEntity.simpleName
-    val pkFieldName = syncableEntityInfo.entityPkField.name
-    val tableId = syncableEntityInfo.tableId
-
-    if(sqlListVar != null) {
-        add("$sqlListVar += %T.generateSyncableEntityInsertTriggersSqlite(%S, %L, %S, %S, %S)\n",
-            DoorSqlGenerator::class, entityName, tableId, pkFieldName, localCsnFieldName,
-            primaryCsnFieldName)
-    }else {
-        beginControlFlow("%T.generateSyncableEntityInsertTriggersSqlite(%S, %L, %S, %S, %S).forEach",
-            DoorSqlGenerator::class, entityName, tableId, pkFieldName, localCsnFieldName,
-            primaryCsnFieldName)
-        add("$execSqlFn(it)\n")
-        endControlFlow()
-    }
-
-
-    return this
-}
-
-fun CodeBlock.Builder.addSyncableEntityFunctionAndTriggerPostgres(sqlListVar: String, syncableEntityInfo: SyncableEntityInfo) : CodeBlock.Builder {
-    add("$sqlListVar += %T.generateSyncableEntityFunctionAndTriggerPostgres(entityName = %S, tableId = %L, pkFieldName = %S, " +
-            "localCsnFieldName = %S, primaryCsnFieldName = %S)\n",
-        DoorSqlGenerator::class, syncableEntityInfo.syncableEntity.simpleName, syncableEntityInfo.tableId,
-        syncableEntityInfo.entityPkField.name, syncableEntityInfo.entityLocalCsnField.name,
-        syncableEntityInfo.entityMasterCsnField.name)
-
-    return this
-}
-
-
-/**
- * Adds code that will create the triggers (to increment change sequence numbers and, if
- * required, insert into ChangeLog) on SQLite when a row on the given syncableEntityInfo is updated.
- *
- * @param syncableEntityInfo SyncableEntityInfo for the entity annotated @SyncableEntity
- * @param execSqlFn the code to run an SQL statement e.g. "db.execSQL"
- * @return this
- */
-fun CodeBlock.Builder.addSyncableEntityUpdateTriggersSqlite(
-    execSqlFn: String,
-    syncableEntityInfo: SyncableEntityInfo,
-    sqlListVar: String? = null
-) : CodeBlock.Builder {
-    val localCsnFieldName = syncableEntityInfo.entityLocalCsnField.name
-    val primaryCsnFieldName = syncableEntityInfo.entityMasterCsnField.name
-    val entityName = syncableEntityInfo.syncableEntity.simpleName
-    val pkFieldName = syncableEntityInfo.entityPkField.name
-    val tableId = syncableEntityInfo.tableId
-
-    if(sqlListVar != null) {
-        add("$sqlListVar += %T.generateSyncableEntityUpdateTriggersSqlite(%S, %L, %S, %S, %S)\n",
-            DoorSqlGenerator::class, entityName, tableId, pkFieldName, localCsnFieldName, primaryCsnFieldName)
-    }else{
-        beginControlFlow("%T.generateSyncableEntityUpdateTriggersSqlite(%S, %L, %S, %S, %S).forEach",
-            DoorSqlGenerator::class, entityName, tableId, pkFieldName, localCsnFieldName, primaryCsnFieldName)
-        add("$execSqlFn(it)\n")
-        endControlFlow()
-    }
-
-
-    return this
-}
-
-
-/**
- * Add to the codeblock to create a line that will execute SQL to insert a row into SqliteChangeSeqNums
- * for the given SyncableEntity
- *
- * @param execSqlFn The name of the function to call to execute SQL e.g. "db.execSQL
- * @param syncableEntityInfo the syncableentityinfo for this row
- * @param preserveCurrentMaxLocalCsn if true, then use a query to set the next local change sequence
- * number to be one higher than the current maximum found in all rows. This should be true when this
- * is used as part of a migration, false otherwise.
- */
-internal fun CodeBlock.Builder.addReplaceSqliteChangeSeqNums(execSqlFn: String,
-                                                             syncableEntityInfo: SyncableEntityInfo,
-                                                             preserveCurrentMaxLocalCsn: Boolean = false): CodeBlock.Builder {
-    var replaceSql = "REPLACE INTO SqliteChangeSeqNums(sCsnTableId, sCsnNextLocal, sCsnNextPrimary)" +
-            " VALUES(${syncableEntityInfo.tableId}, "
-
-    if(preserveCurrentMaxLocalCsn) {
-        replaceSql += "(SELECT COALESCE(" +
-                "(SELECT MAX(${syncableEntityInfo.entityLocalCsnField.name}) FROM ${syncableEntityInfo.syncableEntity.simpleName})" +
-                ", 0) + 1),"
-    }else {
-        replaceSql += "1,"
-    }
-
-    replaceSql += " 1)"
-
-    add("$execSqlFn(%S)\n", replaceSql)
 
     return this
 }

@@ -36,14 +36,8 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
     }
 
     private val constructorFun: Constructor<DoorDatabase> by lazy(LazyThreadSafetyMode.NONE) {
-        if(this is SyncableDoorDatabase) {
-            @Suppress("UNCHECKED_CAST")
-            this::class.java.getConstructor(DoorDatabase::class.java, DataSource::class.java, Boolean::class.javaPrimitiveType,
-                String::class.java) as Constructor<DoorDatabase>
-        }else {
-            @Suppress("UNCHECKED_CAST")
-            this::class.java.getConstructor(DoorDatabase::class.java, DataSource::class.java, String::class.java) as Constructor<DoorDatabase>
-        }
+        @Suppress("UNCHECKED_CAST")
+        this::class.java.getConstructor(DoorDatabase::class.java, DataSource::class.java, String::class.java) as Constructor<DoorDatabase>
     }
 
     override val tableNames: List<String> by lazy {
@@ -89,13 +83,8 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
 
     private fun createTransactionDataSourceAndDb(): Pair<DoorTransactionDataSourceWrapper, DoorDatabase> {
         val transactionDataSource = DoorTransactionDataSourceWrapper(effectiveDatabase.dataSource)
-        val transactionDb = if(this is SyncableDoorDatabase) {
-            effectiveDatabase.constructorFun.newInstance(effectiveDatabase, transactionDataSource, false,
-                "Transaction for $this")
-        }else {
-            effectiveDatabase.constructorFun.newInstance(effectiveDatabase, transactionDataSource,
+        val transactionDb = effectiveDatabase.constructorFun.newInstance(effectiveDatabase, transactionDataSource,
                 "Transaction wrapper for $this")
-        }
 
         transactionDb.transactionDepth.value = 1
 
