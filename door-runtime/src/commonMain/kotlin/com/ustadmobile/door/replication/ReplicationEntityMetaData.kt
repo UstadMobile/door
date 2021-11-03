@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonObject
 
 class ReplicationEntityMetaData(
     val tableId: Int,
+    val priority: Int,
     val entityTableName: String,
     val trackerTableName: String,
     val receiveViewName: String,

@@ -5,6 +5,7 @@ import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_SUBSCRIBE_SSE
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.PATH_REPLICATION
+import com.ustadmobile.door.annotation.ReplicateEntity
 import com.ustadmobile.door.entities.ReplicationStatus
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
@@ -96,13 +97,22 @@ class ReplicationSubscriptionManager(
             SELECT ReplicationStatus.* 
               FROM ReplicationStatus
              WHERE ((lastRemoteChangeTime > lastFetchReplicationCompleteTime)
-                OR (lastLocalChangeTime > lastSendReplicationCompleteTime))
+                    OR (lastLocalChangeTime > lastSendReplicationCompleteTime))
                AND nodeId = ? 
+               AND priority = (
+                   SELECT COALESCE((
+                           SELECT MIN(RepStatusInternal.priority)
+                             FROM ReplicationStatus RepStatusInternal
+                            WHERE ((RepStatusInternal.lastRemoteChangeTime > RepStatusInternal.lastFetchReplicationCompleteTime)
+                                    OR (RepStatusInternal.lastLocalChangeTime > RepStatusInternal.lastSendReplicationCompleteTime))
+                              AND RepStatusInternal.nodeId = ?), ${ReplicateEntity.LOWEST_PRIORITY})
+                   ) 
              LIMIT ?   
             """
         ) { stmt ->
             stmt.setLong(1, remoteNodeId.value)
-            stmt.setInt(2, numProcessors * 2)
+            stmt.setLong(2, remoteNodeId.value)
+            stmt.setInt(3, numProcessors * 2)
             stmt.executeQueryAsyncKmp().useResults { it.mapRows { resultSet ->
                 ReplicationStatus().apply {
                     repStatusId = resultSet.getInt("repStatusId")
@@ -144,8 +154,8 @@ class ReplicationSubscriptionManager(
         val remoteNodeIdVal = remoteNodeId.value
         repository.db.withDoorTransactionAsync(dbKClass) { transactionDb ->
             transactionDb.prepareAndUseStatementAsync("""
-                INSERT INTO ReplicationStatus (tableId, nodeId, lastRemoteChangeTime, lastFetchReplicationCompleteTime, lastLocalChangeTime, lastSendReplicationCompleteTime)
-                SELECT ? AS tableId, ? AS nodeId, ? AS lastRemoteChangeTime, ? AS lastFetchReplicationCompleteTime, ? AS lastLocalChangeTime, ? AS lastSendReplicationCompleteTime
+                INSERT INTO ReplicationStatus (tableId, priority, nodeId, lastRemoteChangeTime, lastFetchReplicationCompleteTime, lastLocalChangeTime, lastSendReplicationCompleteTime)
+                SELECT ? AS tableId, ? as priority, ? AS nodeId, ? AS lastRemoteChangeTime, ? AS lastFetchReplicationCompleteTime, ? AS lastLocalChangeTime, ? AS lastSendReplicationCompleteTime
                 WHERE NOT EXISTS(
                       SELECT RepStatusInternal.tableId 
                         FROM ReplicationStatus RepStatusInternal
@@ -154,13 +164,14 @@ class ReplicationSubscriptionManager(
             """) { stmt ->
                 dbMetadata.replicateEntities.values.forEach { repEntity ->
                     stmt.setInt(1, repEntity.tableId)
-                    stmt.setLong(2, remoteNodeIdVal)
-                    stmt.setLong(3, 0)
+                    stmt.setInt(2, repEntity.priority)
+                    stmt.setLong(3, remoteNodeIdVal)
                     stmt.setLong(4, 0)
                     stmt.setLong(5, 0)
                     stmt.setLong(6, 0)
-                    stmt.setInt(7, repEntity.tableId)
-                    stmt.setLong(8, remoteNodeIdVal)
+                    stmt.setLong(7, 0)
+                    stmt.setInt(8, repEntity.tableId)
+                    stmt.setLong(9, remoteNodeIdVal)
 
                     stmt.executeUpdateAsyncKmp()
                 }

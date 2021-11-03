@@ -32,7 +32,7 @@ actual suspend fun DoorDatabaseRepository.uploadAttachment(entityWithAttachment:
 
     val attachmentFile = File(requireAttachmentDirFile(),
         attachmentUri.substringAfter(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX))
-    val endpointUrl = URL(URL(config.endpoint), "$dbPath/attachments/upload")
+    val endpointUrl = URL(URL(config.endpoint), "attachments/upload")
 
     //val inputFile = Paths.get(systemUri).toFile()
     config.httpClient.post<Unit>(endpointUrl.toString()) {
@@ -56,7 +56,7 @@ actual suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<E
 
             if(!destFile.exists()) {
                 val url = URL(URL(config.endpoint),
-                        "$dbPath/attachments/download?uri=${URLEncoder.encode(attachmentUri, "UTF-8")}")
+                        "attachments/download?uri=${URLEncoder.encode(attachmentUri, "UTF-8")}")
 
                 destFile.parentFile.takeIf { !it.exists() }?.mkdirs()
 

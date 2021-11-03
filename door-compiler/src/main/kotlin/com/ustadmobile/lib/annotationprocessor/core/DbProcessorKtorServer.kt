@@ -95,7 +95,7 @@ fun FileSpec.Builder.addDaoKtorRouteFun(
                         MemberName("io.ktor.routing", "route"),
                         daoClassName.simpleName)
                     .apply {
-                        daoTypeSpec.funSpecs.forEach {daoFunSpec ->
+                        daoTypeSpec.funSpecs.specsWithHttpEndpoint().forEach {daoFunSpec ->
                             addKtorDaoMethodCode(daoFunSpec, processingEnv)
                         }
                     }
@@ -117,7 +117,7 @@ fun FileSpec.Builder.addNanoHttpdResponder(daoTypeSpec: TypeSpec, daoClassName: 
             .superclass(AbstractDoorUriResponder::class)
             .apply {
                 //generate a function for each dao function
-                daoTypeSpec.funSpecs.forEach { daoFunSpec ->
+                daoTypeSpec.funSpecs.specsWithHttpEndpoint().forEach { daoFunSpec ->
                     addNanoHttpdDaoFun(daoFunSpec, daoClassName, daoTypeSpec,
                         processingEnv)
                 }
@@ -171,7 +171,7 @@ fun TypeSpec.Builder.addNanoHttpdResponderFun(
 ) : TypeSpec.Builder {
 
     val isPostFn = methodName.lowercase() == "post"
-    val daoFunsToRespond =  daoTypeSpec.funSpecs.filter {
+    val daoFunsToRespond =  daoTypeSpec.funSpecs.specsWithHttpEndpoint().filter {
         it.httpBodyParams().isNotEmpty() == isPostFn
     }
 
@@ -537,9 +537,6 @@ fun FileSpec.Builder.addDbKtorRouteFunction(
                     .defaultValue(true.toString())
                     .build())
             .addCode(CodeBlock.builder()
-                    .beginControlFlow("%M(%S)",
-                            MemberName("io.ktor.routing", "route"),
-                            dbClassName.simpleName)
                     .apply {
                         dbTypeEl.getAnnotation(MinReplicationVersion::class.java)?.also {
                             add("%M(${it.value})\n",
@@ -563,7 +560,6 @@ fun FileSpec.Builder.addDbKtorRouteFunction(
                         add("%M(%S, _typeToken)\n", MemberName("com.ustadmobile.door.attachments",
                                 "doorAttachmentsRoute"), "attachments")
                     }
-                    .endControlFlow()
                     .build())
             .build())
     return this

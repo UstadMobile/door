@@ -4,6 +4,7 @@ import androidx.room.*
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.ustadmobile.door.*
+import com.ustadmobile.door.annotation.RepoHttpAccessible
 import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.attachments.EntityWithAttachment
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_ANDROID_OUTPUT
@@ -18,6 +19,7 @@ import javax.annotation.processing.ProcessingEnvironment
 import javax.annotation.processing.RoundEnvironment
 import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
+import javax.tools.Diagnostic
 
 /**
  * Generate the table id map of entity names (strings) to the table id as per the syncableentity
@@ -95,10 +97,6 @@ fun FileSpec.Builder.addDbRepoType(
                     .getter(FunSpec.getterBuilder()
                             .addCode("return config.httpClient\n")
                             .build())
-                    .build())
-            .addProperty(PropertySpec.builder("dbPath", String::class)
-                    .getter(FunSpec.getterBuilder().addCode("return ${DbProcessorRepository.DB_NAME_VAR}\n").build())
-                    .addModifiers(KModifier.OVERRIDE)
                     .build())
             .addProperty(PropertySpec.builder("_updateNotificationManager",
                     ServerUpdateNotificationManager::class.asClassName().copy(nullable = true))
@@ -250,7 +248,7 @@ private fun TypeSpec.Builder.addRepoDbDaoAccessor(daoGetter: ExecutableElement,
     addProperty(PropertySpec.builder("_${daoTypeEl.simpleName}",
                 daoTypeEl.asClassNameWithSuffix(SUFFIX_REPOSITORY2))
             .delegate(CodeBlock.builder().beginControlFlow("lazy")
-                    .add("%T(db, this, db.%L, _httpClient, clientId, _endpoint, ${DbProcessorRepository.DB_NAME_VAR}, " +
+                    .add("%T(db, this, db.%L, _httpClient, clientId, _endpoint, " +
                             "config.attachmentsDir) ",
                             daoTypeEl.asClassNameWithSuffix(SUFFIX_REPOSITORY2),
                             daoGetter.makeAccessorCodeBlock())
@@ -310,8 +308,6 @@ fun FileSpec.Builder.addDaoRepoType(daoTypeSpec: TypeSpec,
                     .initializer("_clientId").build())
             .addProperty(PropertySpec.builder("_endpoint", String::class)
                     .initializer("_endpoint").build())
-            .addProperty(PropertySpec.builder("_dbPath", String::class)
-                    .initializer("_dbPath").build())
             .addProperty(PropertySpec.builder("_attachmentsDir", String::class)
                     .initializer("_attachmentsDir").build())
             .superclass(daoClassName)
@@ -326,7 +322,6 @@ fun FileSpec.Builder.addDaoRepoType(daoTypeSpec: TypeSpec,
                     .addParameter("_httpClient", HttpClient::class)
                     .addParameter("_clientId", Long::class)
                     .addParameter("_endpoint", String::class)
-                    .addParameter("_dbPath", String::class)
                     .addParameter("_attachmentsDir", String::class)
                     .apply {
                         takeIf { extraConstructorParams.isNotEmpty() }?.addParameters(extraConstructorParams)
@@ -352,12 +347,14 @@ fun FileSpec.Builder.addDaoRepoType(daoTypeSpec: TypeSpec,
  * generated, false otherwise
  * @param isAlwaysSqlite true if the function will always run on SQLite, false otherwise
  */
-fun TypeSpec.Builder.addDaoRepoFun(daoFunSpec: FunSpec,
-                                   daoName: String,
-                                   processingEnv: ProcessingEnvironment,
-                                   allKnownEntityTypesMap: Map<String, TypeElement>,
-                                   pagingBoundaryCallbackEnabled: Boolean,
-                                   isAlwaysSqlite: Boolean = false) : TypeSpec.Builder {
+fun TypeSpec.Builder.addDaoRepoFun(
+    daoFunSpec: FunSpec,
+    daoName: String,
+    processingEnv: ProcessingEnvironment,
+    allKnownEntityTypesMap: Map<String, TypeElement>,
+    pagingBoundaryCallbackEnabled: Boolean,
+    isAlwaysSqlite: Boolean = false
+) : TypeSpec.Builder {
 
     var repoMethodType = daoFunSpec.getAnnotationSpec(Repository::class.java)
             ?.memberToString(memberName = "methodType")?.toInt() ?: Repository.METHOD_AUTO
@@ -391,6 +388,11 @@ fun TypeSpec.Builder.addDaoRepoFun(daoFunSpec: FunSpec,
 
                     }
                     Repository.METHOD_DELEGATE_TO_WEB -> {
+                        //check that this is http accessible, if not, emit error
+                        if(!daoFunSpec.hasAnnotation(RepoHttpAccessible::class.java))
+                            processingEnv.messager.printMessage(Diagnostic.Kind.ERROR,
+                                "$daoName#${daoFunSpec.name} uses delegate to web, but is not marked as http accessible")
+
                         addDelegateToWebCode(daoFunSpec, daoName)
                     }
 
@@ -528,7 +530,7 @@ fun CodeBlock.Builder.addDelegateToWebCode(daoFunSpec: FunSpec, daoName: String)
         beginRunBlockingControlFlow()
     }
 
-    addKtorRequestForFunction(daoFunSpec, dbPathVarName = "_dbPath", daoName = daoName,
+    addKtorRequestForFunction(daoFunSpec, daoName = daoName,
         addClientIdHeaderVar = "_clientId")
 
     if(!daoFunSpec.isSuspended) {

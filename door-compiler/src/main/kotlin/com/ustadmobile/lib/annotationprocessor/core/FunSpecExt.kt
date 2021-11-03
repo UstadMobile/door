@@ -1,13 +1,10 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
 import androidx.room.Query
-import androidx.room.Delete
-import androidx.room.Update
-import androidx.room.Insert
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.ustadmobile.door.DoorDatabase
-import javax.annotation.processing.ProcessingEnvironment
+import com.ustadmobile.door.annotation.RepoHttpAccessible
 import javax.lang.model.element.TypeElement
 import kotlin.reflect.KClass
 
@@ -105,4 +102,18 @@ fun FunSpec.Builder.addOverrideWrapNewTransactionFun() : FunSpec.Builder {
     addParameter("transactionDb", typeVariableNameT)
     returns(typeVariableNameT)
     return this
+}
+
+/**
+ * Shorthand to check if the given function spec should have an http endpoint generated (e.g. Annotated RepoHttpAccessible)
+ */
+fun FunSpec.hasHttpEndpoint(): Boolean {
+    return hasAnnotation(RepoHttpAccessible::class.java)
+}
+
+/**
+ * Shorthand to filter a list of funspecs to provide only those
+ */
+fun List<FunSpec>.specsWithHttpEndpoint(): List<FunSpec> {
+    return filter { it.hasHttpEndpoint() }
 }

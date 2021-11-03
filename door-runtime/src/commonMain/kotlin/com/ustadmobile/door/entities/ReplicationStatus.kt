@@ -12,6 +12,8 @@ class ReplicationStatus {
 
     var tableId: Int = 0
 
+    var priority: Int = 100
+
     var nodeId: Long = 0
 
     var lastRemoteChangeTime: Long = 0

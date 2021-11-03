@@ -65,6 +65,7 @@ abstract class RepDao {
     @Update
     abstract suspend fun updateAsync(repEntity: RepEntity)
 
+    @RepoHttpAccessible
     @Query("""
     SELECT COUNT(*)
       FROM RepEntity

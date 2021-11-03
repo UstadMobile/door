@@ -166,14 +166,12 @@ fun CodeBlock.Builder.addCreateTableCode(
  * the server
  * @param httpClientVarName variable name to access a KTOR httpClient
  * @param httpEndpointVarName variable name for the base API endpoint
- * @param dbPathVarName The path from the endpoint to the specific database
  * @param daoName The name of the DAO to which funSpec belongs
  */
 internal fun CodeBlock.Builder.addKtorRequestForFunction(
     funSpec: FunSpec,
     httpClientVarName: String = "_httpClient",
     httpEndpointVarName: String = "_endpoint",
-    dbPathVarName: String,
     daoName: String,
     useKotlinxListSerialization: Boolean = false,
     kotlinxSerializationJsonVarName: String = "",
@@ -205,7 +203,7 @@ internal fun CodeBlock.Builder.addKtorRequestForFunction(
             httpMemberFn, httpResultType)
     beginControlFlow("url")
     add("%M($httpEndpointVarName)\n", MemberName("io.ktor.http", "takeFrom"))
-    add("encodedPath = \"\${encodedPath}\${$dbPathVarName}/%L/%L\"\n", daoName, funSpec.name)
+    add("encodedPath = \"\${encodedPath}%L/%L\"\n", daoName, funSpec.name)
     endControlFlow()
 
     if(addNodeIdAndVersionRepoVarName != null) {

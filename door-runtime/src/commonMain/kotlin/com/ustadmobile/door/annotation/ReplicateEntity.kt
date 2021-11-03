@@ -19,5 +19,21 @@ annotation class ReplicateEntity(
     /**
      * The replication tracker entity
      */
-    val tracker: KClass<*>
-)
+    val tracker: KClass<*>,
+
+    /**
+     * Lower priority replications will not proceed if there are any higher priority replications pending. This allows
+     * one entity to depend on another (e.g. for permission management purposes etc).
+     *
+     * Lower values are higher priority.
+     */
+    val priority: Int = DEFAULT_PRIORITY
+) {
+    companion object {
+        const val HIGHEST_PRIORITY = 0
+
+        const val DEFAULT_PRIORITY = 100
+
+        const val LOWEST_PRIORITY = 50000
+    }
+}

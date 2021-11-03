@@ -12,8 +12,6 @@ interface DoorDatabaseRepository {
 
     val config: RepositoryConfig
 
-    val dbPath: String
-
     /**
      * This provides access to the underlying database for this repository. It must be wrapped with
      * The SyncableReadOnlyWrapper if this is a syncable database.

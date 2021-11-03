@@ -295,6 +295,7 @@ private fun CodeBlock.Builder.addReplicateEntityMetaDataCode(
     val trackerTypeEl = entity.getReplicationTracker(processingEnv)
     add("%T(", ReplicationEntityMetaData::class)
     add("%L, ", repEntityAnnotation.tableId)
+    add("%L, ", repEntityAnnotation.priority)
     add("%S, ", entity.entityTableName)
     add("%S, ", trackerTypeEl.entityTableName)
     add("%S, ", entity.replicationEntityReceiveViewName)
