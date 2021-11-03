@@ -2,8 +2,26 @@ group 'com.ustadmobile.door'
 version '0.0.40'
 
 ext.localProperties = new Properties()
+
+//Defaults
+ext.localProperties["door.postgresUrl"] = ""
+ext.localProperties["door.postgresUser"] = ""
+ext.localProperties["door.postgresPass"] = ""
+
 if(project.file("local.properties").exists()) {
     ext.localProperties.load(new FileInputStream(project.file("local.properties")))
+}
+
+if(System.getenv("DOOR_POSTGRES_URL") != null) {
+    ext.localProperties["door.postgresUrl"] = System.getenv("DOOR_POSTGRES_URL")
+}
+
+if(System.getenv("DOOR_POSTGRES_USER") != null) {
+    ext.localProperties["door.postgresUser"] = System.getenv("DOOR_POSTGRES_USER")
+}
+
+if(System.getenv("DOOR_POSTGRES_PASS") != null) {
+    ext.localProperties["door.postgresPass"] = System.getenv("DOOR_POSTGRES_PASS")
 }
 
 buildscript {
