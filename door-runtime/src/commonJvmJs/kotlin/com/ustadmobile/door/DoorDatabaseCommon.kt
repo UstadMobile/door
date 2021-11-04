@@ -1,13 +1,10 @@
 package com.ustadmobile.door
-import com.ustadmobile.door.ext.DoorTag
+import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.*
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Runnable
-import com.ustadmobile.door.ext.concurrentSafeListOf
-import com.ustadmobile.door.ext.doorIdentityHashCode
 import io.github.aakira.napier.Napier
-import com.ustadmobile.door.ext.sourceDatabase
 
 abstract class DoorDatabaseCommon {
 
@@ -18,6 +15,17 @@ abstract class DoorDatabaseCommon {
     abstract val jdbcDbType: Int
 
     abstract val dbName: String
+
+    private val transactionRootDatabase: DoorDatabase
+        get() {
+            @Suppress("CAST_NEVER_SUCCEEDS") //In reality it will succeed
+            var db = (this as DoorDatabase)
+            while(db is DoorDatabaseRepository || db is DoorDatabaseReplicateWrapper) {
+                db = db.sourceDatabase ?: throw IllegalStateException("sourceDatabase cannot be null on repo or wrapper")
+            }
+
+            return db
+        }
 
     /**
      * Convenience variable that will be the sourceDatabase if it is not null, or this database
@@ -78,11 +86,11 @@ abstract class DoorDatabaseCommon {
     }
 
 
-    open fun addChangeListener(changeListenerRequest: ChangeListenerRequest) = effectiveDatabase.apply {
+    open fun addChangeListener(changeListenerRequest: ChangeListenerRequest) = transactionRootDatabase.apply {
         changeListeners.add(changeListenerRequest)
     }
 
-    open fun removeChangeListener(changeListenerRequest: ChangeListenerRequest) = effectiveDatabase.apply {
+    open fun removeChangeListener(changeListenerRequest: ChangeListenerRequest) = transactionRootDatabase.apply {
         changeListeners.remove(changeListenerRequest)
     }
 

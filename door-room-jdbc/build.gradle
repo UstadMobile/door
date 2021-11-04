@@ -2,7 +2,11 @@ plugins {
     id 'com.android.library'
     id 'kotlin-android'
     id 'kotlin-kapt'
+    id 'maven-publish'
 }
+
+group rootProject.group
+version rootProject.version
 
 android {
     compileSdkVersion 30
@@ -51,4 +55,12 @@ dependencies {
     testImplementation 'junit:junit:4.+'
     androidTestImplementation 'androidx.test.ext:junit:1.1.2'
     androidTestImplementation 'junit:junit:4.13.1'
+}
+
+publishing {
+    repositories {
+        maven {
+            url rootProject.ext.localProperties["repo.dir"]
+        }
+    }
 }

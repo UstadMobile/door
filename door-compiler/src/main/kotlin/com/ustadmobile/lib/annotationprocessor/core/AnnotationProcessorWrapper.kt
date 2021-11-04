@@ -107,7 +107,7 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
 
         val postgresDbUrl: String? = processingEnv.options[OPTION_POSTGRES_TESTDB]
 
-        val pgConnection: Connection? = postgresDbUrl?.let { dbUrl ->
+        val pgConnection: Connection? = postgresDbUrl?.takeIf { it.isNotBlank() }?.let { dbUrl ->
             try {
                 Class.forName("org.postgresql.Driver")
                 DriverManager.getConnection(dbUrl, processingEnv.options[OPTION_POSTGRES_TESTUSER],

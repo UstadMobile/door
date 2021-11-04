@@ -8,9 +8,11 @@ import javax.naming.InitialContext
 /**
  * For the given JNDI context bind an SQLite Datasource there if it is not already bound
  */
-fun InitialContext.bindNewSqliteDataSourceIfNotExisting(dbName: String,
-                                                        isPrimary: Boolean = false,
-                                                        sqliteDir: File = File("build")) {
+fun InitialContext.bindNewSqliteDataSourceIfNotExisting(
+    dbName: String,
+    isPrimary: Boolean = false,
+    sqliteDir: File = File("build")
+) {
     try {
         val existingDs = lookup("java:/comp/env/jdbc/$dbName")
         return
@@ -40,29 +42,5 @@ fun InitialContext.bindNewSqliteDataSourceIfNotExisting(dbName: String,
         val sqliteFile = File(sqliteDir, "$dbName.sqlite")
         newDatasource.url = "jdbc:sqlite:${sqliteFile.absolutePath}"
         bind(dbJndiName, newDatasource)
-    }
-
-    if(isPrimary) {
-        try {
-            lookup("java:/comp/env/doordb")
-        }catch (e: Exception) {
-            createSubcontext("java:/comp/env/doordb")
-        }
-
-        try {
-            lookup("java:/comp/env/doordb/$dbName")
-        }catch (e: Exception) {
-            createSubcontext("java:/comp/env/doordb/$dbName")
-        }
-
-
-
-        val primaryJndiName = "java:/comp/env/doordb/$dbName/master"
-
-        try {
-            lookup(primaryJndiName)
-        }catch(e: Exception) {
-            bind(primaryJndiName, isPrimary)
-        }
     }
 }
