@@ -57,10 +57,35 @@ dependencies {
     androidTestImplementation 'junit:junit:4.13.1'
 }
 
-publishing {
-    repositories {
-        maven {
-            url rootProject.ext.localProperties["repo.dir"]
+
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                // Applies the component for the release build variant.
+                from components.release
+
+                // You can then customize attributes of the publication as shown below.
+                groupId = rootProject.group
+                artifactId = "door-room-jdbc"
+                version = rootProject.version
+            }
+            // Creates a Maven publication called “debug”.
+            debug(MavenPublication) {
+                // Applies the component for the debug build variant.
+                from components.debug
+
+                groupId = rootProject.group
+                artifactId = "door-room-jdbc"
+                version = rootProject.version
+            }
+        }
+
+
+        repositories {
+            maven {
+                url rootProject.ext.localProperties["repo.dir"]
+            }
         }
     }
 }

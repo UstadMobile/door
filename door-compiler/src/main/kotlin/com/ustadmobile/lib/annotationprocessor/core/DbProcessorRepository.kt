@@ -103,9 +103,7 @@ fun FileSpec.Builder.addDbRepoType(
                     .initializer("config.updateNotificationManager")
                     .build())
             .addProperty(PropertySpec.builder("_repositoryHelper", RepositoryHelper::class)
-                    .initializer("%T(%M(%S))", RepositoryHelper::class,
-                            MemberName("kotlinx.coroutines", "newSingleThreadContext"),
-                            "Repo-${dbTypeElement.simpleName}")
+                    .initializer("%T()", RepositoryHelper::class)
                     .build())
             .addProperty(PropertySpec.builder("tableIdMap",
                     Map::class.asClassName().parameterizedBy(String::class.asClassName(), INT))
@@ -595,7 +593,7 @@ class DbProcessorRepository: AbstractDbProcessor() {
                         .addDaoRepoType(daoTypeEl.asTypeSpecStub(processingEnv),
                                 daoTypeEl.asClassName(), processingEnv,
                                 allKnownEntityTypesMap = allKnownEntityTypesMap,
-                                pagingBoundaryCallbackEnabled = true,
+                                pagingBoundaryCallbackEnabled = false,
                                 isAlwaysSqlite = true)
                         .build()
                         .writeToDirsFromArg(OPTION_ANDROID_OUTPUT)

@@ -18,14 +18,6 @@ interface DoorDatabaseRepository {
      */
     val db: DoorDatabase
 
-    suspend fun addMirror(mirrorEndpoint: String, initialPriority: Int): Int
-
-    suspend fun removeMirror(mirrorId: Int)
-
-    suspend fun updateMirrorPriorities(newPriorities: Map<Int, Int>)
-
-    suspend fun activeMirrors(): List<MirrorEndpoint>
-
     /**
      * Adds a weak reference to the given connectivity listener - useful for RepositoryLoadHelper
      * so it can automatically retry requests when connectivity is restored or when a mirror

@@ -16,21 +16,18 @@ typealias LifeCycleHelperFactory = (DoorLifecycleOwner) -> RepositoryLoadHelperL
 // On LiveData - never - use a reference to the livedata itself, and check if it's null or empty
 // On a normal or suspended return type: never. THe generated code has to check the result and call again if needed
 // e.g.
-/**
- * @param autoRetryEmptyMirrorResult - if true, this assumes that an empty result from a mirror means
- * it did not have the data we were looking for. This is useful for BoundaryCallback loads, which
- * are themselves triggered by the database not having data.
- */
-class RepositoryLoadHelper<T>(val repository: DoorDatabaseRepository,
-                              val autoRetryEmptyMirrorResult: Boolean = false,
-                              val maxAttempts: Int = 3,
-                              val retryDelay: Int = 5000,
-                              val autoRetryOnEmptyLiveData: DoorLiveData<T>? = null,
-                              val lifecycleHelperFactory: LifeCycleHelperFactory =
-                                      {RepositoryLoadHelperLifecycleHelper(it)},
-                              val uri: String = "",
-                              val listMaxItemsLimit: Int = -1,
-                              val loadFn: suspend(endpoint: String) -> T) : RepositoryConnectivityListener {
+
+class RepositoryLoadHelper<T>(
+    val repository: DoorDatabaseRepository,
+    val maxAttempts: Int = 3,
+    val retryDelay: Int = 5000,
+    val autoRetryOnEmptyLiveData: DoorLiveData<T>? = null,
+    val lifecycleHelperFactory: LifeCycleHelperFactory =
+          {RepositoryLoadHelperLifecycleHelper(it)},
+    val uri: String = "",
+    val listMaxItemsLimit: Int = -1,
+    val loadFn: suspend(endpoint: String) -> T
+) : RepositoryConnectivityListener {
 
     class NoConnectionException(message: String, cause: Throwable? = null): Exception(message, cause)
 
@@ -152,7 +149,6 @@ class RepositoryLoadHelper<T>(val repository: DoorDatabaseRepository,
             Napier.d("$logPrefix doRequest: resetAttemptCount = $resetAttemptCount")
             if(resetAttemptCount) {
                 attemptCount = 0
-                triedMainEndpoint = false
             }
 
             if(runAgain) {
@@ -160,51 +156,21 @@ class RepositoryLoadHelper<T>(val repository: DoorDatabaseRepository,
                 completed.value = false
             }
 
-            var mirrorToUse: MirrorEndpoint? = null
+            val mirrorToUse: MirrorEndpoint? = null
+            val endpointToUse = repository.config.endpoint
             while(!completed.value && isActive && attemptCount <= maxAttempts) {
-                var endpointToUse: String? = null
                 try {
                     attemptCount++
-                    val isConnected = repository.connectivityStatus == DoorDatabaseRepository.STATUS_CONNECTED
-                    mirrorToUse = if(isConnected && !triedMainEndpoint) {
-                        null as MirrorEndpoint? //use the main endpoint
-                    }else {
-                        repository.activeMirrors().filter { it.mirrorId !in mirrorsTried }
-                                .maxByOrNull { it.priority }
-                    }
 
-                    if(!isConnected && mirrorToUse == null) {
-                        //it's hopeless - there is no mirror and we have no connection - give up
-                        throw NoConnectionException("$PREFIX_NOCONNECTION_NO_MIRRORS_MESSAGE $logPrefix: " +
-                                "Repository status indicates no connectivity and there are no active " +
-                                "mirrors")
-                    }
-
-                    val newStatus = if(mirrorToUse != null) {
-                        STATUS_LOADING_MIRROR
-                    }else {
-                        STATUS_LOADING_CLOUD
-                    }
+                    val newStatus = STATUS_LOADING_CLOUD
 
                     if(newStatus != status) {
                         status = newStatus
                         statusLiveData.sendValue(RepoLoadStatus(status))
                     }
 
-                    endpointToUse = if(mirrorToUse == null) {
-                        repository.config.endpoint
-                    }else {
-                        mirrorToUse.endpointUrl
-                    }
-
-                    Napier.d({"$logPrefix doRequest: calling loadFn using endpoint $endpointToUse ."})
-                    var t = loadFn(endpointToUse)
-
-                    if(mirrorToUse == null) {
-                        triedMainEndpoint = true
-                    }else {
-                        mirrorsTried.add(mirrorToUse.mirrorId)
-                    }
+                    Napier.d({"$logPrefix doRequest: calling loadFn using endpoint ${repository.config.endpoint} ."})
+                    val t = loadFn(repository.config.endpoint)
 
                     val isNullOrEmpty = if(t is List<*>) {
                         t.isEmpty()
@@ -212,52 +178,23 @@ class RepositoryLoadHelper<T>(val repository: DoorDatabaseRepository,
                         t == null
                     }
 
-                    //if it came from the main endpoint, or we got some actual data, then it looks good
-                    var isMainEndpointOrNotNullOrEmpty = mirrorToUse == null || !isNullOrEmpty
-                    if(isMainEndpointOrNotNullOrEmpty) {
-                        //completed.value = true
-                    }
-
-                    if(!isMainEndpointOrNotNullOrEmpty && autoRetryOnEmptyLiveData != null) {
-                        val liveDataVal = waitForNonEmptyLiveData()
-                        if(liveDataVal != null) {
-                            t = liveDataVal
-                            isMainEndpointOrNotNullOrEmpty = true
-                            //completed.value = true
-                        }
-                    }
-
-                    if(isMainEndpointOrNotNullOrEmpty || !autoRetryEmptyMirrorResult
-                            || repository.activeMirrors().filter { it.mirrorId !in mirrorsTried }.isEmpty()) {
-                        status = if(isNullOrEmpty) {
-                            STATUS_LOADED_NODATA
-                        }else {
-                            STATUS_LOADED_WITHDATA
-                        }
-
-                        completed.value = true
-                        loadedVal.complete(t)
-                        statusLiveData.sendValue(RepoLoadStatus(status))
-
-
-                        Napier.d({"$logPrefix doRequest: completed successfully from $endpointToUse in ${systemTimeInMillis() - doRequestStart}ms"})
-                        return@withContext t
+                    status = if(isNullOrEmpty) {
+                        STATUS_LOADED_NODATA
                     }else {
-                        Napier.e({"$logPrefix doRequest: loadFn completed from $endpointToUse but " +
-                                "not successful. IsNullOrEmpty=$isNullOrEmpty, " +
-                                "autoRetryOnEmptyLiveData=${autoRetryOnEmptyLiveData != null}" +
-                                "autoRetryEmptyMirrorResult=$autoRetryEmptyMirrorResult"})
+                        STATUS_LOADED_WITHDATA
                     }
 
-                    delay(retryDelay.toLong())
+                    completed.value = true
+                    loadedVal.complete(t)
+                    statusLiveData.sendValue(RepoLoadStatus(status))
+
+                    Napier.d({"$logPrefix doRequest: completed successfully from $endpointToUse in ${systemTimeInMillis() - doRequestStart}ms"})
+                    return@withContext t
                 }catch(e: Exception) {
                     //something went wrong with the load
                     Napier.e("$logPrefix Exception attempting to load from $endpointToUse",
                             e)
-                    if(e is NoConnectionException) {
-                        Napier.d({"No connection and no mirrors available - giving up"})
-                        break
-                    }
+                    delay(retryDelay.toLong())
                 }
             }
 
@@ -283,36 +220,6 @@ class RepositoryLoadHelper<T>(val repository: DoorDatabaseRepository,
         }
     }
 
-    fun shouldTryAnotherMirror() : Boolean {
-        val isCompleted = completed.value
-        return !isCompleted && attemptCount < maxAttempts
-    }
-
-    suspend fun waitForNonEmptyLiveData() : T?{
-        val completableDeferred = CompletableDeferred<T>()
-        Napier.d("$logPrefix waiting for non empty live data.")
-        val observer = object: DoorObserver<T> {
-            override fun onChanged(t: T) {
-                if(t is List<*> && t.isNotEmpty()) {
-                    completableDeferred.complete(t)
-                }else if(t !is List<*> && t != null){
-                    completableDeferred.complete(t)
-                }
-            }
-        }
-
-        var nonEmptyVal: T? = null
-        withContext(doorMainDispatcher()) {
-            autoRetryOnEmptyLiveData?.observeForever(observer)
-            nonEmptyVal = withTimeoutOrNull(500) { completableDeferred.await()}
-            autoRetryOnEmptyLiveData?.removeObserver(observer)
-        }
-
-        Napier.d({"$logPrefix Finished waiting for non empty live data. Result=$nonEmptyVal."})
-
-        return nonEmptyVal
-    }
-
     companion object {
 
         private const val PREFIX_NOCONNECTION_NO_MIRRORS_MESSAGE = "LoadHelper-NOCONNECTION"
@@ -322,8 +229,6 @@ class RepositoryLoadHelper<T>(val repository: DoorDatabaseRepository,
         const val STATUS_NOT_STARTED = 0
 
         const val STATUS_LOADING_CLOUD = 1
-
-        const val STATUS_LOADING_MIRROR = 2
 
         const val STATUS_LOADED_WITHDATA = 11
 

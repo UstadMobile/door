@@ -7,8 +7,13 @@ import com.ustadmobile.door.DoorDatabaseRepository.Companion.STATUS_CONNECTED
 import com.ustadmobile.door.RepositoryLoadHelper.Companion.STATUS_FAILED_NOCONNECTIVITYORPEERS
 import com.ustadmobile.door.RepositoryLoadHelper.Companion.STATUS_LOADED_WITHDATA
 import com.ustadmobile.door.RepositoryLoadHelper.Companion.STATUS_LOADING_CLOUD
-import com.ustadmobile.door.RepositoryLoadHelper.Companion.STATUS_LOADING_MIRROR
+import io.ktor.client.*
+import io.ktor.client.engine.okhttp.*
+import io.ktor.client.features.*
+import io.ktor.client.features.json.*
 import kotlinx.coroutines.*
+import okhttp3.OkHttpClient
+import org.junit.After
 import org.junit.Assert
 import org.junit.Before
 import org.junit.Test
@@ -22,9 +27,34 @@ class RepositoryLoadHelperTest  {
 
     data class DummyEntity(val uid: Long, val firstName: String, val lastName: String)
 
+    private lateinit var repoConfig: RepositoryConfig
+
+    private lateinit var httpClient: HttpClient
+
+    private lateinit var okHttpClient: OkHttpClient
+
     @Before
     fun setup() {
         Napier.base(DebugAntilog())
+        httpClient = HttpClient {
+            install(JsonFeature)
+        }
+        okHttpClient = OkHttpClient.Builder().build()
+        httpClient = HttpClient(OkHttp) {
+            install(JsonFeature)
+            install(HttpTimeout)
+
+            engine {
+                preconfigured = okHttpClient
+            }
+        }
+        repoConfig = RepositoryConfig.repositoryConfig(Any(), "http://localhost:8089/",
+            42L, "", httpClient, okHttpClient)
+    }
+
+    @After
+    fun after() {
+        httpClient.close()
     }
 
     @Test
@@ -33,12 +63,12 @@ class RepositoryLoadHelperTest  {
             on { endpoint }.thenReturn("http://localhost:8089/")
         }
         val mockRepository = mock<DoorDatabaseRepository> {
-            on {connectivityStatus}.thenReturn(DoorDatabaseRepository.STATUS_CONNECTED)
+            on {connectivityStatus}.thenReturn(STATUS_CONNECTED)
             on { config }.thenReturn(mockConfig)
         }
 
         val invocationCount = AtomicInteger()
-        val repoLoadHelper = RepositoryLoadHelper<DummyEntity>(mockRepository,
+        val repoLoadHelper = RepositoryLoadHelper(mockRepository,
                 lifecycleHelperFactory = mock {  }) {endpoint ->
             invocationCount.incrementAndGet()
             val entity = DummyEntity(100, "Bob", "Jones$endpoint")
@@ -77,13 +107,13 @@ class RepositoryLoadHelperTest  {
             on { endpoint }.thenReturn("http://localhost:8089/")
         }
         val mockRepository = mock<DoorDatabaseRepository> {
-            on {connectivityStatus}.thenReturn(DoorDatabaseRepository.STATUS_CONNECTED)
+            on {connectivityStatus}.thenReturn(STATUS_CONNECTED)
             on { config }.thenReturn(mockRepoConfig)
         }
 
         val countDownLatch2 = CountDownLatch(2)
         val countDownLatch1 = CountDownLatch(1)
-        val repoLoadHelper = RepositoryLoadHelper<DummyEntity>(mockRepository,
+        val repoLoadHelper = RepositoryLoadHelper(mockRepository,
                 lifecycleHelperFactory = mock {  }) {endpoint ->
             val entity = DummyEntity(100, "Bob", "Jones$endpoint")
             countDownLatch1.countDown()
@@ -91,7 +121,7 @@ class RepositoryLoadHelperTest  {
             entity
         }
 
-        var mockLiveData = repoLoadHelper.wrapLiveData(mock<DoorLiveData<DummyEntity>> {  })
+        val mockLiveData = repoLoadHelper.wrapLiveData(mock<DoorLiveData<DummyEntity>> {  })
 
         runBlocking {
             val mockLiveDataObserver = mock<DoorObserver<DummyEntity>>{}
@@ -100,7 +130,7 @@ class RepositoryLoadHelperTest  {
             //make sure that the first load happened before the second request
             countDownLatch1.await(5, TimeUnit.SECONDS)
 
-            repoLoadHelper.doRequest(true, true)
+            repoLoadHelper.doRequest(resetAttemptCount = true, runAgain = true)
 
             countDownLatch2.await(5, TimeUnit.SECONDS)
             Assert.assertEquals("LoadHelper ran twice when told to reload: count = 0", 0,
@@ -113,15 +143,15 @@ class RepositoryLoadHelperTest  {
         val currentConnectivityStatus = AtomicInteger(DoorDatabaseRepository.STATUS_DISCONNECTED)
         val mockRepository = mock<DoorDatabaseRepository> {
             on {connectivityStatus}.thenReturn(currentConnectivityStatus.get())
-            onBlocking { activeMirrors() }.thenReturn(listOf())
+            on { config }.thenReturn(repoConfig)
         }
 
         val entity = DummyEntity(100, "Bob", "Jones")
         val completableDeferred = CompletableDeferred<DummyEntity>()
 
-        val repoLoadHelper = RepositoryLoadHelper<DummyEntity>(mockRepository,
-                lifecycleHelperFactory = mock {  }) {endpoint ->
-            if(currentConnectivityStatus.get() == DoorDatabaseRepository.STATUS_CONNECTED) {
+        val repoLoadHelper = RepositoryLoadHelper(mockRepository,
+                lifecycleHelperFactory = mock {  }, retryDelay = 500) {
+            if(currentConnectivityStatus.get() == STATUS_CONNECTED) {
                 completableDeferred.complete(entity)
                 entity
             }else {
@@ -129,11 +159,11 @@ class RepositoryLoadHelperTest  {
             }
         }
 
-        val loadObserver = mock<DoorObserver<RepositoryLoadHelper.RepoLoadStatus>>{}
+        val loadObserver = mock<DoorObserver<RepositoryLoadHelper.RepoLoadStatus>> { }
         repoLoadHelper.statusLiveData.observeForever(loadObserver)
 
 
-        var mockLiveData = repoLoadHelper.wrapLiveData(mock<DoorLiveData<DummyEntity>> {  })
+        repoLoadHelper.wrapLiveData(mock<DoorLiveData<DummyEntity>> {  })
 
         runBlocking {
             try {
@@ -142,7 +172,7 @@ class RepositoryLoadHelperTest  {
 
             }
 
-            currentConnectivityStatus.set(DoorDatabaseRepository.STATUS_CONNECTED)
+            currentConnectivityStatus.set(STATUS_CONNECTED)
             repoLoadHelper.onConnectivityStatusChanged(currentConnectivityStatus.get())
             val entityWithTimeout = withTimeoutOrNull(2000) { completableDeferred.await() }
             Assert.assertNull("When data is not being observed then a repeat request will " +
@@ -152,7 +182,7 @@ class RepositoryLoadHelperTest  {
             completableDeferred.cancel()
 
             argumentCaptor<RepositoryLoadHelper.RepoLoadStatus>().apply {
-                verify(loadObserver, times(2)).onChanged(capture())
+                verify(loadObserver, atLeastOnce()).onChanged(capture())
                 Assert.assertEquals("First status value is 0 (didnt start)", 0,
                         firstValue.loadStatus)
                 Assert.assertEquals("Final value is STATUS_FAILED_NOCONNECTIVITYORPEERS",
@@ -171,16 +201,16 @@ class RepositoryLoadHelperTest  {
         val mockRepository = mock<DoorDatabaseRepository> {
             on { config }.thenReturn(mockRepoConfig)
             on {connectivityStatus}.thenAnswer {
-                invocation -> currentConnectivityStatus.get()
+                currentConnectivityStatus.get()
             }
         }
 
         val entity = DummyEntity(100, "Bob", "Jones")
         val completableDeferred = CompletableDeferred<DummyEntity>()
 
-        val repoLoadHelper = RepositoryLoadHelper<DummyEntity>(mockRepository,
-                lifecycleHelperFactory = mock {  }) {endpoint ->
-            if(currentConnectivityStatus.get() == DoorDatabaseRepository.STATUS_CONNECTED) {
+        val repoLoadHelper = RepositoryLoadHelper(mockRepository,
+                lifecycleHelperFactory = mock {  }, retryDelay = 200) {
+            if(currentConnectivityStatus.get() == STATUS_CONNECTED) {
                 completableDeferred.complete(entity)
                 entity
             }else {
@@ -208,8 +238,8 @@ class RepositoryLoadHelperTest  {
                 //do nothing
             }
 
-            currentConnectivityStatus.set(DoorDatabaseRepository.STATUS_CONNECTED)
-            repoLoadHelper.onConnectivityStatusChanged(DoorDatabaseRepository.STATUS_CONNECTED)
+            currentConnectivityStatus.set(STATUS_CONNECTED)
+            repoLoadHelper.onConnectivityStatusChanged(STATUS_CONNECTED)
 
             val entityWithTimeout = withTimeout(5000) { completableDeferred.await() }
 
@@ -217,15 +247,13 @@ class RepositoryLoadHelperTest  {
                     "the loadhelper automatically calls the request function", entity,
                     entityWithTimeout)
 
-            argumentCaptor<RepositoryLoadHelper.RepoLoadStatus>() {
+            argumentCaptor<RepositoryLoadHelper.RepoLoadStatus> {
                 verify(loadObserver, timeout(5000).atLeast(4))
                         .onChanged(capture())
                 Assert.assertEquals("First status value is 0 (didnt start)", 0,
                         firstValue.loadStatus)
                 Assert.assertEquals("Second value is STATUS_FAILED_NOCONNECTIVITYORPEERS after first fail",
-                        STATUS_FAILED_NOCONNECTIVITYORPEERS, allValues[1].loadStatus)
-                Assert.assertEquals("Third status is LOADING_FROM_CLOUD again when connectivity is restored",
-                        STATUS_LOADING_CLOUD, allValues[2].loadStatus)
+                        STATUS_FAILED_NOCONNECTIVITYORPEERS, allValues[2].loadStatus)
                 Assert.assertEquals("Last value was loaded successfully", STATUS_LOADED_WITHDATA,
                         lastValue.loadStatus)
 
@@ -241,19 +269,18 @@ class RepositoryLoadHelperTest  {
             on { endpoint }.thenReturn("http://localhost:8089/")
         }
         val mockRepository = mock<DoorDatabaseRepository> {
-            on {connectivityStatus}.thenAnswer { invocation -> currentConnectivityStatus.get() }
+            on {connectivityStatus}.thenAnswer { currentConnectivityStatus.get() }
             on { config }.thenReturn(mockRepoConfig)
-            onBlocking { activeMirrors() }.thenReturn(listOf())
         }
 
         val entity = DummyEntity(100, "Bob", "Jones")
         val completableDeferred = CompletableDeferred<DummyEntity>()
 
         val loadHelperCallCount = AtomicInteger()
-        val repoLoadHelper = RepositoryLoadHelper<DummyEntity>(mockRepository,
-                lifecycleHelperFactory = mock {  }) {endpoint ->
+        val repoLoadHelper = RepositoryLoadHelper(mockRepository,
+                lifecycleHelperFactory = mock {  }, retryDelay = 200) {
             loadHelperCallCount.incrementAndGet()
-            if(currentConnectivityStatus.get() == DoorDatabaseRepository.STATUS_CONNECTED) {
+            if(currentConnectivityStatus.get() == STATUS_CONNECTED) {
                 completableDeferred.complete(entity)
                 entity
             }else {
@@ -276,8 +303,8 @@ class RepositoryLoadHelperTest  {
             }
 
             val callCountBeforeConnectivityRestored = loadHelperCallCount.get()
-            currentConnectivityStatus.set(DoorDatabaseRepository.STATUS_CONNECTED)
-            repoLoadHelper.onConnectivityStatusChanged(DoorDatabaseRepository.STATUS_CONNECTED)
+            currentConnectivityStatus.set(STATUS_CONNECTED)
+            repoLoadHelper.onConnectivityStatusChanged(STATUS_CONNECTED)
             delay(2000)
             val callCountAfterConnectivityRestored = loadHelperCallCount.get()
 
@@ -295,64 +322,14 @@ class RepositoryLoadHelperTest  {
 
             verify(loadObserver, timeout(5000))
                     .onChanged(eq(RepositoryLoadHelper.RepoLoadStatus(STATUS_LOADED_WITHDATA)))
-            argumentCaptor<RepositoryLoadHelper.RepoLoadStatus>() {
-                verify(loadObserver, times(4)).onChanged(capture())
+            argumentCaptor<RepositoryLoadHelper.RepoLoadStatus> {
+                verify(loadObserver, atLeast(4)).onChanged(capture())
                 Assert.assertEquals("First status value is 0 (didnt start)", 0,
                         firstValue.loadStatus)
-                Assert.assertEquals("Third value is STATUS_FAILED_NOCONNECTIVITYORPEERS after first fail",
-                        STATUS_FAILED_NOCONNECTIVITYORPEERS, allValues[1].loadStatus)
-                Assert.assertEquals("Fourth status is LOADING_FROM_CLOUD again when connectivity is restored",
-                        STATUS_LOADING_CLOUD, allValues[2].loadStatus)
+                Assert.assertEquals("Second value is STATUS_FAILED_NOCONNECTIVITYORPEERS after first fail",
+                        STATUS_FAILED_NOCONNECTIVITYORPEERS, allValues[2].loadStatus)
                 Assert.assertEquals("Last value was loaded successfully", STATUS_LOADED_WITHDATA,
                         lastValue.loadStatus)
-            }
-        }
-    }
-
-    @Test
-    fun givenLoadUnsucessful_whenObservedAgainAndNoConnectivityAvailable_thenShouldNotLoadAgain() {
-        val mockRepository = mock<DoorDatabaseRepository> {
-            on {connectivityStatus}.thenReturn(DoorDatabaseRepository.STATUS_DISCONNECTED)
-            onBlocking { activeMirrors() }.thenReturn(listOf())
-        }
-
-
-        val loadHelperCallCount = AtomicInteger()
-        val repoLoadHelper = RepositoryLoadHelper<DummyEntity>(mockRepository,
-                lifecycleHelperFactory = mock {  }) {endpoint ->
-            loadHelperCallCount.incrementAndGet()
-            throw IOException("Mock IOException Not connected")
-        }
-
-        var liveData = mock<DoorLiveData<DummyEntity>> {}
-        liveData = repoLoadHelper.wrapLiveData(liveData)
-        val mockObserver = mock<DoorObserver<DummyEntity>> {}
-
-        val loadObserver = mock<DoorObserver<RepositoryLoadHelper.RepoLoadStatus>>{}
-        repoLoadHelper.statusLiveData.observeForever(loadObserver)
-
-        runBlocking {
-            try {
-                repoLoadHelper.doRequest()
-            } catch (e: Exception) {
-                //do nothing - this will fail as connectivity is off
-            }
-
-            val callCountBeforeObserving = loadHelperCallCount.get()
-
-            //now observe it
-            liveData.observeForever(mockObserver)
-
-            delay(2000)
-
-
-            Assert.assertEquals("When adding an observer there are no further calls to the load" +
-                    "function", callCountBeforeObserving, loadHelperCallCount.get())
-            argumentCaptor<RepositoryLoadHelper.RepoLoadStatus>().apply {
-                verify(loadObserver, times(2)).onChanged(capture())
-                Assert.assertEquals("First value is 0 (didnt start)", 0, firstValue.loadStatus)
-                Assert.assertEquals("Last value set is failed to load due to no connection",
-                        STATUS_FAILED_NOCONNECTIVITYORPEERS, lastValue.loadStatus)
             }
         }
     }
@@ -362,18 +339,18 @@ class RepositoryLoadHelperTest  {
     fun givenLoadUnuccessfulWithNoWrappedLiveData_whenConnectivityAvailable_thenShouldNotLoadAgain() {
         val currentConnectivityStatus = AtomicInteger(DoorDatabaseRepository.STATUS_DISCONNECTED)
         val mockRepository = mock<DoorDatabaseRepository> {
-            on {connectivityStatus}.thenAnswer { invocation -> currentConnectivityStatus.get() }
-            onBlocking { activeMirrors() }.thenReturn(listOf())
+            on {connectivityStatus}.thenAnswer { currentConnectivityStatus.get() }
+            on { config }.thenReturn(repoConfig)
         }
 
         val entity = DummyEntity(100, "Bob", "Jones")
         val completableDeferred = CompletableDeferred<DummyEntity>()
 
         val loadHelperCallCount = AtomicInteger()
-        val repoLoadHelper = RepositoryLoadHelper<DummyEntity>(mockRepository,
-                lifecycleHelperFactory = mock {  }) {endpoint ->
+        val repoLoadHelper = RepositoryLoadHelper(mockRepository,
+                lifecycleHelperFactory = mock {  }, retryDelay = 200) {
             loadHelperCallCount.incrementAndGet()
-            if(currentConnectivityStatus.get() == DoorDatabaseRepository.STATUS_CONNECTED) {
+            if(currentConnectivityStatus.get() == STATUS_CONNECTED) {
                 completableDeferred.complete(entity)
                 entity
             }else {
@@ -399,237 +376,10 @@ class RepositoryLoadHelperTest  {
             Assert.assertEquals("When there is no wrapped live data, the request is not retried when" +
                     "connectivity is restored", callCountBeforeConnectivityRestored, loadHelperCallCount.get())
             argumentCaptor<RepositoryLoadHelper.RepoLoadStatus>().apply {
-                verify(loadObserver, times(2)).onChanged(capture())
+                verify(loadObserver, atLeastOnce()).onChanged(capture())
                 Assert.assertEquals("First value is 0 (didnt start)", 0,
                         firstValue.loadStatus)
                 Assert.assertEquals("Last value set is failed to load due to no connection",
-                        STATUS_FAILED_NOCONNECTIVITYORPEERS, lastValue.loadStatus)
-            }
-        }
-    }
-
-
-    @Test
-    fun givenConnectivityAvailableAndMirrorAvailable_whenDoRequestCalled_thenWillUseMainEndpoint() {
-        val mockCloudEndpoint = "http://cloudserver/endpoint"
-        val mockMirrorEndpoint = "http://localhost:2000/proxy"
-        val mockConfig = mock<RepositoryConfig> {
-            on { endpoint }.thenReturn(mockCloudEndpoint)
-        }
-        val mockRepository = mock<DoorDatabaseRepository> {
-            on {connectivityStatus}.thenReturn(DoorDatabaseRepository.STATUS_CONNECTED)
-            on { config }.thenReturn(mockConfig)
-            onBlocking { activeMirrors() }.thenReturn(listOf(MirrorEndpoint(1, mockMirrorEndpoint, 100)))
-        }
-
-        val entity = DummyEntity(100, "Bob", "Jones")
-        val endpointUsed = CompletableDeferred<String>()
-        val repoLoadHelper = RepositoryLoadHelper<DummyEntity>(mockRepository,
-                lifecycleHelperFactory = mock {  }) {endpoint ->
-            endpointUsed.complete(endpoint)
-            entity
-        }
-
-        val loadObserver = mock<DoorObserver<RepositoryLoadHelper.RepoLoadStatus>>{}
-        repoLoadHelper.statusLiveData.observeForever(loadObserver)
-
-        runBlocking {
-            repoLoadHelper.doRequest()
-            val endpointUsedRef = withTimeout(5000)  { endpointUsed.await() }
-            Assert.assertEquals("Given connectivity is available and mirror is available " +
-                    "repoloadhelper uses main endpoint", mockCloudEndpoint, endpointUsedRef)
-
-            verify(loadObserver, timeout(5000L))
-                    .onChanged(RepositoryLoadHelper.RepoLoadStatus(STATUS_LOADED_WITHDATA))
-            argumentCaptor<RepositoryLoadHelper.RepoLoadStatus>().apply {
-                verify(loadObserver, times(3)).onChanged(capture())
-                Assert.assertEquals("First status value is 0 (didnt start)", 0,
-                        firstValue.loadStatus)
-                Assert.assertEquals("Second status is LOADING_FROM_CLOUD",
-                        STATUS_LOADING_CLOUD, allValues[1].loadStatus)
-                Assert.assertEquals("Third final value is LOADED_WITH_DATA",
-                        STATUS_LOADED_WITHDATA, lastValue.loadStatus)
-            }
-        }
-    }
-
-    @Test
-    fun givenNoConnectivityAvailableAndMirrorAvailable_whenDoRequestCalled_thenWillUseMirror() {
-        val mockCloudEndpoint = "http://cloudserver/endpoint"
-        val mockMirrorEndpoint = "http://localhost:2000/proxy"
-        val mockConfig = mock<RepositoryConfig> {
-            on { endpoint }.thenReturn(mockCloudEndpoint)
-        }
-        val mockRepository = mock<DoorDatabaseRepository> {
-            on {connectivityStatus}.thenReturn(DoorDatabaseRepository.STATUS_DISCONNECTED)
-            on {config}.thenReturn(mockConfig)
-            onBlocking { activeMirrors() }.thenReturn(listOf(MirrorEndpoint(1, mockMirrorEndpoint, 100)))
-        }
-
-        val entity = DummyEntity(100, "Bob", "Jones")
-        val endpointUsed = CompletableDeferred<String>()
-        val repoLoadHelper = RepositoryLoadHelper<DummyEntity>(mockRepository,
-                lifecycleHelperFactory = mock {  }) {endpoint ->
-            endpointUsed.complete(endpoint)
-            entity
-        }
-
-        val loadObserver = mock<DoorObserver<RepositoryLoadHelper.RepoLoadStatus>>{}
-        repoLoadHelper.statusLiveData.observeForever(loadObserver)
-
-        runBlocking {
-            repoLoadHelper.doRequest()
-            val endpointUsedRef = withTimeout(5000)  { endpointUsed.await() }
-            Assert.assertEquals("Given connectivity is not available and mirror is available " +
-                    "repoloadhelper uses mirror endpoint", mockMirrorEndpoint, endpointUsedRef)
-            verify(loadObserver, timeout(5000)).onChanged(RepositoryLoadHelper.RepoLoadStatus(STATUS_LOADED_WITHDATA))
-            argumentCaptor<RepositoryLoadHelper.RepoLoadStatus>().apply {
-                verify(loadObserver, times(3)).onChanged(capture())
-                Assert.assertEquals("First status value is 0 (didnt start)", 0,
-                        firstValue.loadStatus)
-                Assert.assertEquals("Second status is LOADING_FROM_CLOUD",
-                        STATUS_LOADING_MIRROR, allValues[1].loadStatus)
-                Assert.assertEquals("Third final value is LOADED_WITH_DATA",
-                        STATUS_LOADED_WITHDATA, lastValue.loadStatus)
-            }
-        }
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    @Test
-    fun givenRequestUnsuccessfulAndDataIsObserved_whenNewMirrorAvailable_thenWillRetry() {
-        val mockCloudEndpoint = "http://cloudserver/endpoint"
-        val mockMirrorEndpoint = "http://localhost:2000/proxy"
-
-        val currentConnectivityStatus = AtomicInteger(DoorDatabaseRepository.STATUS_DISCONNECTED)
-        val currentActiveMirrorList = mutableListOf<MirrorEndpoint>()
-        val mockConfig = mock<RepositoryConfig> {
-            on { endpoint }.thenReturn(mockCloudEndpoint)
-        }
-        val mockRepository = mock<DoorDatabaseRepository> {
-            on {connectivityStatus}.thenAnswer { invocation -> currentConnectivityStatus.get() }
-            on { config }.thenReturn(mockConfig)
-            onBlocking { activeMirrors() }.thenAnswer { invocation -> currentActiveMirrorList }
-        }
-
-        val entity = DummyEntity(100, "Bob", "Jones")
-        val endpointCompletableDeferred = CompletableDeferred<String>()
-        val repoLoadHelper = RepositoryLoadHelper<DummyEntity>(mockRepository,
-                lifecycleHelperFactory = mock {  }) {endpoint ->
-
-            if(currentConnectivityStatus.get() == STATUS_CONNECTED || currentActiveMirrorList.isNotEmpty()) {
-                endpointCompletableDeferred.complete(endpoint)
-                entity
-            }else {
-                throw IOException("Mock offline and there is no mirror")
-            }
-        }
-
-        val loadObserver = mock<DoorObserver<RepositoryLoadHelper.RepoLoadStatus>>{}
-        repoLoadHelper.statusLiveData.observeForever(loadObserver)
-
-        runBlocking {
-            try {
-                repoLoadHelper.doRequest()
-            }catch(e: Exception) {
-                //will fail
-            }
-
-
-            val endpointCompleteOnFirstRequest = endpointCompletableDeferred.isCompleted
-
-            val mockLiveData = mock<DoorLiveData<DummyEntity>> {  }
-            val wrappedLiveData = repoLoadHelper.wrapLiveData(mockLiveData)
-            wrappedLiveData.observeForever(mock {})
-
-            val newMirror = MirrorEndpoint(1, mockMirrorEndpoint, 100)
-            currentActiveMirrorList.add(newMirror)
-
-            repoLoadHelper.onNewMirrorAvailable(newMirror)
-
-            val endpointUsed = withTimeout(5000) { endpointCompletableDeferred.await() }
-            Assert.assertEquals("After a new mirror is available, and data is being observed, then " +
-                    "the repoloadhelper automatically tries again using the new mirror",
-                    mockMirrorEndpoint, endpointUsed)
-            Assert.assertFalse("The repoloadhelper was not marked as complete when the request first loaded",
-                    endpointCompleteOnFirstRequest)
-            verify(loadObserver, timeout(5000)).onChanged(RepositoryLoadHelper.RepoLoadStatus(STATUS_LOADED_WITHDATA))
-            argumentCaptor<RepositoryLoadHelper.RepoLoadStatus>().apply {
-                verify(loadObserver, times(4)).onChanged(capture())
-                Assert.assertEquals("First value is 0 (not started)", 0,
-                        firstValue.loadStatus)
-                Assert.assertEquals("Second value is STATUS_FAILED_NOCONNECTIVITYORPEERS",
-                        STATUS_FAILED_NOCONNECTIVITYORPEERS, secondValue.loadStatus)
-                Assert.assertEquals("Third value is LOADING_FROM_MIRROR", STATUS_LOADING_MIRROR,
-                        thirdValue.loadStatus)
-                Assert.assertEquals("Last status value set is LOADED_WITH_DATA", STATUS_LOADED_WITHDATA,
-                        lastValue.loadStatus)
-            }
-        }
-    }
-
-    @Test
-    fun givenRequestUnsuccessfulAndDataIsNotObserved_whenNewMirrorAvailable_thenWillDoNothing() {
-        val mockCloudEndpoint = "http://cloudserver/endpoint"
-        val mockMirrorEndpoint = "http://localhost:2000/proxy"
-
-        val currentConnectivityStatus = AtomicInteger(DoorDatabaseRepository.STATUS_DISCONNECTED)
-        val currentActiveMirrorList = mutableListOf<MirrorEndpoint>()
-        val mockConfig = mock<RepositoryConfig> {
-            on { endpoint }.thenReturn(mockCloudEndpoint)
-        }
-        val mockRepository = mock<DoorDatabaseRepository> {
-            on {connectivityStatus}.thenAnswer { invocation -> currentConnectivityStatus.get() }
-            on { config }.thenReturn(mockConfig)
-            onBlocking { activeMirrors() }.thenAnswer { invocation -> currentActiveMirrorList }
-        }
-
-        val entity = DummyEntity(100, "Bob", "Jones")
-        val endpointCompletableDeferred = CompletableDeferred<String>()
-        val loadFnCount = AtomicInteger()
-        val repoLoadHelper = RepositoryLoadHelper<DummyEntity>(mockRepository,
-                lifecycleHelperFactory = mock {  }) {endpoint ->
-
-            loadFnCount.incrementAndGet()
-            if(currentConnectivityStatus.get() == STATUS_CONNECTED || currentActiveMirrorList.isNotEmpty()) {
-                endpointCompletableDeferred.complete(endpoint)
-                entity
-            }else {
-                throw IOException("Mock offline and there is no mirror")
-            }
-        }
-
-        val loadObserver = mock<DoorObserver<RepositoryLoadHelper.RepoLoadStatus>>{}
-        repoLoadHelper.statusLiveData.observeForever(loadObserver)
-
-        runBlocking {
-            try {
-                repoLoadHelper.doRequest()
-            }catch(e: Exception) {
-                //will fail
-            }
-
-            val loadFnCountBeforeMirror = loadFnCount.get()
-
-            var liveData = mock<DoorLiveData<DummyEntity>> {  }
-            liveData = repoLoadHelper.wrapLiveData(liveData)
-
-            val newMirror = MirrorEndpoint(1, mockMirrorEndpoint, 100)
-            currentActiveMirrorList.add(newMirror)
-
-            repoLoadHelper.onNewMirrorAvailable(newMirror)
-
-            val mirrorUsed = withTimeoutOrNull(5000) { endpointCompletableDeferred.await() }
-            Assert.assertNull("After a new mirror is available, when data is not being " +
-                    "observed the loadhelper will not try again",
-                    mirrorUsed)
-            Assert.assertEquals("DoRequest loader function has not been called again",
-                    loadFnCountBeforeMirror, loadFnCount.get())
-            argumentCaptor<RepositoryLoadHelper.RepoLoadStatus>().apply {
-                verify(loadObserver, timeout(5000).times(2)).onChanged(capture())
-                Assert.assertEquals("First callback value is 0 (not started)", 0,
-                        firstValue.loadStatus)
-                Assert.assertEquals("Last callback value is STATUS_FAILED_NOCONNECTIVITYORPEERS",
                         STATUS_FAILED_NOCONNECTIVITYORPEERS, lastValue.loadStatus)
             }
         }
