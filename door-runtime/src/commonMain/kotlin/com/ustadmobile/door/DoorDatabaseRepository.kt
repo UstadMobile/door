@@ -18,6 +18,8 @@ interface DoorDatabaseRepository {
      */
     val db: DoorDatabase
 
+    val dbName: String
+
     /**
      * Adds a weak reference to the given connectivity listener - useful for RepositoryLoadHelper
      * so it can automatically retry requests when connectivity is restored or when a mirror

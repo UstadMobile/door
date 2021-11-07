@@ -42,36 +42,33 @@ class DbProcessorAndroid: AbstractDbProcessor() {
                     val outFilePaths = outPaths.map { it.resolve(srcRelativePath)}
                     if(outFilePaths.map {it.toFile() }
                                     .any { !it.exists() || it.lastModified() < srcFilePath.toFile().lastModified()}) {
-                        val lines = srcFilePath.toFile().readLines()
-                        if(!lines.any { it.contains("@Database" )} ) {
-                            outFilePaths.forEach {
-                                val parentDirFile = it.parent.toFile()
-                                if(!parentDirFile.isDirectory){
-                                    parentDirFile.mkdirs()
+                        outFilePaths.forEach {
+                            val parentDirFile = it.parent.toFile()
+                            if(!parentDirFile.isDirectory){
+                                parentDirFile.mkdirs()
+                            }
+
+                            var srcFileIn = null as BufferedReader?
+                            var fileOut = null as BufferedWriter?
+
+                            try {
+                                srcFileIn = BufferedReader(FileReader(srcFilePath.toFile()))
+                                fileOut = BufferedWriter(FileWriter(it.toFile()))
+
+
+                                for(line in srcFileIn.lines()) {
+                                    if(!line.contains("@JsName") && !line.contains("kotlin.js.JsName"))
+                                        fileOut.write(line)
+
+                                    fileOut.newLine()
                                 }
-
-                                var srcFileIn = null as BufferedReader?
-                                var fileOut = null as BufferedWriter?
-
-                                try {
-                                    srcFileIn = BufferedReader(FileReader(srcFilePath.toFile()))
-                                    fileOut = BufferedWriter(FileWriter(it.toFile()))
-
-
-                                    for(line in srcFileIn.lines()) {
-                                        if(!line.contains("@JsName") && !line.contains("kotlin.js.JsName"))
-                                            fileOut.write(line)
-
-                                        fileOut.newLine()
-                                    }
-                                }catch(e: IOException) {
-                                    messager.printMessage(Diagnostic.Kind.ERROR, "IOException " +
-                                            "copying db source file$srcFilePath to $it : $e")
-                                }finally {
-                                    srcFileIn?.close()
-                                    fileOut?.flush()
-                                    fileOut?.close()
-                                }
+                            }catch(e: IOException) {
+                                messager.printMessage(Diagnostic.Kind.ERROR, "IOException " +
+                                        "copying db source file$srcFilePath to $it : $e")
+                            }finally {
+                                srcFileIn?.close()
+                                fileOut?.flush()
+                                fileOut?.close()
                             }
                         }
                     }

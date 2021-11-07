@@ -14,8 +14,6 @@ abstract class DoorDatabaseCommon {
 
     abstract val jdbcDbType: Int
 
-    abstract val dbName: String
-
     private val transactionRootDatabase: DoorDatabase
         get() {
             @Suppress("CAST_NEVER_SUCCEEDS") //In reality it will succeed
@@ -180,6 +178,12 @@ abstract class DoorDatabaseCommon {
     }
 
     override fun toString(): String {
-        return "${this::class.simpleName}: $dbName@${this.doorIdentityHashCode}"
+        val name = when {
+            this is DoorDatabaseRepository -> this.dbName
+            this is DoorDatabaseReplicateWrapper -> this.dbName
+            this is DoorDatabaseJdbc -> this.dbName
+            else -> "Unknown"
+        }
+        return "${this::class.simpleName}: $name@${this.doorIdentityHashCode}"
     }
 }

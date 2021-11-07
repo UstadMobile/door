@@ -150,7 +150,7 @@ fun FileSpec.Builder.addDbRepoType(
             }
             .apply {
                 dbTypeElement.allDbClassDaoGetters(processingEnv).forEach { daoGetter ->
-                    addRepoDbDaoAccessor(daoGetter, overrideKtorHelpers, processingEnv)
+                    addRepoDbDaoAccessor(daoGetter, processingEnv)
                 }
             }
             .addType(TypeSpec.companionObjectBuilder()
@@ -231,9 +231,10 @@ fun FileSpec.Builder.addAsEntityWithAttachmentAdapterExtensionFun(entityWithAtta
  * Add an accessor function for the given dao accessor (and any related ktor helper daos if
  * specified).
  */
-private fun TypeSpec.Builder.addRepoDbDaoAccessor(daoGetter: ExecutableElement,
-                                          overrideKtorHelpers: Boolean,
-                                          processingEnv: ProcessingEnvironment) : TypeSpec.Builder{
+private fun TypeSpec.Builder.addRepoDbDaoAccessor(
+    daoGetter: ExecutableElement,
+    processingEnv: ProcessingEnvironment
+) : TypeSpec.Builder{
     val daoTypeEl = daoGetter.returnType.asTypeElement(processingEnv)
             ?: throw IllegalArgumentException("Dao getter has no return type")
     if(!daoTypeEl.hasAnnotation(Repository::class.java)) {
@@ -255,19 +256,6 @@ private fun TypeSpec.Builder.addRepoDbDaoAccessor(daoGetter: ExecutableElement,
             .build())
 
     addAccessorOverride(daoGetter, CodeBlock.of("return  _${daoTypeEl.simpleName}"))
-
-    if(overrideKtorHelpers) {
-        listOf("Master", "Local").forEach {suffix ->
-            val ktorHelperClassName = daoTypeEl.asClassNameWithSuffix(
-                    "${DbProcessorKtorServer.SUFFIX_KTOR_HELPER}$suffix")
-            addFunction(FunSpec.builder("_${ktorHelperClassName.simpleName}")
-                    .returns(ktorHelperClassName)
-                    .addModifiers(KModifier.OVERRIDE)
-                    .addCode("throw %T(%S)", IllegalAccessException::class,
-                            "Cannot access KTOR HTTP Helper from Repository")
-                    .build())
-        }
-    }
 
     return this
 }

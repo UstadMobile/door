@@ -9,6 +9,8 @@ interface DoorDatabaseReplicateWrapper {
 
     val realDatabase: DoorDatabase
 
+    val dbName: String
+
     companion object {
 
         /**

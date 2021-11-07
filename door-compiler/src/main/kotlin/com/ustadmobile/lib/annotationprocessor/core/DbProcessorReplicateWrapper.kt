@@ -176,8 +176,6 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(
 fun FileSpec.Builder.addDbWrapperTypeSpec(
     dbTypeEl: TypeElement,
     processingEnv: ProcessingEnvironment,
-    overrideKtorHelperDaos: Boolean = false,
-    overrideSyncDao: Boolean = false,
     addJdbcOverrides: Boolean = true,
     addRoomOverrides: Boolean = false
 ): FileSpec.Builder {
@@ -207,20 +205,15 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
                             .addCode("return transactionDb.%M(dbKClass) as T\n",
                                 MemberName("com.ustadmobile.door.ext", "wrap"))
                             .build())
-                        addProperty(PropertySpec.builder("dbName", String::class, KModifier.OVERRIDE)
-                            .getter(FunSpec.getterBuilder()
-                                .addCode("return \"DoorWrapper for [\${_db.toString()}]\"\n")
-                                .build())
-                            .build())
                     }
+                    .addProperty(PropertySpec.builder("dbName", String::class, KModifier.OVERRIDE)
+                        .getter(FunSpec.getterBuilder()
+                            .addCode("return \"DoorWrapper for [\${_db.toString()}]\"\n")
+                            .build())
+                        .build())
                     .apply {
                         dbTypeEl.allDbClassDaoGetters(processingEnv).forEach {daoGetter ->
                             addWrapperAccessorFunction(daoGetter, processingEnv)
-
-                            if(overrideKtorHelperDaos &&
-                                    daoGetter.returnType.asTypeElement(processingEnv)?.isDaoThatRequiresKtorHelper == true) {
-                                addKtorHelperWrapperAccessorFunction(daoGetter, processingEnv)
-                            }
                         }
                     }
                     .addProperty(PropertySpec.builder("realDatabase", DoorDatabase::class)
@@ -314,8 +307,7 @@ class DbProcessorReplicateWrapper: AbstractDbProcessor()  {
                 FileSpec.builder(dbTypeEl.packageName,
                         "${dbTypeEl.simpleName}${DoorDatabaseReplicateWrapper.SUFFIX}")
                         .addDbWrapperTypeSpec(
-                            dbTypeEl, processingEnv, overrideKtorHelperDaos = true,
-                            overrideSyncDao = true,
+                            dbTypeEl, processingEnv,
                             addJdbcOverrides = false,
                             addRoomOverrides = true
                         )

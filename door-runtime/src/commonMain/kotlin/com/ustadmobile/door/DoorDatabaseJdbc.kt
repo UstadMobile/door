@@ -26,5 +26,10 @@ interface DoorDatabaseJdbc {
      */
     val realPrimaryKeyManager: DoorPrimaryKeyManager
 
+    /**
+     * The name as it was provided to the builder function
+     */
+    val dbName: String
+
 
 }
