@@ -6,6 +6,7 @@ import com.ustadmobile.door.ext.minifySql
 import com.ustadmobile.lib.annotationprocessor.core.applyIf
 import com.ustadmobile.lib.annotationprocessor.core.entityTableName
 import com.ustadmobile.lib.annotationprocessor.core.replicationEntityReceiveViewName
+import com.ustadmobile.lib.annotationprocessor.core.sqlToPostgresSql
 import javax.lang.model.element.TypeElement
 
 fun Trigger.toSql(entityTypeEl: TypeElement, dbProductType: Int) : List<String>{
@@ -43,7 +44,7 @@ fun Trigger.toSql(entityTypeEl: TypeElement, dbProductType: Int) : List<String>{
                         FETCH curs1 INTO whereVar;
                         IF whereVar = true THEN """)
                 }
-                .append(sqlStatements.joinToString(separator = ";", postfix = ";"))
+                .append(sqlStatements.joinToString(separator = ";", postfix = ";") { it.sqlToPostgresSql() })
                 .applyIf(conditionSql != "") {
                     append("END IF; CLOSE curs1;")
                 }

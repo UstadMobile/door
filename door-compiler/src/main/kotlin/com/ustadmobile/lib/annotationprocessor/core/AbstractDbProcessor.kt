@@ -11,9 +11,6 @@ import java.io.File
 import javax.annotation.processing.RoundEnvironment
 import javax.lang.model.element.*
 import com.ustadmobile.door.annotation.*
-import javax.lang.model.type.DeclaredType
-import javax.lang.model.type.ExecutableType
-import kotlinx.coroutines.GlobalScope
 import io.ktor.http.HttpStatusCode
 import io.ktor.content.TextContent
 import io.ktor.http.ContentType
@@ -23,8 +20,6 @@ import com.ustadmobile.door.entities.ChangeLog
 import com.ustadmobile.door.ext.minifySql
 import com.ustadmobile.lib.annotationprocessor.core.ext.toSql
 import io.ktor.client.request.forms.MultiPartFormDataContent
-import kotlinx.coroutines.Runnable
-import kotlin.reflect.KClass
 import io.ktor.client.statement.HttpStatement
 import io.ktor.http.Headers
 
@@ -525,22 +520,8 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
             }
         }
 
-        val preparedStatementSqlPostgres = querySqlPostgres ?: querySql?.let { sql ->
-            var newSql = sql.replaceQueryNamedParamsWithQuestionMarks()
-            val uppercaseSql = sql.uppercase()
-            if(uppercaseSql.trimStart().startsWith("REPLACE INTO"))
-                newSql = "INSERT INTO" + sql.substring(newSql.indexOf("REPLACE INTO") + "REPLACE INTO".length)
-
-            var pgSectionIndex: Int
-            while(newSql.indexOf(PGSECTION_COMMENT_PREFIX).also { pgSectionIndex = it } != -1) {
-                val pgSectionEnd = newSql.indexOf("*/", pgSectionIndex)
-                newSql = newSql.substring(0, pgSectionIndex) +
-                        newSql.substring(pgSectionIndex + PGSECTION_COMMENT_PREFIX.length, pgSectionEnd) +
-                        newSql.substring(pgSectionEnd + 2)
-            }
-
-            newSql
-        }
+        val preparedStatementSqlPostgres = querySqlPostgres ?: querySql?.replaceQueryNamedParamsWithQuestionMarks()
+            ?.sqlToPostgresSql()
 
 
         if(resultType != UNIT)

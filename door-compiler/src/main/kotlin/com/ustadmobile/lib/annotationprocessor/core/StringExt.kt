@@ -111,3 +111,25 @@ fun String.getSqlQueryNamedParameters(): List<String> {
 
     return namedParams
 }
+
+/**
+ * Where SQLite and Postgres disagree, sometimes it is possible to simply add additional (postgres only) comments and
+ * change SQLite's REPLACE INTO into INSERT INTO ... ON CONFLICT for Postgres.
+ *
+ */
+fun String.sqlToPostgresSql() : String {
+    val uppercaseSql = uppercase()
+    var newSql = this
+    if(uppercaseSql.trimStart().startsWith("REPLACE INTO"))
+        newSql = "INSERT INTO" + this.substring(newSql.indexOf("REPLACE INTO") + "REPLACE INTO".length)
+
+    var pgSectionIndex: Int
+    while(newSql.indexOf(AbstractDbProcessor.PGSECTION_COMMENT_PREFIX).also { pgSectionIndex = it } != -1) {
+        val pgSectionEnd = newSql.indexOf("*/", pgSectionIndex)
+        newSql = newSql.substring(0, pgSectionIndex) +
+                newSql.substring(pgSectionIndex + AbstractDbProcessor.PGSECTION_COMMENT_PREFIX.length, pgSectionEnd) +
+                newSql.substring(pgSectionEnd + 2)
+    }
+
+    return newSql
+}

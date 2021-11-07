@@ -278,8 +278,11 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
 
                 stmtsMap.forEach {entry ->
                     try {
-                        entry.value.takeIf { trigger.conditionSql != "" }?.executeQuery(
-                            trigger.conditionSql.substituteTriggerPrefixes(entry.key))
+                        var sqlToRun = trigger.conditionSql.substituteTriggerPrefixes(entry.key)
+                        if(entry.key == DoorDbType.POSTGRES)
+                            sqlToRun = sqlToRun.sqlToPostgresSql()
+
+                        entry.value.takeIf { trigger.conditionSql != "" }?.executeQuery(sqlToRun)
                     }catch(e: SQLException) {
                         messager.printMessage(Diagnostic.Kind.ERROR,
                             "Trigger ${trigger.name} condition SQL using ${entry.key.dbProductName} error on: ${e.message}",
@@ -296,8 +299,12 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
                 trigger.sqlStatements.forEach { sql ->
                     try {
                         stmtsMap.forEach { stmtEntry ->
+                            var sqlToRun = sql.substituteTriggerPrefixes(dbType)
                             dbType = stmtEntry.key
-                            stmtEntry.value?.executeUpdate(sql.substituteTriggerPrefixes(dbType))
+                            if(dbType == DoorDbType.POSTGRES)
+                                sqlToRun = sqlToRun.sqlToPostgresSql()
+
+                            stmtEntry.value?.executeUpdate(sqlToRun)
                         }
                     }catch(e: SQLException) {
                         messager.printMessage(Diagnostic.Kind.ERROR,
