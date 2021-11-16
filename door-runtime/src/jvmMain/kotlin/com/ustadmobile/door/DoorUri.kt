@@ -13,6 +13,8 @@ actual class DoorUri(val uri: URI) {
         }
     }
 
+    override fun toString() = uri.toString()
+
     actual companion object {
         actual fun parse(uriString: String) = DoorUri(URI(uriString))
     }
