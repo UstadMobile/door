@@ -12,6 +12,8 @@ actual class DoorUri(val uri: URL)  {
         return uri.pathname.substringAfterLast( "/")
     }
 
+    override fun toString() = uri.toString()
+
     actual companion object {
         actual fun parse(uriString: String) = DoorUri(URL(uriString))
     }

@@ -10,6 +10,8 @@ actual class DoorUri(val uri: Uri) {
         return (context as Context).contentResolver.getFileName(uri)
     }
 
+    override fun toString() = uri.toString()
+
     actual companion object {
         actual fun parse(uriString: String) : DoorUri = DoorUri(Uri.parse(uriString))
     }
