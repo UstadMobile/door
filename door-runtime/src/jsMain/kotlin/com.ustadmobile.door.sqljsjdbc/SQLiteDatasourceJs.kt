@@ -71,7 +71,8 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
         return json(
             "action" to "exec",
             "sql" to sql,
-            "params" to params
+            "params" to params,
+            "config" to json("useBigInt" to true)
         )
     }
 
