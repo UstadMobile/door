@@ -8,6 +8,7 @@ import com.ustadmobile.door.jdbc.types.Time
 import com.ustadmobile.door.jdbc.types.TimeStamp
 import io.ktor.utils.io.core.*
 
+@Suppress("UnsafeCastFromDynamic")
 class SQLiteResultSet(private val results: Array<Any>): ResultSet {
 
     inner class MetaData(): ResultSetMetaData {
@@ -56,12 +57,16 @@ class SQLiteResultSet(private val results: Array<Any>): ResultSet {
         return getValue(columnIndex)?.toString()
     }
 
+    @Suppress("UNUSED_VARIABLE") //value is used on JS
     override fun getBoolean(columnName: String): Boolean {
-        return getValue(columnName)?.toString()?.toBoolean() ?: false
+        val value = getValue(columnName)
+        return js("Boolean(value)")
     }
 
+    @Suppress("UNUSED_VARIABLE") //value is used on JS
     override fun getBoolean(columnIndex: Int): Boolean {
-        return getValue(columnIndex)?.toString()?.toBoolean() ?: false
+        val value = getValue(columnIndex)
+        return js("Boolean(value)")
     }
 
     override fun getByte(columnName: String): Byte {

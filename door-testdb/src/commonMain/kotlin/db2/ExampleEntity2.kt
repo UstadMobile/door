@@ -12,7 +12,8 @@ open class ExampleEntity2(
         var uid: Long = 0L,
         var name: String? = "",
         @ColumnInfo(index = true)
-        var someNumber: Long = 0L) {
+        var someNumber: Long = 0L,
+        var checked: Boolean = false,) {
 
 
         override fun equals(other: Any?): Boolean {
@@ -23,6 +24,7 @@ open class ExampleEntity2(
 
                 if (uid != other.uid) return false
                 if (name != other.name) return false
+                if (checked != other.checked) return false
                 if (someNumber != other.someNumber) return false
 
                 return true
@@ -30,7 +32,8 @@ open class ExampleEntity2(
 
         override fun hashCode(): Int {
                 var result = uid.hashCode()
-                result = 31 * result + name.hashCode()
+                result = 31 * result + (name?.hashCode() ?: 0)
+                result = 31 * result + checked.hashCode()
                 result = 31 * result + someNumber.hashCode()
                 return result
         }
