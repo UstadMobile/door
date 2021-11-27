@@ -1,7 +1,5 @@
 package com.ustadmobile.door
 
-import com.ustadmobile.door.attachments.AttachmentFilter
-import io.ktor.client.HttpClient
 import kotlin.reflect.KClass
 
 /**

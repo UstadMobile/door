@@ -2,7 +2,10 @@ import com.ustadmobile.door.DoorLifecycleObserver
 import com.ustadmobile.door.DoorLifecycleOwner
 import db2.ExampleEntity2
 import kotlinx.css.*
+import kotlinx.css.properties.Transforms
 import kotlinx.css.properties.border
+import kotlinx.css.properties.scale
+import kotlinx.css.properties.transform
 import kotlinx.html.ButtonType
 import kotlinx.html.InputType
 import kotlinx.html.js.onChangeFunction
@@ -58,6 +61,21 @@ class ExampleComponent(mProps: PropsWithChildren): RComponent<PropsWithChildren,
                         flexDirection = FlexDirection.row
                     }
 
+                    styledInput(type = InputType.checkBox){
+                        attrs.onChangeFunction = {
+                            setState {
+                                entity.checked = it.target.asDynamic().checked.toString().toBoolean()
+                            }
+                        }
+
+                        css {
+                            transform{
+                                scale(4,4)
+                            }
+                            margin = "30px"
+                        }
+                    }
+
                     styledInput(type = InputType.text){
                         attrs.onChangeFunction = {
                             setState {
@@ -67,7 +85,7 @@ class ExampleComponent(mProps: PropsWithChildren): RComponent<PropsWithChildren,
                         attrs.placeholder = "Enter name"
 
                         css {
-                            flex(2.0)
+                            flex(3.0)
                             padding = "16px"
                             fontSize = LinearDimension("1.7em")
                             border(width = LinearDimension("1px"), style = BorderStyle.solid, color = Color.black)
@@ -76,6 +94,7 @@ class ExampleComponent(mProps: PropsWithChildren): RComponent<PropsWithChildren,
 
                     styledButton(type = ButtonType.button) {
                         attrs.text("Save")
+                        attrs.disabled = entity.name.isNullOrEmpty()
                         attrs.onClickFunction = {
                             if(!entity.name.isNullOrEmpty()){
                                 mPresenter?.handleSaveEntity(entity)
@@ -88,6 +107,22 @@ class ExampleComponent(mProps: PropsWithChildren): RComponent<PropsWithChildren,
                             marginLeft = LinearDimension("20px")
                             backgroundColor = if(entity.name.isNullOrEmpty()) Color.grey.lighten(200) else Color.black
                             color = if(entity.name.isNullOrEmpty()) Color.black else Color.white
+                        }
+                    }
+
+                    styledButton(type = ButtonType.button) {
+                        attrs.text("Download")
+                        attrs.disabled = list.isNullOrEmpty()
+                        attrs.onClickFunction = {
+                            mPresenter?.handleDownloadDbClicked()
+                        }
+                        css{
+                            flex(1.0)
+                            padding = "16px"
+                            fontSize = LinearDimension("1.8em")
+                            marginLeft = LinearDimension("20px")
+                            backgroundColor = if(list.isNullOrEmpty()) Color.grey.lighten(200) else Color.black
+                            color = if(list.isNullOrEmpty()) Color.black else Color.white
                         }
                     }
                 }
@@ -105,6 +140,7 @@ class ExampleComponent(mProps: PropsWithChildren): RComponent<PropsWithChildren,
                                 display = Display.flex
                             }
                             renderData(it.uid, 1.0)
+                            renderData(if(it.checked) "Checked" else "Unchecked", 1.0)
                             renderData(it.name, 3.0)
                             renderData(it.someNumber, 1.0)
                         }

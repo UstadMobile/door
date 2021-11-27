@@ -8,6 +8,7 @@ import com.ustadmobile.door.jdbc.types.Time
 import com.ustadmobile.door.jdbc.types.TimeStamp
 import io.ktor.utils.io.core.*
 
+@Suppress("UnsafeCastFromDynamic")
 class SQLiteResultSet(private val results: Array<Any>): ResultSet {
 
     inner class MetaData(): ResultSetMetaData {
@@ -56,12 +57,16 @@ class SQLiteResultSet(private val results: Array<Any>): ResultSet {
         return getValue(columnIndex)?.toString()
     }
 
+    @Suppress("UNUSED_VARIABLE") //value is used on JS
     override fun getBoolean(columnName: String): Boolean {
-        return getValue(columnName)?.toString()?.toBoolean() ?: false
+        val value = getValue(columnName)
+        return js("Boolean(value)")
     }
 
+    @Suppress("UNUSED_VARIABLE") //value is used on JS
     override fun getBoolean(columnIndex: Int): Boolean {
-        return getValue(columnIndex)?.toString()?.toBoolean() ?: false
+        val value = getValue(columnIndex)
+        return js("Boolean(value)")
     }
 
     override fun getByte(columnName: String): Byte {
@@ -73,7 +78,7 @@ class SQLiteResultSet(private val results: Array<Any>): ResultSet {
     }
 
     override fun getShort(columnName: String): Short {
-        return getValue(columnName).toString().toShort()
+        return getValue(columnName)?.toString()?.toShort() ?: 0
     }
 
     override fun getShort(columnIndex: Int): Short {
@@ -81,7 +86,7 @@ class SQLiteResultSet(private val results: Array<Any>): ResultSet {
     }
 
     override fun getInt(columnName: String): Int {
-        return getValue(columnName).toString().toInt()
+        return getValue(columnName)?.toString()?.toInt() ?: 0
     }
 
     override fun getInt(columnIndex: Int): Int {
@@ -97,7 +102,7 @@ class SQLiteResultSet(private val results: Array<Any>): ResultSet {
     }
 
     override fun getLong(columnName: String): Long {
-        return getValue(columnName).toString().toLong()
+        return getValue(columnName)?.toString()?.toLong() ?: 0L
     }
 
     override fun getLong(columnIndex: Int): Long {
@@ -105,7 +110,7 @@ class SQLiteResultSet(private val results: Array<Any>): ResultSet {
     }
 
     override fun getDouble(columnName: String): Double {
-       return getValue(columnName).toString().toDouble()
+       return getValue(columnName)?.toString()?.toDouble() ?: 0.0
     }
 
     override fun getDouble(columnIndex: Int): Double {
@@ -124,9 +129,12 @@ class SQLiteResultSet(private val results: Array<Any>): ResultSet {
         return null
     }
 
-
     override fun getDate(columnName: String): Date? {
-        return Date(getValue(columnName).toString())
+        val value = getValue(columnName)
+        if(value != null){
+            return Date(value.toString())
+        }
+        return null
     }
 
     override fun getTime(columnName: String): Time? {

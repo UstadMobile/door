@@ -67,4 +67,9 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon() {
     protected fun setupFromDataSource() {
         //ON JS: nothing to do here - it is always SQLite
     }
+
+    suspend fun exportDatabase() {
+        val con = (openConnection() as SQLiteConnectionJs)
+        con.datasource.exportDatabaseToFile()
+    }
 }

@@ -3,16 +3,18 @@ import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.jdbc.ResultSet
 import com.ustadmobile.door.jdbc.SQLException
+import com.ustadmobile.door.sqljsjdbc.IndexedDb.DATABASE_VERSION
+import com.ustadmobile.door.sqljsjdbc.IndexedDb.DB_STORE_KEY
+import com.ustadmobile.door.sqljsjdbc.IndexedDb.DB_STORE_NAME
+import com.ustadmobile.door.sqljsjdbc.IndexedDb.indexedDb
+import kotlinx.browser.document
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.w3c.dom.HTMLAnchorElement
 import org.w3c.dom.Worker
-import com.ustadmobile.door.sqljsjdbc.IndexedDb.DATABASE_VERSION
-import com.ustadmobile.door.sqljsjdbc.IndexedDb.DB_STORE_KEY
-import com.ustadmobile.door.sqljsjdbc.IndexedDb.DB_STORE_NAME
-import com.ustadmobile.door.sqljsjdbc.IndexedDb.indexedDb
 import kotlin.js.Json
 import kotlin.js.json
 
@@ -69,7 +71,8 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
         return json(
             "action" to "exec",
             "sql" to sql,
-            "params" to params
+            "params" to params,
+            "config" to json("useBigInt" to true)
         )
     }
 
@@ -115,6 +118,20 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
                 Throwable("Error when importing database from IndexedDb to SQLite DB"))
         }
         return exportCompletable.await()
+    }
+
+    /**
+     * Save SQL.JS database to a .db file
+     */
+    @Suppress("UNUSED_VARIABLE") // used in js code
+    suspend fun exportDatabaseToFile() {
+        val result = sendMessage(json("action" to "export"))
+        val blob = js("new Blob([result.buffer]);")
+        val link = document.createElement("a") as HTMLAnchorElement
+        document.body?.appendChild(link)
+        link.href = js("window.URL.createObjectURL(blob);")
+        link.download = "$dbName.db"
+        link.click()
     }
 
     /**
