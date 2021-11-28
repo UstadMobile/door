@@ -44,8 +44,18 @@ class ReplicationSubscriptionManager(
     private val numProcessors: Int = 5,
     eventSourceFactory: DoorEventSourceFactory = DefaultDoorEventSourceFactoryImpl(),
     private val sendReplicationRunner: ReplicateRunner = DefaultReplicationSender(json),
-    private val fetchReplicationRunner: ReplicateRunner = DefaultReplicationFetcher(json)
+    private val fetchReplicationRunner: ReplicateRunner = DefaultReplicationFetcher(json),
+    /**
+     * Event handler that will be called when the subscription is initialized. This can be useful to help setup
+     * remote replication (e.g. to know the node id of the primary remote sever).
+     */
+    @Volatile
+    var onSubscriptionInitialized : SubscriptionInitializedListener? = null
 ): DoorEventListener, ReplicationPendingListener {
+
+    fun interface SubscriptionInitializedListener {
+        suspend fun onSubscriptionInitialized(repo: DoorDatabaseRepository, remoteNodeId: Long)
+    }
 
     fun interface ReplicateRunner {
         suspend fun replicate(repo: DoorDatabaseRepository, tableId: Int, remoteNodeId: Long)
@@ -221,8 +231,11 @@ class ReplicationSubscriptionManager(
     override fun onMessage(message: DoorServerSentEvent) {
         when(message.event) {
             EVT_INIT -> coroutineScope.launch {
-                remoteNodeId.value = message.data.toLong()
+                val remoteNodeIdLong = message.data.toLong()
+                remoteNodeId.value = remoteNodeIdLong
                 initReplicationStatus()
+                onSubscriptionInitialized?.onSubscriptionInitialized(repository, remoteNodeIdLong)
+                dbNotificationDispatcher.onNewDoorNode(remoteNodeIdLong, "")
                 initCompletable.complete(true)
                 dbNotificationDispatcher.addReplicationPendingEventListener(remoteNodeId.value,
                     this@ReplicationSubscriptionManager)

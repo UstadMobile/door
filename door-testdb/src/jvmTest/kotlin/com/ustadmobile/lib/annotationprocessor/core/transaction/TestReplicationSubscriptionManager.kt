@@ -67,7 +67,7 @@ class TestReplicationSubscriptionManager {
     }
 
     @Test
-    fun givenSubscriptionInitialized_whenRemoteInvalidateMessageReceived_thenShouldCallFetchReplications() {
+    fun givenSubscriptionInitialized_whenRemoteInvalidateMessageReceived_thenShouldCallInitListenerAndFetchReplications() {
         val dispatcher = mock<ReplicationNotificationDispatcher> { }
         val mockEventSource = mock<DoorEventSource> { }
         val mockEventSourceFactory = mock<DoorEventSourceFactory> {
@@ -76,10 +76,11 @@ class TestReplicationSubscriptionManager {
 
         val mockSendReplications = mock<ReplicationSubscriptionManager.ReplicateRunner> { }
         val mockFetchReplications = mock<ReplicationSubscriptionManager.ReplicateRunner> { }
+        val mockInitListener = mock<ReplicationSubscriptionManager.SubscriptionInitializedListener> { }
 
         val subscriptionManager = ReplicationSubscriptionManager(1, json, dispatcher,
             repo as DoorDatabaseRepository, GlobalScope, RepDb::class.doorDatabaseMetadata(), RepDb::class,
-            5, mockEventSourceFactory, mockSendReplications, mockFetchReplications)
+            5, mockEventSourceFactory, mockSendReplications, mockFetchReplications, mockInitListener)
 
         subscriptionManager.onMessage(DoorServerSentEvent("1", "INIT", "$testRemoteNodeId"))
 
@@ -88,6 +89,10 @@ class TestReplicationSubscriptionManager {
         verifyBlocking(mockFetchReplications, timeout(5000)) {
             replicate(repo as DoorDatabaseRepository, RepEntity.TABLE_ID, testRemoteNodeId)
         }
+        verifyBlocking(mockInitListener) {
+            onSubscriptionInitialized(any(), eq(testRemoteNodeId))
+        }
+        verify(dispatcher).onNewDoorNode(eq(testRemoteNodeId), any())
     }
 
     @Suppress("RedundantUnitExpression")//When it's removed it won't compile
