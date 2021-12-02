@@ -6,6 +6,7 @@ import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_SUBSCRIBE_SSE
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.PATH_REPLICATION
 import com.ustadmobile.door.annotation.ReplicateEntity
+import com.ustadmobile.door.entities.DoorNode
 import com.ustadmobile.door.entities.ReplicationStatus
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
@@ -235,7 +236,25 @@ class ReplicationSubscriptionManager(
                 remoteNodeId.value = remoteNodeIdLong
                 initReplicationStatus()
                 onSubscriptionInitialized?.onSubscriptionInitialized(repository, remoteNodeIdLong)
-                dbNotificationDispatcher.onNewDoorNode(remoteNodeIdLong, "")
+
+
+                var newNode = false
+
+                repository.db.withDoorTransactionAsync(repository.db::class.doorDatabaseMetadata().dbClass) { transactDb ->
+                    if(!transactDb.selectDoorNodeExists(remoteNodeIdLong)) {
+                        newNode = true
+                        transactDb.insertNewDoorNode(DoorNode().also {
+                            it.rel = DoorNode.SUBSCRIBED_TO
+                            it.nodeId = remoteNodeIdLong
+                            it.auth = null
+                        })
+                    }
+                }
+
+
+
+                dbNotificationDispatcher.takeIf { newNode }?.onNewDoorNode(remoteNodeIdLong, "")
+
                 initCompletable.complete(true)
                 dbNotificationDispatcher.addReplicationPendingEventListener(remoteNodeId.value,
                     this@ReplicationSubscriptionManager)

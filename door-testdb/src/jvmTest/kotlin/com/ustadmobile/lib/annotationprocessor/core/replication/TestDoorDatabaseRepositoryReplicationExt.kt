@@ -136,6 +136,21 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     }
 
+
+    private fun setupLocalAndRemoteReplicationManager() {
+        remoteRepDb.repDao.insertDoorNode(DoorNode().apply {
+            auth = "secret"
+            nodeId = LOCAL_NODE_ID
+        })
+
+        remoteRepDb.addChangeListener(ChangeListenerRequest(listOf(), remoteNotificationDispatcher))
+        localRepDb.addChangeListener(ChangeListenerRequest(listOf(), localNotificationDispatcher))
+
+        localReplicationSubscriptionManager = ReplicationSubscriptionManager(localRepDb.dbVersion, jsonSerializer, localNotificationDispatcher,
+            localDbRepo as DoorDatabaseRepository, GlobalScope, RepDb::class.doorDatabaseMetadata(), RepDb::class)
+    }
+
+
     @After
     fun tearDown() {
         if(::localReplicationSubscriptionManager.isInitialized)
@@ -243,24 +258,6 @@ class TestDoorDatabaseRepositoryReplicationExt  {
     }
 
 
-    private fun setupLocalAndRemoteReplicationManager() {
-        localRepDb.repDao.insertDoorNode(DoorNode().apply {
-            auth = "secret"
-            nodeId = REMOTE_NODE_ID
-        })
-
-        remoteRepDb.repDao.insertDoorNode(DoorNode().apply {
-            auth = "secret"
-            nodeId = LOCAL_NODE_ID
-        })
-
-        remoteRepDb.addChangeListener(ChangeListenerRequest(listOf(), remoteNotificationDispatcher))
-        localRepDb.addChangeListener(ChangeListenerRequest(listOf(), localNotificationDispatcher))
-
-        localReplicationSubscriptionManager = ReplicationSubscriptionManager(localRepDb.dbVersion, jsonSerializer, localNotificationDispatcher,
-            localDbRepo as DoorDatabaseRepository, GlobalScope, RepDb::class.doorDatabaseMetadata(), RepDb::class)
-    }
-
     @Test
     fun givenReplicationSubscriptionEnabled_whenChangeMadeOnRemote_thenShouldTransferToLocal() {
         setupLocalAndRemoteReplicationManager()
@@ -310,7 +307,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         }
 
         val entityOnLocal = runBlocking {
-            localRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000) {
+            localRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000 * 1000) {
                 it != null
             }
         } ?: throw IllegalStateException("Entity not transferred to local")
@@ -320,7 +317,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         localRepDb.repDao.update(entityOnLocal)
 
         val entityUpdatedOnRemote = runBlocking {
-            remoteRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000) {
+            remoteRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000 * 1000) {
                 (it?.reLastChangeTime ?: 0) == entityOnLocal.reLastChangeTime
             }
         }

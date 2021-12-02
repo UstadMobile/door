@@ -10,7 +10,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * NodeIdAuthCache will cache nodeId and auth strings to reduce the number of database queries required.
+ * NodeIdAuthCache will cache nodeId and auth strings to reduce the number of database queries required. Used when
+ * acting as a server for other (remote) nodes to receive replication updates from the local node.
  */
 class NodeIdAuthCache(
     private val db: DoorDatabase
@@ -42,6 +43,7 @@ class NodeIdAuthCache(
                 db.insertNewDoorNode(DoorNode().also {
                     it.auth = auth
                     it.nodeId = nodeId
+                    it.rel = DoorNode.SERVER_FOR
                 })
                 cachedAuth[nodeId] = auth
                 newNodeListeners.forEach {

@@ -171,10 +171,24 @@ internal suspend fun DoorDatabase.getDoorNodeAuth(nodeId : Long): String? {
 }
 
 internal suspend fun DoorDatabase.insertNewDoorNode(node: DoorNode) {
-    prepareAndUseStatementAsync("INSERT INTO DoorNode(nodeId, auth, endpoint) VALUES(?, ?, ?)") { stmt ->
+    prepareAndUseStatementAsync("INSERT INTO DoorNode(nodeId, auth, rel) VALUES(?, ?, ?)") { stmt ->
         stmt.setLong(1, node.nodeId)
         stmt.setString(2, node.auth)
-        stmt.setString(3, node.endpoint)
+        stmt.setInt(3, node.rel)
         stmt.executeUpdateAsyncKmp()
+    }
+}
+
+internal suspend fun DoorDatabase.selectDoorNodeExists(nodeId: Long): Boolean {
+    return prepareAndUseStatementAsync("""
+        SELECT EXISTS(
+               SELECT nodeId 
+                 FROM DoorNode
+                WHERE nodeId = ?) 
+    """) { stmt ->
+        stmt.setLong(1, nodeId)
+        stmt.executeQueryAsyncKmp().useResults { results -> results.mapRows {
+            it.getBoolean(1)
+        } }.first()
     }
 }

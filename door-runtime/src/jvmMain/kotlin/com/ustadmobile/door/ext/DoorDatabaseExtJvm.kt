@@ -81,13 +81,19 @@ actual inline fun <reified  T: DoorDatabase> T.asRepository(repositoryConfig: Re
 }
 
 /**
+ * Strip out any suffixes e.g. _ReplicateWrapper _JdbcImpl etc.
+ */
+private val KClass<*>.qualifiedNameBeforeLastUnderscore: String?
+    get() = this.qualifiedName?.substringBeforeLast("_")
+
+/**
  * Wrap a syncable database to prevent accidental use of the database instead of the repo on queries
  * that modify syncable entities. All modification queries (e.g. update, insert etc) must be done on
  * the repo.
  */
 @Suppress("UNCHECKED_CAST")
 actual fun <T: DoorDatabase> T.wrap(dbClass: KClass<T>) : T {
-    val wrapperClass = Class.forName("${dbClass.qualifiedName}${DoorDatabaseReplicateWrapper.SUFFIX}") as Class<T>
+    val wrapperClass = Class.forName("${dbClass.qualifiedNameBeforeLastUnderscore}${DoorDatabaseReplicateWrapper.SUFFIX}") as Class<T>
     return wrapperClass.getConstructor(dbClass.java).newInstance(this)
 }
 
