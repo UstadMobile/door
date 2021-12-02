@@ -8,6 +8,7 @@ import com.ustadmobile.door.ext.asRepository
 import com.ustadmobile.door.ext.doorDatabaseMetadata
 import com.ustadmobile.door.ext.waitUntilWithTimeout
 import com.ustadmobile.door.replication.*
+import com.ustadmobile.door.util.NodeIdAuthCache
 import com.ustadmobile.lib.annotationprocessor.core.VirtualHostScope
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
@@ -116,6 +117,10 @@ class TestDoorDatabaseRepositoryReplicationExt  {
                 NodeIdAndAuth(REMOTE_NODE_ID, "secret")
             }
 
+            bind<NodeIdAuthCache>() with scoped(remoteVirtualHostScope).singleton {
+                NodeIdAuthCache(instance<RepDb>(tag = DoorTag.TAG_DB))
+            }
+
             registerContextTranslator { _: ApplicationCall -> "localhost" }
         }
 
@@ -138,11 +143,6 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
 
     private fun setupLocalAndRemoteReplicationManager() {
-        remoteRepDb.repDao.insertDoorNode(DoorNode().apply {
-            auth = "secret"
-            nodeId = LOCAL_NODE_ID
-        })
-
         remoteRepDb.addChangeListener(ChangeListenerRequest(listOf(), remoteNotificationDispatcher))
         localRepDb.addChangeListener(ChangeListenerRequest(listOf(), localNotificationDispatcher))
 
@@ -317,7 +317,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         localRepDb.repDao.update(entityOnLocal)
 
         val entityUpdatedOnRemote = runBlocking {
-            remoteRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000 * 1000) {
+            remoteRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000) {
                 (it?.reLastChangeTime ?: 0) == entityOnLocal.reLastChangeTime
             }
         }

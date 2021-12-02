@@ -26,13 +26,11 @@ fun Route.addNodeIdAndAuthCheckInterceptor(){
             val remoteNodeIdAndAuth = requireRemoteNodeIdAndAuth()
 
             if(!nodeIdAuthCache.verify(remoteNodeIdAndAuth.first, remoteNodeIdAndAuth.second)) {
-                context.request.call.respond(
-                    HttpStatusCode.Unauthorized, "Invalid nodeId / nodeauth combo")
+                context.request.call.respond(HttpStatusCode.Unauthorized, "Invalid nodeId / nodeauth combo")
                 return@intercept finish()
             }
         }catch(e: Exception) {
-            context.request.call.respond(
-                HttpStatusCode.BadRequest, "Exception parsing node id / auth header")
+            context.request.call.respond(HttpStatusCode.BadRequest, "Exception parsing node id / auth header")
             return@intercept finish()
         }
     }

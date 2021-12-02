@@ -31,8 +31,8 @@ import org.kodein.type.TypeToken
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.reflect.KClass
 import com.ustadmobile.door.ext.withUtf8Charset
+import com.ustadmobile.door.ktor.addNodeIdAndAuthCheckInterceptor
 import com.ustadmobile.door.util.systemTimeInMillis
-
 
 @Suppress("BlockingMethodInNonBlockingContext") //Has to be done in Server Sent Events
 fun <T: DoorDatabase> Route.doorReplicationRoute(
@@ -40,8 +40,10 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
     dbKClass: KClass<out T>,
     jsonSerializer: Json
 ) {
-    route(PATH_REPLICATION) {
 
+    addNodeIdAndAuthCheckInterceptor()
+
+    route(PATH_REPLICATION) {
         post(ENDPOINT_CHECK_FOR_ENTITIES_ALREADY_RECEIVED) {
             try {
                 val di: DI by closestDI()
