@@ -469,7 +469,13 @@ fun defaultVal(typeName: TypeName) : CodeBlock {
         String::class.asTypeName() -> codeBlock.add("null as String?")
         else -> {
             if(kotlinType is ParameterizedTypeName && kotlinType.rawType == List::class.asClassName()) {
-                codeBlock.add("mutableListOf<%T>()", kotlinType.typeArguments[0])
+                val typeArg = if(kotlinType.typeArguments[0] == String::class.asTypeName()) {
+                    kotlinType.typeArguments[0].copy(nullable = true)
+                }else {
+                    kotlinType.typeArguments[0]
+                }
+
+                codeBlock.add("mutableListOf<%T>()", typeArg)
             }else {
                 codeBlock.add("null as %T?", typeName)
             }

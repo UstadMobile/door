@@ -43,7 +43,7 @@ fun ExecutableElement.asMemberOf(typeElement: TypeElement, processingEnvironment
 fun ExecutableElement.accessAsPropertyOrFunctionInvocationCall(): String {
     val methodName = simpleName.toString()
     if(simpleName.toString().startsWith("get")) {
-        return methodName.substring(3, 4).toLowerCase(Locale.ROOT) + methodName.substring(4)
+        return methodName.substring(3, 4).lowercase() + methodName.substring(4)
     }else {
         return "$simpleName()"
     }
@@ -86,8 +86,9 @@ fun ExecutableElement.asFunSpecConvertedToKotlinTypes(enclosing: DeclaredType,
     }
 
     if(suspendedReturnType != null && suspendedReturnType != UNIT) {
-        funSpec.returns(suspendedReturnType.copy(nullable = forceNullableReturn
-                || suspendedParamEl?.getAnnotation(Nullable::class.java) != null))
+        val returnType = suspendedReturnType.copy(nullable = forceNullableReturn
+                || suspendedParamEl?.getAnnotation(Nullable::class.java) != null)
+        funSpec.returns(returnType.makeParameterizedStringsNullableIfList())
     }else if(suspendedReturnType == null) {
         var returnType = resolvedExecutableType.returnType.asTypeName().javaToKotlinType()
                 .copy(nullable = forceNullableReturn || getAnnotation(Nullable::class.java) != null)
@@ -112,7 +113,8 @@ fun ExecutableElement.asFunSpecConvertedToKotlinTypesForDaoFun(
 
     return asFunSpecConvertedToKotlinTypes(enclosing, processingEnv,
         forceNullableReturn = returnTypeName.isNullableAsSelectReturnResult,
-        forceNullableParameterTypeArgs = returnTypeName.isNullableParameterTypeAsSelectReturnResult)
+        forceNullableParameterTypeArgs = returnTypeName.isNullableParameterTypeAsSelectReturnResult
+                || returnTypeName.isStringList())
 }
 
 fun ExecutableElement.asOverridingFunSpecConvertedToKotlinTypes(enclosing: DeclaredType,
