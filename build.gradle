@@ -1,5 +1,5 @@
 group 'com.ustadmobile.door'
-version '0.0.32q'
+version '0.0.32s'
 
 ext.localProperties = new Properties()
 if(project.file("local.properties").exists()) {
@@ -8,7 +8,7 @@ if(project.file("local.properties").exists()) {
 
 buildscript {
 
-    ext.kotlin_version = "1.5.31"
+    ext.kotlin_version = "1.6.0"
     ext.atomicfu_version = '0.16.3'
 
     repositories {
