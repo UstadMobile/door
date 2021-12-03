@@ -232,3 +232,24 @@ val TypeName.preparedStatementSetterGetterTypeName: String
         }
 
 fun TypeName.isArrayType(): Boolean = (this is ParameterizedTypeName && this.rawType.canonicalName == "kotlin.Array")
+
+/**
+ * Shorthand to check if this TypeName represents a List of Strings (and we need to
+ * check that those string typename args are nullable)
+ */
+fun TypeName.isStringList(): Boolean {
+    return this is ParameterizedTypeName && this.rawType == List::class.asClassName()
+            && this.typeArguments[0] == String::class.asTypeName()
+}
+
+/**
+ * Where this TypeName represents a list of Strings, make the type args nullable as
+ * needed.
+ */
+fun TypeName.makeParameterizedStringsNullableIfList(): TypeName {
+    if(isStringList()) {
+        return List::class.asTypeName().parameterizedBy(String::class.asTypeName().copy(nullable = true))
+    }else {
+        return this
+    }
+}
