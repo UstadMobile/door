@@ -67,7 +67,7 @@ class SQLitePreparedStatementJs(
      * @see <a href="https://www.sqlite.org/datatype3.html">Datatypes</a>
      */
     override fun setLong(index: Int, value: Long) {
-        params[index - 1] = if(value <= 1) eval("Number(${value})") else  eval("${value}n")
+        params[index - 1] = if(value in 0..1) eval("Number(${value})") else  eval("${value}n")
     }
 
     override fun setFloat(index: Int, value: Float) {
