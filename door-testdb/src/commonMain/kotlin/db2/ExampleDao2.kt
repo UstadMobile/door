@@ -63,6 +63,12 @@ abstract class ExampleDao2 {
     @Query("SELECT * FROM ExampleEntity2")
     abstract suspend fun findAllAsync(): List<ExampleEntity2>
 
+    @Query("SELECT name FROM ExampleEntity2")
+    abstract suspend fun findAllStrings(): List<String?>
+
+    @Query("SELECT name FROM ExampleEntity2")
+    abstract fun findAllStringsSync(): List<String?>
+
     @Update
     abstract fun updateSingleItem(entity: ExampleEntity2)
 

@@ -54,6 +54,7 @@ fun resolveEntityFromResultType(type: TypeName) =
 fun pkgNameOfElement(element: Element, processingEnv: ProcessingEnvironment) =
         processingEnv.elementUtils.getPackageOf(element).qualifiedName.toString()
 
+@Suppress("UNCHECKED_CAST")
 fun entityTypesOnDb(dbType: TypeElement, processingEnv: ProcessingEnvironment): MutableList<TypeElement> {
     val entityTypeElements = mutableListOf<TypeElement>()
     for (annotationMirror in dbType.getAnnotationMirrors()) {
@@ -445,7 +446,13 @@ fun defaultVal(typeName: TypeName) : CodeBlock {
         String::class.asTypeName() -> codeBlock.add("null as String?")
         else -> {
             if(kotlinType is ParameterizedTypeName && kotlinType.rawType == List::class.asClassName()) {
-                codeBlock.add("mutableListOf<%T>()", kotlinType.typeArguments[0])
+                val typeArg = if(kotlinType.typeArguments[0] == String::class.asTypeName()) {
+                    kotlinType.typeArguments[0].copy(nullable = true)
+                }else {
+                    kotlinType.typeArguments[0]
+                }
+
+                codeBlock.add("mutableListOf<%T>()", typeArg)
             }else {
                 codeBlock.add("null as %T?", typeName)
             }
