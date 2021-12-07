@@ -603,7 +603,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_REP_RUN_ON_CHANGE_RUNNER)
                 .addReplicationRunOnChangeRunnerType(dbTypeEl)
                 .build()
-                .writeToDirsFromArg(listOf(OPTION_JVM_DIRS, OPTION_JS_OUTPUT))
+                .writeToDirsFromArg(listOf(OPTION_JVM_DIRS, OPTION_JS_OUTPUT, OPTION_ANDROID_OUTPUT))
         }
 
 

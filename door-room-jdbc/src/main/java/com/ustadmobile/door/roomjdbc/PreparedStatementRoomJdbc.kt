@@ -63,7 +63,7 @@ class PreparedStatementRoomJdbc(
     override fun getArgCount(): Int = numArgs
 
     override fun executeQuery(): ResultSet {
-        return ResultSetRoomJdbc(roomConnection.roomDb.query(this))
+        return ResultSetRoomJdbc(roomConnection.roomDb.query(this), this)
     }
 
     override fun executeUpdate(): Int {

@@ -11,7 +11,8 @@ import java.sql.Date
 import java.util.*
 
 class ResultSetRoomJdbc(
-    private val cursor: Cursor
+    private val cursor: Cursor,
+    private val statement: Statement
 ): ResultSet {
 
     private var lastFetchedIndex: Int = -1
@@ -30,25 +31,31 @@ class ResultSetRoomJdbc(
 
     override fun next() = cursor.moveToNext()
 
-
     override fun wasNull(): Boolean = cursor.isNull(lastFetchedIndex - 1)
+
+    private fun getColumnIndexAndSetLastFetched(columnLabel: String) : Int{
+        return cursor.getColumnIndexOrThrow(columnLabel).also {
+            //Android indexes start at 0, JDBC indexes start at 1
+            lastFetchedIndex = it + 1
+        }
+    }
 
     override fun getString(columnIndex: Int): String {
         lastFetchedIndex = columnIndex
         return cursor.getString(columnIndex - 1)
     }
 
-    override fun getString(columnLabel: String?): String {
-        TODO("Not yet implemented")
+    override fun getString(columnLabel: String): String {
+        return cursor.getString(getColumnIndexAndSetLastFetched(columnLabel))
     }
 
     override fun getBoolean(columnIndex: Int): Boolean {
         lastFetchedIndex = columnIndex
-        return cursor.getLong(columnIndex -1) == 0L
+        return cursor.getLong(columnIndex -1) == 1L
     }
 
-    override fun getBoolean(columnLabel: String?): Boolean {
-        TODO("Not yet implemented")
+    override fun getBoolean(columnLabel: String): Boolean {
+        return cursor.getLong(getColumnIndexAndSetLastFetched(columnLabel)) == 1L
     }
 
     override fun getByte(columnIndex: Int): Byte {
@@ -72,20 +79,22 @@ class ResultSetRoomJdbc(
         return cursor.getLong(columnIndex - 1).toInt()
     }
 
-    override fun getInt(columnLabel: String?): Int {
-        TODO("Not yet implemented")
+    override fun getInt(columnLabel: String): Int {
+        return cursor.getInt(getColumnIndexAndSetLastFetched(columnLabel))
     }
 
     override fun getLong(columnIndex: Int): Long {
-        TODO("Not yet implemented")
+        lastFetchedIndex = columnIndex
+        return cursor.getLong(columnIndex - 1)
     }
 
-    override fun getLong(columnLabel: String?): Long {
-        TODO("Not yet implemented")
+    override fun getLong(columnLabel: String): Long {
+        return cursor.getLong(getColumnIndexAndSetLastFetched(columnLabel))
     }
 
     override fun getFloat(columnIndex: Int): Float {
-        TODO("Not yet implemented")
+        lastFetchedIndex = columnIndex
+        return cursor.getFloat(columnIndex - 1)
     }
 
     override fun getFloat(columnLabel: String?): Float {
@@ -551,7 +560,7 @@ class ResultSetRoomJdbc(
     }
 
     override fun getStatement(): Statement {
-        TODO("Not yet implemented")
+        return statement
     }
 
     override fun getRef(columnIndex: Int): Ref {
