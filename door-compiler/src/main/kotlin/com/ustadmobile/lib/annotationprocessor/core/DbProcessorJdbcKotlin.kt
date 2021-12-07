@@ -1410,25 +1410,6 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
     }
 
 
-    /**
-     * Add a ReceiveView for the given EntityTypeElement.
-     */
-    private fun CodeBlock.Builder.addCreateReceiveView(
-        entityTypeEl: TypeElement,
-        sqlListVar: String
-    ): CodeBlock.Builder {
-        val trkrEl = entityTypeEl.getReplicationTracker(processingEnv)
-        val receiveViewAnn = entityTypeEl.getAnnotation(ReplicateReceiveView::class.java)
-        val viewName = receiveViewAnn?.name ?: "${entityTypeEl.entityTableName}$SUFFIX_DEFAULT_RECEIVEVIEW"
-        val sql = receiveViewAnn?.value ?: """
-            SELECT ${entityTypeEl.simpleName}.*, ${trkrEl.entityTableName}.*
-              FROM ${entityTypeEl.simpleName}
-                   LEFT JOIN ${trkrEl.simpleName} ON ${trkrEl.entityTableName}.${trkrEl.replicationTrackerForeignKey.simpleName} = 
-                        ${entityTypeEl.entityTableName}.${entityTypeEl.entityPrimaryKey?.simpleName}
-        """.minifySql()
-        add("$sqlListVar += %S\n", "CREATE VIEW $viewName AS $sql")
-        return this
-    }
 
     fun TypeSpec.Builder.addClearAllTablesFunction(
         dbTypeElement: TypeElement

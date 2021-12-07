@@ -21,7 +21,7 @@ actual class DatabaseBuilder<T: DoorDatabase>(
             val builder = DatabaseBuilder(Room.databaseBuilder(applicationContext, dbClass.java, dbName),
                 dbClass)
 
-            val callbackClassName = "${dbClass.java.canonicalName}_SyncCallback"
+            val callbackClassName = "${dbClass.java.canonicalName}_AndroidReplicationCallback"
             println("Attempt to load callback $callbackClassName")
 
             val callbackClass = Class.forName(callbackClassName).newInstance() as DoorDatabaseCallback

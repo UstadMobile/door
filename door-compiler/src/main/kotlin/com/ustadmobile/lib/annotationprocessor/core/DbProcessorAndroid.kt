@@ -12,12 +12,63 @@ import javax.annotation.processing.RoundEnvironment
 import javax.lang.model.element.TypeElement
 import javax.tools.Diagnostic
 import com.ustadmobile.door.DoorDatabaseCallback
+import com.ustadmobile.door.DoorDbType
+import com.ustadmobile.door.DoorSqlDatabase
+import com.ustadmobile.door.annotation.ReplicateEntity
 
 class DbProcessorAndroid: AbstractDbProcessor() {
+
+    fun FileSpec.Builder.addAndroidReplicationCallbackType(dbTypeElement: TypeElement): FileSpec.Builder {
+        addType(TypeSpec
+            .classBuilder("${dbTypeElement.simpleName}$SUFFIX_ANDROID_REPLICATION_CALLBACK")
+            .addSuperinterface(DoorDatabaseCallback::class)
+            .addFunction(FunSpec.builder("onCreate")
+                .addParameter("db", DoorSqlDatabase::class)
+                .addModifiers(KModifier.OVERRIDE)
+                .addCode(CodeBlock.builder()
+                    .apply {
+                        add("val _stmtList = mutableListOf<String>()\n")
+                        dbTypeElement.allDbEntities(processingEnv).forEach { entityType ->
+                            if(entityType.hasAnnotation(ReplicateEntity::class.java)) {
+                                addReplicateEntityChangeLogTrigger(entityType, "_stmtList",
+                                    DoorDbType.SQLITE)
+                                addCreateReceiveView(entityType, "_stmtList")
+                            }
+
+                            addCreateTriggersCode(entityType, "_stmtList", DoorDbType.SQLITE)
+
+                            if(entityType.entityHasAttachments) {
+                                addGenerateAttachmentTriggerSqlite(entityType, "_stmt.executeUpdate",
+                                    "_stmtList")
+                            }
+                        }
+                        beginControlFlow("_stmtList.forEach")
+                        add("db.execSQL(it)\n")
+                        endControlFlow()
+                    }
+                    .build())
+                .build())
+            .addFunction(FunSpec.builder("onOpen")
+                .addParameter("db", DoorSqlDatabase::class)
+                .addModifiers(KModifier.OVERRIDE)
+                .build())
+            .build())
+
+        return this
+    }
 
     override fun process(elements: MutableSet<out TypeElement>, roundEnv: RoundEnvironment): Boolean {
         //find all databases on the source path
         val outDirsArg = processingEnv.options[OPTION_ANDROID_OUTPUT]
+
+        for(dbTypeEl in roundEnv.getElementsAnnotatedWith(Database::class.java)) {
+            FileSpec.builder(dbTypeEl.packageName,
+                dbTypeEl.simpleName.toString() + SUFFIX_ANDROID_REPLICATION_CALLBACK)
+                .addAndroidReplicationCallbackType(dbTypeEl as TypeElement)
+                .build()
+                .writeToDirsFromArg(OPTION_ANDROID_OUTPUT)
+        }
+
         if(outDirsArg == null) {
             messager.printMessage(Diagnostic.Kind.ERROR,
                     "DoorDb Android output not specified: please provide $OPTION_ANDROID_OUTPUT " +
@@ -80,4 +131,13 @@ class DbProcessorAndroid: AbstractDbProcessor() {
         return true
     }
 
+
+    companion object {
+
+        /**
+         *
+         */
+        const val SUFFIX_ANDROID_REPLICATION_CALLBACK = "_AndroidReplicationCallback"
+
+    }
 }
