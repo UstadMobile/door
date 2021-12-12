@@ -33,25 +33,32 @@ internal fun generateTrackerEntity(entityClass: TypeElement, processingEnv: Proc
                     .build())
             .addProperties(listOf(
                     PropertySpec.builder(DbProcessorSync.TRACKER_PK_FIELDNAME, LONG)
+                            .mutable()
                             .addAnnotation(AnnotationSpec.builder(PrimaryKey::class).addMember("autoGenerate = true").build())
                             .initializer(DbProcessorSync.TRACKER_PK_FIELDNAME)
                             .build(),
                     PropertySpec.builder(DbProcessorSync.TRACKER_ENTITY_PK_FIELDNAME, pkFieldTypeName)
+                            .mutable()
                             .initializer(DbProcessorSync.TRACKER_ENTITY_PK_FIELDNAME)
                             .build(),
                     PropertySpec.builder(DbProcessorSync.TRACKER_DESTID_FIELDNAME, INT)
+                            .mutable()
                             .initializer(DbProcessorSync.TRACKER_DESTID_FIELDNAME)
                             .build(),
                     PropertySpec.builder(DbProcessorSync.TRACKER_CHANGESEQNUM_FIELDNAME, INT)
+                            .mutable()
                             .initializer(DbProcessorSync.TRACKER_CHANGESEQNUM_FIELDNAME)
                             .build(),
                     PropertySpec.builder(DbProcessorSync.TRACKER_RECEIVED_FIELDNAME, BOOLEAN)
+                            .mutable()
                             .initializer(DbProcessorSync.TRACKER_RECEIVED_FIELDNAME)
                             .build(),
                     PropertySpec.builder(DbProcessorSync.TRACKER_REQUESTID_FIELDNAME, INT)
+                            .mutable()
                             .initializer(DbProcessorSync.TRACKER_REQUESTID_FIELDNAME)
                             .build(),
                     PropertySpec.builder(DbProcessorSync.TRACKER_TIMESTAMP_FIELDNAME, LONG)
+                            .mutable()
                             .initializer(DbProcessorSync.TRACKER_TIMESTAMP_FIELDNAME)
                             .build()
             ))
