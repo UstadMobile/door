@@ -1,5 +1,5 @@
 group 'com.ustadmobile.door'
-version '0.0.32r'
+version '0.0.32s'
 
 ext.localProperties = new Properties()
 if(project.file("local.properties").exists()) {
@@ -8,8 +8,8 @@ if(project.file("local.properties").exists()) {
 
 buildscript {
 
-    ext.kotlin_version = "1.5.31"
-    ext.atomicfu_version = '0.16.3'
+    ext.kotlin_version = "1.6.0"
+    ext.atomicfu_version = '0.17.0'
 
     repositories {
         google()
@@ -25,15 +25,15 @@ buildscript {
 }
 
 ext {
-    version_kotlin = "1.5.31"
-    version_ktor = "1.6.4"
+    version_kotlin = "1.6.0"
+    version_ktor = "1.6.7"
     version_nanohttpd = "2.3.1"
-    version_napier = "2.1.0"
-    version_atomicfu = '0.16.3'
+    version_napier = "2.2.0"
+    version_atomicfu = '0.17.0'
     version_sqlite_jdbc = "3.36.0.3"
-    version_kodein_di = "7.8.0"
-    version_kotlin_mockito = "3.2.0"
-    version_mockwebserver = "4.9.0"
+    version_kodein_di = "7.9.0"
+    version_kotlin_mockito = "4.0.0"
+    version_mockwebserver = "4.9.3"
     version_android_room = "2.3.0"
     version_androidx_lifecycle = "2.3.1"
     version_androidx_paging = "2.1.2"
@@ -48,15 +48,15 @@ ext {
     version_postgres_jdbc = "42.2.20"
     version_apache_commons_dbcp2 = "2.8.0"
     version_logback = "1.2.3"
-    version_okhttp = "4.9.0"
-    version_kotlinx_serialization = "1.3.0"
+    version_okhttp = "4.9.1"
+    version_kotlinx_serialization = "1.3.1"
 
-    version_kotlin_react = "17.0.2-pre.260-kotlin-1.5.31"
-    version_kotlin_react_router_dom = "5.3.0-pre.260-kotlin-1.5.31"
-    version_kotlin_styled = "5.3.3-pre.260-kotlin-1.5.31"
-    version_kotlin_redux = "4.1.1-pre.260-kotlin-1.5.31"
-    version_kotlin_extensions = "1.0.1-pre.260-kotlin-1.5.31"
-    version_kotlin_react_redux = "7.2.4-pre.260-kotlin-1.5.31"
+    version_kotlin_react = "17.0.2-pre.279-kotlin-1.6.0"
+    version_kotlin_react_router_dom = "6.0.2-pre.279-kotlin-1.6.0"
+    version_kotlin_styled = "5.3.3-pre.279-kotlin-1.6.0"
+    version_kotlin_redux = "4.1.2-pre.279-kotlin-1.6.0"
+    version_kotlin_extensions = "1.0.1-pre.279-kotlin-1.6.0"
+    version_kotlin_react_redux = "7.2.6-pre.279-kotlin-1.6.0"
 
 }
 
