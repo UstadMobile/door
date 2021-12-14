@@ -4,7 +4,7 @@ import react.dom.render
 
 fun main() {
     window.onload = {
-        render(document.getElementById("root")) {
+        render(document.getElementById("root")!!) {
             renderApp()
         }
     }
