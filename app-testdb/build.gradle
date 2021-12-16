@@ -21,7 +21,7 @@ kotlin {
 }
 
 dependencies {
-    testImplementation 'org.jetbrains.kotlin:kotlin-test'
+    testImplementation 'org.jetbrains.kotlin:kotlin-test:1.6.0'
     implementation "org.jetbrains.kotlin-wrappers:kotlin-react:$version_kotlin_react"
     implementation "org.jetbrains.kotlin-wrappers:kotlin-react-dom:$version_kotlin_react"
     implementation "org.jetbrains.kotlin-wrappers:kotlin-styled:$version_kotlin_styled"

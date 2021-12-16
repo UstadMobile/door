@@ -60,14 +60,14 @@ class SQLitePreparedStatementJs(
     }
 
     /**
-     * JS doesn't support 64 bit, so inserting a long web worker won't pass it,
+     * JS doesn't support 64 bit, so inserting a long to a web worker won't pass it,
      * instead we convert it to a String and pass it to a worker and SQLite will convert
      * it by default to INTEGER/REAL respectively
      *
      * @see <a href="https://www.sqlite.org/datatype3.html">Datatypes</a>
      */
     override fun setLong(index: Int, value: Long) {
-        params[index - 1] = eval("${value}n")
+        params[index - 1] = if(value in 0..1) eval("Number(${value})") else  eval("${value}n")
     }
 
     override fun setFloat(index: Int, value: Float) {
