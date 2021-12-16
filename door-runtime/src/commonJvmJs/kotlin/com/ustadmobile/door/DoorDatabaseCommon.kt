@@ -1,9 +1,12 @@
 package com.ustadmobile.door
+
+import io.github.aakira.napier.Napier
 import com.ustadmobile.door.jdbc.*
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Runnable
 import com.ustadmobile.door.ext.concurrentSafeListOf
+import com.ustadmobile.door.ext.DoorTag
 
 abstract class DoorDatabaseCommon {
 
@@ -150,7 +153,10 @@ abstract class DoorDatabaseCommon {
             connection = openConnection()
             stmt = connection.prepareStatement(stmtConfig)
             return block(stmt)
-        }finally {
+        }catch(e: Exception) {
+            Napier.e("prepareAndUseStatement: Exception running SQL: '${stmtConfig.sql}'", e, tag = DoorTag.LOG_TAG)
+            throw e
+        } finally {
             stmt?.close()
             connection?.close()
         }
@@ -175,6 +181,9 @@ abstract class DoorDatabaseCommon {
             stmt = connection.prepareStatement(stmtConfig)
 
             return block(stmt)
+        }catch(e: Exception) {
+            Napier.e("prepareAndUseStatementAsync: Exception running SQL: '${stmtConfig.sql}'", e, tag = DoorTag.LOG_TAG)
+            throw e
         }finally {
             stmt?.close()
             connection?.close()
