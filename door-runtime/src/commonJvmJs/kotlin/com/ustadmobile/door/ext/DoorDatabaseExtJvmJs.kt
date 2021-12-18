@@ -2,6 +2,7 @@ package com.ustadmobile.door.ext
 
 import com.ustadmobile.door.*
 import com.ustadmobile.door.jdbc.*
+import io.github.aakira.napier.Napier
 
 actual suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
     stmtConfig: PreparedStatementConfig,
@@ -14,6 +15,9 @@ actual suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
         stmt = connection.prepareStatement(stmtConfig)
 
         return block(stmt)
+    }catch(e: Exception) {
+        Napier.e("prepareAndUseStatement: Exception running SQL: '${stmtConfig.sql}'", e, tag = DoorTag.LOG_TAG)
+        throw e
     }finally {
         stmt?.close()
         connection?.close()
@@ -30,6 +34,9 @@ actual fun <R> DoorDatabase.prepareAndUseStatement(
         connection = openConnection()
         stmt = connection.prepareStatement(stmtConfig)
         return block(stmt)
+    }catch(e: Exception) {
+        Napier.e("prepareAndUseStatement: Exception running SQL: '${stmtConfig.sql}'", e, tag = DoorTag.LOG_TAG)
+        throw e
     }finally {
         stmt?.close()
         connection?.close()

@@ -9,6 +9,7 @@ import com.ustadmobile.door.DoorDatabaseRepository.Companion.DOOR_ATTACHMENT_URI
 import com.ustadmobile.door.jdbc.PreparedStatement
 import com.ustadmobile.door.PreparedStatementConfig
 import com.ustadmobile.door.roomjdbc.ConnectionRoomJdbc
+import io.github.aakira.napier.Napier
 import java.io.File
 import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
@@ -93,6 +94,9 @@ actual suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
         stmt = ConnectionRoomJdbc(this).prepareStatement(
             stmtConfig.sql, stmtConfig.generatedKeys)
         return block(stmt)
+    }catch(e: Exception) {
+        Napier.e("prepareAndUseStatement: Exception running SQL: '${stmtConfig.sql}'", e, tag = DoorTag.LOG_TAG)
+        throw e
     }finally {
         stmt?.close()
     }
@@ -108,6 +112,9 @@ actual fun <R> DoorDatabase.prepareAndUseStatement(
         stmt = ConnectionRoomJdbc(this).prepareStatement(
             stmtConfig.sql, stmtConfig.generatedKeys)
         return block(stmt)
+    }catch(e: Exception) {
+        Napier.e("prepareAndUseStatement: Exception running SQL: '${stmtConfig.sql}'", e, tag = DoorTag.LOG_TAG)
+        throw e
     }finally {
         stmt?.close()
     }
