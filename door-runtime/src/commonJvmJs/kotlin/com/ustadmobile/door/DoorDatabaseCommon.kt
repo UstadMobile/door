@@ -1,10 +1,12 @@
 package com.ustadmobile.door
 import com.ustadmobile.door.ext.*
+import io.github.aakira.napier.Napier
 import com.ustadmobile.door.jdbc.*
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Runnable
-import io.github.aakira.napier.Napier
+import com.ustadmobile.door.ext.concurrentSafeListOf
+import com.ustadmobile.door.ext.DoorTag
 
 abstract class DoorDatabaseCommon {
 
