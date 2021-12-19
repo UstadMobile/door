@@ -45,8 +45,8 @@ class ReplicationNotificationDispatcher(
             WHERE EXISTS(
                   SELECT ${repEntity.trackerTableName}.${repEntity.trackerDestNodeIdFieldName}
                     FROM ${repEntity.trackerTableName}
-                   WHERE RepEntityTracker.trkrDestination = ?
-                     AND CAST(RepEntityTracker.trkrProcessed AS BOOLEAN) = false)
+                   WHERE ${repEntity.trackerDestNodeIdFieldName} = ?
+                     AND CAST(${repEntity.trackerProcessedFieldName} AS INTEGER) = 0)
             """
         }
     }

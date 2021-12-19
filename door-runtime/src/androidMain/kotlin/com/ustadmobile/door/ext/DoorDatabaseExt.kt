@@ -36,13 +36,13 @@ actual fun DoorDatabase.dbSchemaVersion(): Int {
 }
 
 actual suspend fun <T: DoorDatabase, R> T.withDoorTransactionAsync(dbKClass: KClass<out T>, block: suspend (T) -> R) : R{
-    return withTransaction {
+    return rootDatabase.withTransaction {
         block(this)
     }
 }
 
 actual fun <T: DoorDatabase, R> T.withDoorTransaction(dbKClass: KClass<T>, block: (T) -> R) : R {
-    return runInTransaction(Callable {
+    return rootDatabase.runInTransaction(Callable {
         block(this)
     })
 }
@@ -91,7 +91,7 @@ actual suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
     var stmt: PreparedStatement? = null
 
     try {
-        stmt = ConnectionRoomJdbc(this).prepareStatement(
+        stmt = ConnectionRoomJdbc(rootDatabase).prepareStatement(
             stmtConfig.sql, stmtConfig.generatedKeys)
         return block(stmt)
     }catch(e: Exception) {
@@ -109,7 +109,7 @@ actual fun <R> DoorDatabase.prepareAndUseStatement(
     var stmt: PreparedStatement? = null
 
     try {
-        stmt = ConnectionRoomJdbc(this).prepareStatement(
+        stmt = ConnectionRoomJdbc(rootDatabase).prepareStatement(
             stmtConfig.sql, stmtConfig.generatedKeys)
         return block(stmt)
     }catch(e: Exception) {
@@ -167,6 +167,7 @@ actual inline fun <reified  T: DoorDatabase> T.asRepository(repositoryConfig: Re
     return repo
 }
 
+@Suppress("unused")
 fun <T: DoorDatabase> DoorDatabase.isWrappable(dbClass: KClass<T>): Boolean {
     try {
         Class.forName("${dbClass.qualifiedName}${DoorDatabaseReplicateWrapper.SUFFIX}")

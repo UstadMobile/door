@@ -20,30 +20,26 @@ class PreparedStatementRoomJdbc(
     private val autoGenerateKeys: Int = PreparedStatement.NO_GENERATED_KEYS,
 ) : StatementRoomJdbc(roomConnection), PreparedStatement, SupportSQLiteQuery {
 
-    private val bindingTypes = ArrayList<Int>()
+    private val bindingTypes = mutableMapOf<Int, Int>()
 
-    private val boundLongs = ArrayList<Long>()
+    private val boundLongs = mutableMapOf<Int, Long>()
 
-    private val boundDoubles = ArrayList<Double>()
+    private val boundDoubles = mutableMapOf<Int, Double>()
 
-    private val boundStrings = ArrayList<String?>()
-
-    private val boundBlobs = ArrayList<ByteArray>()
+    private val boundStrings = mutableMapOf<Int, String?>()
 
     private var numArgs = 0
 
     private var lastGeneratedKey: Long = 0
 
+    private var closeStmt: Boolean = false
+
     private val compiledStmt: SupportSQLiteStatement by lazy {
+        closeStmt = true
         roomConnection.roomDb.openHelper.writableDatabase.compileStatement(querySql)
     }
 
     private fun ensureCapacity(paramCount: Int) {
-        bindingTypes.ensureCapacity(paramCount)
-        boundLongs.ensureCapacity(paramCount)
-        boundDoubles.ensureCapacity(paramCount)
-        boundStrings.ensureCapacity(paramCount)
-        boundBlobs.ensureCapacity(paramCount)
         numArgs = max(numArgs, paramCount)
     }
 
@@ -52,12 +48,23 @@ class PreparedStatementRoomJdbc(
     override fun bindTo(statement: SupportSQLiteProgram) {
         for(index in 0 until numArgs) {
             when(bindingTypes[index]) {
-                NULL -> statement.bindNull(index)
-                LONG -> statement.bindLong(index, boundLongs[index])
-                DOUBLE -> statement.bindDouble(index, boundDoubles[index])
-                STRING -> statement.bindString(index, boundStrings[index])
+                NULL -> statement.bindNull(index + 1)
+                LONG -> statement.bindLong(index + 1, boundLongs[index]!!)
+                DOUBLE -> statement.bindDouble(index + 1, boundDoubles[index]!!)
+                STRING -> {
+                    if(boundStrings[index] != null) {
+                        statement.bindString(index + 1, boundStrings[index])
+                    }else {
+                        statement.bindNull(index + 1)
+                    }
+                }
             }
         }
+    }
+
+    override fun close() {
+        if(closeStmt)
+            compiledStmt.close()
     }
 
     override fun getArgCount(): Int = numArgs
@@ -86,7 +93,7 @@ class PreparedStatementRoomJdbc(
     }
 
     override fun setNull(parameterIndex: Int, sqlType: Int) {
-        ensureCapacity(parameterIndex)
+        ensureCapacity(parameterIndex + 1)
         bindingTypes[parameterIndex - 1] = NULL
     }
 
@@ -95,33 +102,45 @@ class PreparedStatementRoomJdbc(
     }
 
     override fun setBoolean(parameterIndex: Int, x: Boolean) {
-        ensureCapacity(parameterIndex)
+        ensureCapacity(parameterIndex + 1)
         bindingTypes[parameterIndex - 1] = LONG
         boundLongs[parameterIndex -1] = if(x) 1L else 0L
     }
 
     override fun setByte(parameterIndex: Int, x: Byte) {
-        TODO("Not yet implemented")
+        ensureCapacity(parameterIndex + 1)
+        bindingTypes[parameterIndex - 1] = LONG
+        boundLongs[parameterIndex - 1] = x.toLong()
     }
 
     override fun setShort(parameterIndex: Int, x: Short) {
-        TODO("Not yet implemented")
+        ensureCapacity(parameterIndex + 1)
+        bindingTypes[parameterIndex - 1] = LONG
+        boundLongs[parameterIndex - 1] = x.toLong()
     }
 
     override fun setInt(parameterIndex: Int, x: Int) {
-        TODO("Not yet implemented")
+        ensureCapacity(parameterIndex + 1)
+        bindingTypes[parameterIndex - 1] = LONG
+        boundLongs[parameterIndex - 1] = x.toLong()
     }
 
     override fun setLong(parameterIndex: Int, x: Long) {
-        TODO("Not yet implemented")
+        ensureCapacity(parameterIndex + 1)
+        bindingTypes[parameterIndex - 1] = LONG
+        boundLongs[parameterIndex - 1] = x
     }
 
     override fun setFloat(parameterIndex: Int, x: Float) {
-        TODO("Not yet implemented")
+        ensureCapacity(parameterIndex + 1)
+        bindingTypes[parameterIndex - 1] = DOUBLE
+        boundDoubles[parameterIndex - 1] = x.toDouble()
     }
 
     override fun setDouble(parameterIndex: Int, x: Double) {
-        TODO("Not yet implemented")
+        ensureCapacity(parameterIndex + 1)
+        bindingTypes[parameterIndex - 1] = DOUBLE
+        boundDoubles[parameterIndex - 1] = x
     }
 
     override fun setBigDecimal(parameterIndex: Int, x: BigDecimal?) {
@@ -129,7 +148,7 @@ class PreparedStatementRoomJdbc(
     }
 
     override fun setString(parameterIndex: Int, x: String?) {
-        ensureCapacity(parameterIndex)
+        ensureCapacity(parameterIndex + 1)
         bindingTypes[parameterIndex -1] = STRING
         boundStrings[parameterIndex -1] = x
     }
