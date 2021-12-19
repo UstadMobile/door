@@ -57,7 +57,8 @@ class ReplicationNotificationDispatcher(
 
     override fun onNewDoorNode(newNodeId: Long, auth: String) {
         coroutineScope.launch {
-            replicationRunOnChangeRunner.runOnNewNode(newNodeId)
+            val tablesChanged = replicationRunOnChangeRunner.runOnNewNode(newNodeId)
+            findAndSendPendingReplicationNotifications(tablesChanged.toSet())
         }
     }
 
@@ -74,7 +75,11 @@ class ReplicationNotificationDispatcher(
         Napier.d("ReplicationNotificationDispatcher for [$db]: processing changes to ${changedTables.joinToString()}",
             tag = DoorTag.LOG_TAG)
         val replicationsToCheck = replicationRunOnChangeRunner.runReplicationRunOnChange(changedTables)
-        replicationsToCheck.forEach { tableName ->
+        findAndSendPendingReplicationNotifications(replicationsToCheck)
+    }
+
+    private suspend fun findAndSendPendingReplicationNotifications(changedTableNames: Set<String>) {
+        changedTableNames.forEach { tableName ->
             val repMetaData = dbMetaData.replicateEntities.values
                 .firstOrNull { it.entityTableName == tableName } ?: return@forEach
 
@@ -82,7 +87,7 @@ class ReplicationNotificationDispatcher(
             val sql = """
                 SELECT DISTINCT ${repMetaData.trackerDestNodeIdFieldName} 
                   FROM ${repMetaData.trackerTableName}
-                 WHERE CAST(${repMetaData.trackerProcessedFieldName} AS BOOLEAN) = FALSE  
+                 WHERE CAST(${repMetaData.trackerProcessedFieldName} AS INTEGER) = 0  
             """
 
             db.prepareAndUseStatementAsync(sql) { stmt ->
@@ -97,8 +102,6 @@ class ReplicationNotificationDispatcher(
                 }
             }
         }
-
-        db::class.doorDatabaseMetadata()
     }
 
     private fun fire(evt: ReplicationPendingEvent) {

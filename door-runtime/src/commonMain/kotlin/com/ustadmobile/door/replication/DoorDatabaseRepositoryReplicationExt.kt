@@ -8,10 +8,7 @@ import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_FIND_PENDI
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_MARK_REPLICATE_TRACKERS_AS_PROCESSED
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_RECEIVE_ENTITIES
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.PATH_REPLICATION
-import com.ustadmobile.door.ext.DoorTag
-import com.ustadmobile.door.ext.doorDatabaseMetadata
-import com.ustadmobile.door.ext.doorNodeIdHeader
-import com.ustadmobile.door.ext.withUtf8Charset
+import com.ustadmobile.door.ext.*
 import io.github.aakira.napier.Napier
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -45,6 +42,7 @@ suspend fun DoorDatabaseRepository.sendPendingReplications(
                 encodedPath = "${encodedPath}$PATH_REPLICATION/$ENDPOINT_CHECK_FOR_ENTITIES_ALREADY_RECEIVED"
             }
 
+            dbVersionHeader(this@sendPendingReplications.db)
             doorNodeIdHeader(this@sendPendingReplications)
             parameter("tableId", tableId)
 
@@ -73,6 +71,7 @@ suspend fun DoorDatabaseRepository.sendPendingReplications(
             }
 
             parameter("tableId", tableId)
+            dbVersionHeader(this@sendPendingReplications.db)
             doorNodeIdHeader(this@sendPendingReplications)
 
             body = TextContent(jsonSerializer.encodeToString(JsonArray.serializer(), pendingReplicationToSend),
@@ -103,6 +102,7 @@ suspend inline fun <reified T> DoorDatabaseRepository.put(
 
         parameter("tableId", tableId)
         doorNodeIdHeader(this@put)
+        dbVersionHeader(this@put.db)
         block()
     }
 }
@@ -133,6 +133,7 @@ suspend fun DoorDatabaseRepository.fetchPendingReplications(
             parameter("tableId", tableId)
             parameter("offset", offset)
             doorNodeIdHeader(this@fetchPendingReplications)
+            dbVersionHeader(this@fetchPendingReplications.db)
         }
 
         val remotePendingTrackersJsonArray = jsonSerializer.decodeFromString(JsonArray.serializer(),
@@ -155,6 +156,7 @@ suspend fun DoorDatabaseRepository.fetchPendingReplications(
 
             parameter("tableId", tableId)
             doorNodeIdHeader(this@fetchPendingReplications)
+            dbVersionHeader(this@fetchPendingReplications.db)
 
             body = TextContent(jsonSerializer.encodeToString(JsonArray.serializer(), alreadyUpdatedTrackers),
                 ContentType.Application.Json.withUtf8Charset())
@@ -176,6 +178,7 @@ suspend fun DoorDatabaseRepository.fetchPendingReplications(
 
             parameter("tableId", tableId)
             doorNodeIdHeader(this@fetchPendingReplications)
+            dbVersionHeader(this@fetchPendingReplications.db)
         }
 
         val pendingReplicationsJson = jsonSerializer.decodeFromString(JsonArray.serializer(), pendingReplicationsStr)

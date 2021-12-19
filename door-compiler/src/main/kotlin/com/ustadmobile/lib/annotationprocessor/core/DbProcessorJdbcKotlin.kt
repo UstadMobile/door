@@ -250,6 +250,12 @@ fun FileSpec.Builder.addDatabaseMetadataType(dbTypeElement: TypeElement, process
                 .addCode("return TABLE_ID_MAP\n", dbTypeElement.asClassNameWithSuffix(SUFFIX_REPOSITORY2))
                 .build())
             .build())
+        .addProperty(PropertySpec.builder("version", INT)
+            .addModifiers(KModifier.OVERRIDE)
+            .getter(FunSpec.getterBuilder()
+                .addCode("return ${dbTypeElement.getAnnotation(Database::class.java).version}\n")
+                .build())
+            .build())
         .addProperty(PropertySpec.builder("replicateEntities", Map::class.parameterizedBy(Int::class, ReplicationEntityMetaData::class))
             .addModifiers(KModifier.OVERRIDE)
             .delegate(
