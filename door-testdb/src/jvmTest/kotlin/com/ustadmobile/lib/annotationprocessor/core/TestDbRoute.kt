@@ -86,7 +86,7 @@ class TestDbRoute  {
 
             tmpAttachmentsDir = Files.createTempDirectory("TestDbRoute").toFile()
             install(Routing) {
-                ExampleDatabase2_KtorRoute(true)
+                ExampleDatabase2_KtorRoute()
             }
         }
 

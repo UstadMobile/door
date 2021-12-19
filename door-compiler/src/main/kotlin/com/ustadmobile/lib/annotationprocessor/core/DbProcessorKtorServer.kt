@@ -33,6 +33,7 @@ import com.ustadmobile.door.AbstractDoorUriResponder
 import com.ustadmobile.door.annotation.*
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SUFFIX_KTOR_ROUTE
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SUFFIX_NANOHTTPD_ADDURIMAPPING
+import kotlinx.serialization.json.Json
 import javax.annotation.processing.RoundEnvironment
 
 fun CodeBlock.Builder.addNanoHttpdResponse(varName: String, addNonNullOperator: Boolean = false,
@@ -533,9 +534,9 @@ fun FileSpec.Builder.addDbKtorRouteFunction(
     val dbClassName = dbTypeEl.asClassName()
     addFunction(FunSpec.builder("${dbClassName.simpleName}$SUFFIX_KTOR_ROUTE")
             .receiver(Route::class)
-            .addParameter(ParameterSpec.builder("_isPrimary", BOOLEAN)
-                    .defaultValue(true.toString())
-                    .build())
+            .addParameter(ParameterSpec.builder("json", Json::class)
+                .defaultValue(CodeBlock.of("%T { encodeDefaults = true } ", Json::class))
+                .build())
             .addCode(CodeBlock.builder()
                     .apply {
                         dbTypeEl.getAnnotation(MinReplicationVersion::class.java)?.also {
@@ -550,6 +551,11 @@ fun FileSpec.Builder.addDbKtorRouteFunction(
 
                         add("val _typeToken: %T<%T> = %M()\n", org.kodein.type.TypeToken::class.java,
                                 dbTypeEl, DbProcessorKtorServer.DI_ERASED_MEMBER)
+                        if(dbTypeEl.dbHasReplicateWrapper(processingEnv)) {
+                            add("%M(_typeToken, %T::class, json)\n",
+                                MemberName("com.ustadmobile.door.replication", "doorReplicationRoute"),
+                                dbTypeEl)
+                        }
                     }.apply {
                         dbTypeEl.allDbClassDaoGettersWithRepo(processingEnv).forEach {daoGetter ->
                             val daoTypeEl = daoGetter.returnType.asTypeElement(processingEnv)

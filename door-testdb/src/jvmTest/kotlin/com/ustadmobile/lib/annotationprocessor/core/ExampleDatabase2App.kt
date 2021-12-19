@@ -75,7 +75,7 @@ fun Application.ExampleDatabase2App(devMode: Boolean = true, attachmentsDir: Str
     }
 
     install(Routing) {
-        ExampleDatabase2_KtorRoute(true)
+        ExampleDatabase2_KtorRoute()
         get("ExampleDatabase2/clearAllTables") {
             serverDb.clearAllTables()
             call.respond("OK - cleared")
