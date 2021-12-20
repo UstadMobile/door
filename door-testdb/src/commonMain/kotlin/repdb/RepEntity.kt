@@ -16,8 +16,8 @@ import repdb.RepEntity.Companion.TABLE_ID
         events = [Trigger.Event.INSERT],
         conditionSql = "SELECT NOT EXISTS(SELECT rePrimaryKey FROM RepEntity WHERE rePrimaryKey = NEW.rePrimaryKey)",
         sqlStatements = [
-            """INSERT INTO RepEntity(rePrimaryKey, reLastChangedBy, reLastChangeTime, reNumField, reString)
-               VALUES (NEW.rePrimaryKey, NEW.reLastChangedBy, NEW.reLastChangeTime, NEW.reNumField, NEW.reString)
+            """INSERT INTO RepEntity(rePrimaryKey, reLastChangedBy, reLastChangeTime, reNumField, reString, reBoolean)
+               VALUES (NEW.rePrimaryKey, NEW.reLastChangedBy, NEW.reLastChangeTime, NEW.reNumField, NEW.reString, NEW.reBoolean)
             """]),
     Trigger(name = "repent_remote_update",
         order = Trigger.Order.INSTEAD_OF,
@@ -29,7 +29,8 @@ import repdb.RepEntity.Companion.TABLE_ID
             SET reLastChangedBy = NEW.reLastChangedBy,
                 reLastChangeTime = NEW.reLastChangeTime,
                 reNumField = NEW.reNumField,
-                reString = NEW.reString
+                reString = NEW.reString,
+                reBoolean = NEW.reBoolean
           WHERE rePrimaryKey = NEW.rePrimaryKey
         """])))
 class RepEntity {
@@ -47,6 +48,8 @@ class RepEntity {
     var reNumField: Int = 0
 
     var reString: String? = null
+
+    var reBoolean: Boolean = false
 
     companion object {
         const val TABLE_ID = 500

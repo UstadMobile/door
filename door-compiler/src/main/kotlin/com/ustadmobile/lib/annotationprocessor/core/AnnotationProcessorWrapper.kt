@@ -277,8 +277,8 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
 
 
                 stmtsMap.forEach {entry ->
+                    var sqlToRun = trigger.conditionSql.substituteTriggerPrefixes(entry.key)
                     try {
-                        var sqlToRun = trigger.conditionSql.substituteTriggerPrefixes(entry.key)
                         if(entry.key == DoorDbType.POSTGRES)
                             sqlToRun = sqlToRun.sqlToPostgresSql()
 
@@ -297,9 +297,9 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
 
                 var dbType = 0
                 trigger.sqlStatements.forEach { sql ->
+                    var sqlToRun = sql.substituteTriggerPrefixes(dbType)
                     try {
                         stmtsMap.forEach { stmtEntry ->
-                            var sqlToRun = sql.substituteTriggerPrefixes(dbType)
                             dbType = stmtEntry.key
                             if(dbType == DoorDbType.POSTGRES)
                                 sqlToRun = sqlToRun.sqlToPostgresSql()
