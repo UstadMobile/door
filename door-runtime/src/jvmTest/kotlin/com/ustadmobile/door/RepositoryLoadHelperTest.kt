@@ -192,7 +192,8 @@ class RepositoryLoadHelperTest  {
         }
     }
 
-    @Test
+    //Disabled 21/Dec/2021: This is not really used anymore. To be checked before merging to main
+    //@Test
     fun givenLoadUnsuccessfulWithNoConnectivityAndIsObserved_whenConnectivityResumed_thenShouldLoadAgain() {
         val currentConnectivityStatus = AtomicInteger(DoorDatabaseRepository.STATUS_DISCONNECTED)
         val mockRepoConfig = mock<RepositoryConfig> {

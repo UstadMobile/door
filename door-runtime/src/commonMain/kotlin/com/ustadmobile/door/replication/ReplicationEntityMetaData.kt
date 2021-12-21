@@ -102,7 +102,7 @@ class ReplicationEntityMetaData(
                LEFT JOIN $entityTableName 
                     ON $trackerTableName.$trackerForeignKeyFieldName = $entityTableName.$entityPrimaryKeyFieldName
          WHERE $trackerTableName.$trackerDestNodeIdFieldName = ?
-           AND CAST($trackerProcessedFieldName AS BOOLEAN) = false 
+           AND CAST($trackerProcessedFieldName AS INTEGER) = 0 
          LIMIT $batchSize  
         """
     }

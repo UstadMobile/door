@@ -1,13 +1,12 @@
 package com.ustadmobile.door.roomjdbc
 
 import android.content.Context
+import androidx.room.InvalidationTracker
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
-import com.ustadmobile.door.ext.prepareAndUseStatement
-import com.ustadmobile.door.ext.prepareAndUseStatementAsync
-import com.ustadmobile.door.ext.withDoorTransactionAsync
+import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
 import com.ustadmobile.door.roomjdbc.basicdb.BasicRoomDb
 import com.ustadmobile.door.roomjdbc.basicdb.BasicRoomEntity
@@ -103,6 +102,49 @@ class ExampleInstrumentedTest {
 
         val entityFound = db.basicDao.findByUid(42L)
         assertNotNull("Found entity inserted by prepareAndUseStatement:", entityFound)
+    }
+
+    @Test
+    fun runTransactionAndGetInvalidation() {
+
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = Room.databaseBuilder(context, BasicRoomDb::class.java, "BasicRoomDb")
+            .fallbackToDestructiveMigration()
+            .build().also {
+                it.clearAllTables()
+            }
+
+        val invalidatedTables = mutableListOf<String>()
+
+        db.invalidationTracker.addObserver(object: InvalidationTracker.Observer(arrayOf("BasicRoomEntity")) {
+            override fun onInvalidated(tables: MutableSet<String>) {
+                invalidatedTables.addAll(tables)
+            }
+        })
+
+        Thread.sleep(1000)
+
+
+        val paramsToInsert = listOf(
+            Triple(42L, "Bob", 20),
+            Triple(50L, "Belinda", 21)
+        )
+
+//        db.basicDao.insert(BasicRoomEntity())
+        db.withDoorTransaction(BasicRoomDb::class) { transactDb ->
+            transactDb.prepareAndUseStatement("INSERT INTO BasicRoomEntity(uid, name, orgId) VALUES(?, ?, ?)") { stmt ->
+                paramsToInsert.forEach {
+                    stmt.setLong(1, it.first)
+                    stmt.setString(2, it.second)
+                    stmt.setInt(3, it.third)
+                    stmt.executeUpdate()
+                }
+            }
+        }
+
+
+        Thread.sleep(2000)
+        Assert.assertTrue(invalidatedTables.isNotEmpty())
     }
 
     @Test

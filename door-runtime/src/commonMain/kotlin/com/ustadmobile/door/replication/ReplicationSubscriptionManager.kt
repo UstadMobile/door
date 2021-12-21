@@ -64,13 +64,25 @@ class ReplicationSubscriptionManager(
 
     private class DefaultReplicationSender(private val json: Json): ReplicateRunner {
         override suspend fun replicate(repo: DoorDatabaseRepository, tableId: Int, remoteNodeId: Long) {
-            repo.sendPendingReplications(json, tableId, remoteNodeId)
+            try {
+                repo.sendPendingReplications(json, tableId, remoteNodeId)
+            }catch(e: Exception) {
+                Napier.e("Exception attempting send pending replications for $tableId to $remoteNodeId" +
+                        " (${repo.config.endpoint})")
+            }
+
         }
     }
 
     private class DefaultReplicationFetcher(private val json: Json): ReplicateRunner {
         override suspend fun replicate(repo: DoorDatabaseRepository, tableId: Int, remoteNodeId: Long) {
-            repo.fetchPendingReplications(json, tableId, remoteNodeId)
+            try {
+                repo.fetchPendingReplications(json, tableId, remoteNodeId)
+            }catch(e: Exception) {
+                Napier.e("Exception attempting fetch pending replications for $tableId from $remoteNodeId" +
+                        " (${repo.config.endpoint})")
+            }
+
         }
     }
 

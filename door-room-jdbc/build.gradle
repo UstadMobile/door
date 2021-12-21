@@ -43,6 +43,7 @@ dependencies {
     implementation "androidx.room:room-runtime:$version_android_room"
     implementation "androidx.room:room-ktx:$version_android_room"
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.4.0'
     androidTestImplementation project(":door-runtime")
     androidTestImplementation "androidx.test:core:$version_android_junit_runner"
     androidTestImplementation "androidx.test:core-ktx:$version_android_junit_runner"

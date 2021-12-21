@@ -40,12 +40,12 @@ class ResultSetRoomJdbc(
         }
     }
 
-    override fun getString(columnIndex: Int): String {
+    override fun getString(columnIndex: Int): String? {
         lastFetchedIndex = columnIndex
         return cursor.getString(columnIndex - 1)
     }
 
-    override fun getString(columnLabel: String): String {
+    override fun getString(columnLabel: String): String? {
         return cursor.getString(getColumnIndexAndSetLastFetched(columnLabel))
     }
 
@@ -59,19 +59,21 @@ class ResultSetRoomJdbc(
     }
 
     override fun getByte(columnIndex: Int): Byte {
-        TODO("Not yet implemented")
+        lastFetchedIndex = columnIndex
+        return cursor.getInt(columnIndex).toByte()
     }
 
-    override fun getByte(columnLabel: String?): Byte {
-        TODO("Not yet implemented")
+    override fun getByte(columnLabel: String): Byte {
+        return cursor.getInt(getColumnIndexAndSetLastFetched(columnLabel)).toByte()
     }
 
     override fun getShort(columnIndex: Int): Short {
-        TODO("Not yet implemented")
+        lastFetchedIndex = columnIndex
+        return cursor.getShort(columnIndex)
     }
 
-    override fun getShort(columnLabel: String?): Short {
-        TODO("Not yet implemented")
+    override fun getShort(columnLabel: String): Short {
+        return cursor.getShort(getColumnIndexAndSetLastFetched(columnLabel))
     }
 
     override fun getInt(columnIndex: Int): Int {
@@ -97,16 +99,17 @@ class ResultSetRoomJdbc(
         return cursor.getFloat(columnIndex - 1)
     }
 
-    override fun getFloat(columnLabel: String?): Float {
-        TODO("Not yet implemented")
+    override fun getFloat(columnLabel: String): Float {
+        return cursor.getDouble(getColumnIndexAndSetLastFetched(columnLabel)).toFloat()
     }
 
     override fun getDouble(columnIndex: Int): Double {
-        TODO("Not yet implemented")
+        lastFetchedIndex = columnIndex
+        return cursor.getDouble(columnIndex -1)
     }
 
-    override fun getDouble(columnLabel: String?): Double {
-        TODO("Not yet implemented")
+    override fun getDouble(columnLabel: String): Double {
+        return cursor.getDouble(getColumnIndexAndSetLastFetched(columnLabel))
     }
 
     override fun getBigDecimal(columnIndex: Int, scale: Int): BigDecimal {

@@ -115,7 +115,9 @@ actual val DoorDatabase.sourceDatabase: DoorDatabase?
     }
 
 actual fun DoorDatabase.handleTablesChanged(changeTableNames: List<String>)  {
-    invalidationTracker.refreshVersionsAsync()
+    // When a change on Android is done within a transaction, there is no need
+    // to do anything. The InvalidationTracker uses triggers, and it will find the
+    // changes.
 }
 
 private val pkManagersMap = ConcurrentHashMap<RoomDatabase, DoorPrimaryKeyManager>()
