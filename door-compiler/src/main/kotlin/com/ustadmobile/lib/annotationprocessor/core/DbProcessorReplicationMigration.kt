@@ -1,12 +1,16 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
+import androidx.room.ColumnInfo
 import androidx.room.Database
 import androidx.room.Entity
+import androidx.room.Index
 import com.squareup.kotlinpoet.*
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.annotation.*
+import com.ustadmobile.door.ext.minifySql
 import com.ustadmobile.door.migration.DoorMigrationSync
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_MIGRATIONS_OUTPUT
+import kotlinx.serialization.Serializable
 import java.io.File
 import javax.annotation.processing.RoundEnvironment
 import javax.lang.model.element.TypeElement
@@ -15,16 +19,24 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
 
     lateinit var outputDir: File
 
-    fun FileSpec.Builder.addTrackerClass(entity: TypeElement): FileSpec.Builder {
-        val simpleName = entity.simpleName.toString()
-        val varPrefix = if(simpleName.count { it.isUpperCase() } > 1) {
-            simpleName.filter { it.isUpperCase() }.lowercase()
+    fun TypeElement.prefix(): String {
+        return if(simpleName.count { it.isUpperCase() } > 1) {
+            simpleName.filter { it.isUpperCase() }.toString().lowercase()
         }else {
-            simpleName.lowercase()
+            simpleName.toString().lowercase()
         }
+    }
+
+    fun FileSpec.Builder.addTrackerClass(entity: TypeElement): FileSpec.Builder {
+        val varPrefix = entity.prefix()
 
         addType(TypeSpec.classBuilder("${entity.simpleName}Tracker")
-            .addAnnotation(Entity::class)
+            .addAnnotation(AnnotationSpec.builder(Entity::class)
+                .addMember("primaryKeys = arrayOf(%S, %S)", "${varPrefix}Fk", "${varPrefix}Destination")
+                .addMember("indices = arrayOf(%T(value = arrayOf(%S, %S, %S)))", Index::class,
+                    "${varPrefix}Destination", "${varPrefix}Processed", "${varPrefix}Fk")
+                .build())
+            .addAnnotation(Serializable::class)
             .addProperty(PropertySpec.builder("${varPrefix}Fk", LONG)
                 .mutable()
                 .initializer("0")
@@ -43,6 +55,9 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
             .addProperty(PropertySpec.builder("${varPrefix}Processed", BOOLEAN)
                 .mutable()
                 .initializer("false")
+                .addAnnotation(AnnotationSpec.builder(ColumnInfo::class)
+                    .addMember("defaultValue = %S", "0")
+                    .build())
                 .addAnnotation(ReplicationTrackerProcessed::class)
                 .build())
             .build())
@@ -65,6 +80,26 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
         }
 
 
+        fun CodeBlock.Builder.addCreateTrackerTableAndIndex(
+            entityType: TypeElement,
+            longTypeName: String,
+            boolTypeName: String
+        ) {
+            val varPrefix = entityType.prefix()
+
+            val defaultBoolVal = if(boolTypeName == "INTEGER") "0" else "false"
+            add("_stmtList += %S\n", """
+                           CREATE TABLE IF NOT EXISTS ${entityType.simpleName}Tracker ( ${varPrefix}Fk $longTypeName NOT NULL,
+                                ${varPrefix}VersionId $longTypeName NOT NULL,
+                                ${varPrefix}Destination $longTypeName NOT NULL,
+                                ${varPrefix}Processed $boolTypeName NOT NULL DEFAULT $defaultBoolVal,
+                                PRIMARY KEY (${varPrefix}Fk, ${varPrefix}Destination)) 
+                        """.minifySql())
+            add("_stmtList += %S\n", """
+                            CREATE INDEX index_${entityType.simpleName}Tracker_${varPrefix}Destination_${varPrefix}Processed_${varPrefix}Fk ON ${entityType.simpleName}Tracker (${varPrefix}Destination, ${varPrefix}Processed, ${varPrefix}Fk)
+                        """.minifySql())
+        }
+
         addProperty(PropertySpec.builder("${dbTypeEl.simpleName}_ReplicationMigration",
                 DoorMigrationSync::class)
             .initializer(CodeBlock.builder()
@@ -73,28 +108,31 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
                 .beginControlFlow("if(db.%M() == %T.SQLITE)", MemberName("com.ustadmobile.door.ext",
                     "dbType"), DoorDbType::class)
                 .apply {
-                    dbTypeEl.allDbEntities(processingEnv).forEach { entityType ->
-                        if (entityType.hasAnnotation(ReplicateEntity::class.java)) {
-                            addReplicateEntityChangeLogTrigger(
-                                entityType, "_stmtList",
-                                DoorDbType.SQLITE
-                            )
-                            addCreateReceiveView(entityType, "_stmtList")
-                        }
+                    dbTypeEl.allDbEntities(processingEnv).filter{ it.hasAnnotation(ReplicateEntity::class.java) }.forEach { entityType ->
+                        addCreateTrackerTableAndIndex(entityType, "INTEGER", "INTEGER")
+
+                        addReplicateEntityChangeLogTrigger(
+                            entityType, "_stmtList",
+                            DoorDbType.SQLITE
+                        )
+                        addCreateReceiveView(entityType, "_stmtList")
+
 
                         addCreateTriggersCode(entityType, "_stmtList", DoorDbType.SQLITE)
                     }
                 }
                 .nextControlFlow("else")
                 .apply {
-                    dbTypeEl.allDbEntities(processingEnv).forEach { entityType ->
-                        if (entityType.hasAnnotation(ReplicateEntity::class.java)) {
-                            addReplicateEntityChangeLogTrigger(
-                                entityType, "_stmtList",
-                                DoorDbType.POSTGRES
-                            )
-                            addCreateReceiveView(entityType, "_stmtList")
-                        }
+                    dbTypeEl.allDbEntities(processingEnv).filter{ it.hasAnnotation(ReplicateEntity::class.java) }.forEach { entityType ->
+                        addCreateTrackerTableAndIndex(entityType, "BIGINT", "BOOL")
+
+
+                        addReplicateEntityChangeLogTrigger(
+                            entityType, "_stmtList",
+                            DoorDbType.POSTGRES
+                        )
+                        addCreateReceiveView(entityType, "_stmtList")
+
 
                         addCreateTriggersCode(entityType, "_stmtList", DoorDbType.POSTGRES)
                     }

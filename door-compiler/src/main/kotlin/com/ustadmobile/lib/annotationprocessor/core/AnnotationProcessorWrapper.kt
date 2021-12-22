@@ -142,12 +142,13 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
                 val entityVersionIdField = entity.enclosedElementsWithAnnotation(ReplicationVersionId::class.java)
                 if(entityVersionIdField.size != 1)
                     messager.printMessage(Diagnostic.Kind.ERROR,
-                        "@ReplicateEntity must have exactly one field annotated @ReplicationVersionId",
+                        "@ReplicateEntity ${entity.qualifiedName} must have exactly one field annotated @ReplicationVersionId",
                         entity)
 
 
                 if(!entityRepTrkr.hasAnnotation(Entity::class.java))
-                    messager.printMessage(Diagnostic.Kind.ERROR, "Replication tracker entity does not have @Entity annotation",
+                    messager.printMessage(Diagnostic.Kind.ERROR, "Replication ${entityRepTrkr.qualifiedName} tracker " +
+                            "entity does not have @Entity annotation",
                         entityRepTrkr)
 
                 val trkrForeignKey = entityRepTrkr.enclosedElementsWithAnnotation(ReplicationEntityForeignKey::class.java)
@@ -159,7 +160,9 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
                     entityRepTrkr.kmPropertiesWithAnnotation(ReplicationEntityForeignKey::class.java).first().returnType)
 
                     messager.printMessage(Diagnostic.Kind.ERROR,
-                        "Replication tracker must have exactly one field annotated @ReplicationEntityForeignKey of the same type as the entity's primary key")
+                        "Replication tracker ${entityRepTrkr.qualifiedName} must have exactly one field annotated " +
+                                "@ReplicationEntityForeignKey of the same type as the entity ${entity.qualifiedName} " +
+                                "primary key")
 
 
 
@@ -167,21 +170,24 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
                 if(trkrVersionId.size != 1 ||
                         trkrVersionId.first().asType().asTypeName() != entityVersionIdField.firstOrNull()?.asType()?.asTypeName()) {
                     messager.printMessage(Diagnostic.Kind.ERROR,
-                        "Replication tracker must have exactly one field annotated @ReplicationVersionId " +
-                            "and it must be the same type as the field annotated @ReplicationVersionId on the main entity",
+                        "Replication tracker ${entityRepTrkr.qualifiedName} must have exactly one field annotated " +
+                                "@ReplicationVersionId and it must be the same type as the field annotated " +
+                                "@ReplicationVersionId on the main entity ${entity.qualifiedName}",
                         entityRepTrkr)
                 }
 
                 val trkrNodeId = entityRepTrkr.enclosedElementsWithAnnotation(ReplicationDestinationNodeId::class.java)
                 if(trkrNodeId.size != 1 || trkrNodeId.first().asType().asTypeName() != LONG) {
-                    messager.printMessage(Diagnostic.Kind.ERROR, "Replication tracker must have exactly one field" +
-                            "annotated @ReplicationDestinationNodeId and it must be of type long", entityRepTrkr)
+                    messager.printMessage(Diagnostic.Kind.ERROR, "Replication tracker ${entityRepTrkr.qualifiedName} " +
+                            "must have exactly one field annotated @ReplicationDestinationNodeId and it must be of " +
+                            "type long", entityRepTrkr)
                 }
 
                 val trkrProcessed = entityRepTrkr.enclosedElementsWithAnnotation(ReplicationTrackerProcessed::class.java)
                 if(trkrProcessed.size != 1 || trkrProcessed.first().asType().asTypeName() != BOOLEAN) {
-                    messager.printMessage(Diagnostic.Kind.ERROR, "Replication Tracker must have exactly one field " +
-                            "annotated @ReplicationTrackerProcessed and it must be of type boolean", entityRepTrkr)
+                    messager.printMessage(Diagnostic.Kind.ERROR, "Replication Tracker ${entityRepTrkr.qualifiedName}" +
+                            " must have exactly one field annotated @ReplicationTrackerProcessed and it must be of type" +
+                            " boolean", entityRepTrkr)
                 }
 
                 //check for duplicate fields between tracker and entity
@@ -189,14 +195,17 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
                 val trkrFieldNames = entityRepTrkr.entityFields.map { it.simpleName.toString() }
 
                 val duplicateFieldElements = entityFieldNames.filter { it.simpleName.toString() in trkrFieldNames }
-                duplicateFieldElements.forEach { fieldEl ->
-                    messager.printMessage(Diagnostic.Kind.ERROR, "Same field names used in both entity and tracker. " +
-                            "This is not allowed as it will lead to a conflict in SQL query row names",
-                        fieldEl)
+                if(duplicateFieldElements.isNotEmpty()) {
+                    messager.printMessage(Diagnostic.Kind.ERROR, "Same field names used in both entity " +
+                            "${entity.qualifiedName} and tracker. ( ${duplicateFieldElements.joinToString()  }) This is " +
+                            "not allowed as it will lead to a conflict in SQL query row names",
+                        entity)
                 }
 
+
             }catch(e: IllegalArgumentException){
-                messager.printMessage(Diagnostic.Kind.ERROR, "ReplicateEntity must have a tracker entity specified",
+                messager.printMessage(Diagnostic.Kind.ERROR, "ReplicateEntity ${entity.qualifiedName} must have a " +
+                        "tracker entity specified",
                     entity)
             }
 
