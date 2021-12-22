@@ -39,7 +39,8 @@ import javax.tools.Diagnostic
 class AnnotationProcessorWrapper: AbstractProcessor() {
 
     val processors = listOf(DbProcessorJdbcKotlin(), DbProcessorKtorServer(),
-            DbProcessorRepository(), DbProcessorAndroid(), DbProcessorReplicateWrapper())
+            DbProcessorRepository(), DbProcessorAndroid(), DbProcessorReplicateWrapper(),
+            DbProcessorReplicationMigration())
 
     lateinit var messager: MessagerWrapper
 

@@ -1,5 +1,6 @@
 package com.ustadmobile.door.entities
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -11,6 +12,7 @@ class DoorNode {
 
     var auth: String? = null
 
+    @ColumnInfo(defaultValue = "2")
     var rel: Int = SUBSCRIBED_TO
 
     companion object {
