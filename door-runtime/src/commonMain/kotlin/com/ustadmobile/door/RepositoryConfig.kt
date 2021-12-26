@@ -20,8 +20,10 @@ expect class RepositoryConfig {
 
     val attachmentsDir: String
 
-    val updateNotificationManager: ServerUpdateNotificationManager?
-
+    /**
+     * If true, the repository will automatically create a replication subscription manager and connect to start
+     * replication
+     */
     val useReplicationSubscription: Boolean
 
     val attachmentFilters: List<AttachmentFilter>

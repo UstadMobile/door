@@ -36,6 +36,7 @@ import com.ustadmobile.lib.annotationprocessor.core.ext.getClassValue
 import kotlinx.coroutines.GlobalScope
 import kotlin.reflect.KClass
 import com.ustadmobile.door.ChangeListenerRequest
+import com.ustadmobile.door.util.NodeIdAuthCache
 
 val QUERY_SINGULAR_TYPES = listOf(INT, LONG, SHORT, BYTE, BOOLEAN, FLOAT, DOUBLE,
         String::class.asTypeName(), String::class.asTypeName().copy(nullable = true))
@@ -1325,6 +1326,21 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     .nextControlFlow("else")
                     .add("rootDatabase.%M\n",
                         MemberName("com.ustadmobile.door.ext", "replicationNotificationDispatcher"))
+                    .endControlFlow()
+                    .endControlFlow()
+                    .build())
+                .build())
+            .addProperty(PropertySpec.builder("realNodeIdAuthCache", NodeIdAuthCache::class,
+                    KModifier.OVERRIDE)
+                .delegate(CodeBlock.builder()
+                    .beginControlFlow("lazy")
+                    .beginControlFlow("if(this == %M)",
+                        MemberName("com.ustadmobile.door.ext", "rootDatabase"))
+                    .add("val nodeIdAuthCache = %T(this)\n", NodeIdAuthCache::class)
+                    .add("nodeIdAuthCache.addNewNodeListener(realReplicationNotificationDispatcher)\n")
+                    .add("nodeIdAuthCache\n")
+                    .nextControlFlow("else")
+                    .add("rootDatabase.%M\n", MemberName("com.ustadmobile.door.ext", "nodeIdAuthCache"))
                     .endControlFlow()
                     .endControlFlow()
                     .build())

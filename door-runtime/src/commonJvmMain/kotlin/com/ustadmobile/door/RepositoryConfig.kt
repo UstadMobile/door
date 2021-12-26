@@ -15,7 +15,6 @@ actual class RepositoryConfig internal constructor(
     val okHttpClient: OkHttpClient,
     actual val json: Json,
     actual val attachmentsDir: String,
-    actual val updateNotificationManager: ServerUpdateNotificationManager?,
     actual val useReplicationSubscription: Boolean,
     actual val attachmentFilters: List<AttachmentFilter>
 ) {
@@ -34,8 +33,6 @@ actual class RepositoryConfig internal constructor(
 
             var attachmentsDir: String? = null
 
-            var updateNotificationManager: ServerUpdateNotificationManager? = null
-
             var useClientSyncManager: Boolean = true
 
             val attachmentFilters = mutableListOf<AttachmentFilter>()
@@ -43,20 +40,20 @@ actual class RepositoryConfig internal constructor(
             fun build() : RepositoryConfig{
                 val effectiveAttachmentDir = attachmentsDir ?: defaultAttachmentDir(context, endpoint)
                 return RepositoryConfig(context, endpoint, auth, nodeId, httpClient, okHttpClient, json,
-                        effectiveAttachmentDir,updateNotificationManager, useClientSyncManager,
-                    attachmentFilters.toList())
+                        effectiveAttachmentDir, useClientSyncManager, attachmentFilters.toList())
             }
 
         }
 
-        fun repositoryConfig(context: Any,
-                             endpoint: String,
-                             nodeId: Long,
-                             auth: String,
-                             httpClient: HttpClient,
-                             okHttpClient: OkHttpClient,
-                             json: Json,
-                             block: Builder.() -> Unit = {}
+        fun repositoryConfig(
+            context: Any,
+            endpoint: String,
+            nodeId: Long,
+            auth: String,
+            httpClient: HttpClient,
+            okHttpClient: OkHttpClient,
+            json: Json = Json { encodeDefaults = true },
+            block: Builder.() -> Unit = {}
         ) : RepositoryConfig {
             val builder = Builder(context, endpoint, nodeId, auth, httpClient, okHttpClient, json)
             block(builder)

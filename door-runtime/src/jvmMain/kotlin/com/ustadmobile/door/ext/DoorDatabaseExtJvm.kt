@@ -3,6 +3,7 @@ package com.ustadmobile.door.ext
 import com.ustadmobile.door.*
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
 import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
+import com.ustadmobile.door.util.NodeIdAuthCache
 
 import kotlin.reflect.KClass
 
@@ -101,20 +102,5 @@ actual fun <T: DoorDatabase> T.wrap(dbClass: KClass<T>) : T {
 @Suppress("UNCHECKED_CAST")
 actual fun <T: DoorDatabase> T.unwrap(dbClass: KClass<T>): T {
     return (this as DoorDatabaseReplicateWrapper).realDatabase as T
-}
-
-actual val DoorDatabase.replicationNotificationDispatcher: ReplicationNotificationDispatcher
-    get() = if(this is DoorDatabaseJdbc) {
-        this.realReplicationNotificationDispatcher
-    }else {
-        this.rootDatabase.replicationNotificationDispatcher
-    }
-
-actual fun DoorDatabase.addInvalidationListener(changeListenerRequest: ChangeListenerRequest) {
-    addChangeListener(changeListenerRequest)
-}
-
-actual fun DoorDatabase.removeInvalidationListener(changeListenerRequest: ChangeListenerRequest) {
-    removeChangeListener(changeListenerRequest)
 }
 

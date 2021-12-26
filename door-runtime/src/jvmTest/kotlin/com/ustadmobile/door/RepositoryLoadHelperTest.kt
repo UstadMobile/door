@@ -49,7 +49,7 @@ class RepositoryLoadHelperTest  {
             }
         }
         repoConfig = RepositoryConfig.repositoryConfig(Any(), "http://localhost:8089/",
-            42L, "", httpClient, okHttpClient)
+            42L, "", httpClient, okHttpClient, kotlinx.serialization.json.Json { encodeDefaults = true })
     }
 
     @After

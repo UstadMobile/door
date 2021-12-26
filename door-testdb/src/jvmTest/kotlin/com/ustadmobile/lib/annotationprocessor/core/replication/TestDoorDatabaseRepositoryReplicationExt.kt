@@ -94,7 +94,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
             }
 
             bind<NodeIdAuthCache>() with scoped(remoteVirtualHostScope).singleton {
-                NodeIdAuthCache(instance<RepDb>(tag = DoorTag.TAG_DB))
+                instance<RepDb>(tag = DoorTag.TAG_DB).nodeIdAuthCache
             }
 
             registerContextTranslator { _: ApplicationCall -> "localhost" }

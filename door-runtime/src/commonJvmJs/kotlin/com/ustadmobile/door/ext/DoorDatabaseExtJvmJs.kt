@@ -2,6 +2,8 @@ package com.ustadmobile.door.ext
 
 import com.ustadmobile.door.*
 import com.ustadmobile.door.jdbc.*
+import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
+import com.ustadmobile.door.util.NodeIdAuthCache
 import io.github.aakira.napier.Napier
 
 actual suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
@@ -60,3 +62,25 @@ actual val DoorDatabase.doorPrimaryKeyManager: DoorPrimaryKeyManager
 actual fun DoorDatabase.handleTablesChanged(changeTableNames: List<String>) {
     handleTableChangedInternal(changeTableNames)
 }
+
+actual val DoorDatabase.replicationNotificationDispatcher: ReplicationNotificationDispatcher
+    get() = if(this is DoorDatabaseJdbc) {
+        this.realReplicationNotificationDispatcher
+    }else {
+        this.rootDatabase.replicationNotificationDispatcher
+    }
+
+actual fun DoorDatabase.addInvalidationListener(changeListenerRequest: ChangeListenerRequest) {
+    addChangeListener(changeListenerRequest)
+}
+
+actual fun DoorDatabase.removeInvalidationListener(changeListenerRequest: ChangeListenerRequest) {
+    removeChangeListener(changeListenerRequest)
+}
+
+actual val DoorDatabase.nodeIdAuthCache: NodeIdAuthCache
+    get() = if(this is DoorDatabaseJdbc) {
+        this.realNodeIdAuthCache
+    }else {
+        this.rootDatabase.nodeIdAuthCache
+    }

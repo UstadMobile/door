@@ -10,6 +10,8 @@ import com.ustadmobile.door.PreparedStatementConfig
 import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
 import com.ustadmobile.door.replication.ReplicationRunOnChangeRunner
 import com.ustadmobile.door.roomjdbc.ConnectionRoomJdbc
+import com.ustadmobile.door.util.ChangeListenerRequestInvalidationObserver
+import com.ustadmobile.door.util.NodeIdAuthCache
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.GlobalScope
 import java.io.File
@@ -199,13 +201,15 @@ actual fun DoorDatabase.removeInvalidationListener(changeListenerRequest: Change
 
 private val replicationNotificationDispatchers = WeakHashMap<DoorDatabase, ReplicationNotificationDispatcher>()
 
+private val DoorDatabase.dbClassName: String
+    get() = this::class.qualifiedName?.substringBefore("_")
+        ?: throw IllegalArgumentException("No class name!")
+
 actual val DoorDatabase.replicationNotificationDispatcher: ReplicationNotificationDispatcher
     get() {
         val rootDb: DoorDatabase = this.rootDatabase
         synchronized(replicationNotificationDispatchers) {
             return replicationNotificationDispatchers.getOrPut(rootDb) {
-                val dbClassName = rootDb::class.qualifiedName?.substringBefore("_")
-                    ?: throw IllegalArgumentException("No class name!")
                 val dbClass = Class.forName(dbClassName)
                 val runOnChangeRunnerClass = Class.forName("${dbClassName}_ReplicationRunOnChangeRunner")
                     .getConstructor(dbClass)
@@ -216,3 +220,13 @@ actual val DoorDatabase.replicationNotificationDispatcher: ReplicationNotificati
         }
     }
 
+private val nodeIdAuthCacheMap = WeakHashMap<DoorDatabase, NodeIdAuthCache>()
+
+actual val DoorDatabase.nodeIdAuthCache: NodeIdAuthCache
+    get() {
+        synchronized(nodeIdAuthCacheMap) {
+            return nodeIdAuthCacheMap.getOrPut(rootDatabase) {
+                NodeIdAuthCache(this)
+            }
+        }
+    }

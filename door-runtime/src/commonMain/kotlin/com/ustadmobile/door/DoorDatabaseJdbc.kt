@@ -1,6 +1,7 @@
 package com.ustadmobile.door
 
 import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
+import com.ustadmobile.door.util.NodeIdAuthCache
 
 /**
  * This interface is implemented by all generated JDBC implementations of a database.
@@ -39,5 +40,6 @@ interface DoorDatabaseJdbc {
      */
     val realReplicationNotificationDispatcher: ReplicationNotificationDispatcher
 
+    val realNodeIdAuthCache: NodeIdAuthCache
 
 }

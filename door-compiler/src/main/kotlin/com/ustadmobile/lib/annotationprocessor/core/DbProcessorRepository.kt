@@ -119,10 +119,6 @@ fun FileSpec.Builder.addDbRepoType(
                             .addCode("return config.httpClient\n")
                             .build())
                     .build())
-            .addProperty(PropertySpec.builder("_updateNotificationManager",
-                    ServerUpdateNotificationManager::class.asClassName().copy(nullable = true))
-                    .initializer("config.updateNotificationManager")
-                    .build())
             .addProperty(PropertySpec.builder("_repositoryHelper", RepositoryHelper::class)
                     .initializer("%T()", RepositoryHelper::class)
                     .build())
