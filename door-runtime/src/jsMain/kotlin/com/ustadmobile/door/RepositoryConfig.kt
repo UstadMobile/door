@@ -2,20 +2,24 @@ package com.ustadmobile.door
 
 import com.ustadmobile.door.attachments.AttachmentFilter
 import io.ktor.client.*
+import kotlinx.serialization.json.Json
 
 /**
  * Contains the configuration for a repository. It is created via a platform-specific builder that may have additional
  * dependencies on specific platforms.
  */
-actual class RepositoryConfig internal constructor(actual val context: Any,
-                                                   actual val endpoint: String,
-                                                   actual val auth: String,
-                                                   actual val nodeId: Long,
-                                                   actual val httpClient: HttpClient,
-                                                   actual val attachmentsDir: String,
-                                                   actual val updateNotificationManager: ServerUpdateNotificationManager?,
-                                                   actual val useClientSyncManager: Boolean,
-                                                   actual val attachmentFilters: List<AttachmentFilter>){
+actual class RepositoryConfig internal constructor(
+    actual val context: Any,
+    actual val endpoint: String,
+    actual val auth: String,
+    actual val nodeId: Long,
+    actual val httpClient: HttpClient,
+    actual val json: Json,
+    actual val attachmentsDir: String,
+    actual val updateNotificationManager: ServerUpdateNotificationManager?,
+    actual val useReplicationSubscription: Boolean,
+    actual val attachmentFilters: List<AttachmentFilter>
+){
 
     companion object {
 

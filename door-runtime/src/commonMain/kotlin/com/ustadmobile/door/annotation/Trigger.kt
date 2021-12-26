@@ -1,5 +1,7 @@
 package com.ustadmobile.door.annotation
 
+//Array literal is not supported on Javascript compilation
+@Suppress("ReplaceArrayOfWithLiteral")
 @Target(AnnotationTarget.CLASS)
 /**
  * Attempt to implement a common trigger wrapper that works on both SQL and Postgres.
@@ -39,7 +41,7 @@ annotation class Trigger(
      * A list of SQL statements that should run on Postgres. If present, then these will be used instead of sqlStatements
      * when running on Postgres.
      */
-    val postgreSqlStatements: Array<String> = [],
+    val postgreSqlStatements: Array<String> = arrayOf(),
 
     /**
      * An SQL query that evaluates as a Boolean to determine if the sqlStatements should run.

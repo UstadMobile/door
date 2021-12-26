@@ -7,6 +7,7 @@ import com.ustadmobile.door.*
 import com.ustadmobile.door.annotation.RepoHttpAccessible
 import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.attachments.EntityWithAttachment
+import com.ustadmobile.door.replication.ReplicationSubscriptionManager
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_ANDROID_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JVM_DIRS
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorRepository.Companion.BOUNDARY_CALLBACK_CLASSNAME
@@ -64,6 +65,10 @@ fun FileSpec.Builder.addDbRepoType(
                 .addParameter("db", dbTypeElement.asClassName())
                 .addParameter("dbUnwrapped", dbTypeElement.asClassName())
                 .addParameter("config", RepositoryConfig::class)
+                .addParameter(ParameterSpec.builder("isRootRepository", BOOLEAN)
+                    .addModifiers(KModifier.OVERRIDE)
+                    .defaultValue("false")
+                    .build())
                 .build())
             .applyIf(overrideDataSourceProp) {
                 addDataSourceProperty("db")
@@ -72,6 +77,22 @@ fun FileSpec.Builder.addDbRepoType(
                     .addModifiers(KModifier.OVERRIDE)
                     .initializer("config")
                     .build())
+            .addProperty(PropertySpec.builder("isRootRepository", BOOLEAN)
+                .addModifiers(KModifier.OVERRIDE)
+                .initializer("isRootRepository")
+                .build())
+            .addProperty(PropertySpec.builder("replicationSubscriptionManager",
+                    ReplicationSubscriptionManager::class.asTypeName().copy(nullable = true))
+                .addModifiers(KModifier.OVERRIDE)
+                .initializer(CodeBlock.builder()
+                    .beginControlFlow("if(isRootRepository && config.useReplicationSubscription)")
+                    .add("%M()\n", MemberName("com.ustadmobile.door.replication",
+                        "makeNewSubscriptionManager"))
+                    .nextControlFlow("else")
+                    .add("null\n")
+                    .endControlFlow()
+                    .build())
+                .build())
             .addProperty(PropertySpec.builder("context", Any::class)
                     .getter(FunSpec.getterBuilder()
                             .addCode("return config.context\n")

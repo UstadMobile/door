@@ -2,6 +2,7 @@ package com.ustadmobile.door
 
 import com.ustadmobile.door.attachments.AttachmentFilter
 import io.ktor.client.*
+import kotlinx.serialization.json.Json
 
 /**
  * Contains the configuration for a repository. It is created via a platform-specific builder that may have additional
@@ -15,11 +16,13 @@ expect class RepositoryConfig {
 
     val httpClient: HttpClient
 
+    val json: Json
+
     val attachmentsDir: String
 
     val updateNotificationManager: ServerUpdateNotificationManager?
 
-    val useClientSyncManager: Boolean
+    val useReplicationSubscription: Boolean
 
     val attachmentFilters: List<AttachmentFilter>
 

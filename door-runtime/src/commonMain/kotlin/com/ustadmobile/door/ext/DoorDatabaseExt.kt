@@ -1,11 +1,9 @@
 package com.ustadmobile.door.ext
 
-import com.ustadmobile.door.DoorDatabase
-import com.ustadmobile.door.DoorPrimaryKeyManager
-import com.ustadmobile.door.PreparedStatementConfig
-import com.ustadmobile.door.RepositoryConfig
+import com.ustadmobile.door.*
 import kotlin.reflect.KClass
 import com.ustadmobile.door.jdbc.*
+import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
 
 
 /**
@@ -99,5 +97,17 @@ expect inline fun <reified  T: DoorDatabase> T.asRepository(repositoryConfig: Re
 expect fun <T: DoorDatabase> T.wrap(dbClass: KClass<T>): T
 
 expect fun <T: DoorDatabase> T.unwrap(dbClass: KClass<T>): T
+
+expect val DoorDatabase.replicationNotificationDispatcher: ReplicationNotificationDispatcher
+
+/**
+ * Add an invalidation listener for the given tables.
+ */
+expect fun DoorDatabase.addInvalidationListener(changeListenerRequest: ChangeListenerRequest)
+
+/**
+ * Remove the given invalidation listener
+ */
+expect fun DoorDatabase.removeInvalidationListener(changeListenerRequest: ChangeListenerRequest)
 
 

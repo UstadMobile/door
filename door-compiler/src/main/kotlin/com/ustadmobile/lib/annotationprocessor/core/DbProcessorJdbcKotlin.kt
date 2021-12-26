@@ -25,6 +25,7 @@ import com.ustadmobile.door.ext.minifySql
 import com.ustadmobile.door.replication.ReplicationRunOnChangeRunner
 import com.ustadmobile.door.replication.ReplicationEntityMetaData
 import com.ustadmobile.door.replication.ReplicationFieldMetaData
+import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_ANDROID_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JS_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JVM_DIRS
@@ -32,7 +33,9 @@ import com.ustadmobile.lib.annotationprocessor.core.DbProcessorRepository.Compan
 import com.ustadmobile.lib.annotationprocessor.core.ext.filterByClass
 import com.ustadmobile.lib.annotationprocessor.core.ext.getClassArrayValue
 import com.ustadmobile.lib.annotationprocessor.core.ext.getClassValue
+import kotlinx.coroutines.GlobalScope
 import kotlin.reflect.KClass
+import com.ustadmobile.door.ChangeListenerRequest
 
 val QUERY_SINGULAR_TYPES = listOf(INT, LONG, SHORT, BYTE, BOOLEAN, FLOAT, DOUBLE,
         String::class.asTypeName(), String::class.asTypeName().copy(nullable = true))
@@ -1305,6 +1308,27 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                         .build())
                     .build())
             }
+            .addProperty(PropertySpec.builder("realReplicationNotificationDispatcher",
+                    ReplicationNotificationDispatcher::class)
+                .addModifiers(KModifier.OVERRIDE)
+                .delegate(CodeBlock.builder()
+                    .beginControlFlow("lazy")
+                    .beginControlFlow("if(this == %M)",
+                        MemberName("com.ustadmobile.door.ext", "rootDatabase"))
+                    .add("val dispatcher = %T(this, %T(this), %T)\n", ReplicationNotificationDispatcher::class,
+                        dbTypeElement.asClassNameWithSuffix(SUFFIX_REP_RUN_ON_CHANGE_RUNNER), GlobalScope::class)
+                        .add("this.%M(%T(this::class.%M().replicateTableNames, dispatcher))\n",
+                            MemberName("com.ustadmobile.door.ext", "addInvalidationListener"),
+                            ChangeListenerRequest::class,
+                            MemberName("com.ustadmobile.door.ext", "doorDatabaseMetadata"))
+                    .add("dispatcher\n")
+                    .nextControlFlow("else")
+                    .add("rootDatabase.%M\n",
+                        MemberName("com.ustadmobile.door.ext", "replicationNotificationDispatcher"))
+                    .endControlFlow()
+                    .endControlFlow()
+                    .build())
+                .build())
             .addProperty(PropertySpec.builder("realPrimaryKeyManager", DoorPrimaryKeyManager::class,
                     KModifier.OVERRIDE)
                 .delegate(CodeBlock.builder()

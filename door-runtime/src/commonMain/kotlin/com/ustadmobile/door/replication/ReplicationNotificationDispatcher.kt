@@ -32,9 +32,16 @@ class ReplicationNotificationDispatcher(
 
     private data class ReplicationPendingRequest(val nodeId: Long, val listener: ReplicationPendingListener)
 
-    //Init should run a query to find anything pending in ChangeLog and call onTableChanged to handle them
-
     private val eventCollator = DoorEventCollator(200, coroutineScope, this::onDispatch)
+
+    init {
+        coroutineScope.launch {
+            val pendingChangeLogs = db.findDistinctPendingChangeLogs()
+            Napier.d("ReplicationNotificationDispatcher startup: found ${pendingChangeLogs.size} ChangeLogs to" +
+                    " process now", tag = DoorTag.LOG_TAG)
+            eventCollator.receiveEvent(pendingChangeLogs.mapNotNull { dbMetaData.replicateEntities[it]?.entityTableName })
+        }
+    }
 
     private val replicationPendingListeners = concurrentSafeListOf<ReplicationPendingRequest>()
 

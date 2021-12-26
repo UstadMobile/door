@@ -13,6 +13,8 @@ import io.github.aakira.napier.Napier
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.http.content.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.GlobalScope
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlin.math.max
@@ -202,3 +204,15 @@ suspend fun DoorDatabaseRepository.fetchPendingReplications(
     }while(pendingReplicationsJson.size == repEntityMetaData.batchSize)
     Napier.d("$this : tableId $tableId : fetchPendingReplications - done", tag = DoorTag.LOG_TAG)
 }
+
+/**
+ * This is used by generated code to create a replicationSubscriptionManager if needed.
+ */
+fun DoorDatabaseRepository.makeNewSubscriptionManager(
+    coroutineScope: CoroutineScope = GlobalScope
+): ReplicationSubscriptionManager {
+    val dbMetadata = this.db::class.doorDatabaseMetadata()
+    return ReplicationSubscriptionManager(dbMetadata.version, config.json, db.replicationNotificationDispatcher,
+        this, coroutineScope, dbMetadata, dbMetadata.dbClass)
+}
+

@@ -25,6 +25,12 @@ abstract class DoorDatabaseMetadata<T: DoorDatabase> {
     abstract val replicateEntities: Map<Int, ReplicationEntityMetaData>
 
     /**
+     * Shorthand to get a list of all the table names that are used by replicate entities
+     */
+    val replicateTableNames: List<String>
+        get() = replicateEntities.values.map { it.entityTableName}
+
+    /**
      * If true, this database has a corresponding DoorDatabaseSyncableReadOnlyWrapper
      */
     abstract val hasReadOnlyWrapper: Boolean

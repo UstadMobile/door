@@ -1,5 +1,7 @@
 package com.ustadmobile.door
 
+import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
+
 /**
  * This interface is implemented by all generated JDBC implementations of a database.
  */
@@ -30,6 +32,12 @@ interface DoorDatabaseJdbc {
      * The name as it was provided to the builder function
      */
     val dbName: String
+
+    /**
+     * The real replication notification dispatcher (which is generally accessed
+     * using multiplatform extension properties)
+     */
+    val realReplicationNotificationDispatcher: ReplicationNotificationDispatcher
 
 
 }

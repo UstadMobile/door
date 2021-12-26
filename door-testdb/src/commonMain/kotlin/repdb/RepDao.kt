@@ -73,6 +73,13 @@ abstract class RepDao {
     abstract fun countEntities(): Int
 
     @Query("""
+    SELECT COUNT(*)
+      FROM RepEntity
+    """)
+    abstract fun countEntitiesLive(): DoorLiveData<Int>
+
+
+    @Query("""
     SELECT RepEntity.*
       FROM RepEntity
      WHERE RepEntity.rePrimaryKey = :uid 

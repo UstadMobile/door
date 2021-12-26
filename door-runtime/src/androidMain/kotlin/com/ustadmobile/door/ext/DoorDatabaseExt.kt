@@ -7,9 +7,13 @@ import com.ustadmobile.door.*
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.DOOR_ATTACHMENT_URI_PREFIX
 import com.ustadmobile.door.jdbc.PreparedStatement
 import com.ustadmobile.door.PreparedStatementConfig
+import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
+import com.ustadmobile.door.replication.ReplicationRunOnChangeRunner
 import com.ustadmobile.door.roomjdbc.ConnectionRoomJdbc
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.GlobalScope
 import java.io.File
+import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KClass
@@ -183,3 +187,32 @@ actual fun <T: DoorDatabase> T.unwrap(dbClass: KClass<T>): T {
         return this
     }
 }
+
+actual fun DoorDatabase.addInvalidationListener(changeListenerRequest: ChangeListenerRequest) {
+    invalidationTracker.addObserver(ChangeListenerRequestInvalidationObserver(changeListenerRequest))
+}
+
+actual fun DoorDatabase.removeInvalidationListener(changeListenerRequest: ChangeListenerRequest) {
+    invalidationTracker.removeObserver(ChangeListenerRequestInvalidationObserver(changeListenerRequest))
+}
+
+
+private val replicationNotificationDispatchers = WeakHashMap<DoorDatabase, ReplicationNotificationDispatcher>()
+
+actual val DoorDatabase.replicationNotificationDispatcher: ReplicationNotificationDispatcher
+    get() {
+        val rootDb: DoorDatabase = this.rootDatabase
+        synchronized(replicationNotificationDispatchers) {
+            return replicationNotificationDispatchers.getOrPut(rootDb) {
+                val dbClassName = rootDb::class.qualifiedName?.substringBefore("_")
+                    ?: throw IllegalArgumentException("No class name!")
+                val dbClass = Class.forName(dbClassName)
+                val runOnChangeRunnerClass = Class.forName("${dbClassName}_ReplicationRunOnChangeRunner")
+                    .getConstructor(dbClass)
+                    .newInstance(rootDb) as ReplicationRunOnChangeRunner
+
+                ReplicationNotificationDispatcher(this, runOnChangeRunnerClass, GlobalScope)
+            }
+        }
+    }
+

@@ -9,9 +9,7 @@ import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_RECEIVE_EN
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_SUBSCRIBE_SSE
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.PATH_REPLICATION
 import com.ustadmobile.door.entities.NodeIdAndAuth
-import com.ustadmobile.door.ext.DoorTag
-import com.ustadmobile.door.ext.doorDatabaseMetadata
-import com.ustadmobile.door.ext.requireRemoteNodeIdAndAuth
+import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.sse.DoorServerSentEvent
 import io.github.aakira.napier.Napier
 import io.ktor.application.*
@@ -30,7 +28,6 @@ import org.kodein.di.on
 import org.kodein.type.TypeToken
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.reflect.KClass
-import com.ustadmobile.door.ext.withUtf8Charset
 import com.ustadmobile.door.ktor.addNodeIdAndAuthCheckInterceptor
 import com.ustadmobile.door.util.systemTimeInMillis
 
@@ -138,8 +135,8 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
         get(ENDPOINT_SUBSCRIBE_SSE) {
             call.response.cacheControl(CacheControl.NoCache(null))
             val di: DI by closestDI()
+            val db: DoorDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
 
-            val replicationNotificationDispatcher: ReplicationNotificationDispatcher = di.on(call).direct.instance()
             val channel = Channel<DoorServerSentEvent>(capacity = Channel.UNLIMITED)
             val remoteNodeIdAndAuth = requireRemoteNodeIdAndAuth()
             val localNodeIdAndAuth: NodeIdAndAuth = di.on(call).direct.instance()
@@ -150,7 +147,7 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
             try {
                 channel.send(DoorServerSentEvent("0", ReplicationSubscriptionManager.EVT_INIT,
                     localNodeIdAndAuth.nodeId.toString()))
-                replicationNotificationDispatcher.addReplicationPendingEventListener(remoteNodeIdAndAuth.first,
+                db.replicationNotificationDispatcher.addReplicationPendingEventListener(remoteNodeIdAndAuth.first,
                     pendingReplicationListener)
 
                 call.respondTextWriter(contentType = ContentType.Text.EventStream) {
@@ -168,7 +165,7 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
             }catch(e: Exception) {
                 e.printStackTrace()
             }finally {
-                replicationNotificationDispatcher.removeReplicationPendingEventListener(remoteNodeIdAndAuth.first,
+                db.replicationNotificationDispatcher.removeReplicationPendingEventListener(remoteNodeIdAndAuth.first,
                     pendingReplicationListener)
                 channel.close()
             }

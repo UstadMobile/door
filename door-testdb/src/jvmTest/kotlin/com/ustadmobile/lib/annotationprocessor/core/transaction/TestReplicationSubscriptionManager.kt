@@ -62,7 +62,7 @@ class TestReplicationSubscriptionManager {
         }
 
         repo = db.asRepository(RepositoryConfig.repositoryConfig(Any(), "http://localhost/dummy",
-            1234, "", httpClient, okHttpClient))
+            1234, "", httpClient, okHttpClient, Json { encodeDefaults = true }))
 
     }
 

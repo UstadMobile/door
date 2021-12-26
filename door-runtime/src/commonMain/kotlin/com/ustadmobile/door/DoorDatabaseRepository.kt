@@ -1,5 +1,6 @@
 package com.ustadmobile.door
 
+import com.ustadmobile.door.replication.ReplicationSubscriptionManager
 import kotlin.reflect.KClass
 
 /**
@@ -17,6 +18,12 @@ interface DoorDatabaseRepository {
     val db: DoorDatabase
 
     val dbName: String
+
+    /**
+     * Indicates whether this is the root repository that corresponds to the root database. This is used on
+     * initialization by the repo code to determine if it should create a ReplicationSubscriptionManager
+     */
+    val isRootRepository: Boolean
 
     /**
      * Adds a weak reference to the given connectivity listener - useful for RepositoryLoadHelper
@@ -50,6 +57,8 @@ interface DoorDatabaseRepository {
      * NOT be called manually.
      */
     fun <T: Any> handleSyncEntitiesReceived(entityClass: KClass<T>, entitiesIncoming: List<T>)
+
+    val replicationSubscriptionManager: ReplicationSubscriptionManager?
 
     companion object {
 

@@ -3,10 +3,7 @@ package com.ustadmobile.lib.annotationprocessor.core.replication
 import com.ustadmobile.door.*
 import com.ustadmobile.door.entities.DoorNode
 import com.ustadmobile.door.entities.NodeIdAndAuth
-import com.ustadmobile.door.ext.DoorTag
-import com.ustadmobile.door.ext.asRepository
-import com.ustadmobile.door.ext.doorDatabaseMetadata
-import com.ustadmobile.door.ext.waitUntilWithTimeout
+import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.replication.*
 import com.ustadmobile.door.util.NodeIdAuthCache
 import com.ustadmobile.lib.annotationprocessor.core.VirtualHostScope
@@ -55,10 +52,6 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     private lateinit var jsonSerializer: Json
 
-    private lateinit var remoteNotificationDispatcher :ReplicationNotificationDispatcher
-
-    private lateinit var localNotificationDispatcher: ReplicationNotificationDispatcher
-
     private lateinit var localReplicationSubscriptionManager: ReplicationSubscriptionManager
 
     @Before
@@ -89,28 +82,11 @@ class TestDoorDatabaseRepositoryReplicationExt  {
                 it.clearAllTables()
             }
 
-        localDbRepo = localRepDb.asRepository(RepositoryConfig.repositoryConfig(Any(), "http://localhost:8089/",
-            LOCAL_NODE_ID, "secret", httpClient, okHttpClient))
-
-
         remoteVirtualHostScope = VirtualHostScope()
-
-        remoteNotificationDispatcher = ReplicationNotificationDispatcher(
-            remoteRepDb, RepDb_ReplicationRunOnChangeRunner(remoteRepDb), GlobalScope,
-            RepDb::class.doorDatabaseMetadata())
-
-        localNotificationDispatcher = ReplicationNotificationDispatcher(
-            localRepDb, RepDb_ReplicationRunOnChangeRunner(localRepDb), GlobalScope,
-            RepDb::class.doorDatabaseMetadata())
-
 
         remoteDi = DI {
             bind<RepDb>(tag = DoorTag.TAG_DB) with scoped(remoteVirtualHostScope).singleton {
                 remoteRepDb
-            }
-
-            bind<ReplicationNotificationDispatcher>() with scoped(remoteVirtualHostScope).singleton {
-                remoteNotificationDispatcher
             }
 
             bind<NodeIdAndAuth>() with scoped(remoteVirtualHostScope).singleton {
@@ -138,18 +114,12 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         }
         remoteServer.start()
 
-
+        localDbRepo = localRepDb.asRepository(RepositoryConfig.repositoryConfig(Any(), "http://localhost:8089/",
+            LOCAL_NODE_ID, "secret", httpClient, okHttpClient, jsonSerializer
+        ) {
+            useClientSyncManager = true
+        })
     }
-
-
-    private fun setupLocalAndRemoteReplicationManager() {
-        remoteRepDb.addChangeListener(ChangeListenerRequest(listOf(), remoteNotificationDispatcher))
-        localRepDb.addChangeListener(ChangeListenerRequest(listOf(), localNotificationDispatcher))
-
-        localReplicationSubscriptionManager = ReplicationSubscriptionManager(localRepDb.dbVersion, jsonSerializer, localNotificationDispatcher,
-            localDbRepo as DoorDatabaseRepository, GlobalScope, RepDb::class.doorDatabaseMetadata(), RepDb::class)
-    }
-
 
     @After
     fun tearDown() {
@@ -162,7 +132,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
      *
      */
     @Test
-    fun givenEntityCreatedLocally_whenSendPendingReplicationsCalled_thenShouldBePresenterOnRemote() {
+    fun givenEmptyDatabase_whenEntityCreatedLocally_thenShouldReplicateToRemote() {
         localRepDb.repDao.insertDoorNode(DoorNode().apply {
             auth = "secret"
             nodeId = REMOTE_NODE_ID
@@ -173,19 +143,17 @@ class TestDoorDatabaseRepositoryReplicationExt  {
             rePrimaryKey = localRepDb.repDao.insert(this)
         }
 
-
-        runBlocking { localRepDb.repDao.updateReplicationTrackers(0) }
-
         runBlocking {
-            (localDbRepo as DoorDatabaseRepository).sendPendingReplications(jsonSerializer, RepEntity.TABLE_ID,
-                REMOTE_NODE_ID)
+            remoteRepDb.repDao.findByUidLive(repEntity.rePrimaryKey).waitUntilWithTimeout(5000) {
+                it != null
+            }
         }
 
         Assert.assertNotNull("entity now on remote", remoteRepDb.repDao.findByUid(repEntity.rePrimaryKey))
     }
 
     @Test
-    fun givenEntityCreatedRemotely_whenFetchPendingReplicationsCalled_thenShouldBePresentOnLocal() {
+    fun givenEmptyDatabase_whenEntityCreatedRemotely_thenShouldBeReplicatedToLocal() {
         remoteRepDb.repDao.insertDoorNode(DoorNode().apply {
             auth = "secret"
             nodeId = LOCAL_NODE_ID
@@ -196,18 +164,17 @@ class TestDoorDatabaseRepositoryReplicationExt  {
             rePrimaryKey = remoteRepDb.repDao.insert(this)
         }
 
-        runBlocking { remoteRepDb.repDao.updateReplicationTrackers(0) }
-
         runBlocking {
-            (localDbRepo as DoorDatabaseRepository).fetchPendingReplications(jsonSerializer, RepEntity.TABLE_ID,
-                REMOTE_NODE_ID)
+            localRepDb.repDao.findByUidLive(repEntity.rePrimaryKey).waitUntilWithTimeout(5000) {
+                it != null
+            }
         }
 
         Assert.assertNotNull("Entity now on local", localRepDb.repDao.findByUid(repEntity.rePrimaryKey))
     }
 
     @Test
-    fun givenMoreEntitiesThanInBatchCreatedRemotely_whenFetchPendingReplicationsCalled_thenShouldAllBePresentOnLocal() {
+    fun givenEmptyDatabase_whenMoreEntitiesThanInBatchCreatedRemotely_thenShouldAllReplicateToLocal() {
         remoteRepDb.repDao.insertDoorNode(DoorNode().apply {
             auth = "secret"
             nodeId = LOCAL_NODE_ID
@@ -220,12 +187,12 @@ class TestDoorDatabaseRepositoryReplicationExt  {
             }
         })
 
-        runBlocking { remoteRepDb.repDao.updateReplicationTrackers(0) }
-
         runBlocking {
-            (localDbRepo as DoorDatabaseRepository).fetchPendingReplications(jsonSerializer, RepEntity.TABLE_ID,
-                REMOTE_NODE_ID)
+            localRepDb.repDao.countEntitiesLive().waitUntilWithTimeout(5000) {
+                it == remoteRepDb.repDao.countEntities()
+            }
         }
+
 
         Assert.assertEquals("All entities transferred", remoteRepDb.repDao.countEntities(),
             localRepDb.repDao.countEntities())
@@ -233,7 +200,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
 
     @Test
-    fun givenMoreEntitiesThanInBatchCreatedLocally_whenSendPendingReplicationsCalled_thenAllShouldBePresentOnRemote() {
+    fun givenEmptyDatabase_whenMoreEntitiesThanInBatchCreatedLocally_thenAllShouldBeReplicatedToRemote() {
         localRepDb.repDao.insertDoorNode(DoorNode().apply {
             auth = "secret"
             nodeId = REMOTE_NODE_ID
@@ -246,11 +213,10 @@ class TestDoorDatabaseRepositoryReplicationExt  {
             }
         })
 
-        runBlocking { localRepDb.repDao.updateReplicationTrackers(0) }
-
         runBlocking {
-            (localDbRepo as DoorDatabaseRepository).sendPendingReplications(jsonSerializer, RepEntity.TABLE_ID,
-                REMOTE_NODE_ID)
+            remoteRepDb.repDao.countEntitiesLive().waitUntilWithTimeout(5000) {
+                it == localRepDb.repDao.countEntities()
+            }
         }
 
         Assert.assertEquals("All entities transferred", localRepDb.repDao.countEntities(),
@@ -260,8 +226,6 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     @Test
     fun givenReplicationSubscriptionEnabled_whenChangeMadeOnRemote_thenShouldTransferToLocal() {
-        setupLocalAndRemoteReplicationManager()
-
         //Just create it - this will need a close
         val entity = RepEntity().apply {
             reString = "Subscribe and replicate"
@@ -279,8 +243,6 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     @Test
     fun givenReplicationSubscriptionEnabled_whenInsertedOnLocal_thenShouldTransferToRemote() {
-        setupLocalAndRemoteReplicationManager()
-
         //Just create it - this will need a close
         val entity = RepEntity().apply {
             reString = "Subscribe and replicate"
@@ -298,8 +260,6 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     @Test
     fun givenReplicationSubscriptionEnabled_whenChangeMadeOnRemoteThenLocal_thenShouldTransferToLocalAndUpdateOnRemote() {
-        setupLocalAndRemoteReplicationManager()
-
         //Just create it - this will need a close
         val entity = RepEntity().apply {
             reString = "Subscribe and replicate"
@@ -307,7 +267,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         }
 
         val entityOnLocal = runBlocking {
-            localRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000 * 1000) {
+            localRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000) {
                 it != null
             }
         } ?: throw IllegalStateException("Entity not transferred to local")
@@ -330,8 +290,6 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     @Test
     fun givenReplicationSubscriptionEnabled_whenChangeMadeOnLocalThenRemote_thenShouldTransferToRemoteAndUpdateOnLocal() {
-        setupLocalAndRemoteReplicationManager()
-
         //Just create it - this will need a close
         val entity = RepEntity().apply {
             reString = "Subscribe and replicate"

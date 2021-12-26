@@ -2,6 +2,7 @@ package com.ustadmobile.door.ext
 
 import com.ustadmobile.door.*
 import com.ustadmobile.door.jdbc.PreparedStatement
+import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
 import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
@@ -121,6 +122,17 @@ suspend fun DoorDatabase.deleteFromChangeLog(tableId: Int) {
     prepareAndUseStatementAsync("DELETE FROM ChangeLog WHERE chTableId = ?") { stmt ->
         stmt.setInt(1, tableId)
         stmt.executeUpdateAsyncKmp()
+    }
+}
+
+/**
+ * Find tables which have pending changelogs that have not yet been processed.
+ */
+suspend fun DoorDatabase.findDistinctPendingChangeLogs(): List<Int> {
+    return prepareAndUseStatementAsync("SELECT DISTINCT chTableId FROM ChangeLog") { stmt ->
+        stmt.executeQueryAsyncKmp().useResults { it.mapRows {
+            it.getInt(1)
+        } }
     }
 }
 
