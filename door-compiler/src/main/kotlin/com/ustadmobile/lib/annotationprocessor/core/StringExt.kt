@@ -133,3 +133,17 @@ fun String.sqlToPostgresSql() : String {
 
     return newSql
 }
+
+fun String.useAsPostgresSqlIfNotBlankOrFallback(generalSql: String): String {
+    return if(this != "")
+        this
+    else
+        generalSql.sqlToPostgresSql()
+}
+
+fun Array<String>.useAsPostgresSqlIfNotEmptyOrFallback(generalSql: Array<String>) : Array<String> {
+    return if(isNotEmpty())
+        this
+    else
+        generalSql.map { it.sqlToPostgresSql() }.toTypedArray()
+}

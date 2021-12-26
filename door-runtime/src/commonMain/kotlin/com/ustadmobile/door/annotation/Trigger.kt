@@ -36,9 +36,21 @@ annotation class Trigger(
     val sqlStatements: Array<String>,
 
     /**
+     * A list of SQL statements that should run on Postgres. If present, then these will be used instead of sqlStatements
+     * when running on Postgres.
+     */
+    val postgreSqlStatements: Array<String> = [],
+
+    /**
      * An SQL query that evaluates as a Boolean to determine if the sqlStatements should run.
      */
     val conditionSql: String = "",
+
+    /**
+     * An SQL query that evaluates as a Boolean to determine if the sql statements should run. If this is not a blank
+     * string, it will be used instead of conditionSql on postgres.
+     */
+    val conditionSqlPostgres: String = "",
 
     ) {
 

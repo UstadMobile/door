@@ -160,7 +160,7 @@ suspend fun DoorDatabase.insertReplicationsIntoReceiveView(
 internal suspend fun DoorDatabase.getDoorNodeAuth(nodeId : Long): String? {
     return prepareAndUseStatementAsync("""SELECT auth
           FROM DoorNode
-         WHERE nodeId = :nodeId""") { stmt ->
+         WHERE nodeId = ?""") { stmt ->
 
         stmt.setLong(1, nodeId)
 

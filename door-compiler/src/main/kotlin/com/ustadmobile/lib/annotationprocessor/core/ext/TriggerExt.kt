@@ -3,10 +3,7 @@ package com.ustadmobile.lib.annotationprocessor.core.ext
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.annotation.Trigger
 import com.ustadmobile.door.ext.minifySql
-import com.ustadmobile.lib.annotationprocessor.core.applyIf
-import com.ustadmobile.lib.annotationprocessor.core.entityTableName
-import com.ustadmobile.lib.annotationprocessor.core.replicationEntityReceiveViewName
-import com.ustadmobile.lib.annotationprocessor.core.sqlToPostgresSql
+import com.ustadmobile.lib.annotationprocessor.core.*
 import javax.lang.model.element.TypeElement
 
 fun Trigger.toSql(entityTypeEl: TypeElement, dbProductType: Int) : List<String>{
@@ -34,7 +31,7 @@ fun Trigger.toSql(entityTypeEl: TypeElement, dbProductType: Int) : List<String>{
                     append("""
                        DECLARE
                          whereVar boolean;
-                         curs1 CURSOR FOR $conditionSql ;
+                         curs1 CURSOR FOR ${conditionSqlPostgres.useAsPostgresSqlIfNotBlankOrFallback(conditionSql)} ;
                          """)
                 }
                 .append("BEGIN \n")
@@ -44,7 +41,8 @@ fun Trigger.toSql(entityTypeEl: TypeElement, dbProductType: Int) : List<String>{
                         FETCH curs1 INTO whereVar;
                         IF whereVar = true THEN """)
                 }
-                .append(sqlStatements.joinToString(separator = ";", postfix = ";") { it.sqlToPostgresSql() })
+                .append(postgreSqlStatements.useAsPostgresSqlIfNotEmptyOrFallback(sqlStatements)
+                    .joinToString(separator = ";", postfix = ";"))
                 .applyIf(conditionSql != "") {
                     append("END IF; CLOSE curs1;")
                 }
