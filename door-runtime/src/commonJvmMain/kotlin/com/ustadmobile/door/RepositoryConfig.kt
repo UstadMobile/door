@@ -35,7 +35,7 @@ actual class RepositoryConfig internal constructor(
 
             var attachmentsDir: String? = null
 
-            var useClientSyncManager: Boolean = true
+            var useReplicationSubscription = true
 
             val attachmentFilters = mutableListOf<AttachmentFilter>()
 
@@ -44,7 +44,7 @@ actual class RepositoryConfig internal constructor(
             fun build() : RepositoryConfig{
                 val effectiveAttachmentDir = attachmentsDir ?: defaultAttachmentDir(context, endpoint)
                 return RepositoryConfig(context, endpoint, auth, nodeId, httpClient, okHttpClient, json,
-                        effectiveAttachmentDir, useClientSyncManager, replicationSubscriptionInitListener,
+                        effectiveAttachmentDir, useReplicationSubscription, replicationSubscriptionInitListener,
                     attachmentFilters.toList())
             }
 

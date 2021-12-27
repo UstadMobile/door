@@ -117,7 +117,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         localDbRepo = localRepDb.asRepository(RepositoryConfig.repositoryConfig(Any(), "http://localhost:8089/",
             LOCAL_NODE_ID, "secret", httpClient, okHttpClient, jsonSerializer
         ) {
-            useClientSyncManager = true
+            useReplicationSubscription = true
         })
     }
 
