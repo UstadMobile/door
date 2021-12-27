@@ -1,5 +1,6 @@
 package com.ustadmobile.door.replication
 
+import com.ustadmobile.door.ChangeListenerRequest
 import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.TablesInvalidationListener
 import com.ustadmobile.door.ext.*
@@ -35,6 +36,7 @@ class ReplicationNotificationDispatcher(
     private val eventCollator = DoorEventCollator(200, coroutineScope, this::onDispatch)
 
     init {
+        db.addInvalidationListener(ChangeListenerRequest(dbMetaData.replicateTableNames, this))
         coroutineScope.launch {
             val pendingChangeLogs = db.findDistinctPendingChangeLogs()
             Napier.d("ReplicationNotificationDispatcher startup: found ${pendingChangeLogs.size} ChangeLogs to" +

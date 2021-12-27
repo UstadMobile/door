@@ -208,11 +208,13 @@ suspend fun DoorDatabaseRepository.fetchPendingReplications(
 /**
  * This is used by generated code to create a replicationSubscriptionManager if needed.
  */
+@Suppress("Unused") //This is used by generated code
 fun DoorDatabaseRepository.makeNewSubscriptionManager(
     coroutineScope: CoroutineScope = GlobalScope
 ): ReplicationSubscriptionManager {
     val dbMetadata = this.db::class.doorDatabaseMetadata()
     return ReplicationSubscriptionManager(dbMetadata.version, config.json, db.replicationNotificationDispatcher,
-        this, coroutineScope, dbMetadata, dbMetadata.dbClass)
+        this, coroutineScope, dbMetadata, dbMetadata.dbClass,
+        onSubscriptionInitialized = config.replicationSubscriptionInitListener)
 }
 

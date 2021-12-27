@@ -1,7 +1,9 @@
 package com.ustadmobile.door.ktor
 
+import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.requireRemoteNodeIdAndAuth
 import com.ustadmobile.door.util.NodeIdAuthCache
+import io.github.aakira.napier.Napier
 import io.ktor.application.*
 import io.ktor.http.*
 import io.ktor.response.*
@@ -31,6 +33,7 @@ fun Route.addNodeIdAndAuthCheckInterceptor(){
             }
         }catch(e: Exception) {
             context.request.call.respond(HttpStatusCode.BadRequest, "Exception parsing node id / auth header")
+            Napier.w("Exception parsing node id / auth header", e, tag = DoorTag.LOG_TAG)
             return@intercept finish()
         }
     }

@@ -155,8 +155,8 @@ actual inline fun <reified  T: DoorDatabase> T.asRepository(repositoryConfig: Re
     val dbClass = T::class
     val repoImplClass = Class.forName("${dbClass.qualifiedName}_Repo") as Class<T>
     val repo = repoImplClass
-        .getConstructor(dbClass.java, dbClass.java, RepositoryConfig::class.java)
-        .newInstance(this, dbUnwrapped, repositoryConfig)
+        .getConstructor(dbClass.java, dbClass.java, RepositoryConfig::class.java, Boolean::class.javaPrimitiveType)
+        .newInstance(this, dbUnwrapped, repositoryConfig, true)
     return repo
 }
 
@@ -214,7 +214,6 @@ actual val DoorDatabase.replicationNotificationDispatcher: ReplicationNotificati
                 val runOnChangeRunnerClass = Class.forName("${dbClassName}_ReplicationRunOnChangeRunner")
                     .getConstructor(dbClass)
                     .newInstance(rootDb) as ReplicationRunOnChangeRunner
-
                 ReplicationNotificationDispatcher(this, runOnChangeRunnerClass, GlobalScope)
             }
         }

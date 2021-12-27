@@ -1149,14 +1149,8 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         val daosWithRunOnNewNode = dbTypeElement.dbEnclosedDaos(processingEnv)
             .filter { it.enclosedElementsWithAnnotation(ReplicationRunOnNewNode::class.java).isNotEmpty() }
 
-        val replicatedEntitiesWithOnChangeFunctions = daosWithRunOnChange
-            .flatMap {
-                val funsWithOnChange = it.enclosedElementsWithAnnotation(ReplicationRunOnChange::class.java)
-                val repOnChangeAnnotationMirrors = funsWithOnChange.flatMap {
-                    it.annotationMirrors.filterByClass(processingEnv, ReplicationRunOnChange::class)
-                }
-                repOnChangeAnnotationMirrors.flatMap { it.getClassArrayValue("value", processingEnv) }
-            }
+        val allReplicateEntities = dbTypeElement.allDbEntities(processingEnv)
+            .filter { it.hasAnnotation(ReplicateEntity::class.java) }
 
 
         addType(TypeSpec.classBuilder(dbTypeElement.asClassNameWithSuffix(SUFFIX_REP_RUN_ON_CHANGE_RUNNER))
@@ -1171,8 +1165,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .initializer("_db")
                 .build())
             .apply {
-                //TODO: this should have an abstract super class to implement the MessageBus
-                replicatedEntitiesWithOnChangeFunctions.forEach { repEntity ->
+                allReplicateEntities.forEach { repEntity ->
                     addFunction(FunSpec.builder("handle${repEntity.simpleName}Changed")
                         .receiver(dbTypeElement.asClassName())
                         .addModifiers(KModifier.SUSPEND)
@@ -1183,7 +1176,10 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                                 val repTablesToCheck = mutableSetOf<String>()
                                 daosWithRunOnChange.forEach { dao ->
                                     val daoFunsToRun = dao.enclosedElements
-                                        .filter { it.hasAnyAnnotation { it.getClassValue("value", processingEnv) == repEntity} }
+                                        .filter { it.hasAnyAnnotation {
+                                            it.annotationType.asTypeName() == ReplicationRunOnChange::class.java.asTypeName() &&
+                                            it.getClassValue("value", processingEnv) == repEntity}
+                                        }
                                     val daoAccessorCodeBlock = dbTypeElement.findDaoGetter(dao, processingEnv)
                                     daoFunsToRun.mapNotNull { it as? ExecutableElement}.forEach { funToRun ->
                                         add("%L.${funToRun.simpleName}(", daoAccessorCodeBlock)
@@ -1220,13 +1216,11 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                             MemberName("com.ustadmobile.door.ext", "withDoorTransactionAsync"),
                             dbTypeElement)
                         add("_transactionDb ->\n")
-                        beginControlFlow("when")
-                        replicatedEntitiesWithOnChangeFunctions.forEach { repEntity ->
-                            beginControlFlow("%S in tableNames -> ", repEntity.simpleName)
+                        allReplicateEntities.forEach { repEntity ->
+                            beginControlFlow("if(%S in tableNames)", repEntity.simpleName)
                             add("_checkPendingNotifications.addAll(_transactionDb.handle${repEntity.simpleName}Changed())\n")
                             endControlFlow()
                         }
-                        endControlFlow()
                         add("Unit\n")
                         endControlFlow()
                         add("return _checkPendingNotifications\n")
@@ -1316,13 +1310,8 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     .beginControlFlow("lazy")
                     .beginControlFlow("if(this == %M)",
                         MemberName("com.ustadmobile.door.ext", "rootDatabase"))
-                    .add("val dispatcher = %T(this, %T(this), %T)\n", ReplicationNotificationDispatcher::class,
+                    .add("%T(this, %T(this), %T)\n", ReplicationNotificationDispatcher::class,
                         dbTypeElement.asClassNameWithSuffix(SUFFIX_REP_RUN_ON_CHANGE_RUNNER), GlobalScope::class)
-                        .add("this.%M(%T(this::class.%M().replicateTableNames, dispatcher))\n",
-                            MemberName("com.ustadmobile.door.ext", "addInvalidationListener"),
-                            ChangeListenerRequest::class,
-                            MemberName("com.ustadmobile.door.ext", "doorDatabaseMetadata"))
-                    .add("dispatcher\n")
                     .nextControlFlow("else")
                     .add("rootDatabase.%M\n",
                         MemberName("com.ustadmobile.door.ext", "replicationNotificationDispatcher"))

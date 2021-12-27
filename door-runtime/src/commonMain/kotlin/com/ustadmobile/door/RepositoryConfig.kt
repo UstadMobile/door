@@ -1,6 +1,7 @@
 package com.ustadmobile.door
 
 import com.ustadmobile.door.attachments.AttachmentFilter
+import com.ustadmobile.door.replication.ReplicationSubscriptionManager
 import io.ktor.client.*
 import kotlinx.serialization.json.Json
 
@@ -29,6 +30,8 @@ expect class RepositoryConfig {
     val attachmentFilters: List<AttachmentFilter>
 
     val nodeId: Long
+
+    val replicationSubscriptionInitListener: ReplicationSubscriptionManager.SubscriptionInitializedListener?
 
     /**
      * Random auth string known only to the repository server and the device
