@@ -273,11 +273,11 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
 
                     availablePrefixes.forEach { prefix ->
                         entity.entityFields.forEach { field ->
-                            sqlFormatted = sqlFormatted.replace("$prefix.${field.simpleName}",
+                            sqlFormatted = sqlFormatted.replaceColNameWithDefaultValueInSql("$prefix.${field.simpleName}",
                                 field.asType().asTypeName().defaultSqlValue(dbProductType))
                         }
                         repTrkr.takeIf { trigger.on == Trigger.On.RECEIVEVIEW }?.entityFields?.forEach { field ->
-                            sqlFormatted = sqlFormatted.replace("$prefix.${field.simpleName}",
+                            sqlFormatted = sqlFormatted.replaceColNameWithDefaultValueInSql("$prefix.${field.simpleName}",
                                 field.asType().asTypeName().defaultSqlValue(dbProductType))
                         }
                     }
@@ -306,8 +306,9 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
 
 
                 var dbType = 0
+                var sqlToRun: String
                 trigger.sqlStatements.forEach { sql ->
-                    var sqlToRun = sql.substituteTriggerPrefixes(dbType)
+                    sqlToRun = sql.substituteTriggerPrefixes(dbType)
                     try {
                         stmtsMap.forEach { stmtEntry ->
                             dbType = stmtEntry.key

@@ -147,3 +147,13 @@ fun Array<String>.useAsPostgresSqlIfNotEmptyOrFallback(generalSql: Array<String>
     else
         generalSql.map { it.sqlToPostgresSql() }.toTypedArray()
 }
+
+/**
+ * Used where we need to test a query, but a field name does not exist because it's not inside a trigger
+ * (e.g. NEW.someField). This uses a regex to avoid issues where one field name is a substring of another.
+ */
+fun String.replaceColNameWithDefaultValueInSql(fieldName: String, substitution: String) : String {
+    return "([\\s,)(])$fieldName([\\s,)(])".toRegex().replace(this) {
+        it.groupValues[1] + substitution + it.groupValues[2]
+    }
+}

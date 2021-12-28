@@ -112,6 +112,35 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
                 @ReplicationCheckPendingNotificationsFor([${repEntity.simpleName}::class])
                 abstract suspend fun replicateOnNewNode(@NewNodeIdParam newNodeId: Long)
                 """.trimIndent())
+                .addComment("""
+                    
+                    @Query(""${'"'}
+                    REPLACE INTO ${repEntity.simpleName}Replicate(${entityPrefix}Pk, ${entityPrefix}VersionId, ${entityPrefix}Destination)
+                     SELECT ${repEntity.entityTableName}.${repEntity.entityPrimaryKey?.simpleName} AS ${entityPrefix}Uid,
+                            ${repEntity.entityTableName}.${entityVersionField?.simpleName} AS ${entityPrefix}VersionId,
+                            UserSession.usClientNodeId AS ${entityPrefix}Destination
+                       FROM ChangeLog
+                            JOIN ${repEntity.entityTableName}
+                                ON ChangeLog.chTableId = ${repEntity.getAnnotation(ReplicateEntity::class.java).tableId}
+                                   AND ChangeLog.chEntityPk = ${repEntity.entityTableName}.${repEntity.entityPrimaryKey?.simpleName}
+                            JOIN UserSession
+                      WHERE UserSession.usClientNodeId != (
+                            SELECT nodeClientId 
+                              FROM SyncNode
+                             LIMIT 1)
+                        AND ${repEntity.entityTableName}.${entityVersionField?.simpleName} != COALESCE(
+                            (SELECT ${entityPrefix}VersionId
+                               FROM ${repEntity.simpleName}Replicate
+                              WHERE ${entityPrefix}Pk = ${repEntity.simpleName}.${repEntity.entityPrimaryKey?.simpleName}
+                                AND ${entityPrefix}Destination = UserSession.usClientNodeId), 0)
+                    /*psql ON CONFLICT(${entityPrefix}Pk, ${entityPrefix}Destination) DO UPDATE
+                        SET ${entityPrefix}Processed = false
+                     */               
+                    ""${'"'})
+                    @ReplicationRunOnChange([${repEntity.simpleName}::class])
+                    @ReplicationCheckPendingNotificationsFor([${repEntity.simpleName}::class])
+                    abstract suspend fun replicateOnChange()
+                """.trimIndent())
                 .addTrackerClass(repEntity)
                 .build()
                 .writeTo(outputDir)
