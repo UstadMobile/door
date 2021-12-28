@@ -1,9 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import androidx.room.ColumnInfo
-import androidx.room.Database
-import androidx.room.Entity
-import androidx.room.Index
+import androidx.room.*
 import com.squareup.kotlinpoet.*
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.annotation.*
@@ -30,14 +27,14 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
     fun FileSpec.Builder.addTrackerClass(entity: TypeElement): FileSpec.Builder {
         val varPrefix = entity.prefix()
 
-        addType(TypeSpec.classBuilder("${entity.simpleName}Tracker")
+        addType(TypeSpec.classBuilder("${entity.simpleName}Replicate")
             .addAnnotation(AnnotationSpec.builder(Entity::class)
-                .addMember("primaryKeys = arrayOf(%S, %S)", "${varPrefix}Fk", "${varPrefix}Destination")
+                .addMember("primaryKeys = arrayOf(%S, %S)", "${varPrefix}Pk", "${varPrefix}Destination")
                 .addMember("indices = arrayOf(%T(value = arrayOf(%S, %S, %S)))", Index::class,
-                    "${varPrefix}Destination", "${varPrefix}Processed", "${varPrefix}Fk")
+                    "${varPrefix}Destination", "${varPrefix}Processed", "${varPrefix}Pk")
                 .build())
             .addAnnotation(Serializable::class)
-            .addProperty(PropertySpec.builder("${varPrefix}Fk", LONG)
+            .addProperty(PropertySpec.builder("${varPrefix}Pk", LONG)
                 .mutable()
                 .initializer("0")
                 .addAnnotation(ReplicationEntityForeignKey::class)
@@ -72,7 +69,49 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
 
         repEntities.forEach { repEntity ->
             //Generate the tracker itself
-            FileSpec.builder(repEntity.packageName, "${repEntity.simpleName}Tracker")
+            val entityFields = repEntity.entityFields
+            val entityPrefix = repEntity.prefix()
+            val nonPkFields = repEntity.entityFields.filter { !it.hasAnnotation(PrimaryKey::class.java) }
+            val entityVersionField = repEntity.enclosedElementsWithAnnotation(ReplicationVersionId::class.java).firstOrNull()
+
+            FileSpec.builder(repEntity.packageName, "${repEntity.simpleName}Replicate")
+                .addComment("""
+                    @Triggers(arrayOf(
+                        Trigger(
+                            name = "${repEntity.simpleName.toString().lowercase()}_remote_insert",
+                            order = Trigger.Order.INSTEAD_OF,
+                            on = Trigger.On.RECEIVEVIEW,
+                            events = [Trigger.Event.INSERT],
+                            sqlStatements = [
+                                ""${'"'}REPLACE INTO ${repEntity.simpleName}(${entityFields.joinToString { it.simpleName }}) 
+                                VALUES (${entityFields.joinToString { "NEW." + it.simpleName }}) 
+                                /*psql ON CONFLICT (${repEntity.entityPrimaryKey!!.simpleName}) DO UPDATE 
+                                SET ${nonPkFields.joinToString { "$it = EXCLUDED.$it" }}
+                                */""${'"'}
+                            ]
+                        )
+                    ))            
+                """.trimIndent())
+                .addComment("""
+                    @Query(""${'"'}
+                    REPLACE INTO ${repEntity.simpleName}Replicate(${entityPrefix}Pk, ${entityPrefix}VersionId, ${entityPrefix}Destination)
+                     SELECT ${repEntity.entityTableName}.${repEntity.entityPrimaryKey?.simpleName} AS ${entityPrefix}Uid,
+                            ${repEntity.entityTableName}.${entityVersionField?.simpleName} AS ${entityPrefix}VersionId,
+                            :newNodeId AS ${entityPrefix}Destination
+                       FROM ${repEntity.entityTableName}
+                      WHERE ${repEntity.entityTableName}.${entityVersionField?.simpleName} != COALESCE(
+                            (SELECT ${entityPrefix}VersionId
+                               FROM ${repEntity.simpleName}Replicate
+                              WHERE ${entityPrefix}Pk = ${repEntity.entityTableName}.${repEntity.entityPrimaryKey?.simpleName}
+                                AND ${entityPrefix}Destination = :newNodeId), 0) 
+                     /*psql ON CONFLICT(${entityPrefix}Pk, ${entityPrefix}Destination) DO UPDATE
+                            SET ${entityPrefix}Processed = false
+                     */       
+                ""${'"'})
+                @ReplicationRunOnNewNode
+                @ReplicationCheckPendingNotificationsFor([${repEntity.simpleName}::class])
+                abstract suspend fun replicateOnNewNode(@NewNodeIdParam newNodeId: Long)
+                """.trimIndent())
                 .addTrackerClass(repEntity)
                 .build()
                 .writeTo(outputDir)
@@ -89,14 +128,14 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
 
             val defaultBoolVal = if(boolTypeName == "INTEGER") "0" else "false"
             add("_stmtList += %S\n", """
-                           CREATE TABLE IF NOT EXISTS ${entityType.simpleName}Tracker ( ${varPrefix}Fk $longTypeName NOT NULL,
+                           CREATE TABLE IF NOT EXISTS ${entityType.simpleName}Replicate ( ${varPrefix}Pk $longTypeName NOT NULL,
                                 ${varPrefix}VersionId $longTypeName NOT NULL,
                                 ${varPrefix}Destination $longTypeName NOT NULL,
                                 ${varPrefix}Processed $boolTypeName NOT NULL DEFAULT $defaultBoolVal,
-                                PRIMARY KEY (${varPrefix}Fk, ${varPrefix}Destination)) 
+                                PRIMARY KEY (${varPrefix}Pk, ${varPrefix}Destination)) 
                         """.minifySql())
             add("_stmtList += %S\n", """
-                            CREATE INDEX index_${entityType.simpleName}Tracker_${varPrefix}Destination_${varPrefix}Processed_${varPrefix}Fk ON ${entityType.simpleName}Tracker (${varPrefix}Destination, ${varPrefix}Processed, ${varPrefix}Fk)
+                            CREATE INDEX index_${entityType.simpleName}Replicate_${varPrefix}Destination_${varPrefix}Processed_${varPrefix}Pk ON ${entityType.simpleName}Replicate (${varPrefix}Destination, ${varPrefix}Processed, ${varPrefix}Pk)
                         """.minifySql())
         }
 
@@ -145,7 +184,7 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
 
 
         File(outputDir, "trackers.txt")
-            .writeText(repEntities.joinToString(separator = ",\n") { "${it.simpleName}Tracker::class" })
+            .writeText(repEntities.joinToString(separator = ",\n") { "${it.simpleName}Replicate::class" })
 
 
 

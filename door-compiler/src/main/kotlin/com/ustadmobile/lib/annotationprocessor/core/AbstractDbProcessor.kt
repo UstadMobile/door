@@ -401,14 +401,28 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
             )
 
             triggerParams.forEach { params ->
+                /*
+                Note: REPLACE INTO etc. does not work because the conflict policy will be determined by the statement
+                triggering this as per https://sqlite.org/lang_createtrigger.html Section 2.
+                "An ON CONFLICT clause may be specified as part of an UPDATE or INSERT action within the body of the
+                trigger. However if an ON CONFLICT clause is specified as part of the statement causing the trigger to
+                 fire, then conflict handling policy of the outer statement is used instead."
+                 */
                 add("$sqlListVar += %S\n",
                     """
                 CREATE TRIGGER ch_${params.opPrefix}_${replicateEntity.tableId}
                        AFTER ${params.opName} ON ${entityType.entityTableName}
                 BEGIN
-                       REPLACE INTO ChangeLog(chTableId, chEntityPk, chType)
-                       VALUES (${replicateEntity.tableId}, ${params.prefix}.${primaryKeyEl.simpleName}, ${params.opCode});
-                END       
+                       INSERT INTO ChangeLog(chTableId, chEntityPk, chType)
+                       SELECT ${replicateEntity.tableId} AS chTableId, 
+                              ${params.prefix}.${primaryKeyEl.simpleName} AS chEntityPk, 
+                              ${params.opCode} AS chType
+                        WHERE NOT EXISTS(
+                              SELECT chTableId 
+                                FROM ChangeLog 
+                               WHERE chTableId = ${replicateEntity.tableId}
+                                 AND chEntityPk = ${params.prefix}.${primaryKeyEl.simpleName}); 
+                END
                 """.minifySql())
             }
         }else {
