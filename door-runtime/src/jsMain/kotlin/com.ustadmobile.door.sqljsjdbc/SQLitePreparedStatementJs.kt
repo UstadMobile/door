@@ -49,6 +49,7 @@ class SQLitePreparedStatementJs(
 
     override fun setObject(index: Int, value: Any?) {
         params[index - 1] = null
+        console.log("$value")
     }
 
     override fun setArray(index: Int, array: com.ustadmobile.door.jdbc.Array) {
