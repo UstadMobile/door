@@ -697,7 +697,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                             .applyIf(rawQueryParamName != null) {
                                 add("val _rawQuery = $rawQueryParamName.%M(\n",
                                     MemberName("com.ustadmobile.door.ext", "copyWithExtraParams"))
-                                add("sql = \"(SELECT * FROM (\${$rawQueryParamName.getSql()}) LIMIT ? OFFSET ?\",\n")
+                                add("sql = \"SELECT * FROM (\${$rawQueryParamName.getSql()}) LIMIT ? OFFSET ?\",\n")
                                 add("extraParams = arrayOf(_limit, _offset))\n")
                             }
                             .add("return ")
