@@ -47,9 +47,24 @@ class SQLitePreparedStatementJs(
         throw SQLException("This is currently not supported")
     }
 
+    /**
+     * By design, this will be used only if we are binding NULL,
+     * but there are some edge cases that might use this
+     * i.e When arguments are represented as Array<Any>
+     */
     override fun setObject(index: Int, value: Any?) {
-        params[index - 1] = null
-        console.log("$value")
+        when(value){
+            null -> {
+                params[index - 1] = null
+            }
+            is Boolean -> setBoolean(index, value)
+            is Byte -> setByte(index, value)
+            is Short -> setShort(index, value)
+            is String -> setString(index, value)
+            is ByteArray -> setBytes(index, value)
+            is Long -> setLong(index, value)
+            is Int -> setInt(index, value)
+        }
     }
 
     override fun setArray(index: Int, array: com.ustadmobile.door.jdbc.Array) {
