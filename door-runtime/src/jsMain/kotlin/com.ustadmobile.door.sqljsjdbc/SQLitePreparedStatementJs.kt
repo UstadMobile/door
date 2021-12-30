@@ -48,7 +48,7 @@ class SQLitePreparedStatementJs(
     }
 
     /**
-     * By design, this will be used only if we are binding NULL,
+     * By design, this will be used only if we are binding NULL values,
      * but there are some edge cases that might use this
      * i.e When arguments are represented as Array<Any>
      */
