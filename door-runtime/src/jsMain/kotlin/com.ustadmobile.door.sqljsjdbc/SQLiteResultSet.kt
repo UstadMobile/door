@@ -20,7 +20,8 @@ class SQLiteResultSet(private val results: Array<Any>): ResultSet {
          * Indexes are 0 based on JS while on JVM is 1 based
          */
         override fun getColumnLabel(column: Int): String {
-            return columns?.get(column - 1) ?: throw IllegalStateException("Could not get column index: $column")
+            val index = column - 1
+            return columns?.get(index) ?: throw IllegalStateException("Could not get column index: $index")
         }
     }
 
