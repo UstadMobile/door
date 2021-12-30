@@ -16,8 +16,11 @@ class SQLiteResultSet(private val results: Array<Any>): ResultSet {
             return columns?.size ?: 0
         }
 
+        /**
+         * Indexes are 0 based on JS while on JVM is 1 based
+         */
         override fun getColumnLabel(column: Int): String {
-            return columns?.get(column) ?: throw IllegalStateException("Could not get column index: $column")
+            return columns?.get(column - 1) ?: throw IllegalStateException("Could not get column index: $column")
         }
     }
 
