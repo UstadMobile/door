@@ -19,6 +19,7 @@ import com.ustadmobile.door.*
 import com.ustadmobile.door.entities.ChangeLog
 import com.ustadmobile.door.ext.minifySql
 import com.ustadmobile.lib.annotationprocessor.core.ext.toSql
+import io.github.aakira.napier.Napier
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.statement.HttpStatement
 import io.ktor.http.Headers
@@ -485,6 +486,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         stmtListVar: String,
         dbProductType: Int
     ): CodeBlock.Builder {
+        Napier.d("Door Wrapper: addCreateTriggersCode ${entityType.simpleName}")
         entityType.getAnnotationsByType(Triggers::class.java).firstOrNull()?.value?.forEach { trigger ->
             trigger.toSql(entityType, dbProductType).forEach { sqlStr ->
                 add("$stmtListVar += %S\n", sqlStr)

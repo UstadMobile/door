@@ -105,7 +105,7 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
                               WHERE ${entityPrefix}Pk = ${repEntity.entityTableName}.${repEntity.entityPrimaryKey?.simpleName}
                                 AND ${entityPrefix}Destination = :newNodeId), 0) 
                      /*psql ON CONFLICT(${entityPrefix}Pk, ${entityPrefix}Destination) DO UPDATE
-                            SET ${entityPrefix}Processed = false
+                            SET ${entityPrefix}Processed = false, ${entityPrefix}VersionId = EXCLUDED.${entityPrefix}VersionId
                      */       
                 ""${'"'})
                 @ReplicationRunOnNewNode
@@ -134,7 +134,7 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
                               WHERE ${entityPrefix}Pk = ${repEntity.simpleName}.${repEntity.entityPrimaryKey?.simpleName}
                                 AND ${entityPrefix}Destination = UserSession.usClientNodeId), 0)
                     /*psql ON CONFLICT(${entityPrefix}Pk, ${entityPrefix}Destination) DO UPDATE
-                        SET ${entityPrefix}Processed = false
+                        SET ${entityPrefix}Processed = false, ${entityPrefix}VersionId = EXCLUDED.${entityPrefix}VersionId
                      */               
                     ""${'"'})
                     @ReplicationRunOnChange([${repEntity.simpleName}::class])

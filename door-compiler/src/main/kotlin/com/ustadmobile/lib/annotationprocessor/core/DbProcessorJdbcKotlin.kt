@@ -37,6 +37,7 @@ import kotlinx.coroutines.GlobalScope
 import kotlin.reflect.KClass
 import com.ustadmobile.door.ChangeListenerRequest
 import com.ustadmobile.door.util.NodeIdAuthCache
+import io.github.aakira.napier.Napier
 
 val QUERY_SINGULAR_TYPES = listOf(INT, LONG, SHORT, BYTE, BOOLEAN, FLOAT, DOUBLE,
         String::class.asTypeName(), String::class.asTypeName().copy(nullable = true))
@@ -595,31 +596,37 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         val dbs = roundEnv.getElementsAnnotatedWith(Database::class.java)
 
         for(dbTypeEl in dbs) {
+            Napier.d("Processing database: ${dbTypeEl.simpleName}")
             FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_JDBC_KT2)
                 .addJdbcDbImplType(dbTypeEl as TypeElement, DoorTarget.JVM)
                 .build()
                 .writeToDirsFromArg(listOf(OPTION_JVM_DIRS))
 
+            Napier.d("Creating JS database for ${dbTypeEl.simpleName}")
             FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_JDBC_KT2)
                 .addJdbcDbImplType(dbTypeEl, DoorTarget.JS)
                 .build()
                 .writeToDirsFromArg(listOf(OPTION_JS_OUTPUT))
 
+            Napier.d("Creating metadata for ${dbTypeEl.simpleName}")
             FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_DOOR_METADATA)
                 .addDatabaseMetadataType(dbTypeEl, processingEnv)
                 .build()
                 .writeToDirsFromArg(listOf(OPTION_JVM_DIRS, OPTION_ANDROID_OUTPUT))
 
+            Napier.d("Creating runOnChangeRunner for ${dbTypeEl.simpleName}")
             FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_REP_RUN_ON_CHANGE_RUNNER)
                 .addReplicationRunOnChangeRunnerType(dbTypeEl)
                 .build()
                 .writeToDirsFromArg(listOf(OPTION_JVM_DIRS, OPTION_JS_OUTPUT, OPTION_ANDROID_OUTPUT))
+            Napier.d("Done with ${dbTypeEl.simpleName}")
         }
 
 
         val daos = roundEnv.getElementsAnnotatedWith(Dao::class.java)
 
         for(daoElement in daos) {
+            Napier.d("Processing dao: ${daoElement.simpleName}")
             val daoTypeEl = daoElement as TypeElement
             FileSpec.builder(daoElement.packageName,
                 daoElement.simpleName.toString() + SUFFIX_JDBC_KT2)
@@ -628,12 +635,14 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .writeToDirsFromArg(listOf(OPTION_JVM_DIRS, OPTION_JS_OUTPUT))
         }
 
+        Napier.d("DbProcessJdbcKotlin: process complete")
         return true
     }
 
     fun FileSpec.Builder.addDaoJdbcImplType(
         daoTypeElement: TypeElement
     ) : FileSpec.Builder{
+        Napier.d("DbProcessorJdbcKotlin: addDaoJdbcImplType: start ${daoTypeElement.simpleName}")
         addImport("com.ustadmobile.door", "DoorDbType")
         addType(TypeSpec.classBuilder("${daoTypeElement.simpleName}$SUFFIX_JDBC_KT2")
             .primaryConstructor(FunSpec.constructorBuilder().addParameter("_db",
@@ -659,6 +668,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             }
             .build())
 
+        Napier.d("DbProcessorJdbcKotlin: addDaoJdbcImplType: finish ${daoTypeElement.simpleName}")
         return this
     }
 
@@ -666,6 +676,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         funElement: ExecutableElement,
         daoTypeElement: TypeElement
     ): TypeSpec.Builder {
+        Napier.d("DbProcessorJdbcKotlin: addDaoQueryFunction: start ${daoTypeElement.simpleName}#${funElement.simpleName}")
         val funSpec = funElement.asFunSpecConvertedToKotlinTypesForDaoFun(
             daoTypeElement.asType() as DeclaredType, processingEnv).build()
 
@@ -716,6 +727,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             .endControlFlow()
             .build()
 
+            Napier.d("DbProcessorJdbcKotlin: addDaoQueryFunction: end ${daoTypeElement.simpleName}#${funElement.simpleName}")
             return this
         }
 
@@ -792,6 +804,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         funElement: ExecutableElement,
         daoTypeElement: TypeElement
     ) : TypeSpec.Builder {
+        Napier.d("DbProcessorJdbcKotlin: addDaoDeleteFunction: start ${daoTypeElement.simpleName}#${funElement.simpleName}")
         val funSpec = funElement.asFunSpecConvertedToKotlinTypesForDaoFun(
             daoTypeElement.asType() as DeclaredType, processingEnv).build()
         val entityType = funSpec.parameters.first().type.unwrapListOrArrayComponentType()
@@ -847,6 +860,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .build())
             .build())
 
+        Napier.d("DbProcessorJdbcKotlin: addDaoDeleteFunction: finish ${daoTypeElement.simpleName}#${funElement.simpleName}")
         return this
     }
 
@@ -854,6 +868,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         funElement: ExecutableElement,
         daoTypeElement: TypeElement
     ) : TypeSpec.Builder {
+        Napier.d("DbProcessorJdbcKotlin: addDaoUpdateFunction: start ${daoTypeElement.simpleName}#${funElement.simpleName}")
         val funSpec = funElement.asFunSpecConvertedToKotlinTypesForDaoFun(
             daoTypeElement.asType() as DeclaredType, processingEnv).build()
         val entityType = funSpec.parameters.first().type.unwrapListOrArrayComponentType()
@@ -919,6 +934,8 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .build())
 
             .build())
+
+        Napier.d("DbProcessorJdbcKotlin: addDaoUpdateFunction: finish ${daoTypeElement.simpleName}#${funElement.simpleName}")
         return this
     }
 
@@ -927,6 +944,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         daoTypeElement: TypeElement,
         daoTypeBuilder: TypeSpec.Builder
     ): TypeSpec.Builder {
+        Napier.d("Start add dao insert function: ${funElement.simpleName} on ${daoTypeElement.simpleName}")
         val funSpec = funElement.asFunSpecConvertedToKotlinTypesForDaoFun(
             daoTypeElement.asType() as DeclaredType, processingEnv).build()
         val entityType = funSpec.parameters.first().type.unwrapListOrArrayComponentType() as ClassName
@@ -950,6 +968,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     suspended = funSpec.isSuspended)
                 .build())
             .build())
+        Napier.d("Finish dao insert function: ${funElement.simpleName} on ${daoTypeElement.simpleName}")
         return this
     }
 
@@ -1250,7 +1269,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                             }
                         }
                         endControlFlow()
-                        add("return setOf(${entitiesChanged.joinToString(separator = "\",\"", prefix = "\"", postfix = "\"")})\n")
+                        add("return setOf(${entitiesChanged.joinToString(separator = "\", \"", prefix = "\"", postfix = "\"")})\n")
                     }
                     .build())
                 .build())
@@ -1361,6 +1380,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     .filter { it.modifiers.contains(Modifier.ABSTRACT) }
 
                 daoGetters.forEach {
+                    Napier.d("CReating dao getter for ${it.simpleName}")
                     val daoTypeEl = processingEnv.typeUtils.asElement(it.returnType) as TypeElement
                     val daoImplClassName = daoTypeEl.asClassNameWithSuffix(SUFFIX_JDBC_KT2)
                     addProperty(PropertySpec.builder("_${daoTypeEl.simpleName}",
@@ -1377,6 +1397,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         dbTypeElement: TypeElement
     ) : TypeSpec.Builder {
         val initDbVersion = dbTypeElement.getAnnotation(Database::class.java).version
+        Napier.d("Door Wrapper: add create all tables function for ${dbTypeElement.simpleName}")
         addFunction(FunSpec.builder("createAllTables")
             .addModifiers(KModifier.OVERRIDE)
             .returns(List::class.parameterizedBy(String::class))
@@ -1446,6 +1467,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .build())
             .build())
 
+        Napier.d("Door Wrapper: done with tables function for ${dbTypeElement.simpleName}")
         return this
     }
 

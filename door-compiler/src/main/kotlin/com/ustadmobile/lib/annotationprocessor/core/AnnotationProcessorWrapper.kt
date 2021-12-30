@@ -20,6 +20,8 @@ import com.squareup.kotlinpoet.metadata.toImmutableKmClass
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.DoorDbType.Companion.PRODUCT_INT_TO_NAME_MAP
 import com.ustadmobile.door.annotation.*
+import io.github.aakira.napier.DebugAntilog
+import io.github.aakira.napier.Napier
 import org.sqlite.SQLiteDataSource
 import java.io.File
 import java.sql.Connection
@@ -65,12 +67,15 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
         messager = MessagerWrapper(p0.messager)
         processors.forEach { it.init(p0) }
         processingEnv = p0
+        Napier.takeLogarithm()
+        Napier.base(DebugAntilog())
     }
 
     override fun process(annotations: MutableSet<out TypeElement>, roundEnv: RoundEnvironment): Boolean {
         if(annotations.isEmpty())
             return true
 
+        Napier.d("Starting wrapper validation")
         setupDb(roundEnv)
 
         //Check if any errors were emitted when setting up the database. If so, it is not valid, and we should not
@@ -79,9 +84,13 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
             return true
         }
 
+        Napier.d("Wrapper validation done")
+
         val dbConnection = dbConnection ?: throw IllegalStateException("Could not connect to db")
         processors.forEach {
+            Napier.d("Door Wrapper: running ${it::class.simpleName}")
             it.processDb(annotations, roundEnv, dbConnection, allKnownEntityNames, allKnownEntityTypesMap)
+            Napier.d("Door Wrapper: done running ${it::class.simpleName}")
         }
 
         dbConnection.close()
@@ -252,6 +261,7 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
         dbs.flatMap { it.allDbEntities(processingEnv) }.toSet()
         .filter { it.hasAnnotation(Triggers::class.java) }
         .forEach { entity ->
+            println("Checking Triggers for ${entity.qualifiedName}")
             entity.getAnnotationsByType(Triggers::class.java).firstOrNull()?.value?.forEach { trigger ->
                 val stmt = connectionVal.createStatement()!!
                 val pgStmt = pgConnection?.createStatement()
