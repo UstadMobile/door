@@ -47,7 +47,6 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
 
                 val results = if(dbEvent.data["results"] != js("undefined")) dbEvent.data["results"] else arrayOf<Any>()
                 val buffer = if(dbEvent.data["buffer"] != js("undefined")) dbEvent.data["buffer"] else null
-                console.log(results)
                 pendingCompletable.complete(WorkerResult(dbEvent.data["id"], results, executedSuccessfully, buffer))
             }
         }

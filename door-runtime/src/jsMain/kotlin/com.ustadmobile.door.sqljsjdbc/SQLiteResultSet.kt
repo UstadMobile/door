@@ -43,6 +43,9 @@ class SQLiteResultSet(private val results: Array<Any>): ResultSet {
             val data = results.first().asDynamic().values
             val hasNext = currentIndex < data.length as Int
             currentRow = if(hasNext) data[currentIndex] else null
+            if(currentRow == null){
+                currentIndex--
+            }
             return currentRow != null
         }else{
             false
