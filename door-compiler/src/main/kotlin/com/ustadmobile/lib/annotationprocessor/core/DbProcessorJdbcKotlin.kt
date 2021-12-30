@@ -1319,6 +1319,11 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     .endControlFlow()
                     .build())
                 .build())
+            .addProperty(PropertySpec.builder("realIncomingReplicationListenerHelper",
+                    IncomingReplicationListenerHelper::class)
+                .addModifiers(KModifier.OVERRIDE)
+                .initializer(CodeBlock.of("%T()\n", IncomingReplicationListenerHelper::class))
+                .build())
             .addProperty(PropertySpec.builder("realNodeIdAuthCache", NodeIdAuthCache::class,
                     KModifier.OVERRIDE)
                 .delegate(CodeBlock.builder()

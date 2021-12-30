@@ -8,6 +8,7 @@ import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_FIND_PENDI
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_MARK_REPLICATE_TRACKERS_AS_PROCESSED
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_RECEIVE_ENTITIES
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.PATH_REPLICATION
+import com.ustadmobile.door.IncomingReplicationEvent
 import com.ustadmobile.door.ext.*
 import io.github.aakira.napier.Napier
 import io.ktor.client.request.*
@@ -190,6 +191,8 @@ suspend fun DoorDatabaseRepository.fetchPendingReplications(
         db.insertReplicationsIntoReceiveView(dbMetaData, dbKClass, remoteNodeId, tableId, pendingReplicationsJson)
         Napier.d("$this : tableId $tableId : fetchPendingReplications - received - " +
                 "${pendingReplicationsJson.size} entities inserted into receive view", tag = DoorTag.LOG_TAG)
+        db.incomingReplicationListenerHelper.fireIncomingReplicationEvent(
+            IncomingReplicationEvent(pendingReplicationsJson, tableId))
 
         val replicationTrackersToMarkProcessed = repEntityMetaData.entityJsonArrayToReplicationTrackSummaryArray(
             pendingReplicationsJson)

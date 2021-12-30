@@ -8,12 +8,11 @@ import com.ustadmobile.door.DoorDatabaseRepository.Companion.DOOR_ATTACHMENT_URI
 import com.ustadmobile.door.jdbc.PreparedStatement
 import com.ustadmobile.door.PreparedStatementConfig
 import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
-import com.ustadmobile.door.replication.ReplicationRunOnChangeRunner
 import com.ustadmobile.door.roomjdbc.ConnectionRoomJdbc
 import com.ustadmobile.door.util.ChangeListenerRequestInvalidationObserver
+import com.ustadmobile.door.util.DoorAndroidRoomHelper
 import com.ustadmobile.door.util.NodeIdAuthCache
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.GlobalScope
 import java.io.File
 import java.util.*
 import java.util.concurrent.Callable
@@ -198,34 +197,39 @@ actual fun DoorDatabase.removeInvalidationListener(changeListenerRequest: Change
     invalidationTracker.removeObserver(ChangeListenerRequestInvalidationObserver(changeListenerRequest))
 }
 
-
-private val replicationNotificationDispatchers = WeakHashMap<DoorDatabase, ReplicationNotificationDispatcher>()
-
-private val DoorDatabase.dbClassName: String
+internal val DoorDatabase.dbClassName: String
     get() = this::class.qualifiedName?.substringBefore("_")
         ?: throw IllegalArgumentException("No class name!")
 
-actual val DoorDatabase.replicationNotificationDispatcher: ReplicationNotificationDispatcher
+/**
+ * The Door Android room helper is mapped 1:1 with each database to provide some Door-specific functions
+ */
+private val doorAndroidRoomHelperMap = WeakHashMap<DoorDatabase, DoorAndroidRoomHelper>()
+
+internal val DoorDatabase.doorAndroidRoomHelper: DoorAndroidRoomHelper
     get() {
-        val rootDb: DoorDatabase = this.rootDatabase
-        synchronized(replicationNotificationDispatchers) {
-            return replicationNotificationDispatchers.getOrPut(rootDb) {
-                val dbClass = Class.forName(dbClassName)
-                val runOnChangeRunnerClass = Class.forName("${dbClassName}_ReplicationRunOnChangeRunner")
-                    .getConstructor(dbClass)
-                    .newInstance(rootDb) as ReplicationRunOnChangeRunner
-                ReplicationNotificationDispatcher(this, runOnChangeRunnerClass, GlobalScope)
+        synchronized(doorAndroidRoomHelperMap) {
+            val rootDb = this.rootDatabase
+            return doorAndroidRoomHelperMap.getOrPut(rootDb) {
+                DoorAndroidRoomHelper(this)
             }
         }
     }
 
-private val nodeIdAuthCacheMap = WeakHashMap<DoorDatabase, NodeIdAuthCache>()
+actual val DoorDatabase.replicationNotificationDispatcher : ReplicationNotificationDispatcher
+    get() = doorAndroidRoomHelper.replicationNotificationDispatcher
 
 actual val DoorDatabase.nodeIdAuthCache: NodeIdAuthCache
-    get() {
-        synchronized(nodeIdAuthCacheMap) {
-            return nodeIdAuthCacheMap.getOrPut(rootDatabase) {
-                NodeIdAuthCache(this)
-            }
-        }
-    }
+    get() = doorAndroidRoomHelper.nodeIdAndAuthCache
+
+actual fun DoorDatabase.addIncomingReplicationListener(incomingReplicationListener: IncomingReplicationListener) {
+    doorAndroidRoomHelper.incomingReplicationListenerHelper.addIncomingReplicationListener(incomingReplicationListener)
+}
+
+actual fun DoorDatabase.removeIncomingReplicationListener(incomingReplicationListener: IncomingReplicationListener) {
+    doorAndroidRoomHelper.incomingReplicationListenerHelper.removeIncomingReplicationListener(incomingReplicationListener)
+}
+
+actual val DoorDatabase.incomingReplicationListenerHelper: IncomingReplicationListenerHelper
+    get() = doorAndroidRoomHelper.incomingReplicationListenerHelper
+

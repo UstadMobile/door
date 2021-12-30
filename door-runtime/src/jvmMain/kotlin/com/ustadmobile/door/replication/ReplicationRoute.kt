@@ -8,6 +8,7 @@ import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_MARK_REPLI
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_RECEIVE_ENTITIES
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_SUBSCRIBE_SSE
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.PATH_REPLICATION
+import com.ustadmobile.door.IncomingReplicationEvent
 import com.ustadmobile.door.entities.NodeIdAndAuth
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.sse.DoorServerSentEvent
@@ -56,8 +57,8 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
                 call.respondText(contentType = ContentType.Application.Json.withUtf8Charset(),
                     text = jsonSerializer.encodeToString(JsonArray.serializer(), alreadyReceivedTrackers))
             }catch(e: Exception) {
-                e.printStackTrace()
-                e.printStackTrace()
+                Napier.e("Exception on check entities received", e, tag = DoorTag.LOG_TAG)
+                call.respond(HttpStatusCode.InternalServerError, e.toString())
             }
 
         }
@@ -76,60 +77,77 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
                 db.insertReplicationsIntoReceiveView(dbMetaData, dbKClass, remoteNodeId.first, tableId,
                     receivedEntitiesJsonArr)
                 call.respondText(text = "", status = HttpStatusCode.NoContent)
+                db.incomingReplicationListenerHelper.fireIncomingReplicationEvent(
+                    IncomingReplicationEvent(receivedEntitiesJsonArr, tableId))
             }catch(e: Exception) {
-                e.printStackTrace()
-                e.printStackTrace()
+                Napier.e("Exception on receive entities", e, tag = DoorTag.LOG_TAG)
+                call.respond(HttpStatusCode.InternalServerError, e.toString())
             }
 
         }
 
         put(ENDPOINT_MARK_REPLICATE_TRACKERS_AS_PROCESSED) {
-            call.response.cacheControl(CacheControl.NoCache(null))
-            val di: DI by closestDI()
+            try {
+                call.response.cacheControl(CacheControl.NoCache(null))
+                val di: DI by closestDI()
 
-            val db: DoorDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
-            val dbMetaData = dbKClass.doorDatabaseMetadata()
-            val tableId = call.request.queryParameters["tableId"]?.toInt() ?: 0
+                val db: DoorDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
+                val dbMetaData = dbKClass.doorDatabaseMetadata()
+                val tableId = call.request.queryParameters["tableId"]?.toInt() ?: 0
 
-            val trackersStr = call.receive<String>()
-            val trackersJson = jsonSerializer.decodeFromString(JsonArray.serializer(), trackersStr)
-            val (remoteNodeId, _) = requireRemoteNodeIdAndAuth()
+                val trackersStr = call.receive<String>()
+                val trackersJson = jsonSerializer.decodeFromString(JsonArray.serializer(), trackersStr)
+                val (remoteNodeId, _) = requireRemoteNodeIdAndAuth()
 
-            db.markReplicateTrackersAsProcessed(dbMetaData.dbClass, dbMetaData, trackersJson,
-                remoteNodeId, tableId)
-            call.respondText(text = "", status = HttpStatusCode.NoContent)
+                db.markReplicateTrackersAsProcessed(dbMetaData.dbClass, dbMetaData, trackersJson,
+                    remoteNodeId, tableId)
+                call.respondText(text = "", status = HttpStatusCode.NoContent)
+            }catch(e: Exception) {
+                Napier.e("Exception on mark replicate trackers as processed", e, tag = DoorTag.LOG_TAG)
+                call.respond(HttpStatusCode.InternalServerError, e.toString())
+            }
         }
 
 
         get(ENDPOINT_FIND_PENDING_REPLICATION_TRACKERS) {
-            call.response.cacheControl(CacheControl.NoCache(null))
-            val di: DI by closestDI()
+            try {
+                call.response.cacheControl(CacheControl.NoCache(null))
+                val di: DI by closestDI()
 
-            val db: DoorDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
-            val dbMetaData = dbKClass.doorDatabaseMetadata()
-            val tableId = call.request.queryParameters["tableId"]?.toInt() ?: 0
-            val offset = call.request.queryParameters["offset"]?.toInt()  ?: 0
+                val db: DoorDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
+                val dbMetaData = dbKClass.doorDatabaseMetadata()
+                val tableId = call.request.queryParameters["tableId"]?.toInt() ?: 0
+                val offset = call.request.queryParameters["offset"]?.toInt()  ?: 0
 
-            val (remoteNodeId, _) = requireRemoteNodeIdAndAuth()
+                val (remoteNodeId, _) = requireRemoteNodeIdAndAuth()
 
-            val pendingTrackers = db.findPendingReplicationTrackers(dbMetaData, remoteNodeId, tableId, offset)
-            call.respondText(contentType = ContentType.Application.Json.withUtf8Charset(),
-                text = jsonSerializer.encodeToString(JsonArray.serializer(), pendingTrackers))
+                val pendingTrackers = db.findPendingReplicationTrackers(dbMetaData, remoteNodeId, tableId, offset)
+                call.respondText(contentType = ContentType.Application.Json.withUtf8Charset(),
+                    text = jsonSerializer.encodeToString(JsonArray.serializer(), pendingTrackers))
+            }catch(e: Exception) {
+                Napier.e("Exception finding pending replication trackers", e, tag = DoorTag.LOG_TAG)
+                call.respond(HttpStatusCode.InternalServerError, e.toString())
+            }
         }
 
         get(ENDPOINT_FIND_PENDING_REPLICATIONS) {
-            val startTime = systemTimeInMillis()
-            call.response.cacheControl(CacheControl.NoCache(null))
-            val di: DI by closestDI()
+            try {
+                val startTime = systemTimeInMillis()
+                call.response.cacheControl(CacheControl.NoCache(null))
+                val di: DI by closestDI()
 
-            val db: DoorDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
-            val dbMetaData = dbKClass.doorDatabaseMetadata()
-            val tableId = call.request.queryParameters["tableId"]?.toInt() ?: 0
+                val db: DoorDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
+                val dbMetaData = dbKClass.doorDatabaseMetadata()
+                val tableId = call.request.queryParameters["tableId"]?.toInt() ?: 0
 
-            val pendingReplications = db.findPendingReplications(dbMetaData, requireRemoteNodeIdAndAuth().first, tableId)
-            call.respondText(contentType = ContentType.Application.Json,
-                text = jsonSerializer.encodeToString(JsonArray.serializer(), pendingReplications))
-            println("Took ${systemTimeInMillis() - startTime}ms to provide http response")
+                val pendingReplications = db.findPendingReplications(dbMetaData, requireRemoteNodeIdAndAuth().first, tableId)
+                call.respondText(contentType = ContentType.Application.Json,
+                    text = jsonSerializer.encodeToString(JsonArray.serializer(), pendingReplications))
+                println("Took ${systemTimeInMillis() - startTime}ms to provide http response")
+            }catch(e: Exception) {
+                Napier.e("Exception finding pending replication trackers", e, tag = DoorTag.LOG_TAG)
+                call.respond(HttpStatusCode.InternalServerError, e.toString())
+            }
         }
 
         get(ENDPOINT_SUBSCRIBE_SSE) {

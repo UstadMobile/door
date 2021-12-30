@@ -121,3 +121,14 @@ expect fun DoorDatabase.removeInvalidationListener(changeListenerRequest: Change
  */
 expect val DoorDatabase.nodeIdAuthCache: NodeIdAuthCache
 
+/**
+ * Add a listener to receive events when incoming replication data has been received.
+ */
+expect fun DoorDatabase.addIncomingReplicationListener(incomingReplicationListener: IncomingReplicationListener)
+
+/**
+ * Remove a listener that was added using addIncomingReplicationListener
+ */
+expect fun DoorDatabase.removeIncomingReplicationListener(incomingReplicationListener: IncomingReplicationListener)
+
+internal expect val DoorDatabase.incomingReplicationListenerHelper: IncomingReplicationListenerHelper

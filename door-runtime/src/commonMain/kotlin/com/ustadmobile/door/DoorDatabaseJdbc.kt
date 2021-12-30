@@ -42,4 +42,6 @@ interface DoorDatabaseJdbc {
 
     val realNodeIdAuthCache: NodeIdAuthCache
 
+    val realIncomingReplicationListenerHelper: IncomingReplicationListenerHelper
+
 }

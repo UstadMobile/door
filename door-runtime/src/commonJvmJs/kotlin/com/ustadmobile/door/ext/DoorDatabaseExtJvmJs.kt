@@ -84,3 +84,16 @@ actual val DoorDatabase.nodeIdAuthCache: NodeIdAuthCache
     }else {
         this.rootDatabase.nodeIdAuthCache
     }
+
+actual fun DoorDatabase.addIncomingReplicationListener(incomingReplicationListener: IncomingReplicationListener) {
+    val rootDb = this.rootDatabase as DoorDatabaseJdbc
+    rootDb.realIncomingReplicationListenerHelper.addIncomingReplicationListener(incomingReplicationListener)
+}
+
+actual fun DoorDatabase.removeIncomingReplicationListener(incomingReplicationListener: IncomingReplicationListener) {
+    val rootDb = this.rootDatabase as DoorDatabaseJdbc
+    rootDb.realIncomingReplicationListenerHelper.removeIncomingReplicationListener(incomingReplicationListener)
+}
+
+actual val DoorDatabase.incomingReplicationListenerHelper: IncomingReplicationListenerHelper
+    get() = (this.rootDatabase as DoorDatabaseJdbc).realIncomingReplicationListenerHelper
