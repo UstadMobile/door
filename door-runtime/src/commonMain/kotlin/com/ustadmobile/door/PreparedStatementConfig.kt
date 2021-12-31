@@ -14,4 +14,10 @@ data class PreparedStatementConfig(
      * parameters in the same order.
      */
     val postgreSql: String? = null
-)
+) {
+    fun sqlToUse(dbType: Int) = if(dbType == DoorDbType.SQLITE) {
+        sql
+    }else {
+        postgreSql ?: sql
+    }
+}

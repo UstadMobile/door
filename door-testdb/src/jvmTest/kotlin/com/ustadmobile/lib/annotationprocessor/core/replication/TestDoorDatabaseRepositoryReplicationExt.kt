@@ -436,7 +436,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         }
 
         //now update on local2
-        localRepDb.repDao.update(entityOnLocal2!!.apply {
+        localRepDb2.repDao.update(entityOnLocal2!!.apply {
             reString = "Updated"
         })
 
@@ -446,14 +446,14 @@ class TestDoorDatabaseRepositoryReplicationExt  {
             }
         }
 
-        val updataedOnLocal1 = runBlocking {
-            remoteRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000) {
+        val updatedOnLocal1 = runBlocking {
+            localRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5001) {
                 it?.reString == "Updated"
             }
         }
 
         Assert.assertEquals("Entity was updated on remote", "Updated", updatedOnRemote?.reString)
-        Assert.assertEquals("Entity was updated on local1", "Updated", updataedOnLocal1?.reString)
+        Assert.assertEquals("Entity was updated on local1", "Updated", updatedOnLocal1?.reString)
     }
 
 

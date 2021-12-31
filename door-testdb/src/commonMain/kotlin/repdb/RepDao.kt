@@ -26,14 +26,14 @@ abstract class RepDao {
           FROM ChangeLog
                JOIN RepEntity 
                     ON ChangeLog.chTableId = 500 AND ChangeLog.chEntityPk = RepEntity.rePrimaryKey
-               JOIN DoorNode 
+               JOIN DoorNode ON DoorNode.nodeId = DoorNode.nodeId
          WHERE RepEntity.reLastChangeTime != COALESCE(
                 (SELECT trkrVersionId
                   FROM RepEntityTracker
                  WHERE RepEntityTracker.trkrForeignKey = RepEntity.rePrimaryKey
                    AND RepEntityTracker.trkrDestination = DoorNode.nodeId), 0)
         /*psql ON CONFLICT(trkrForeignKey, trkrDestination) DO UPDATE 
-              SET trkrProcessed = false
+              SET trkrProcessed = false, trkrVersionId = EXCLUDED.trkrVersionId
         */
     """)
     //Note UPDATE does not need a WHERE check - this was already checked in the insert using the where clause there
@@ -56,7 +56,7 @@ abstract class RepDao {
                  WHERE RepEntityTracker.trkrForeignKey = RepEntity.rePrimaryKey
                    AND RepEntityTracker.trkrDestination = DoorNode.nodeId), 0)
         /*psql ON CONFLICT(trkrForeignKey, trkrDestination) DO UPDATE 
-              SET trkrProcessed = false
+              SET trkrProcessed = false, trkrVersionId = EXCLUDED.trkrVersionId
         */      
     """)
     @ReplicationRunOnNewNode

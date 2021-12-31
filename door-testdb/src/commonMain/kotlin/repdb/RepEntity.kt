@@ -21,7 +21,8 @@ import repdb.RepEntity.Companion.TABLE_ID
                    SET reLastChangedBy = EXCLUDED.reLastChangedBy,
                        reLastChangeTime = EXCLUDED.reLastChangeTime,
                        reNumField = EXCLUDED.reNumField,
-                       reBoolean = EXCLUDED.reBoolean
+                       reBoolean = EXCLUDED.reBoolean,
+                       reString = EXCLUDED.reString
                        */
                        
             """])))
