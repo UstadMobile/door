@@ -25,9 +25,8 @@ abstract class RepDao {
                DoorNode.nodeId AS trkrDestination
           FROM ChangeLog
                JOIN RepEntity 
-                    ON (:newNodeId != 0) OR (ChangeLog.chTableId = 500 AND ChangeLog.chEntityPk = RepEntity.rePrimaryKey)
+                    ON ChangeLog.chTableId = 500 AND ChangeLog.chEntityPk = RepEntity.rePrimaryKey
                JOIN DoorNode 
-                    ON :newNodeId = 0 OR DoorNode.nodeId = :newNodeId
          WHERE RepEntity.reLastChangeTime != COALESCE(
                 (SELECT trkrVersionId
                   FROM RepEntityTracker
@@ -39,9 +38,30 @@ abstract class RepDao {
     """)
     //Note UPDATE does not need a WHERE check - this was already checked in the insert using the where clause there
     @ReplicationRunOnChange(value = [RepEntity::class])
+    @ReplicationCheckPendingNotificationsFor([RepEntity::class])
+    abstract suspend fun updateReplicationTrackers()
+
+
+
+    @Query("""
+       REPLACE INTO RepEntityTracker(trkrForeignKey, trkrVersionId, trkrDestination)
+        SELECT RepEntity.rePrimaryKey AS trkrForeignKey,
+               RepEntity.reLastChangeTime AS trkrVersionId,
+               DoorNode.nodeId AS trkrDestination
+          FROM RepEntity
+               JOIN DoorNode ON DoorNode.nodeId = :newNodeId
+         WHERE RepEntity.reLastChangeTime != COALESCE(
+                (SELECT trkrVersionId
+                  FROM RepEntityTracker
+                 WHERE RepEntityTracker.trkrForeignKey = RepEntity.rePrimaryKey
+                   AND RepEntityTracker.trkrDestination = DoorNode.nodeId), 0)
+        /*psql ON CONFLICT(trkrForeignKey, trkrDestination) DO UPDATE 
+              SET trkrProcessed = false
+        */      
+    """)
     @ReplicationRunOnNewNode
     @ReplicationCheckPendingNotificationsFor([RepEntity::class])
-    abstract suspend fun updateReplicationTrackers(@NewNodeIdParam newNodeId: Long)
+    abstract suspend fun updateReplicationTrackersNewNode(@NewNodeIdParam newNodeId: Long)
 
     @Insert
     abstract suspend fun insertAsync(repEntity: RepEntity): Long

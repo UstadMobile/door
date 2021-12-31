@@ -18,7 +18,7 @@ actual suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
 
         return block(stmt)
     }catch(e: Exception) {
-        Napier.e("prepareAndUseStatement: Exception running SQL: '${stmtConfig.sql}'", e, tag = DoorTag.LOG_TAG)
+        Napier.e("prepareAndUseStatementAsync: Exception running SQL: '${stmtConfig.sql}' on DB $this", e, tag = DoorTag.LOG_TAG)
         throw e
     }finally {
         stmt?.close()
@@ -37,7 +37,7 @@ actual fun <R> DoorDatabase.prepareAndUseStatement(
         stmt = connection.prepareStatement(stmtConfig)
         return block(stmt)
     }catch(e: Exception) {
-        Napier.e("prepareAndUseStatement: Exception running SQL: '${stmtConfig.sql}'", e, tag = DoorTag.LOG_TAG)
+        Napier.e("prepareAndUseStatement: Exception running SQL: '${stmtConfig.sql}' on DB $this", e, tag = DoorTag.LOG_TAG)
         throw e
     }finally {
         stmt?.close()

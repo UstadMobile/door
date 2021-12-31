@@ -39,7 +39,7 @@ class ReplicationNotificationDispatcher(
         db.addInvalidationListener(ChangeListenerRequest(dbMetaData.replicateTableNames, this))
         coroutineScope.launch {
             val pendingChangeLogs = db.findDistinctPendingChangeLogs()
-            Napier.d("ReplicationNotificationDispatcher startup: found ${pendingChangeLogs.size} ChangeLogs to" +
+            Napier.d("ReplicationNotificationDispatcher for [$db] startup: found ${pendingChangeLogs.size} ChangeLogs to" +
                     " process now", tag = DoorTag.LOG_TAG)
             eventCollator.receiveEvent(pendingChangeLogs.mapNotNull { dbMetaData.replicateEntities[it]?.entityTableName })
         }
@@ -67,6 +67,8 @@ class ReplicationNotificationDispatcher(
     override fun onNewDoorNode(newNodeId: Long, auth: String) {
         coroutineScope.launch {
             val tablesChanged = replicationRunOnChangeRunner.runOnNewNode(newNodeId)
+            Napier.d("ReplicationNotificationDispatcher for [$db] - onNewDoorNode nodeId $newNodeId " +
+                    "check for pending replications on table(s): ${tablesChanged.joinToString()}")
             findAndSendPendingReplicationNotifications(tablesChanged.toSet())
         }
     }
@@ -88,6 +90,8 @@ class ReplicationNotificationDispatcher(
     }
 
     private suspend fun findAndSendPendingReplicationNotifications(changedTableNames: Set<String>) {
+        Napier.d("ReplicationNotificationDispatcher for [$db] findAndSendPendingReplicationNotifications " +
+                " for table(s) ${changedTableNames.joinToString()}")
         changedTableNames.forEach { tableName ->
             val repMetaData = dbMetaData.replicateEntities.values
                 .firstOrNull { it.entityTableName == tableName } ?: return@forEach
@@ -101,9 +105,10 @@ class ReplicationNotificationDispatcher(
 
             db.prepareAndUseStatementAsync(sql) { stmt ->
                 stmt.executeQueryAsyncKmp().useResults { result ->
-                    Napier.d("ReplicationNotificationDispatcher for [$db]: sending notifications for changes to table " +
-                            "${repMetaData.entityTableName}.", tag = DoorTag.LOG_TAG)
                     val devicesToNotify = result.mapRows{ it.getLong(1) }
+                    Napier.d("ReplicationNotificationDispatcher for [$db]: sending notifications for changes to table " +
+                            "${repMetaData.entityTableName} to nodes ${devicesToNotify.joinToString()}", tag = DoorTag.LOG_TAG)
+
 
                     devicesToNotify.forEach { deviceId ->
                         fire(ReplicationPendingEvent(deviceId, listOf(repMetaData.tableId)))

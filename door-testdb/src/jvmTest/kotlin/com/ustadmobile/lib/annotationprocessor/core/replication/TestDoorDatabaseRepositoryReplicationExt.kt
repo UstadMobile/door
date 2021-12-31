@@ -6,6 +6,7 @@ import com.ustadmobile.door.entities.NodeIdAndAuth
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.replication.*
 import com.ustadmobile.door.util.NodeIdAuthCache
+import com.ustadmobile.door.util.systemTimeInMillis
 import com.ustadmobile.lib.annotationprocessor.core.VirtualHostScope
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
@@ -16,8 +17,6 @@ import io.ktor.client.features.json.*
 import io.ktor.routing.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
-import io.ktor.utils.io.*
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
@@ -30,7 +29,6 @@ import org.kodein.di.ktor.DIFeature
 import org.kodein.type.erased
 import repdb.RepDb
 import repdb.RepEntity
-import repdb.RepDb_ReplicationRunOnChangeRunner
 
 class TestDoorDatabaseRepositoryReplicationExt  {
 
@@ -42,7 +40,11 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     private lateinit var localRepDb: RepDb
 
-    private lateinit var localDbRepo: RepDb
+    private lateinit var localRepDbRepo: RepDb
+
+    private lateinit var localRepDb2: RepDb
+
+    private lateinit var localRepDb2Repo: RepDb
 
     private lateinit var remoteVirtualHostScope: VirtualHostScope
 
@@ -114,12 +116,28 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         }
         remoteServer.start()
 
-        localDbRepo = localRepDb.asRepository(RepositoryConfig.repositoryConfig(Any(), "http://localhost:8089/",
+        localRepDbRepo = localRepDb.asRepository(RepositoryConfig.repositoryConfig(Any(), "http://localhost:8089/",
             LOCAL_NODE_ID, "secret", httpClient, okHttpClient, jsonSerializer
         ) {
             useReplicationSubscription = true
         })
     }
+
+    //Setup a second local copy (e.g. simulate a second client)
+    private fun setupLocalDb2() {
+        localRepDb2 = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "RepDbLocal2")
+            .build().also {
+                it.clearAllTables()
+            }
+
+        localRepDb2Repo = localRepDb2.asRepository(RepositoryConfig.repositoryConfig(Any(), "http://localhost:8089/",
+            LOCAL_NODE_ID2, "secret", httpClient, okHttpClient, jsonSerializer
+        ) {
+            useReplicationSubscription = true
+        })
+
+    }
+
 
     @After
     fun tearDown() {
@@ -319,11 +337,64 @@ class TestDoorDatabaseRepositoryReplicationExt  {
     }
 
 
+    @Test
+    fun givenReplicationSubscriptionEnabled_whenInsertedOnLocal_thenShouldTransferToRemoteAgain() {
+        //Just create it - this will need a close
+        val entity = RepEntity().apply {
+            reString = "Subscribe and replicate"
+            rePrimaryKey = localRepDb.repDao.insert(this)
+        }
+
+        val entityOnRemote = runBlocking {
+            remoteRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000) {
+                it != null
+            }
+        }
+
+        Assert.assertNotNull(entityOnRemote)
+    }
+
+
+    @Test
+    fun givenTwoActiveClients_whenEntityInsertedOnClient1_thenShouldReplicateToClient2() {
+        setupLocalDb2()
+
+        val startTime = systemTimeInMillis()
+
+        val entity = RepEntity().apply {
+            reString = "Subscribe and replicate"
+            rePrimaryKey = localRepDb.repDao.insert(this)
+        }
+
+        val entityOnRemote = runBlocking {
+            remoteRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(10000) {
+                it != null
+            }
+        }
+
+        val entityOnLocal2 = runBlocking {
+            localRepDb2.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(10000) {
+                it != null
+            }
+        }
+
+        val runTime = systemTimeInMillis() - startTime
+        Napier.d("Finish sync after $runTime ms")
+        Assert.assertNotNull(entityOnRemote)
+        Assert.assertNotNull("Got entity on local 2", entityOnLocal2)
+
+
+        Assert.assertTrue("no pending transactions", localRepDb.openTransactions.isEmpty())
+        Assert.assertTrue("no pending transactions", remoteRepDb.openTransactions.isEmpty())
+    }
+
     companion object {
 
         private const val REMOTE_NODE_ID = 1234L
 
         private const val LOCAL_NODE_ID = 1330L
+
+        private const val LOCAL_NODE_ID2 = 1331L
     }
 
 }

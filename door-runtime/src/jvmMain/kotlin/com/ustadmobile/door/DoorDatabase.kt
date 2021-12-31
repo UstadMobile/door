@@ -1,10 +1,10 @@
 package com.ustadmobile.door
 
 
-import com.ustadmobile.door.ext.concurrentSafeMapOf
-import com.ustadmobile.door.ext.sourceDatabase
+import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.*
 import com.ustadmobile.door.transaction.DoorTransactionDataSourceWrapper
+import io.github.aakira.napier.Napier
 import kotlinx.atomicfu.atomic
 import java.lang.reflect.Constructor
 import kotlin.reflect.KClass
@@ -22,6 +22,10 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
         protected set
 
     private val transactionDepth = atomic(0)
+
+    private val transactionCount = atomic(0)
+
+    internal val openTransactions = concurrentSafeListOf<Int>()
 
     protected val currentTransactionDepth: Int
         get() = transactionDepth.value
@@ -82,8 +86,9 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
     }
 
     private fun createTransactionDataSourceAndDb(): Pair<DoorTransactionDataSourceWrapper, DoorDatabase> {
-        val transactionDataSource = DoorTransactionDataSourceWrapper(effectiveDatabase.dataSource)
-        val transactionDb = effectiveDatabase.constructorFun.newInstance(effectiveDatabase, transactionDataSource,
+        val rootDb = rootDatabase
+        val transactionDataSource = DoorTransactionDataSourceWrapper(rootDb.dataSource)
+        val transactionDb = rootDb.constructorFun.newInstance(rootDb, transactionDataSource,
                 "Transaction wrapper for $this")
 
         transactionDb.transactionDepth.value = 1
@@ -126,11 +131,20 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
 
         return when(transactionDepth.value) {
             0 -> {
+                val transactionNum = rootDatabase.transactionCount.incrementAndGet()
+                val openTx = rootDatabase.openTransactions.toList()
+                if(openTx.isNotEmpty()) {
+                    Napier.w("WARNING: there are still open transactions on $rootDatabase: ${openTx.joinToString()}")
+                }
+                rootDatabase.openTransactions += transactionNum
+                Napier.d("Opening transaction # $transactionNum on $this", tag = DoorTag.LOG_TAG)
                 val (transactionDs, transactionDb) = createTransactionDataSourceAndDb()
                 transactionDs.use {
                     val transactionWrappedDb = wrapForNewTransaction(dbKClass, transactionDb as T)
                     val result = block(transactionWrappedDb)
                     transactionDb.fireTransactionTablesChanged()
+                    rootDatabase.openTransactions -= transactionNum
+                    Napier.d("Transaction # $transactionNum finished on $rootDatabase", tag = DoorTag.LOG_TAG)
                     result
                 }
             }
@@ -155,10 +169,20 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
 
         return when(transactionDepth.value) {
             0 -> {
+                val transactionNum = rootDatabase.transactionCount.incrementAndGet()
+                Napier.d("Opening transaction # $transactionNum on $rootDatabase", tag = DoorTag.LOG_TAG)
+                val openTx = rootDatabase.openTransactions.toList()
+                if(openTx.isNotEmpty()) {
+                    Napier.w("WARNING: there are still open transactions on $rootDatabase: ${openTx.joinToString()}")
+                }
+                rootDatabase.openTransactions += transactionNum
+
                 val (transactionDs, transactionDb) = createTransactionDataSourceAndDb()
                 transactionDs.useAsync {
                     val result = block(wrapForNewTransaction(dbKClass, transactionDb as T))
                     transactionDb.fireTransactionTablesChanged()
+                    Napier.d("Transaction # $transactionNum finished on $this", tag = DoorTag.LOG_TAG)
+                    rootDatabase.openTransactions -= transactionNum
                     result
                 }
             }
