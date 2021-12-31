@@ -380,13 +380,82 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
         val runTime = systemTimeInMillis() - startTime
         Napier.d("Finish sync after $runTime ms")
-        Assert.assertNotNull(entityOnRemote)
+        Assert.assertNotNull("Got entity on remote", entityOnRemote)
         Assert.assertNotNull("Got entity on local 2", entityOnLocal2)
 
 
         Assert.assertTrue("no pending transactions", localRepDb.openTransactions.isEmpty())
         Assert.assertTrue("no pending transactions", remoteRepDb.openTransactions.isEmpty())
     }
+
+    @Test
+    fun givenTwoActiveClients_whenEntityCreatedOnServer_thenShouldReplicateToBothClients() {
+        setupLocalDb2()
+
+        val entity = RepEntity().apply {
+            reString = "Subscribe and replicate"
+            rePrimaryKey = remoteRepDb.repDao.insert(this)
+        }
+
+        val entityOnLocal1 = runBlocking {
+            localRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000) {
+                it != null
+            }
+        }
+
+        val entityOnLocal2 = runBlocking {
+            localRepDb2.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000) {
+                it != null
+            }
+        }
+
+
+        Assert.assertNotNull("Entity was replicated to local1", entityOnLocal1)
+        Assert.assertNotNull("Entity was replicated to local2", entityOnLocal2)
+    }
+
+    @Test
+    fun givenTwoActiveClients_whenEntityCreatedOnLocal1ThenUpdatedOnLocal2_thenUpdatedVersionShouldReplicateToLocalAndRemote() {
+        setupLocalDb2()
+
+        val entity = RepEntity().apply {
+            reString = "Subscribe and replicate"
+            rePrimaryKey = localRepDb.repDao.insert(this)
+        }
+
+        runBlocking {
+            remoteRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(10000) {
+                it != null
+            }
+        }
+
+        val entityOnLocal2 = runBlocking {
+            localRepDb2.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(10000) {
+                it != null
+            }
+        }
+
+        //now update on local2
+        localRepDb.repDao.update(entityOnLocal2!!.apply {
+            reString = "Updated"
+        })
+
+        val updatedOnRemote = runBlocking {
+            remoteRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000) {
+                it?.reString == "Updated"
+            }
+        }
+
+        val updataedOnLocal1 = runBlocking {
+            remoteRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000) {
+                it?.reString == "Updated"
+            }
+        }
+
+        Assert.assertEquals("Entity was updated on remote", "Updated", updatedOnRemote?.reString)
+        Assert.assertEquals("Entity was updated on local1", "Updated", updataedOnLocal1?.reString)
+    }
+
 
     companion object {
 
