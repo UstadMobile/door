@@ -281,11 +281,10 @@ fun FileSpec.Builder.addDaoWrapperTypeSpec(
 private fun TypeElement.daoHasRepositoryWriteFunctions(
     processingEnv: ProcessingEnvironment
 ) : Boolean {
-    return ancestorsAsList(processingEnv).any {
-        it.allDaoClassModifyingQueryMethods(checkQueryAnnotation = false).any { daoMethodEl ->
-            val paramType = daoMethodEl.parameters.first().asType().unwrapListOrArrayComponentType()
-            paramType.asTypeElement(processingEnv)?.hasAnnotation(ReplicateEntity::class.java) == true
-        }
+    return allOverridableMethods(processingEnv).any { daoMethodEl ->
+        val fnResolved = daoMethodEl.asMemberOf(this, processingEnv)
+        val paramType = fnResolved.parameterTypes.firstOrNull()?.unwrapListOrArrayComponentType()
+        paramType?.asTypeElement(processingEnv)?.hasAnnotation(ReplicateEntity::class.java) == true
     }
 }
 
