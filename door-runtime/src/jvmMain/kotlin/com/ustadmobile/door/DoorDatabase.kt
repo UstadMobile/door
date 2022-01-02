@@ -179,7 +179,9 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
 
                 val (transactionDs, transactionDb) = createTransactionDataSourceAndDb()
                 transactionDs.useAsync {
-                    val result = block(wrapForNewTransaction(dbKClass, transactionDb as T))
+                    //If this represents a repo, replicatewrapepr, etc. then apply the same wrapping
+                    val wrappedDb = wrapForNewTransaction(dbKClass, transactionDb as T)
+                    val result = block(wrappedDb)
                     transactionDb.fireTransactionTablesChanged()
                     Napier.d("Transaction # $transactionNum finished on $this", tag = DoorTag.LOG_TAG)
                     rootDatabase.openTransactions -= transactionNum

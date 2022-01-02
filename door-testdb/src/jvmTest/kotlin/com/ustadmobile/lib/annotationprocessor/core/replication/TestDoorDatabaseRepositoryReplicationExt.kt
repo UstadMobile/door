@@ -54,8 +54,6 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     private lateinit var jsonSerializer: Json
 
-    private lateinit var localReplicationSubscriptionManager: ReplicationSubscriptionManager
-
     @Before
     fun setup() {
         Napier.takeLogarithm()
@@ -141,8 +139,6 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     @After
     fun tearDown() {
-        if(::localReplicationSubscriptionManager.isInitialized)
-            localReplicationSubscriptionManager.close()
         remoteServer.stop(1000, 1000)
     }
 
@@ -454,6 +450,19 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
         Assert.assertEquals("Entity was updated on remote", "Updated", updatedOnRemote?.reString)
         Assert.assertEquals("Entity was updated on local1", "Updated", updatedOnLocal1?.reString)
+    }
+
+    @Test
+    fun givenTwoActiveClients_whenEntityCreatedAndThenUpdatedOnLocalOne_thenLatestVersionShouldReplicate() {
+        setupLocalDb2()
+
+        val entity = RepEntity().apply {
+            reString = "Subscribe and replicate"
+            rePrimaryKey = localRepDb.repDao.insert(this)
+        }
+
+
+
     }
 
 

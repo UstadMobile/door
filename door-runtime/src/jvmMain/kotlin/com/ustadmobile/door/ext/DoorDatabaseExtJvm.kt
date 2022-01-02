@@ -45,8 +45,9 @@ fun <T: DoorDatabase> T.wrapDbAsRepositoryForTransaction(
     }
 
     val repoConfig = (originalRepo as DoorDatabaseRepository).config
-    return repoImplKClass.java.getConstructor(dbKClass.java, dbKClass.java, RepositoryConfig::class.java)
-        .newInstance(wrappedDb, this, repoConfig) as T
+    return repoImplKClass.java.getConstructor(
+        dbKClass.java, dbKClass.java, RepositoryConfig::class.java, Boolean::class.javaPrimitiveType
+    ).newInstance(wrappedDb, this, repoConfig, false) as T
 }
 
 actual fun DoorDatabase.execSqlBatch(vararg sqlStatements: String) {
