@@ -96,7 +96,11 @@ suspend fun <T: DoorDatabase> DoorDatabase.markReplicateTrackersAsProcessed(
                     replicateTracker.get(KEY_PRIMARY_KEY) as JsonPrimitive)
                 stmt.setJsonPrimitive(2, repEntityMetaData.versionIdFieldType,
                     replicateTracker.get(KEY_VERSION_ID) as JsonPrimitive)
-                stmt.setLong(3, remoteNodeId)
+                stmt.setJsonPrimitive(3, repEntityMetaData.versionIdFieldType,
+                    replicateTracker.get(KEY_VERSION_ID) as JsonPrimitive)
+                stmt.setJsonPrimitive(4, repEntityMetaData.entityPrimaryKeyFieldType,
+                    replicateTracker.get(KEY_PRIMARY_KEY) as JsonPrimitive)
+                stmt.setLong(5, remoteNodeId)
                 stmt.executeUpdateAsyncKmp()
             }
         }

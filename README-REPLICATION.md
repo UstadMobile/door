@@ -1,24 +1,37 @@
 
 # Replication
 
-Door implements a selective multi-primary (e.g. primary-primary) replication system. 
+Door implements a selective multi-primary (e.g. primary-primary) sync/replication system. 
 Mobile clients should (for security and performance reasons) normally only replicate the 
 data for active accounts on that device. It is designed to support offline-first database-driven applications. 
 Multiple nodes can replicate to/from a central node and nodes can also replicate with each other peer-to-peer.
 Nodes can switch seamlessly between synchronizing with peers and synchronizing with a central node.
 It supports:
 * Room SQLite databases on Android
-* Door SQLite databases on Kotlin/JS
+* Door SQLite databases on Kotlin/JS (powered by SQL.js)
 * Door SQLite and Postgres databases on JVM
 
+Each entity has a replication tracker entity with a few annotated fields. To replicate an entity, just insert
+into the replication entity table. At it's simplest, it looks something like this:
+
+```
+INSERT INTO EntityReplication(entityPrimaryKey, destinationNodeId)
+SELECT Entity.primaryKey AS entityPrimaryKey, 
+       DoorNode.nodeId AS destinationNodeId
+  FROM Entity
+       JOIN DoorNode -- DoorNode is a special table with a list of all known nodes             
+```
+
 Each node has a 64bit node id (randomly generated). Replication is modeled as a special 1-many join between the Entity 
-and the Replication Tracker. The replication tracker has annotated fields for:
+and the Replication Tracker entity. The replication tracker has annotated fields for:
 * A foreign key that links to the primary key of the entity itself
 * The destination node id (e.g. the destination node to which the entity should be replicated)
-* The version identifier of the entity (normally last changed timestamp, could be a hash)
+* The version identifier of the entity (normally last changed timestamp, could be a hash). This allows 
+  each node to 'remember' the version of an entity on any other node, and use this information when 
+  deciding what should be replicated.
 * A processed boolean flag to indicate whether or not the destination node has received the Entity
 
-To mark a node for replication, simply insert / update the replication trackers (1 row per entity per destination node). 
+To mark an entity replication, simply insert / update the replication trackers (1 row per entity per destination node). 
 Door will deliver the entity to the destination node (almost immediately if the node is currently connected, or 
 as soon as it next connects).
 
@@ -34,13 +47,13 @@ etc. to decide how to process incoming replication data.
  • The replication tracker is another entity with specially annotated fields.
  */
 @ReplicateEntity(
-tracker = Entity_ReplicationTracker::class,
+tracker = EntityReplicate::class,
 tableId = 42,
 batch = 100) //Where a batch is specified, the lowest numbered batches will be replicated first. No higher batch
             //will start replication until earlier batches finish. This can be used to manage dependencies (eg 
             //sync permissions first)
 /*
- * The replication process will by default automatically create a Remote Insert View. 
+ * Optional: The replication process will by default automatically create a Remote Insert View. 
  * This annotation itself is optional. If it is not specified, Door will automatically create "Entity_ReceiveView" 
  * as per the default.
  */ 
@@ -87,18 +100,14 @@ Annotate exactly one field as ReplicationVersionId. This will be used to avoid e
 You can use the optional LastChangedTime annotation so that the Door repository will automatically use the
 modification timestamp as a version identifier. 
 
-The Door repository will generate a unique 64bit primary key where autoGenerate is set to true. The 64bit key is based on 
+Door will generate a unique 64bit primary key where autoGenerate is set to true. The 64bit key is based on 
 a combination of the time, device identifiers, and a sequence number on the device. It can generate up to 4,096
 unique primary keys per second (per table). This is loosely based on the Twitter snowflake approach.
 
 ### Replication Tracker Entity setup
 ```
-//There must be only one tracker per entity primary key - node id combination.
-@Entity(indices = [Index([value = "trkrEntityPrimaryKey", trkrDestinationNode"], unique = true)]
-class Entity_ReplicationTracker {
-
-    @PrimaryKey(autoGenerate = true)
-    var trkrPrimaryKey: Long = 0
+@Entity(primaryKeys = arrayOf("trkrEntityPrimaryKey", "trkrDestinationNode"))
+class EntityReplicate {
      
     @ReplicationEntityForeignKey
     var trkrEntityPrimaryKey: Long = 0
@@ -121,39 +130,44 @@ type on both the entity itself and the replication tracker entity.
 ```
 @Dao
 class EntityDao { 
-    /* Indicate that this function should be run when any of the given Entity tables are changed.  */
+    /* Query that runs whenever a change happens on the table to determine what needs
+    to be replicated.  
+    */
     @ReplicationRunOnChange([Entity::class])
     /* By default, a check will be made to see if there are pending replications for remote 
      * devices for the same entity (e.g. Entity::class). To check for other entities, they 
      * should be given in the ReplicationCheckPendingNotificationsFor annotation
      */
     @ReplicationCheckPendingNotificationsFor([Entity::class])for changes
-    /*
-     * This annotation can be used to indicate this function should run when a new node
-     * is added (e.g. a new client connects to the server). The function must then accept
-     * a parameter annotated as @NewNodeIdParam. This parameter will be 0 if the same 
-     * function is run for any reason other than a new node connecting.
-     */
-    @ReplicationRunOnNewNode
     @Query("""
-REPLACE INTO Entity_ReplicationTracker(tkrEntityPrimaryKey, trkrEntityPrimaryKey, trkrDestinationNode,
-             trkrVersionId, trkrProcessed)
+REPLACE INTO EntityReplicate(trkrEntityPrimaryKey, trkrDestinationNode)
 SELECT Entity.entityPrimaryKey AS trkrEntityPrimaryKey,
-       DoorNode.nodeId AS trkrDestinationNode,
-       Entity.entityLastChangedTime AS trkrVersionId,
-       0 AS trkrProcessed
+       DoorNode.nodeId AS trkrDestinationNode
        FROM ChangeLog
             JOIN Entity ON ChangeLog.chTableId = 42 AND ChangeLog.chEntityPk = Entity.entityPrimaryKey
             JOIN DoorNode ON DoorNode.nodeId != 0
   
- /*Postgres- ON CONFLICT(...) DO UPDATE  -*/:
+ /*psql- ON CONFLICT(...) DO UPDATE  -*/:
  ")
-    @PgQuery(
-    fun updateEntityReplicationTrackers(@NewNodeIdParam newNodeId: Long)
+    fun updateEntityReplicationOnEntityChanged()
+    
+    /*
+     * Query that runs whenever a new node is connected to determine what needs 
+     * to be replicated
+     */
+    @ReplicationRunOnNewNode 
+    @Query("""
+    REPLACE INTO EntityReplicate(trkrEntityPrimaryKey, trkrDestinationNode)
+     SELECT Entity.entityPrimaryKey AS trkrEntityPrimaryKey,
+            :newNodeId AS trkrDestinationNode       
+    /*psql- ON CONFLICT(...) DO UPDATE  -*/:
+    """) 
+    fun updateEntityReplicationOnNewNode(@NewNodeParam newNodeId: Long) 
+    
 }
 
 ```
-It is possible to simply insert replication trackers manually. To make things easier, you can annotate 
+It is possible to simply insert/update replication trackers manually. To make things easier, you can annotate 
 DAO functions so that the replication trackers are inserted/updated automatically when changes happen.
 
 This uses a special table called ChangeLog. Each time any entity is changed, an SQL trigger will insert
@@ -206,11 +220,18 @@ Request BODY:
 Remote runs:
 ```
 //For each acknowledgment received
-UPDATE Entity_RT
-   SET processed = 1
- WHERE trkrPrimaryKey = :primaryKey
-   AND trkrVersionId = :versionId
-   AND nodeId = :nodeId  
+UPDATE EntityReplicate
+   SET trkrProcessed = (
+       SELECT CASE
+       WHEN ((SELECT entityVersionIdField
+                FROM Entity
+               WHERE entityPk = :primaryKey) = :versionId) THEN 1
+       ELSE 0
+       END),
+       trkrVersionIdField = :versionId
+ WHERE trkrEntityPkField = :primaryKey
+   AND trkrDestinationNodeId = :nodeId
+    
 ```
 
 #### Update trackers on local

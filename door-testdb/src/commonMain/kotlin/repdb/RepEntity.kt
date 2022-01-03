@@ -1,5 +1,6 @@
 package repdb
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.ustadmobile.door.annotation.*
@@ -34,6 +35,7 @@ class RepEntity {
     @LastChangedBy
     var reLastChangedBy: Long = 0
 
+    @ColumnInfo(defaultValue = "0")
     @ReplicationVersionId
     @LastChangedTime
     var reLastChangeTime: Long = 0

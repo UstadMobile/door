@@ -15,6 +15,7 @@ class RepEntityTracker {
     var trkrForeignKey: Long = 0
 
     @ReplicationVersionId
+    @ColumnInfo(defaultValue = "0")
     var trkrVersionId: Long = 0
 
     @ReplicationDestinationNodeId

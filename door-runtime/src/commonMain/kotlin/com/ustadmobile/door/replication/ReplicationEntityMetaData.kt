@@ -48,9 +48,11 @@ class ReplicationEntityMetaData(
 
     val findPendingTrackerSql: String by lazy(LazyThreadSafetyMode.NONE) {
         """
-        SELECT $trackerForeignKeyFieldName AS primaryKey, 
-               $trackerVersionFieldName AS versionId
+        SELECT $trackerTableName.$trackerForeignKeyFieldName AS primaryKey, 
+               $entityTableName.$entityVersionIdFieldName AS versionId
           FROM $trackerTableName
+               JOIN $entityTableName 
+                    ON $entityTableName.$entityPrimaryKeyFieldName = $trackerTableName.$trackerForeignKeyFieldName
          WHERE $trackerDestNodeIdFieldName = ?
            AND CAST($trackerProcessedFieldName AS INTEGER) = 0
          LIMIT $batchSize 
@@ -75,23 +77,40 @@ class ReplicationEntityMetaData(
         updateSetTrackerProcessedSqlPostgres
     }
 
+    /*
+     * Parameters:
+     *  1) primary key
+     *  2) versionId
+     *  3) versionId
+     *  4) primary key
+     *  5) destination node
+     */
     val updateSetTrackerProcessedSqlSqlite: String by lazy(LazyThreadSafetyMode.NONE) {
         """
         UPDATE $trackerTableName
-           SET $trackerProcessedFieldName = 1
+           SET $trackerProcessedFieldName = (
+               SELECT CASE
+               WHEN ((SELECT $entityVersionIdFieldName
+                        FROM $entityTableName
+                       WHERE $entityPrimaryKeyFieldName = ?) = ?) THEN 1
+               ELSE 0
+               END),
+               $trackerVersionFieldName = ?
          WHERE $trackerForeignKeyFieldName = ?
-           AND $trackerVersionFieldName = ?
-           AND $trackerDestNodeIdFieldName = ?
+           AND $trackerDestNodeIdFieldName = ? 
         """
     }
 
     val updateSetTrackerProcessedSqlPostgres: String by lazy(LazyThreadSafetyMode.NONE) {
         """
         UPDATE $trackerTableName
-           SET $trackerProcessedFieldName = true
+           SET $trackerProcessedFieldName = 
+               (SELECT $entityVersionIdFieldName
+                        FROM $entityTableName
+                       WHERE $entityPrimaryKeyFieldName = ?) = ?,
+               $trackerVersionFieldName = ?
          WHERE $trackerForeignKeyFieldName = ?
-           AND $trackerVersionFieldName = ?
-           AND $trackerDestNodeIdFieldName = ?  
+           AND $trackerDestNodeIdFieldName = ? 
         """
     }
 
