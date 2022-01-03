@@ -53,7 +53,7 @@ abstract class ExampleDao2 {
     abstract fun findNameByUid(uid: Long): String?
 
     @Query("SELECT name FROM ExampleEntity2 WHERE uid = :uid")
-    abstract fun findNameByUidAsync(uid: Long): String?
+    abstract suspend fun findNameByUidAsync(uid: Long): String?
 
     @Query("SELECT ExampleEntity2.*, ExampleLinkEntity.* FROM " +
             " ExampleEntity2 LEFT JOIN ExampleLinkEntity ON ExampleEntity2.uid = ExampleLinkEntity.fkValue " +
