@@ -21,7 +21,6 @@ import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.annotation.*
 import com.ustadmobile.door.ext.DoorDatabaseMetadata
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
-import com.ustadmobile.door.ext.minifySql
 import com.ustadmobile.door.replication.ReplicationRunOnChangeRunner
 import com.ustadmobile.door.replication.ReplicationEntityMetaData
 import com.ustadmobile.door.replication.ReplicationFieldMetaData
@@ -30,12 +29,10 @@ import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.C
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JS_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JVM_DIRS
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorRepository.Companion.SUFFIX_REPOSITORY2
-import com.ustadmobile.lib.annotationprocessor.core.ext.filterByClass
 import com.ustadmobile.lib.annotationprocessor.core.ext.getClassArrayValue
 import com.ustadmobile.lib.annotationprocessor.core.ext.getClassValue
 import kotlinx.coroutines.GlobalScope
 import kotlin.reflect.KClass
-import com.ustadmobile.door.ChangeListenerRequest
 import com.ustadmobile.door.util.NodeIdAuthCache
 import io.github.aakira.napier.Napier
 
@@ -315,7 +312,7 @@ private fun CodeBlock.Builder.addReplicateEntityMetaDataCode(
     add("%S, ", trackerTypeEl.firstFieldWithAnnotation(ReplicationEntityForeignKey::class.java))
     add("%S, ", trackerTypeEl.firstFieldWithAnnotation(ReplicationDestinationNodeId::class.java))
     add("%S, ", trackerTypeEl.firstFieldWithAnnotation(ReplicationVersionId::class.java))
-    add("%S, \n", trackerTypeEl.firstFieldWithAnnotation(ReplicationTrackerProcessed::class.java))
+    add("%S, \n", trackerTypeEl.firstFieldWithAnnotation(ReplicationPending::class.java))
     addFieldsCodeBlock(entity).add(",\n")
     addFieldsCodeBlock(trackerTypeEl).add("\n")
     add(")")

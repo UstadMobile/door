@@ -32,7 +32,7 @@ abstract class RepDao {
                  WHERE RepEntityTracker.trkrForeignKey = RepEntity.rePrimaryKey
                    AND RepEntityTracker.trkrDestination = DoorNode.nodeId), 0)
         /*psql ON CONFLICT(trkrForeignKey, trkrDestination) DO UPDATE 
-              SET trkrProcessed = false
+              SET trkrPending = true
         */
     """)
     //Note UPDATE does not need a WHERE check - this was already checked in the insert using the where clause there
@@ -54,7 +54,7 @@ abstract class RepDao {
                  WHERE RepEntityTracker.trkrForeignKey = RepEntity.rePrimaryKey
                    AND RepEntityTracker.trkrDestination = DoorNode.nodeId), 0)
         /*psql ON CONFLICT(trkrForeignKey, trkrDestination) DO UPDATE 
-              SET trkrProcessed = false
+              SET trkrPending = true
         */      
     """)
     @ReplicationRunOnNewNode

@@ -55,7 +55,7 @@ class ReplicationNotificationDispatcher(
                   SELECT ${repEntity.trackerTableName}.${repEntity.trackerDestNodeIdFieldName}
                     FROM ${repEntity.trackerTableName}
                    WHERE ${repEntity.trackerDestNodeIdFieldName} = ?
-                     AND CAST(${repEntity.trackerProcessedFieldName} AS INTEGER) = 0)
+                     AND CAST(${repEntity.trackerPendingFieldName} AS INTEGER) = 1)
             """
         }
     }
@@ -100,7 +100,7 @@ class ReplicationNotificationDispatcher(
             val sql = """
                 SELECT DISTINCT ${repMetaData.trackerDestNodeIdFieldName} 
                   FROM ${repMetaData.trackerTableName}
-                 WHERE CAST(${repMetaData.trackerProcessedFieldName} AS INTEGER) = 0  
+                 WHERE CAST(${repMetaData.trackerPendingFieldName} AS INTEGER) = 1 
             """
 
             db.prepareAndUseStatementAsync(sql) { stmt ->

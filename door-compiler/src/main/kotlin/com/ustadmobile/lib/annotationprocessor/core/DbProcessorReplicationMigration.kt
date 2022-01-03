@@ -30,8 +30,13 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
         addType(TypeSpec.classBuilder("${entity.simpleName}Replicate")
             .addAnnotation(AnnotationSpec.builder(Entity::class)
                 .addMember("primaryKeys = arrayOf(%S, %S)", "${varPrefix}Pk", "${varPrefix}Destination")
-                .addMember("indices = arrayOf(%T(value = arrayOf(%S, %S, %S)))", Index::class,
-                    "${varPrefix}Destination", "${varPrefix}Processed", "${varPrefix}Pk")
+                .addMember(CodeBlock.builder()
+                    .add("indices = arrayOf(")
+                    .add("%T(value = arrayOf(%S, %S, %S)),\n", Index::class,
+                        "${varPrefix}Pk", "${varPrefix}Destination", "${varPrefix}VersionId")
+                    .add("%T(value = arrayOf(%S, %S))", Index::class, "${varPrefix}Destination", "${varPrefix}Pending")
+                    .add(")\n")
+                    .build())
                 .build())
             .addAnnotation(Serializable::class)
             .addProperty(PropertySpec.builder("${varPrefix}Pk", LONG)
@@ -42,6 +47,9 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
             .addProperty(PropertySpec.builder("${varPrefix}VersionId", LONG)
                 .mutable()
                 .initializer("0")
+                .addAnnotation(AnnotationSpec.builder(ColumnInfo::class)
+                    .addMember("defaultValue = %S", "0")
+                    .build())
                 .addAnnotation(ReplicationVersionId::class)
                 .build())
             .addProperty(PropertySpec.builder("${varPrefix}Destination", LONG)
@@ -49,13 +57,13 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
                 .initializer("0")
                 .addAnnotation(ReplicationDestinationNodeId::class)
                 .build())
-            .addProperty(PropertySpec.builder("${varPrefix}Processed", BOOLEAN)
+            .addProperty(PropertySpec.builder("${varPrefix}Pending", BOOLEAN)
                 .mutable()
-                .initializer("false")
+                .initializer("true")
                 .addAnnotation(AnnotationSpec.builder(ColumnInfo::class)
-                    .addMember("defaultValue = %S", "0")
+                    .addMember("defaultValue = %S", "1")
                     .build())
-                .addAnnotation(ReplicationTrackerProcessed::class)
+                .addAnnotation(ReplicationPending::class)
                 .build())
             .build())
 
@@ -105,7 +113,7 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
                               WHERE ${entityPrefix}Pk = ${repEntity.entityTableName}.${repEntity.entityPrimaryKey?.simpleName}
                                 AND ${entityPrefix}Destination = :newNodeId), 0) 
                      /*psql ON CONFLICT(${entityPrefix}Pk, ${entityPrefix}Destination) DO UPDATE
-                            SET ${entityPrefix}Processed = false, ${entityPrefix}VersionId = EXCLUDED.${entityPrefix}VersionId
+                            SET ${entityPrefix}Pending = true
                      */       
                 ""${'"'})
                 @ReplicationRunOnNewNode
@@ -134,7 +142,7 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
                               WHERE ${entityPrefix}Pk = ${repEntity.simpleName}.${repEntity.entityPrimaryKey?.simpleName}
                                 AND ${entityPrefix}Destination = UserSession.usClientNodeId), 0)
                     /*psql ON CONFLICT(${entityPrefix}Pk, ${entityPrefix}Destination) DO UPDATE
-                        SET ${entityPrefix}Processed = false, ${entityPrefix}VersionId = EXCLUDED.${entityPrefix}VersionId
+                        SET ${entityPrefix}Pending = true
                      */               
                     ""${'"'})
                     @ReplicationRunOnChange([${repEntity.simpleName}::class])
@@ -155,16 +163,19 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
         ) {
             val varPrefix = entityType.prefix()
 
-            val defaultBoolVal = if(boolTypeName == "INTEGER") "0" else "false"
+            val defaultBoolVal = if(boolTypeName == "INTEGER") "1" else "true"
             add("_stmtList += %S\n", """
                            CREATE TABLE IF NOT EXISTS ${entityType.simpleName}Replicate ( ${varPrefix}Pk $longTypeName NOT NULL,
-                                ${varPrefix}VersionId $longTypeName NOT NULL,
+                                ${varPrefix}VersionId $longTypeName NOT NULL DEFAULT 0,
                                 ${varPrefix}Destination $longTypeName NOT NULL,
-                                ${varPrefix}Processed $boolTypeName NOT NULL DEFAULT $defaultBoolVal,
+                                ${varPrefix}Pending $boolTypeName NOT NULL DEFAULT $defaultBoolVal,
                                 PRIMARY KEY (${varPrefix}Pk, ${varPrefix}Destination)) 
                         """.minifySql())
             add("_stmtList += %S\n", """
-                            CREATE INDEX index_${entityType.simpleName}Replicate_${varPrefix}Destination_${varPrefix}Processed_${varPrefix}Pk ON ${entityType.simpleName}Replicate (${varPrefix}Destination, ${varPrefix}Processed, ${varPrefix}Pk)
+                            CREATE INDEX index_${entityType.simpleName}Replicate_${varPrefix}Pk_${varPrefix}Destination_${varPrefix}VersionId ON ${entityType.simpleName}Replicate (${varPrefix}Pk, ${varPrefix}Destination, ${varPrefix}VersionId)
+                        """.minifySql())
+            add("_stmtList += %S\n", """
+                            CREATE INDEX index_${entityType.simpleName}Replicate_${varPrefix}Destination_${varPrefix}Pending ON ${entityType.simpleName}Replicate (${varPrefix}Destination, ${varPrefix}Pending)
                         """.minifySql())
         }
 

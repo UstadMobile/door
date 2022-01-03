@@ -192,11 +192,11 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
                             "type long", entityRepTrkr)
                 }
 
-                val trkrProcessed = entityRepTrkr.enclosedElementsWithAnnotation(ReplicationTrackerProcessed::class.java)
-                if(trkrProcessed.size != 1 || trkrProcessed.first().asType().asTypeName() != BOOLEAN) {
+                val trkrPending = entityRepTrkr.enclosedElementsWithAnnotation(ReplicationPending::class.java)
+                if(trkrPending.size != 1 || trkrPending.first().asType().asTypeName() != BOOLEAN) {
                     messager.printMessage(Diagnostic.Kind.ERROR, "Replication Tracker ${entityRepTrkr.qualifiedName}" +
-                            " must have exactly one field annotated @ReplicationTrackerProcessed and it must be of type" +
-                            " boolean", entityRepTrkr)
+                            " must have exactly one field annotated @ReplicationPending and it must be of type" +
+                            " boolean, default value should be true", entityRepTrkr)
                 }
 
                 //check for duplicate fields between tracker and entity

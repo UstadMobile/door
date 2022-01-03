@@ -133,7 +133,7 @@ class TestDoorDatabaseReplicationExt {
              SELECT COUNT(*) 
                FROM RepEntityTracker
               WHERE trkrDestination = ?   
-                AND CAST(trkrProcessed AS INTEGER) = 0
+                AND CAST(trkrPending AS INTEGER) = 1
             """
         ) { stmt ->
             stmt.setLong(1, 42)

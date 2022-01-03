@@ -8,7 +8,9 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 @Entity(primaryKeys = arrayOf("trkrForeignKey", "trkrDestination"),
-    indices = arrayOf(Index(value = arrayOf("trkrDestination", "trkrProcessed", "trkrForeignKey"))))
+    indices = arrayOf(
+        Index(value = arrayOf("trkrForeignKey", "trkrDestination", "trkrVersionId")),
+        Index(value = arrayOf("trkrDestination", "trkrPending"))))
 class RepEntityTracker {
 
     @ReplicationEntityForeignKey
@@ -21,8 +23,8 @@ class RepEntityTracker {
     @ReplicationDestinationNodeId
     var trkrDestination: Long = 0
 
-    @ColumnInfo(defaultValue = "0")
-    @ReplicationTrackerProcessed
-    var trkrProcessed: Boolean = false
+    @ColumnInfo(defaultValue = "1")
+    @ReplicationPending
+    var trkrPending: Boolean = true
 
 }

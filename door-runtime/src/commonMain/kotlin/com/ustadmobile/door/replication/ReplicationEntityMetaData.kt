@@ -16,7 +16,7 @@ class ReplicationEntityMetaData(
     val trackerForeignKeyFieldName: String,
     val trackerDestNodeIdFieldName: String,
     val trackerVersionFieldName: String,
-    val trackerProcessedFieldName: String,
+    val trackerPendingFieldName: String,
     val entityFields: List<ReplicationFieldMetaData>,
     val trackerFields: List<ReplicationFieldMetaData>,
     val batchSize: Int = 1000
@@ -54,7 +54,7 @@ class ReplicationEntityMetaData(
                JOIN $entityTableName 
                     ON $entityTableName.$entityPrimaryKeyFieldName = $trackerTableName.$trackerForeignKeyFieldName
          WHERE $trackerDestNodeIdFieldName = ?
-           AND CAST($trackerProcessedFieldName AS INTEGER) = 0
+           AND CAST($trackerPendingFieldName AS INTEGER) = 1
          LIMIT $batchSize 
         OFFSET ?
     """
@@ -88,12 +88,12 @@ class ReplicationEntityMetaData(
     val updateSetTrackerProcessedSqlSqlite: String by lazy(LazyThreadSafetyMode.NONE) {
         """
         UPDATE $trackerTableName
-           SET $trackerProcessedFieldName = (
+           SET $trackerPendingFieldName = (
                SELECT CASE
                WHEN ((SELECT $entityVersionIdFieldName
                         FROM $entityTableName
-                       WHERE $entityPrimaryKeyFieldName = ?) = ?) THEN 1
-               ELSE 0
+                       WHERE $entityPrimaryKeyFieldName = ?) = ?) THEN 0
+               ELSE 1
                END),
                $trackerVersionFieldName = ?
          WHERE $trackerForeignKeyFieldName = ?
@@ -104,10 +104,10 @@ class ReplicationEntityMetaData(
     val updateSetTrackerProcessedSqlPostgres: String by lazy(LazyThreadSafetyMode.NONE) {
         """
         UPDATE $trackerTableName
-           SET $trackerProcessedFieldName = 
+           SET $trackerPendingFieldName = 
                (SELECT $entityVersionIdFieldName
                         FROM $entityTableName
-                       WHERE $entityPrimaryKeyFieldName = ?) = ?,
+                       WHERE $entityPrimaryKeyFieldName = ?) != ?,
                $trackerVersionFieldName = ?
          WHERE $trackerForeignKeyFieldName = ?
            AND $trackerDestNodeIdFieldName = ? 
@@ -121,7 +121,7 @@ class ReplicationEntityMetaData(
                LEFT JOIN $entityTableName 
                     ON $trackerTableName.$trackerForeignKeyFieldName = $entityTableName.$entityPrimaryKeyFieldName
          WHERE $trackerTableName.$trackerDestNodeIdFieldName = ?
-           AND CAST($trackerProcessedFieldName AS INTEGER) = 0 
+           AND CAST($trackerPendingFieldName AS INTEGER) = 1
          LIMIT $batchSize  
         """
     }
