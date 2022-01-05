@@ -9,6 +9,11 @@ fun PreparedStatement.setJsonPrimitive(
     type: Int,
     jsonPrimitive: JsonPrimitive
 ) {
+    if(jsonPrimitive is JsonNull) {
+        setObject(index, null)
+        return
+    }
+
     when(type) {
         TypesKmp.INTEGER -> setInt(index, jsonPrimitive.int)
         TypesKmp.SMALLINT -> setShort(index, jsonPrimitive.int.toShort())

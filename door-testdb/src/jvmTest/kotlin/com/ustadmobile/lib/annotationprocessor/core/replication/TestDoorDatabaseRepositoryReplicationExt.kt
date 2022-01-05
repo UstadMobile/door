@@ -168,11 +168,6 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     @Test
     fun givenEmptyDatabase_whenEntityCreatedRemotely_thenShouldBeReplicatedToLocal() {
-        remoteRepDb.repDao.insertDoorNode(DoorNode().apply {
-            auth = "secret"
-            nodeId = LOCAL_NODE_ID
-        })
-
         val repEntity = RepEntity().apply {
             reString = "Fetch"
             rePrimaryKey = remoteRepDb.repDao.insert(this)
@@ -186,6 +181,43 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
         Assert.assertNotNull("Entity now on local", localRepDb.repDao.findByUid(repEntity.rePrimaryKey))
     }
+
+    @Test
+    fun givenEmptyDatabase_whenEntityWithNullStringCreatedRemotely_thenShouldReplicateAndBeEqual() {
+        val repEntity = RepEntity().apply {
+            reString = null
+            rePrimaryKey = remoteRepDb.repDao.insert(this)
+        }
+
+        runBlocking {
+            localRepDb.repDao.findByUidLive(repEntity.rePrimaryKey).waitUntilWithTimeout(5000) {
+                it != null
+            }
+        }
+
+        val entityOnLocal = localRepDb.repDao.findByUid(repEntity.rePrimaryKey)
+        Assert.assertNotNull("Entity now on local", entityOnLocal)
+        Assert.assertEquals("Entity on local is the same as the one on remote", repEntity, entityOnLocal)
+    }
+
+    @Test
+    fun givenEmptyDatabase_whenEntityWithArabicCharsCreated_thenShouldReplicateAndBeEqual() {
+        val repEntity = RepEntity().apply {
+            reString = "سلام"
+            rePrimaryKey = remoteRepDb.repDao.insert(this)
+        }
+
+        runBlocking {
+            localRepDb.repDao.findByUidLive(repEntity.rePrimaryKey).waitUntilWithTimeout(5000 * 1000) {
+                it != null
+            }
+        }
+
+        val entityOnLocal = localRepDb.repDao.findByUid(repEntity.rePrimaryKey)
+        Assert.assertNotNull("Entity now on local", entityOnLocal)
+        Assert.assertEquals("Entity on local is the same as the one on remote", repEntity, entityOnLocal)
+    }
+
 
     @Test
     fun givenEmptyDatabase_whenMoreEntitiesThanInBatchCreatedRemotely_thenShouldAllReplicateToLocal() {

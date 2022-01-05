@@ -102,9 +102,8 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
                 """.trimIndent())
                 .addComment("""
                     @Query(""${'"'}
-                    REPLACE INTO ${repEntity.simpleName}Replicate(${entityPrefix}Pk, ${entityPrefix}VersionId, ${entityPrefix}Destination)
-                     SELECT ${repEntity.entityTableName}.${repEntity.entityPrimaryKey?.simpleName} AS ${entityPrefix}Uid,
-                            ${repEntity.entityTableName}.${entityVersionField?.simpleName} AS ${entityPrefix}VersionId,
+                    REPLACE INTO ${repEntity.simpleName}Replicate(${entityPrefix}Pk, ${entityPrefix}Destination)
+                     SELECT ${repEntity.entityTableName}.${repEntity.entityPrimaryKey?.simpleName} AS ${entityPrefix}Pk,
                             :newNodeId AS ${entityPrefix}Destination
                        FROM ${repEntity.entityTableName}
                       WHERE ${repEntity.entityTableName}.${entityVersionField?.simpleName} != COALESCE(
@@ -123,15 +122,14 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
                 .addComment("""
                     
                     @Query(""${'"'}
-                    REPLACE INTO ${repEntity.simpleName}Replicate(${entityPrefix}Pk, ${entityPrefix}VersionId, ${entityPrefix}Destination)
+                    REPLACE INTO ${repEntity.simpleName}Replicate(${entityPrefix}Pk, ${entityPrefix}Destination)
                      SELECT ${repEntity.entityTableName}.${repEntity.entityPrimaryKey?.simpleName} AS ${entityPrefix}Uid,
-                            ${repEntity.entityTableName}.${entityVersionField?.simpleName} AS ${entityPrefix}VersionId,
                             UserSession.usClientNodeId AS ${entityPrefix}Destination
                        FROM ChangeLog
                             JOIN ${repEntity.entityTableName}
-                                ON ChangeLog.chTableId = ${repEntity.getAnnotation(ReplicateEntity::class.java).tableId}
+                                ON ChangeLog.chTableId = ${'$'}{${repEntity.entityTableName}.TABLE_ID}
                                    AND ChangeLog.chEntityPk = ${repEntity.entityTableName}.${repEntity.entityPrimaryKey?.simpleName}
-                            JOIN UserSession
+                            JOIN UserSession ON UserSession.usStatus = ${'$'}{UserSession.STATUS_ACTIVE}
                       WHERE UserSession.usClientNodeId != (
                             SELECT nodeClientId 
                               FROM SyncNode

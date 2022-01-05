@@ -149,8 +149,12 @@ class PreparedStatementRoomJdbc(
 
     override fun setString(parameterIndex: Int, x: String?) {
         ensureCapacity(parameterIndex + 1)
-        bindingTypes[parameterIndex -1] = STRING
-        boundStrings[parameterIndex -1] = x
+        if(x != null) {
+            bindingTypes[parameterIndex -1] = STRING
+            boundStrings[parameterIndex -1] = x
+        }else {
+            bindingTypes[parameterIndex - 1] = NULL
+        }
     }
 
     override fun setBytes(parameterIndex: Int, x: ByteArray?) {
@@ -218,7 +222,12 @@ class PreparedStatementRoomJdbc(
     }
 
     override fun setObject(parameterIndex: Int, x: Any?) {
-        TODO("Not yet implemented")
+        if(x == null) {
+            ensureCapacity(parameterIndex + 1)
+            bindingTypes[parameterIndex - 1] = NULL
+        }else {
+            throw IllegalArgumentException("setObject on Room JDBC only supports null")
+        }
     }
 
     override fun setObject(parameterIndex: Int, x: Any?, targetSqlType: Int, scaleOrLength: Int) {

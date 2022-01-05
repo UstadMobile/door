@@ -33,6 +33,13 @@ class ResultSetRoomJdbc(
 
     override fun wasNull(): Boolean = cursor.isNull(lastFetchedIndex - 1)
 
+    private fun Cursor.getStringOrNull(index: Int) : String?{
+        return if(isNull(index))
+            null
+        else
+            getString(index)
+    }
+
     private fun getColumnIndexAndSetLastFetched(columnLabel: String) : Int{
         return cursor.getColumnIndexOrThrow(columnLabel).also {
             //Android indexes start at 0, JDBC indexes start at 1
@@ -42,11 +49,11 @@ class ResultSetRoomJdbc(
 
     override fun getString(columnIndex: Int): String? {
         lastFetchedIndex = columnIndex
-        return cursor.getString(columnIndex - 1)
+        return cursor.getStringOrNull(columnIndex - 1)
     }
 
     override fun getString(columnLabel: String): String? {
-        return cursor.getString(getColumnIndexAndSetLastFetched(columnLabel))
+        return cursor.getStringOrNull(getColumnIndexAndSetLastFetched(columnLabel))
     }
 
     override fun getBoolean(columnIndex: Int): Boolean {

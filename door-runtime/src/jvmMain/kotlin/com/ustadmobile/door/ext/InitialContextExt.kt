@@ -36,6 +36,7 @@ fun InitialContext.bindNewSqliteDataSourceIfNotExisting(
             setJournalMode(SQLiteConfig.JournalMode.WAL)
             setBusyTimeout(30000)
             setSynchronous(SQLiteConfig.SynchronousMode.OFF)
+            enableRecursiveTriggers(true)
         })
 
         sqliteDir.takeIf { !it.exists() }?.mkdirs()

@@ -1,5 +1,5 @@
 group 'com.ustadmobile.door'
-version '0.0.40at'
+version '0.0.40au'
 
 ext.localProperties = new Properties()
 

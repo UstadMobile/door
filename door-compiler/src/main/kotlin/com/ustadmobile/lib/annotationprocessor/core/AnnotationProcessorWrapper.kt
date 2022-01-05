@@ -67,8 +67,6 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
         messager = MessagerWrapper(p0.messager)
         processors.forEach { it.init(p0) }
         processingEnv = p0
-        Napier.takeLogarithm()
-        Napier.base(DebugAntilog())
     }
 
     override fun process(annotations: MutableSet<out TypeElement>, roundEnv: RoundEnvironment): Boolean {

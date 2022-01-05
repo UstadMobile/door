@@ -46,8 +46,36 @@ class RepEntity {
 
     var reBoolean: Boolean = false
 
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other == null || this::class != other::class) return false
+
+        other as RepEntity
+
+        if (rePrimaryKey != other.rePrimaryKey) return false
+        if (reLastChangedBy != other.reLastChangedBy) return false
+        if (reLastChangeTime != other.reLastChangeTime) return false
+        if (reNumField != other.reNumField) return false
+        if (reString != other.reString) return false
+        if (reBoolean != other.reBoolean) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = rePrimaryKey.hashCode()
+        result = 31 * result + reLastChangedBy.hashCode()
+        result = 31 * result + reLastChangeTime.hashCode()
+        result = 31 * result + reNumField
+        result = 31 * result + (reString?.hashCode() ?: 0)
+        result = 31 * result + reBoolean.hashCode()
+        return result
+    }
+
     companion object {
         const val TABLE_ID = 500
     }
+
 
 }
