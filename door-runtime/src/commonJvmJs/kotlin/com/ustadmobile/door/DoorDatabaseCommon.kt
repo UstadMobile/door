@@ -96,19 +96,16 @@ abstract class DoorDatabaseCommon {
 
 
     open fun handleTableChangedInternal(changeTableNames: List<String>) : DoorDatabase{
-        GlobalScope.launch {
-            effectiveDatabase.apply {
-                val affectedChangeListeners = changeListeners.filter {
-                    it.tableNames.isEmpty() || it.tableNames.any { changeTableNames.contains(it) }
-                }
-                Napier.d("$this notifying ${affectedChangeListeners.size} listeners of changes to " +
-                        changeTableNames.joinToString(), tag = DoorTag.LOG_TAG)
-                affectedChangeListeners.forEach {
-                    it.onInvalidated.onTablesInvalidated(changeTableNames)
-                }
+        effectiveDatabase.apply {
+            val affectedChangeListeners = changeListeners.filter {
+                it.tableNames.isEmpty() || it.tableNames.any { changeTableNames.contains(it) }
+            }
+            Napier.d("$this notifying ${affectedChangeListeners.size} listeners of changes to " +
+                    changeTableNames.joinToString(), tag = DoorTag.LOG_TAG)
+            affectedChangeListeners.forEach {
+                it.onInvalidated.onTablesInvalidated(changeTableNames)
             }
         }
-
         return effectiveDatabase
     }
 

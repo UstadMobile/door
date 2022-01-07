@@ -281,7 +281,7 @@ class ReplicationSubscriptionManager(
                 checkQueueSignal.send(true)
             }
             EVT_INVALIDATE -> coroutineScope.launch {
-                val tableIdsToInvalidate = message.data.split(",").mapNotNull { it.toIntOrNull() }
+                val tableIdsToInvalidate = message.data.split(",").mapNotNull { it.trim().toIntOrNull() }
                 initCompletable.await()
                 val timeNow = systemTimeInMillis()
                 repository.db.withDoorTransactionAsync(dbKClass) { transactionDb ->

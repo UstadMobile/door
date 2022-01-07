@@ -142,10 +142,11 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
                 transactionDs.use {
                     val transactionWrappedDb = wrapForNewTransaction(dbKClass, transactionDb as T)
                     val result = block(transactionWrappedDb)
-                    transactionDb.fireTransactionTablesChanged()
                     rootDatabase.openTransactions -= transactionNum
                     Napier.d("Transaction # $transactionNum finished on $rootDatabase", tag = DoorTag.LOG_TAG)
                     result
+                }.also {
+                    transactionDb.fireTransactionTablesChanged()
                 }
             }
 
@@ -182,10 +183,11 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
                     //If this represents a repo, replicatewrapepr, etc. then apply the same wrapping
                     val wrappedDb = wrapForNewTransaction(dbKClass, transactionDb as T)
                     val result = block(wrappedDb)
-                    transactionDb.fireTransactionTablesChanged()
                     Napier.d("Transaction # $transactionNum finished on $this", tag = DoorTag.LOG_TAG)
                     rootDatabase.openTransactions -= transactionNum
                     result
+                }.also {
+                    transactionDb.fireTransactionTablesChanged()
                 }
             }
 
