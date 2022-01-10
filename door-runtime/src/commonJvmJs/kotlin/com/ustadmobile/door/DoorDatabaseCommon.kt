@@ -7,10 +7,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Runnable
 import com.ustadmobile.door.ext.concurrentSafeListOf
 import com.ustadmobile.door.ext.DoorTag
+import com.ustadmobile.door.ext.rootTransactionDatabase
 
 abstract class DoorDatabaseCommon {
-
-    abstract val dataSource: DataSource
 
     abstract val dbVersion: Int
 
@@ -26,6 +25,10 @@ abstract class DoorDatabaseCommon {
 
             return db
         }
+
+    val transactionRootJdbcDb : DoorDatabaseJdbc
+        get() = ((this as? DoorDatabase)?.rootTransactionDatabase as? DoorDatabaseJdbc)
+            ?: throw IllegalStateException("Database does not have jdbc transaction root")
 
     /**
      * Convenience variable that will be the sourceDatabase if it is not null, or this database
@@ -76,9 +79,6 @@ abstract class DoorDatabaseCommon {
         }
     }
 
-
-    open fun openConnection() =  effectiveDatabase.dataSource.getConnection()
-
     abstract fun createAllTables(): List<String>
 
     open fun runInTransaction(runnable: Runnable) {
@@ -86,12 +86,14 @@ abstract class DoorDatabaseCommon {
     }
 
 
-    open fun addChangeListener(changeListenerRequest: ChangeListenerRequest) = transactionRootDatabase.apply {
-        changeListeners.add(changeListenerRequest)
+    fun addChangeListener(doorInvalidationObserver: ChangeListenerRequest) {
+        val rootDb = (this as DoorDatabase).rootDatabase
+        rootDb.changeListeners.add(doorInvalidationObserver)
     }
 
-    open fun removeChangeListener(changeListenerRequest: ChangeListenerRequest) = transactionRootDatabase.apply {
-        changeListeners.remove(changeListenerRequest)
+    fun removeChangeListener(doorInvalidationObserver: ChangeListenerRequest) {
+        val rootDb = (this as DoorDatabase).rootDatabase
+        rootDb.changeListeners.remove(doorInvalidationObserver)
     }
 
 
@@ -116,8 +118,10 @@ abstract class DoorDatabaseCommon {
     open fun execSQLBatch(vararg sqlStatements: String) {
         var connection: Connection? = null
         var statement: Statement? = null
+        val rootDb = (this as DoorDatabase).rootDatabase
+        val jdbcDb = (rootDb as DoorDatabaseJdbc)
         try {
-            connection = openConnection()
+            connection = jdbcDb.openConnection()
             connection.setAutoCommit(false)
             statement = connection.createStatement()
             sqlStatements.forEach { sql ->

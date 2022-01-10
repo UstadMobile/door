@@ -233,3 +233,6 @@ actual fun DoorDatabase.removeIncomingReplicationListener(incomingReplicationLis
 actual val DoorDatabase.incomingReplicationListenerHelper: IncomingReplicationListenerHelper
     get() = doorAndroidRoomHelper.incomingReplicationListenerHelper
 
+actual val DoorDatabase.rootTransactionDatabase: DoorDatabase
+    get() = rootDatabase
+

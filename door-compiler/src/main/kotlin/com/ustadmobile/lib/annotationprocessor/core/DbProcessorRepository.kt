@@ -70,9 +70,6 @@ fun FileSpec.Builder.addDbRepoType(
                     .defaultValue("false")
                     .build())
                 .build())
-            .applyIf(overrideDataSourceProp) {
-                addDataSourceProperty("db")
-            }
             .addProperty(PropertySpec.builder("config", RepositoryConfig::class)
                     .addModifiers(KModifier.OVERRIDE)
                     .initializer("config")

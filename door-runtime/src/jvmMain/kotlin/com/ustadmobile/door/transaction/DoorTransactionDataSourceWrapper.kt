@@ -1,5 +1,7 @@
 package com.ustadmobile.door.transaction
 
+import com.ustadmobile.door.DoorDatabase
+import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.jdbc.SQLException
@@ -8,19 +10,23 @@ import com.ustadmobile.door.jdbc.SQLException
  * This is a wrapper for the DataSource class that can be used with the JDBC implementation to run transactions. This
  * DataSource will call the real DataSource getConnection once and only once.
  *
- * It will use a single connection and calls to getConnection will return a connection wrapper. The wrapper will set
- * autoCommit set to false on the real underlying connection at the start. When the transaction is completed via the use
- * or useAsync function, the commit function on the real underlying connection will be called and its autoCommit will be
- * restored to being true. The returned connection wrapper will block calls to commit, close, and rollback.
+ * It will use a single connection and calls to getConnection will return a connection wrapper. When the transaction is
+ * completed via the use or useAsync function, the commit function on the real underlying connection will be called and
+ * its autoCommit will be restored to being true. The returned connection wrapper will block calls to commit, close,
+ * and rollback.
  */
 class DoorTransactionDataSourceWrapper(
-    private val realDataSource: DataSource
-): DataSource by realDataSource  {
+    private val rootDb: DoorDatabase,
+    /**
+     * The actual JDBC connection. This should already be set to autoCommit = false
+     */
+    private val connection: Connection
+): DataSource by (rootDb as DoorDatabaseJdbc).dataSource  {
 
     @Volatile
     private var transactionClosed: Boolean = false
 
-    private class TransactionConnectionWrapper(
+    class TransactionConnectionWrapper(
         val realConnection: Connection
     ) : Connection by realConnection {
 
@@ -41,10 +47,8 @@ class DoorTransactionDataSourceWrapper(
         }
     }
 
-    private val transactionConnectionWrapper: TransactionConnectionWrapper by lazy {
-        TransactionConnectionWrapper(realDataSource.connection.also {
-            it.autoCommit = false
-        })
+    val transactionConnectionWrapper: TransactionConnectionWrapper by lazy {
+        TransactionConnectionWrapper(connection)
     }
 
     override fun getConnection(): Connection {

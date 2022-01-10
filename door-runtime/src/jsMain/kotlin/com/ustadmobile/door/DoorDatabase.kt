@@ -34,7 +34,7 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon() {
             val tableNamesList = mutableListOf<String>()
             val tableResult: ResultSet?
             try {
-                con = openConnection() as SQLiteConnectionJs
+                con = transactionRootJdbcDb.openConnection() as SQLiteConnectionJs
                 val metadata = con.getMetaData() as SQLiteDatabaseMetadataJs
                 tableResult = metadata.getTablesAsync(null, null, "%", arrayOf("TABLE"))
                 while(tableResult.next()) {
@@ -53,7 +53,7 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon() {
     suspend fun execSQLBatchAsync(vararg sqlStatements: String){
         var connection: SQLiteConnectionJs? = null
         try {
-            connection = openConnection() as SQLiteConnectionJs
+            connection = transactionRootJdbcDb.openConnection() as SQLiteConnectionJs
             val statement = connection.createStatement() as SQLiteStatementJs
             statement.executeUpdateAsync(sqlStatements.joinToString(";"))
             statement.close()
@@ -69,7 +69,7 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon() {
     }
 
     suspend fun exportDatabase() {
-        val con = (openConnection() as SQLiteConnectionJs)
+        val con = (transactionRootJdbcDb.openConnection() as SQLiteConnectionJs)
         con.datasource.exportDatabaseToFile()
     }
 }

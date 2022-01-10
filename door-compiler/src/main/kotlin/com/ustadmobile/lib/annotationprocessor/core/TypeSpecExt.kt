@@ -254,13 +254,3 @@ fun TypeSpec.toCreateTableSql(
 fun TypeSpec.functionsToImplement() = funSpecs.filter { KModifier.ABSTRACT in it.modifiers }
 
 
-//Add a property that will provide the required datasource abstract val by delegating to the 'real' database
-fun TypeSpec.Builder.addDataSourceProperty(dbVarName: String): TypeSpec.Builder {
-    addProperty(PropertySpec.builder("dataSource", AbstractDbProcessor.CLASSNAME_DATASOURCE,
-        KModifier.OVERRIDE)
-        .getter(FunSpec.getterBuilder()
-            .addCode("return $dbVarName.dataSource\n")
-            .build())
-        .build())
-    return this
-}

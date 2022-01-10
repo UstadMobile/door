@@ -21,14 +21,9 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
         get() = sourceDatabase?.jdbcArraySupported ?: field
         protected set
 
-    private val transactionDepth = atomic(0)
-
-    private val transactionCount = atomic(0)
+    internal val transactionCount = atomic(0)
 
     internal val openTransactions = concurrentSafeListOf<Int>()
-
-    protected val currentTransactionDepth: Int
-        get() = transactionDepth.value
 
     private val transactionTablesChanged = concurrentSafeMapOf<String, String>()
 
@@ -49,6 +44,7 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
         if(delegatedDatabaseVal != null) {
             delegatedDatabaseVal.tableNames
         }else {
+            val thisJdbc = this as DoorDatabaseJdbc
             var con = null as Connection?
             val tableNamesList = mutableListOf<String>()
             var tableResult: ResultSet? = null
@@ -72,26 +68,28 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
     }
 
     protected fun setupFromDataSource() {
-        openConnection().use { dbConnection ->
-            jdbcDbType = DoorDbType.typeIntFromProductName(dbConnection.metaData?.databaseProductName ?: "")
-            jdbcArraySupported = jdbcDbType == DoorDbType.POSTGRES
+        val rootDb = rootDatabase
+        if(this == rootDb) {
+            val jdbcDb = (this as DoorDatabaseJdbc)
+            jdbcDb.openConnection().use { dbConnection ->
+                jdbcDbType = DoorDbType.typeIntFromProductName(dbConnection.metaData?.databaseProductName ?: "")
+                jdbcArraySupported = jdbcDbType == DoorDbType.POSTGRES
+            }
+        }else {
+            jdbcDbType = rootDb.jdbcDbType
+            jdbcArraySupported = rootDb.jdbcArraySupported
         }
-    }
-
-    override fun openConnection(): java.sql.Connection {
-        return if(transactionDepth.value == 0)
-            super.openConnection()
-        else
-            dataSource.connection
     }
 
     private fun createTransactionDataSourceAndDb(): Pair<DoorTransactionDataSourceWrapper, DoorDatabase> {
         val rootDb = rootDatabase
-        val transactionDataSource = DoorTransactionDataSourceWrapper(rootDb.dataSource)
+        val connection = (rootDb as DoorDatabaseJdbc).openConnection()
+        connection.setAutoCommit(false)
+        val transactionDataSource = DoorTransactionDataSourceWrapper(rootDb, connection)
         val transactionDb = rootDb.constructorFun.newInstance(rootDb, transactionDataSource,
-                "Transaction wrapper for $this")
+                "Transaction wrapper for $rootDb")
 
-        transactionDb.transactionDepth.value = 1
+        (transactionDb as DoorDatabaseJdbc).transactionDepthCounter.incrementTransactionDepth()
 
         return Pair(transactionDataSource, transactionDb)
     }
@@ -129,34 +127,22 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
     ): R {
         dbKClass.assertIsClassForThisDb()
 
-        return when(transactionDepth.value) {
-            0 -> {
-                val transactionNum = rootDatabase.transactionCount.incrementAndGet()
-                val openTx = rootDatabase.openTransactions.toList()
-                if(openTx.isNotEmpty()) {
-                    Napier.w("WARNING: there are still open transactions on $rootDatabase: ${openTx.joinToString()}")
-                }
-                rootDatabase.openTransactions += transactionNum
-                Napier.d("Opening transaction # $transactionNum on $this", tag = DoorTag.LOG_TAG)
-                val (transactionDs, transactionDb) = createTransactionDataSourceAndDb()
-                transactionDs.use {
-                    val transactionWrappedDb = wrapForNewTransaction(dbKClass, transactionDb as T)
-                    val result = block(transactionWrappedDb)
-                    rootDatabase.openTransactions -= transactionNum
-                    Napier.d("Transaction # $transactionNum finished on $rootDatabase", tag = DoorTag.LOG_TAG)
-                    result
-                }.also {
-                    transactionDb.fireTransactionTablesChanged()
-                }
+        val txRoot = transactionRootJdbcDb
+        return if(!txRoot.isInTransaction) {
+            val (transactionDs, transactionDb) = createTransactionDataSourceAndDb()
+            transactionDs.use {
+                val transactionWrappedDb = wrapForNewTransaction(dbKClass, transactionDb as T)
+                val result = block(transactionWrappedDb)
+                result
+            }.also {
+                transactionDb.fireTransactionTablesChanged()
             }
-
-            else -> {
-                try {
-                    transactionDepth.incrementAndGet()
-                    block(this as T)
-                }finally {
-                    transactionDepth.decrementAndGet()
-                }
+        }else {
+            try {
+                txRoot.transactionDepthCounter.incrementTransactionDepth()
+                block(this as T)
+            }finally {
+                txRoot.transactionDepthCounter.decrementTransactionDepth()
             }
         }
     }
@@ -167,37 +153,22 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
         block: suspend (T) -> R
     ): R {
         dbKClass.assertIsClassForThisDb()
-
-        return when(transactionDepth.value) {
-            0 -> {
-                val transactionNum = rootDatabase.transactionCount.incrementAndGet()
-                Napier.d("Opening transaction # $transactionNum on $rootDatabase", tag = DoorTag.LOG_TAG)
-                val openTx = rootDatabase.openTransactions.toList()
-                if(openTx.isNotEmpty()) {
-                    Napier.w("WARNING: there are still open transactions on $rootDatabase: ${openTx.joinToString()}")
-                }
-                rootDatabase.openTransactions += transactionNum
-
-                val (transactionDs, transactionDb) = createTransactionDataSourceAndDb()
-                transactionDs.useAsync {
-                    //If this represents a repo, replicatewrapepr, etc. then apply the same wrapping
-                    val wrappedDb = wrapForNewTransaction(dbKClass, transactionDb as T)
-                    val result = block(wrappedDb)
-                    Napier.d("Transaction # $transactionNum finished on $this", tag = DoorTag.LOG_TAG)
-                    rootDatabase.openTransactions -= transactionNum
-                    result
-                }.also {
-                    transactionDb.fireTransactionTablesChanged()
-                }
+        val txRoot = transactionRootJdbcDb
+        return if(!txRoot.isInTransaction) {
+            val (transactionDs, transactionDb) = createTransactionDataSourceAndDb()
+            transactionDs.useAsync {
+                val transactionWrappedDb = wrapForNewTransaction(dbKClass, transactionDb as T)
+                val result = block(transactionWrappedDb)
+                result
+            }.also {
+                transactionDb.fireTransactionTablesChanged()
             }
-
-            else -> {
-                try {
-                    transactionDepth.incrementAndGet()
-                    block(this as T)
-                }finally {
-                    transactionDepth.decrementAndGet()
-                }
+        }else {
+            try {
+                txRoot.transactionDepthCounter.incrementTransactionDepth()
+                block(this as T)
+            }finally {
+                txRoot.transactionDepthCounter.decrementTransactionDepth()
             }
         }
     }
@@ -208,7 +179,7 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
         val sourceDbVal = this.sourceDatabase
         if(!isImplementation && sourceDbVal != null)
             sourceDbVal.handleTableChangedInternal(changeTableNames)
-        else if(isImplementation && transactionDepth.value > 0) {
+        else if(isImplementation && transactionRootJdbcDb.isInTransaction) {
             transactionTablesChanged.putAll(changeTableNames.associateWith { key -> key })
         }else {
             super.handleTableChangedInternal(changeTableNames)

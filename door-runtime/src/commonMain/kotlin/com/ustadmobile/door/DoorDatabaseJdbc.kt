@@ -1,12 +1,25 @@
 package com.ustadmobile.door
 
+import com.ustadmobile.door.jdbc.Connection
+import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
 import com.ustadmobile.door.util.NodeIdAuthCache
+import com.ustadmobile.door.util.TransactionDepthCounter
 
 /**
  * This interface is implemented by all generated JDBC implementations of a database.
  */
 interface DoorDatabaseJdbc {
+
+    /**
+     * The JNDI DataSource which will be used to open connections.
+     */
+    val dataSource: DataSource
+
+    /**
+     * Called to open a new database connection
+     */
+    fun openConnection(): Connection
 
     /**
      * When this instance is a repository or ReplicationWrapper, the sourceDatabase must be the database that they
@@ -22,6 +35,7 @@ interface DoorDatabaseJdbc {
      * be true. False otherwise (eg. for the root database itself).
      */
     val isInTransaction: Boolean
+        get() = transactionDepthCounter.transactionDepth > 0
 
     /**
      * If this database is the root database, e.g. doorJdbcSourceDatabase == null, then it will hold a primary key
@@ -43,5 +57,7 @@ interface DoorDatabaseJdbc {
     val realNodeIdAuthCache: NodeIdAuthCache
 
     val realIncomingReplicationListenerHelper: IncomingReplicationListenerHelper
+
+    val transactionDepthCounter: TransactionDepthCounter
 
 }

@@ -43,7 +43,7 @@ actual fun DoorSqlDatabase.dbType(): Int {
  * The name deliberately lower cases sql to avoid name clashes
  */
 actual fun DoorDatabase.execSqlBatch(vararg sqlStatements: String) {
-    val connection = dataSource.getConnection()
+    val connection = transactionRootJdbcDb.openConnection()
     connection.setAutoCommit(false)
     sqlStatements.forEach {
         GlobalScope.launch {

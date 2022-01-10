@@ -199,7 +199,6 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
                                 .returns(List::class.parameterizedBy(String::class))
                                 .addCode("return _db.createAllTables()\n")
                                 .build())
-                        addDataSourceProperty("_db")
                         addFunction(FunSpec.builder("wrapForNewTransaction")
                             .addOverrideWrapNewTransactionFun()
                             .addCode("return transactionDb.%M(dbKClass) as T\n",

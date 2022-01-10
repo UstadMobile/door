@@ -13,7 +13,7 @@ actual suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
     var connection: Connection? = null
     var stmt: PreparedStatement? = null
     try {
-        connection = openConnection()
+        connection = transactionRootJdbcDb.openConnection()
         stmt = connection.prepareStatement(stmtConfig)
 
         return block(stmt)
@@ -33,7 +33,7 @@ actual fun <R> DoorDatabase.prepareAndUseStatement(
     var connection: Connection? = null
     var stmt: PreparedStatement? = null
     try {
-        connection = openConnection()
+        connection = transactionRootJdbcDb.openConnection()
         stmt = connection.prepareStatement(stmtConfig)
         return block(stmt)
     }catch(e: Exception) {
@@ -97,3 +97,14 @@ actual fun DoorDatabase.removeIncomingReplicationListener(incomingReplicationLis
 
 actual val DoorDatabase.incomingReplicationListenerHelper: IncomingReplicationListenerHelper
     get() = (this.rootDatabase as DoorDatabaseJdbc).realIncomingReplicationListenerHelper
+
+actual val DoorDatabase.rootTransactionDatabase: DoorDatabase
+    get() {
+        var db = this
+        while(db !is DoorDatabaseJdbc) {
+            db = db.sourceDatabase
+                ?: throw IllegalStateException("rootTransactionDatabase: cannot find DoorDatabaseJdbc through sourceDatabase")
+        }
+
+        return db
+    }

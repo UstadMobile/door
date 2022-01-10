@@ -34,6 +34,7 @@ import com.ustadmobile.lib.annotationprocessor.core.ext.getClassValue
 import kotlinx.coroutines.GlobalScope
 import kotlin.reflect.KClass
 import com.ustadmobile.door.util.NodeIdAuthCache
+import com.ustadmobile.door.util.TransactionDepthCounter
 import io.github.aakira.napier.Napier
 
 val QUERY_SINGULAR_TYPES = listOf(INT, LONG, SHORT, BYTE, BOOLEAN, FLOAT, DOUBLE,
@@ -822,7 +823,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .add("var _stmt = null as %T?\n", CLASSNAME_PREPARED_STATEMENT)
                 .add("var _numChanges = 0\n")
                 .beginControlFlow("try")
-                .add("_con = _db.openConnection()\n")
+                .add("_con = _db.transactionRootJdbcDb.openConnection()\n")
                 .add("_stmt = _con.prepareStatement(%S)\n", stmtSql)
                 .applyIf(firstParam.type.isListOrArray()) {
                     add("_con.setAutoCommit(false)\n")
@@ -1303,14 +1304,15 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             .addProperty(PropertySpec.builder("dbName", String::class)
                 .initializer("dbName")
                 .build())
-            .applyIf(target == DoorTarget.JVM) {
-                addProperty(PropertySpec.builder("isInTransaction", Boolean::class,
-                    KModifier.OVERRIDE)
-                    .getter(FunSpec.getterBuilder()
-                        .addCode("return currentTransactionDepth > 0\n")
-                        .build())
-                    .build())
-            }
+            .addFunction(FunSpec.builder("openConnection")
+                .addModifiers(KModifier.OVERRIDE)
+                .returns(CLASSNAME_CONNECTION)
+                .addCode("return dataSource.getConnection()\n")
+                .build())
+            .addProperty(PropertySpec.builder("transactionDepthCounter", TransactionDepthCounter::class)
+                .addModifiers(KModifier.OVERRIDE)
+                .initializer("%T()", TransactionDepthCounter::class)
+                .build())
             .applyIf(target == DoorTarget.JS) {
                 addProperty(PropertySpec.builder("isInTransaction", Boolean::class,
                     KModifier.OVERRIDE)

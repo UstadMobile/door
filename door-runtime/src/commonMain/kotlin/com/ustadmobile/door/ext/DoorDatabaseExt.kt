@@ -132,3 +132,13 @@ expect fun DoorDatabase.addIncomingReplicationListener(incomingReplicationListen
 expect fun DoorDatabase.removeIncomingReplicationListener(incomingReplicationListener: IncomingReplicationListener)
 
 internal expect val DoorDatabase.incomingReplicationListenerHelper: IncomingReplicationListenerHelper
+
+/**
+ * Finds the database which is the root for the transaction (if a transaction is ongoing). This removes any replicate
+ * wrappers, repository wrappers, etc.
+ *
+ * On JVM/JS this will be the DoorDatabaseJdbc implementation
+ * On Android: this will be the Database object itself.
+ */
+expect val DoorDatabase.rootTransactionDatabase: DoorDatabase
+
