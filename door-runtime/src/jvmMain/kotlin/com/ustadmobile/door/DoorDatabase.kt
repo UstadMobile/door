@@ -21,12 +21,6 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
         get() = sourceDatabase?.jdbcArraySupported ?: field
         protected set
 
-    internal val transactionCount = atomic(0)
-
-    internal val openTransactions = concurrentSafeListOf<Int>()
-
-    private val transactionTablesChanged = concurrentSafeMapOf<String, String>()
-
     /**
      * This is true where this class is the actual JDBC implementation, false if it is a Repository or SyncReadOnlyWrapper etc
      */
@@ -135,7 +129,7 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
                 val result = block(transactionWrappedDb)
                 result
             }.also {
-                transactionDb.fireTransactionTablesChanged()
+                transactionDb.transactionRootJdbcDb.invalidationTracker.onCommit()
             }
         }else {
             try {
@@ -161,7 +155,7 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
                 val result = block(transactionWrappedDb)
                 result
             }.also {
-                transactionDb.fireTransactionTablesChanged()
+                transactionDb.transactionRootJdbcDb.invalidationTracker.onCommit()
             }
         }else {
             try {
@@ -171,29 +165,6 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
                 txRoot.transactionDepthCounter.decrementTransactionDepth()
             }
         }
-    }
-
-    override fun handleTableChangedInternal(changeTableNames: List<String>): DoorDatabase {
-        //If this a transaction, then changes need to be collected together and only fired once the transaction is
-        //complete.
-        val sourceDbVal = this.sourceDatabase
-        if(!isImplementation && sourceDbVal != null)
-            sourceDbVal.handleTableChangedInternal(changeTableNames)
-        else if(isImplementation && transactionRootJdbcDb.isInTransaction) {
-            transactionTablesChanged.putAll(changeTableNames.associateWith { key -> key })
-        }else {
-            super.handleTableChangedInternal(changeTableNames)
-        }
-
-        return this
-    }
-
-    private fun fireTransactionTablesChanged() {
-        val changedTablesList = transactionTablesChanged.values.toList()
-        if(changedTablesList.isNotEmpty())
-            super.handleTableChangedInternal(changedTablesList)
-
-        transactionTablesChanged.clear()
     }
 
     actual override fun runInTransaction(runnable: Runnable) {

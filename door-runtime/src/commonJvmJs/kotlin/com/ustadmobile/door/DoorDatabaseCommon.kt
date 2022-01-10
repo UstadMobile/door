@@ -50,6 +50,9 @@ abstract class DoorDatabaseCommon {
 
     val changeListeners = concurrentSafeListOf<ChangeListenerRequest>()
 
+    protected val rootDatabaseJdbc: DoorDatabaseJdbc
+        get() = (this as DoorDatabase).rootDatabase as DoorDatabaseJdbc
+
     inner class DoorSqlDatabaseImpl : DoorSqlDatabase {
 
         override fun execSQL(sql: String) {
@@ -87,28 +90,16 @@ abstract class DoorDatabaseCommon {
 
 
     fun addChangeListener(doorInvalidationObserver: ChangeListenerRequest) {
-        val rootDb = (this as DoorDatabase).rootDatabase
-        rootDb.changeListeners.add(doorInvalidationObserver)
+        rootDatabaseJdbc.invalidationTracker.addInvalidationListener(doorInvalidationObserver)
     }
 
     fun removeChangeListener(doorInvalidationObserver: ChangeListenerRequest) {
-        val rootDb = (this as DoorDatabase).rootDatabase
-        rootDb.changeListeners.remove(doorInvalidationObserver)
+        rootDatabaseJdbc.invalidationTracker.removeInvalidationListener(doorInvalidationObserver)
     }
 
 
-    open fun handleTableChangedInternal(changeTableNames: List<String>) : DoorDatabase{
-        effectiveDatabase.apply {
-            val affectedChangeListeners = changeListeners.filter {
-                it.tableNames.isEmpty() || it.tableNames.any { changeTableNames.contains(it) }
-            }
-            Napier.d("$this notifying ${affectedChangeListeners.size} listeners of changes to " +
-                    changeTableNames.joinToString(), tag = DoorTag.LOG_TAG)
-            affectedChangeListeners.forEach {
-                it.onInvalidated.onTablesInvalidated(changeTableNames)
-            }
-        }
-        return effectiveDatabase
+    fun handleTableChangedInternal(changeTableNames: List<String>) {
+        transactionRootJdbcDb.invalidationTracker.onTablesInvalidated(changeTableNames.toSet())
     }
 
     /**

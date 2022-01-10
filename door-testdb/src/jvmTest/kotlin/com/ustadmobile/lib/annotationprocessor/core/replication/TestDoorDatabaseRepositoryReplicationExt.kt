@@ -20,10 +20,7 @@ import io.ktor.server.netty.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
-import org.junit.After
-import org.junit.Assert
-import org.junit.Before
-import org.junit.Test
+import org.junit.*
 import org.kodein.di.*
 import org.kodein.di.ktor.DIFeature
 import org.kodein.type.erased
@@ -56,9 +53,6 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     @Before
     fun setup() {
-        Napier.takeLogarithm()
-        Napier.base(DebugAntilog())
-
         jsonSerializer = Json {
             encodeDefaults = true
         }
@@ -410,10 +404,6 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         Napier.d("Finish sync after $runTime ms")
         Assert.assertNotNull("Got entity on remote", entityOnRemote)
         Assert.assertNotNull("Got entity on local 2", entityOnLocal2)
-
-
-        Assert.assertTrue("no pending transactions", localRepDb.openTransactions.isEmpty())
-        Assert.assertTrue("no pending transactions", remoteRepDb.openTransactions.isEmpty())
     }
 
     @Test
@@ -499,6 +489,13 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
 
     companion object {
+
+        @BeforeClass
+        @JvmStatic
+        fun beforeClass() {
+            Napier.takeLogarithm()
+            Napier.base(DebugAntilog())
+        }
 
         private const val REMOTE_NODE_ID = 1234L
 

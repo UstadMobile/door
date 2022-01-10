@@ -35,6 +35,7 @@ import kotlinx.coroutines.GlobalScope
 import kotlin.reflect.KClass
 import com.ustadmobile.door.util.NodeIdAuthCache
 import com.ustadmobile.door.util.TransactionDepthCounter
+import com.ustadmobile.door.util.DoorInvalidationTracker
 import io.github.aakira.napier.Napier
 
 val QUERY_SINGULAR_TYPES = listOf(INT, LONG, SHORT, BYTE, BOOLEAN, FLOAT, DOUBLE,
@@ -1311,7 +1312,11 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .build())
             .addProperty(PropertySpec.builder("transactionDepthCounter", TransactionDepthCounter::class)
                 .addModifiers(KModifier.OVERRIDE)
-                .initializer("%T()", TransactionDepthCounter::class)
+                .initializer("%T()\n", TransactionDepthCounter::class)
+                .build())
+            .addProperty(PropertySpec.builder("invalidationTracker", DoorInvalidationTracker::class)
+                .addModifiers(KModifier.OVERRIDE)
+                .initializer("%T(this)\n", DoorInvalidationTracker::class)
                 .build())
             .applyIf(target == DoorTarget.JS) {
                 addProperty(PropertySpec.builder("isInTransaction", Boolean::class,

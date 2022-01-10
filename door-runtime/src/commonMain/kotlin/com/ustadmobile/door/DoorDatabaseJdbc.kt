@@ -5,6 +5,7 @@ import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
 import com.ustadmobile.door.util.NodeIdAuthCache
 import com.ustadmobile.door.util.TransactionDepthCounter
+import com.ustadmobile.door.util.DoorInvalidationTracker
 
 /**
  * This interface is implemented by all generated JDBC implementations of a database.
@@ -59,5 +60,7 @@ interface DoorDatabaseJdbc {
     val realIncomingReplicationListenerHelper: IncomingReplicationListenerHelper
 
     val transactionDepthCounter: TransactionDepthCounter
+
+    val invalidationTracker: DoorInvalidationTracker
 
 }
