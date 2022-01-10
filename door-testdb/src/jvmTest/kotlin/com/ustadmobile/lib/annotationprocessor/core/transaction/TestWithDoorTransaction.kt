@@ -82,7 +82,6 @@ class TestWithDoorTransaction {
         val lastConnectionSpy = lastConnection.get()
         verify(lastConnectionSpy, times(1)).autoCommit = false
         verify(lastConnectionSpy, times(1)).commit()
-        verify(lastConnectionSpy, times(1)).autoCommit = true
 
 
         //Check that the onTablesInvalidated is only called once at the end of the transaction

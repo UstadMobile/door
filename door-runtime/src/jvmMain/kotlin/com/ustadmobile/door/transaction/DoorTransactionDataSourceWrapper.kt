@@ -68,7 +68,6 @@ class DoorTransactionDataSourceWrapper(
             throw e
         }finally {
             transactionClosed = true
-            transactionConnectionWrapper.realConnection.autoCommit = true
             transactionConnectionWrapper.realConnection.close()
         }
     }
@@ -86,7 +85,6 @@ class DoorTransactionDataSourceWrapper(
             throw e
         }finally {
             transactionClosed = true
-            transactionConnectionWrapper.realConnection.autoCommit = true
             transactionConnectionWrapper.realConnection.close()
         }
     }
