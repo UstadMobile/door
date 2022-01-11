@@ -7,6 +7,7 @@ import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.concurrentSafeListOf
 import com.ustadmobile.door.ext.rootDatabase
 import io.github.aakira.napier.Napier
+import kotlin.jvm.Synchronized
 
 /**
  * The TransactionInvalidationTracker is used by Jdbc database implementations to track which tables have changed and
@@ -35,26 +36,24 @@ class DoorInvalidationTracker(
     }
 
     fun onCommit() {
-        if(jdbcDatabase.isInTransaction) {
+        if(jdbcDatabase.isInTransaction && tablesChanged.isNotEmpty()) {
             val rootJdbcDb = (jdbcDatabase as DoorDatabase).rootDatabase as DoorDatabaseJdbc
             rootJdbcDb.invalidationTracker.onTablesInvalidated(tablesChanged.toSet())
         }
     }
 
-    private fun <T> MutableList<T>.removeAndCollect(): List<T> {
-        val removedItems = mutableListOf<T>()
-        while(this.isNotEmpty()) {
-            removedItems.add(this.removeFirst())
-        }
-
-        return removedItems
+    @Synchronized
+    private fun getChangeListAndClear() : List<String>{
+        val changeList = tablesChanged.toSet().toList()
+        tablesChanged.clear()
+        return changeList
     }
 
     private fun fireChanges() {
-        val listToFire = tablesChanged.toSet().toMutableList().removeAndCollect()
+        val listToFire = getChangeListAndClear()
 
-        val affectedChangeListeners = listeners.filter {
-            it.tableNames.isEmpty() || it.tableNames.any { listToFire.contains(it) }
+        val affectedChangeListeners = listeners.filter { changeListener ->
+            changeListener.tableNames.any { listToFire.contains(it) }
         }
         Napier.d("$this notifying ${affectedChangeListeners.size} listeners of changes to " +
                 listToFire.joinToString(), tag = DoorTag.LOG_TAG)

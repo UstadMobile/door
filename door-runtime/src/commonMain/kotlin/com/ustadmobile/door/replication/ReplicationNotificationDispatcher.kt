@@ -92,6 +92,8 @@ class ReplicationNotificationDispatcher(
     private suspend fun findAndSendPendingReplicationNotifications(changedTableNames: Set<String>) {
         Napier.d("ReplicationNotificationDispatcher for [$db] findAndSendPendingReplicationNotifications " +
                 " for table(s) ${changedTableNames.joinToString()}")
+
+        val changesByDevice = mutableMapOf<Long, MutableList<Int>>()
         changedTableNames.forEach { tableName ->
             val repMetaData = dbMetaData.replicateEntities.values
                 .firstOrNull { it.entityTableName == tableName } ?: return@forEach
@@ -106,15 +108,17 @@ class ReplicationNotificationDispatcher(
             db.prepareAndUseStatementAsync(sql) { stmt ->
                 stmt.executeQueryAsyncKmp().useResults { result ->
                     val devicesToNotify = result.mapRows{ it.getLong(1) }
-                    Napier.d("ReplicationNotificationDispatcher for [$db]: sending notifications for changes to table " +
-                            "${repMetaData.entityTableName} to nodes ${devicesToNotify.joinToString()}", tag = DoorTag.LOG_TAG)
-
-
                     devicesToNotify.forEach { deviceId ->
-                        fire(ReplicationPendingEvent(deviceId, listOf(repMetaData.tableId)))
+                        changesByDevice.getOrPut(deviceId) { mutableListOf() }.add(repMetaData.tableId)
                     }
                 }
             }
+        }
+
+        changesByDevice.forEach {
+            fire(ReplicationPendingEvent(it.key, it.value))
+            Napier.d("ReplicationNotificationDispatcher for [$db]: sending notifications for changes for tables ids " +
+                            "${it.value.joinToString()}} to node id ${it.key}", tag = DoorTag.LOG_TAG)
         }
     }
 
