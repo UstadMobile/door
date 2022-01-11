@@ -6,6 +6,7 @@ import db2.ExampleDatabase2_JdbcKt
 import db2.ExampleEntity2
 import kotlinx.browser.window
 import kotlinx.coroutines.*
+import kotlinx.serialization.json.*
 import org.w3c.dom.url.URL
 import org.w3c.files.Blob
 import kotlin.js.Promise
@@ -28,6 +29,13 @@ class TestDbBuilder {
         exampleDb2 = DatabaseBuilder.databaseBuilder<ExampleDatabase2>(builderOptions).build()
          //TODO Still running synchronously, we need async for this
         //exampleDb2.clearAllTables()
+    }
+
+    @Test
+    fun givenLongInJsonArray_whenDecoded_shouldBeEqualToOriginalValue() = GlobalScope.promise {
+        val jsonStr = """[{"big": ${Long.MAX_VALUE}}]"""
+        val jsonArray = Json.decodeFromString(JsonArray.serializer(), jsonStr)
+        assertEquals(Long.MAX_VALUE, jsonArray.get(0).jsonObject.get("big")?.jsonPrimitive?.long)
     }
 
     @Test
