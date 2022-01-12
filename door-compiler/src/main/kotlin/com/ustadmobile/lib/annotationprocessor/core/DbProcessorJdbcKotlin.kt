@@ -1038,7 +1038,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                                 insertSql += pgOnConflict.replace(" ", " ")
                             }
                             upsertMode -> {
-                                insertSql += " ON CONFLICT (${pkFields.joinToString()}) DO UPDATE SET "
+                                insertSql += " ON CONFLICT (${pkFields.joinToString {it.name} }) DO UPDATE SET "
                                 insertSql += entityFields.filter { !it.annotations.any { it.typeName == PrimaryKey::class.asTypeName() } }
                                     .joinToString(separator = ",") {
                                         "${it.name} = excluded.${it.name}"

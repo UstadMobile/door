@@ -11,8 +11,8 @@ class SyncNodeIdCallback(val nodeId: Long): DoorDatabaseCallback {
     private fun setSyncNode(execSqlFn: (Array<String>) -> Unit) {
         execSqlFn(arrayOf("DELETE FROM SyncNode",
             """
-            INSERT INTO SyncNode(nodeClientId, master)
-                    VALUES ($nodeId, 0) 
+            INSERT INTO SyncNode(nodeClientId)
+                    VALUES ($nodeId) 
             """))
     }
 

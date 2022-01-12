@@ -116,14 +116,18 @@ abstract class DoorDatabaseCommon {
             connection.setAutoCommit(false)
             statement = connection.createStatement()
             sqlStatements.forEach { sql ->
-                statement.executeUpdate(sql)
+                try {
+                    statement.executeUpdate(sql)
+                }catch(eInner: SQLException) {
+                    Napier.e("execSQLBatch: Exception running SQL: $sql")
+                    throw eInner
+                }
             }
             connection.commit()
         }catch(e: SQLException) {
             throw e
         }finally {
             statement?.close()
-            connection?.setAutoCommit(true)
             connection?.close()
         }
     }

@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 
 @Entity
 @Serializable
-data class SyncNode(@PrimaryKey var nodeClientId: Long = 0, var master: Boolean = false) {
+data class SyncNode(@PrimaryKey var nodeClientId: Long = 0) {
     companion object {
 
         @Suppress("unused")
