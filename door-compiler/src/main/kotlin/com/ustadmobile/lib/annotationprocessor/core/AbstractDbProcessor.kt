@@ -447,7 +447,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                 add("$sqlListVar += %S\n",
                     """
             CREATE TRIGGER ch_${params.opPrefix}_${replicateEntity.tableId}_trig 
-                   AFTER ${params.opName} ON RepEntity
+                   AFTER ${params.opName} ON ${replicateEntity.tableId}
                    FOR EACH ROW
                    EXECUTE PROCEDURE ch_${params.opPrefix}_${replicateEntity.tableId}_fn();
             """.minifySql())
