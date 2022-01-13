@@ -35,7 +35,7 @@ import com.ustadmobile.door.ext.toUrlQueryString
 // of remote changes, and will then call fetchPendingReplications as needed.
 
 class ReplicationSubscriptionManager(
-    dbSchemaVersion: Int,
+    private val dbSchemaVersion: Int,
     private val json: Json,
     private val dbNotificationDispatcher: ReplicationNotificationDispatcher,
     private val repository: DoorDatabaseRepository,
@@ -43,7 +43,7 @@ class ReplicationSubscriptionManager(
     private val dbMetadata: DoorDatabaseMetadata<*>,
     private val dbKClass: KClass<out DoorDatabase>,
     private val numProcessors: Int = 5,
-    eventSourceFactory: DoorEventSourceFactory = DefaultDoorEventSourceFactoryImpl(),
+    private val eventSourceFactory: DoorEventSourceFactory = DefaultDoorEventSourceFactoryImpl(),
     private val sendReplicationRunner: ReplicateRunner = DefaultReplicationSender(json),
     private val fetchReplicationRunner: ReplicateRunner = DefaultReplicationFetcher(json),
     /**
@@ -99,15 +99,37 @@ class ReplicationSubscriptionManager(
     @Volatile
     private var initCompletable = CompletableDeferred<Boolean>()
 
-    init {
-        //start the subscription to the endpoint. When the endpoint replies, it can provide the node id as a header or
-        // as a message itself.
-        val queryParams = mapOf(
-            DoorConstants.HEADER_DBVERSION to dbSchemaVersion.toString(),
-            DoorConstants.HEADER_NODE to "${repository.config.nodeId}/${repository.config.auth}")
+    private var replicationSupervisor: ReplicationSubscriptionSupervisor? = null
 
-        eventSource.value = eventSourceFactory.makeNewDoorEventSource(repository.config,
-            "${repository.config.endpoint}$PATH_REPLICATION/$ENDPOINT_SUBSCRIBE_SSE?${queryParams.toUrlQueryString()}",this)
+    var enabled: Boolean
+        get() = eventSource.value != null
+        set(value) {
+            if(value) {
+                //start the subscription to the endpoint. When the endpoint replies, it can provide the node id as a header or
+                // as a message itself.
+                Napier.i("ReplicationSubscriptionManager for $repository : enabling")
+                val queryParams = mapOf(
+                    DoorConstants.HEADER_DBVERSION to dbSchemaVersion.toString(),
+                    DoorConstants.HEADER_NODE to "${repository.config.nodeId}/${repository.config.auth}")
+
+                if(eventSource.value == null) {
+                    eventSource.value = eventSourceFactory.makeNewDoorEventSource(repository.config,
+                        "${repository.config.endpoint}$PATH_REPLICATION/$ENDPOINT_SUBSCRIBE_SSE?${queryParams.toUrlQueryString()}",
+                        this)
+                }
+
+                checkQueueSignal.trySend(true)
+            }else {
+                Napier.i("ReplicationSubscriptionManager for $repository : disabling")
+                val oldEventSource = eventSource.getAndSet(null)
+                oldEventSource?.close()
+            }
+        }
+
+    init {
+        if(repository.config.replicationSubscriptionMode == ReplicationSubscriptionMode.AUTO) {
+            replicationSupervisor = ReplicationSubscriptionSupervisor(this, repository)
+        }
     }
 
     override fun onOpen() {
@@ -154,16 +176,18 @@ class ReplicationSubscriptionManager(
     private fun CoroutineScope.produceJobs() = produce {
         do {
             checkQueueSignal.receive()
-            val numProcessorsAvailable = numProcessors - activeTables.size
-            if(numProcessorsAvailable > 0) {
-                val tablesToReplicate = findTablesToReplicate().filter {
-                    it.tableId !in activeTables
-                }
+            if(enabled) {
+                val numProcessorsAvailable = numProcessors - activeTables.size
+                if(numProcessorsAvailable > 0) {
+                    val tablesToReplicate = findTablesToReplicate().filter {
+                        it.tableId !in activeTables
+                    }
 
-                val numTablesToSend = min(numProcessorsAvailable, tablesToReplicate.size)
-                for(i in 0 until numTablesToSend){
-                    activeTables += tablesToReplicate[i].tableId
-                    send(tablesToReplicate[i])
+                    val numTablesToSend = min(numProcessorsAvailable, tablesToReplicate.size)
+                    for(i in 0 until numTablesToSend){
+                        activeTables += tablesToReplicate[i].tableId
+                        send(tablesToReplicate[i])
+                    }
                 }
             }
         }while(coroutineContext.isActive)

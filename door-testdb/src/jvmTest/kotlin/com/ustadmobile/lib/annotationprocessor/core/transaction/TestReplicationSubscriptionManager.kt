@@ -5,10 +5,7 @@ import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.RepositoryConfig
 import com.ustadmobile.door.ext.asRepository
 import com.ustadmobile.door.ext.doorDatabaseMetadata
-import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
-import com.ustadmobile.door.replication.ReplicationPendingEvent
-import com.ustadmobile.door.replication.ReplicationPendingListener
-import com.ustadmobile.door.replication.ReplicationSubscriptionManager
+import com.ustadmobile.door.replication.*
 import com.ustadmobile.door.sse.DoorEventSource
 import com.ustadmobile.door.sse.DoorEventSourceFactory
 import com.ustadmobile.door.sse.DoorServerSentEvent
@@ -41,6 +38,14 @@ class TestReplicationSubscriptionManager {
 
     private val testRemoteNodeId = 43232L
 
+    private lateinit var mockEventSource: DoorEventSource
+
+    private lateinit var mockEventSourceFactory: DoorEventSourceFactory
+
+    private lateinit var mockSendReplications: ReplicationSubscriptionManager.ReplicateRunner
+
+    private lateinit var mockFetchReplications: ReplicationSubscriptionManager.ReplicateRunner
+
     @Before
     fun setup() {
         db = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "RepDb").build()
@@ -62,25 +67,31 @@ class TestReplicationSubscriptionManager {
         }
 
         repo = db.asRepository(RepositoryConfig.repositoryConfig(Any(), "http://localhost/dummy",
-            1234, "", httpClient, okHttpClient, Json { encodeDefaults = true }))
+            1234, "", httpClient, okHttpClient, Json { encodeDefaults = true }) {
+            this.useReplicationSubscription =  false
+            this.replicationSubscriptionMode = ReplicationSubscriptionMode.MANUAL
+        })
+
+        mockEventSource = mock<DoorEventSource> { }
+        mockEventSourceFactory = mock<DoorEventSourceFactory> {
+            on { makeNewDoorEventSource(any(), any(), any()) }.thenReturn(mockEventSource)
+        }
+
+        mockSendReplications = mock<ReplicationSubscriptionManager.ReplicateRunner> { }
+        mockFetchReplications = mock<ReplicationSubscriptionManager.ReplicateRunner> { }
 
     }
 
     @Test
     fun givenSubscriptionInitialized_whenRemoteInvalidateMessageReceived_thenShouldCallInitListenerAndFetchReplications() {
         val dispatcher = mock<ReplicationNotificationDispatcher> { }
-        val mockEventSource = mock<DoorEventSource> { }
-        val mockEventSourceFactory = mock<DoorEventSourceFactory> {
-            on { makeNewDoorEventSource(any(), any(), any()) }.thenReturn(mockEventSource)
-        }
 
-        val mockSendReplications = mock<ReplicationSubscriptionManager.ReplicateRunner> { }
-        val mockFetchReplications = mock<ReplicationSubscriptionManager.ReplicateRunner> { }
         val mockInitListener = mock<ReplicationSubscriptionManager.SubscriptionInitializedListener> { }
 
         val subscriptionManager = ReplicationSubscriptionManager(1, json, dispatcher,
             repo as DoorDatabaseRepository, GlobalScope, RepDb::class.doorDatabaseMetadata(), RepDb::class,
             5, mockEventSourceFactory, mockSendReplications, mockFetchReplications, mockInitListener)
+        subscriptionManager.enabled = true
 
         subscriptionManager.onMessage(DoorServerSentEvent("1", "INIT", "$testRemoteNodeId"))
 
@@ -108,19 +119,11 @@ class TestReplicationSubscriptionManager {
             }
         }
 
-        val mockEventSource = mock<DoorEventSource> { }
-        val mockEventSourceFactory = mock<DoorEventSourceFactory> {
-            on { makeNewDoorEventSource(any(), any(), any()) }.thenAnswer {
-                mockEventSource
-            }
-        }
-
-        val mockSendReplications = mock<ReplicationSubscriptionManager.ReplicateRunner> { }
-        val mockFetchReplications = mock<ReplicationSubscriptionManager.ReplicateRunner> { }
 
         val subscriptionManager = ReplicationSubscriptionManager(1, json, dispatcher,
             repo as DoorDatabaseRepository, GlobalScope, RepDb::class.doorDatabaseMetadata(), RepDb::class,
             5, mockEventSourceFactory, mockSendReplications, mockFetchReplications)
+        subscriptionManager.enabled = true
 
 
         subscriptionManager.onMessage(DoorServerSentEvent("1", "INIT", "$testRemoteNodeId"))
@@ -131,6 +134,26 @@ class TestReplicationSubscriptionManager {
         verifyBlocking(mockSendReplications, timeout(5000).times(1)) {
             replicate(any(), eq(RepEntity.TABLE_ID), eq(testRemoteNodeId))
         }
+    }
+
+
+    @Test
+    fun givenSubscriptionManagerStartedInManualMode_whenDisabled_thenShouldNotCallSendReplications() {
+        val dispatcher = mock<ReplicationNotificationDispatcher> { }
+
+        val subscriptionManager = ReplicationSubscriptionManager(1, json, dispatcher,
+            repo as DoorDatabaseRepository, GlobalScope, RepDb::class.doorDatabaseMetadata(), RepDb::class,
+            5, mockEventSourceFactory, mockSendReplications, mockFetchReplications)
+
+        subscriptionManager.onMessage(DoorServerSentEvent("1", "INIT", "$testRemoteNodeId"))
+
+        subscriptionManager.onMessage(DoorServerSentEvent("2", "INVALIDATE", RepEntity.TABLE_ID.toString()))
+
+        Thread.sleep(2000)
+
+        verifyNoInteractions(mockSendReplications)
+        verifyNoInteractions(mockFetchReplications)
+        verifyNoInteractions(mockEventSourceFactory)
     }
 
 

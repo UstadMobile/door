@@ -8,8 +8,12 @@ import com.ustadmobile.door.RepositoryConfig
  * EventSource in Javascript. The URL should be the server URL sending events. The listener
  * will be called when the stream is opened, on error, and when an event is received.
  */
-expect class DoorEventSource(repoConfig: RepositoryConfig, url: String, listener: DoorEventListener) {
-
+expect class DoorEventSource(
+    repoConfig: RepositoryConfig,
+    url: String,
+    listener: DoorEventListener,
+    retry: Int = 2000
+) {
 
     fun close()
 

@@ -1,6 +1,7 @@
 package com.ustadmobile.door
 
 import com.ustadmobile.door.attachments.AttachmentFilter
+import com.ustadmobile.door.replication.ReplicationSubscriptionMode
 import com.ustadmobile.door.replication.ReplicationSubscriptionManager
 import io.ktor.client.*
 import kotlinx.serialization.json.Json
@@ -28,6 +29,11 @@ expect class RepositoryConfig {
      * The database itself should be initialized addCallback(SyncNodeIdCallback(nodeId))
      */
     val useReplicationSubscription: Boolean
+
+    /**
+     * By deafault, replication subscription is enabled when a device is connected, and disabled when a device disconnects
+     */
+    val replicationSubscriptionMode: ReplicationSubscriptionMode
 
     val attachmentFilters: List<AttachmentFilter>
 

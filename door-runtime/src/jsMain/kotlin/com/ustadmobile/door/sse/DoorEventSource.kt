@@ -11,7 +11,12 @@ import org.w3c.dom.EventSource
  * EventSource in Javascript. The URL should be the server URL sending events. The listener
  * will be called when the stream is opened, on error, and when an event is received.
  */
-actual class DoorEventSource actual constructor(val repoConfig: RepositoryConfig, var url: String, var listener: DoorEventListener) {
+actual class DoorEventSource actual constructor(
+    val repoConfig: RepositoryConfig,
+    var url: String,
+    var listener: DoorEventListener,
+    retry: Int
+) {
 
     private val logPrefix: String
         get() = "[DoorEventSource@${this.doorIdentityHashCode}]"
