@@ -55,7 +55,7 @@ class DoorInvalidationTracker(
         val affectedChangeListeners = listeners.filter { changeListener ->
             changeListener.tableNames.any { listToFire.contains(it) }
         }
-        Napier.d("$this notifying ${affectedChangeListeners.size} listeners of changes to " +
+        Napier.d("Invalidation Tracker for [${this.jdbcDatabase}] notifying ${affectedChangeListeners.size} listeners of changes to " +
                 listToFire.joinToString(), tag = DoorTag.LOG_TAG)
         affectedChangeListeners.forEach {
             it.onInvalidated.onTablesInvalidated(listToFire)

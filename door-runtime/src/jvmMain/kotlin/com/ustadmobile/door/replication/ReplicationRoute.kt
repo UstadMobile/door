@@ -165,6 +165,7 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
             try {
                 channel.send(DoorServerSentEvent("0", ReplicationSubscriptionManager.EVT_INIT,
                     localNodeIdAndAuth.nodeId.toString()))
+                Napier.d("ReplicationRoute SSE: started for ${remoteNodeIdAndAuth.first}")
                 db.replicationNotificationDispatcher.addReplicationPendingEventListener(remoteNodeIdAndAuth.first,
                     pendingReplicationListener)
 
@@ -175,8 +176,8 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
                         write("event: ${notification.event}\n")
                         write("data: ${notification.data}\n\n")
                         flush()
-                        Napier.d("Sent event ${notification.id} for data: ${notification.data}",
-                            tag = DoorTag.LOG_TAG)
+                        Napier.d("Sent event ${notification.id} for data: ${notification.data} to " +
+                                "${remoteNodeIdAndAuth.first}", tag = DoorTag.LOG_TAG)
                     }
                 }
 
@@ -185,6 +186,7 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
             }finally {
                 db.replicationNotificationDispatcher.removeReplicationPendingEventListener(remoteNodeIdAndAuth.first,
                     pendingReplicationListener)
+                Napier.d("ReplicationRoute SSE: ended for ${remoteNodeIdAndAuth.first}")
                 channel.close()
             }
 
