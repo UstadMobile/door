@@ -9,6 +9,7 @@ import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.io.File
 import java.lang.reflect.Constructor
 import kotlin.reflect.KClass
 
@@ -35,7 +36,8 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
 
     private val constructorFun: Constructor<DoorDatabase> by lazy(LazyThreadSafetyMode.NONE) {
         @Suppress("UNCHECKED_CAST")
-        this::class.java.getConstructor(DoorDatabase::class.java, DataSource::class.java, String::class.java) as Constructor<DoorDatabase>
+        this::class.java.getConstructor(DoorDatabase::class.java, DataSource::class.java,
+            String::class.java, File::class.java) as Constructor<DoorDatabase>
     }
 
     override val tableNames: List<String> by lazy {
@@ -82,11 +84,12 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
 
     private fun createTransactionDataSourceAndDb(): Pair<DoorTransactionDataSourceWrapper, DoorDatabase> {
         val rootDb = rootDatabase
-        val connection = (rootDb as DoorDatabaseJdbc).openConnection()
+        val rootJdbcDb = (rootDb as DoorDatabaseJdbc)
+        val connection = rootJdbcDb.openConnection()
         connection.setAutoCommit(false)
         val transactionDataSource = DoorTransactionDataSourceWrapper(rootDb, connection)
         val transactionDb = rootDb.constructorFun.newInstance(rootDb, transactionDataSource,
-                "Transaction wrapper for $rootDb")
+                "Transaction wrapper for $rootDb", rootDb.realAttachmentStorageUri?.toFile())
 
         (transactionDb as DoorDatabaseJdbc).transactionDepthCounter.incrementTransactionDepth()
 

@@ -37,6 +37,7 @@ import com.ustadmobile.door.util.NodeIdAuthCache
 import com.ustadmobile.door.util.TransactionDepthCounter
 import com.ustadmobile.door.util.DoorInvalidationTracker
 import io.github.aakira.napier.Napier
+import java.io.File
 
 val QUERY_SINGULAR_TYPES = listOf(INT, LONG, SHORT, BYTE, BOOLEAN, FLOAT, DOUBLE,
         String::class.asTypeName(), String::class.asTypeName().copy(nullable = true))
@@ -1292,12 +1293,30 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .addParameter(ParameterSpec("dataSource",  CLASSNAME_DATASOURCE,
                     KModifier.OVERRIDE))
                 .addParameter("dbName", String::class, KModifier.OVERRIDE)
+                .applyIf(target == DoorTarget.JVM) {
+                    addParameter("attachmentDir", File::class.asTypeName().copy(nullable = true))
+                }
                 .addCode("setupFromDataSource()\n")
                 .build())
             .addDbVersionProperty(dbTypeElement)
             .addProperty(PropertySpec.builder("dataSource", CLASSNAME_DATASOURCE)
                 .initializer("dataSource")
                 .build())
+            .applyIf(target == DoorTarget.JVM) {
+                addProperty(PropertySpec.builder("realAttachmentStorageUri",
+                        DoorUri::class.asTypeName().copy(nullable = true))
+                    .addModifiers(KModifier.OVERRIDE)
+                    .initializer("attachmentDir?.%M()\n",
+                        MemberName("com.ustadmobile.door.ext", "toDoorUri"))
+                    .build())
+            }
+            .applyIf(target == DoorTarget.JS) {
+                addProperty(PropertySpec.builder("realAttachmentStorageUri",
+                    DoorUri::class.asTypeName().copy(nullable = true))
+                    .addModifiers(KModifier.OVERRIDE)
+                    .initializer("null")
+                    .build())
+            }
             .addProperty(PropertySpec.builder("doorJdbcSourceDatabase",
                     DoorDatabase::class.asTypeName().copy(nullable = true))
                 .initializer("doorJdbcSourceDatabase")

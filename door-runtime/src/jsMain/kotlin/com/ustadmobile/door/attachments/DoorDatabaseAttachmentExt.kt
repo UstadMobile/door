@@ -1,7 +1,10 @@
 package com.ustadmobile.door.attachments
 
+import com.ustadmobile.door.DoorDatabase
+import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.DoorUri
+import com.ustadmobile.door.ext.rootDatabase
 
 /**
  * Store an attachment locally. This will be called by the generated update and insert implementation.
@@ -18,7 +21,8 @@ import com.ustadmobile.door.DoorUri
  * will be done
  *
  */
-actual suspend fun DoorDatabaseRepository.storeAttachment(entityWithAttachment: EntityWithAttachment) {
+actual suspend fun DoorDatabase.storeAttachment(entityWithAttachment: EntityWithAttachment) {
+    TODO("NOT IMPLEMENTEd")
 }
 
 /**
@@ -27,7 +31,7 @@ actual suspend fun DoorDatabaseRepository.storeAttachment(entityWithAttachment: 
  * @param attachmentUri The attachmentUri: this can be a platform dependent URI string, or it could
  *
  */
-actual suspend fun DoorDatabaseRepository.retrieveAttachment(attachmentUri: String): DoorUri {
+actual suspend fun DoorDatabase.retrieveAttachment(attachmentUri: String): DoorUri {
     TODO("Not yet implemented")
 }
 
@@ -46,3 +50,6 @@ actual suspend fun DoorDatabaseRepository.uploadAttachment(entityWithAttachment:
 
 actual suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<EntityWithAttachment>) {
 }
+
+actual val DoorDatabase.attachmentsStorageUri: DoorUri?
+    get() = (rootDatabase as DoorDatabaseJdbc).realAttachmentStorageUri

@@ -62,6 +62,29 @@ fun TypeSpec.Builder.addKtorHelperWrapperAccessorFunction(
 }
 
 
+fun CodeBlock.Builder.beginAttachmentStorageFlow(daoFunSpec: FunSpec) {
+    val entityParam = daoFunSpec.parameters.first()
+    val isList = entityParam.type.isListOrArray()
+
+    if(!daoFunSpec.isSuspended)
+        beginRunBlockingControlFlow()
+
+    if(isList)
+        beginControlFlow("${entityParam.name}.forEach")
+}
+
+fun CodeBlock.Builder.endAttachmentStorageFlow(daoFunSpec: FunSpec) {
+    val entityParam = daoFunSpec.parameters.first()
+    val isList = entityParam.type.isListOrArray()
+
+    if(!daoFunSpec.isSuspended)
+        endControlFlow()
+
+    if(isList)
+        endControlFlow()
+}
+
+
 /**
  * Adds a function that will delegate to the real DAO, or throw an exception if the function is
  * modifying an entity annotated with SyncableEntity
@@ -91,6 +114,27 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(
                 .apply {
                     if(daoMethod.hasAnyAnnotation(Insert::class.java, Update::class.java, Delete::class.java) &&
                         (overridingFunction.entityParamComponentType as? ClassName)?.isReplicateEntity(processingEnv) == true) {
+
+                        val entityParam = overridingFunction.parameters.first()
+                        val entityComponentType = entityParam.type.unwrapListOrArrayComponentType()
+
+                        if(daoMethod.hasAnyAnnotation(Update::class.java, Insert::class.java)
+                            && entityComponentType.hasAttachments(processingEnv)) {
+                            val isList = entityParam.type.isListOrArray()
+
+                            beginAttachmentStorageFlow(overridingFunction)
+
+                            val entityClassName = entityComponentType as ClassName
+
+                            add("_db.%M(%L.%M())\n",
+                                MemberName("com.ustadmobile.door.attachments", "storeAttachment"),
+                                if(isList) "it" else entityParam.name,
+                                MemberName(entityClassName.packageName, "asEntityWithAttachment"))
+
+                            endAttachmentStorageFlow(overridingFunction)
+                        }
+
+
 
                         entityTypeEl =  overridingFunction.entityParamComponentType
                             .asComponentClassNameIfList().asTypeElement(processingEnv)

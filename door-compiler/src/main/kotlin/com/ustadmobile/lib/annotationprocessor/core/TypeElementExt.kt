@@ -275,8 +275,10 @@ val TypeElement.entityPrimaryKeys: List<VariableElement>
         if(annotatedPkVar != null) {
             return listOf(annotatedPkVar)
         }else {
-            return entityPkVarNames.map { varName ->
-                enclosedElements.find { it.kind == ElementKind.FIELD && it.simpleName.toString() == varName } as VariableElement
+            return entityPkVarNames.mapNotNull { varName ->
+                enclosedElements.firstOrNull {
+                    it.kind == ElementKind.FIELD && it.simpleName.toString() == varName
+                } as? VariableElement
             }
         }
     }

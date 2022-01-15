@@ -8,18 +8,27 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.ustadmobile.door.ext.isWrappable
 import com.ustadmobile.door.ext.wrap
 import com.ustadmobile.door.migration.DoorMigration
+import com.ustadmobile.door.util.DoorAndroidRoomHelper
+import java.io.File
 
 @Suppress("UNCHECKED_CAST", "unused") //This is used as an API
 actual class DatabaseBuilder<T: DoorDatabase>(
     private val roomBuilder: RoomDatabase.Builder<T>,
-    private val dbClass: KClass<T>
+    private val dbClass: KClass<T>,
+    private val appContext: Context,
+    private val attachmentsDir: File?,
 ) {
 
     companion object {
-        fun <T : DoorDatabase> databaseBuilder(context: Any, dbClass: KClass<T>, dbName: String): DatabaseBuilder<T> {
+        fun <T : DoorDatabase> databaseBuilder(
+            context: Any,
+            dbClass: KClass<T>,
+            dbName: String,
+            attachmentsDir: File? = null
+        ): DatabaseBuilder<T> {
             val applicationContext = (context as Context).applicationContext
             val builder = DatabaseBuilder(Room.databaseBuilder(applicationContext, dbClass.java, dbName),
-                dbClass)
+                dbClass, applicationContext, attachmentsDir)
 
             val callbackClassName = "${dbClass.java.canonicalName}_AndroidReplicationCallback"
             println("Attempt to load callback $callbackClassName")
@@ -36,6 +45,7 @@ actual class DatabaseBuilder<T: DoorDatabase>(
 
     fun build(): T {
         val db = roomBuilder.build()
+        DoorAndroidRoomHelper.createAndRegisterHelper(db, appContext, attachmentsDir)
         return if(db.isWrappable(dbClass)) {
             db.wrap(dbClass)
         }else {

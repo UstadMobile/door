@@ -17,7 +17,6 @@ actual class RepositoryConfig internal constructor(
     actual val nodeId: Long,
     actual val httpClient: HttpClient,
     actual val json: Json,
-    actual val attachmentsDir: String,
     actual val useReplicationSubscription: Boolean,
     actual val replicationSubscriptionMode: ReplicationSubscriptionMode,
     actual val replicationSubscriptionInitListener: ReplicationSubscriptionManager.SubscriptionInitializedListener?,
@@ -35,8 +34,6 @@ actual class RepositoryConfig internal constructor(
             val json: Json
         ) {
 
-            var attachmentsDir: String? = null
-
             var useReplicationSubscription: Boolean = true
 
             val attachmentFilters = mutableListOf<AttachmentFilter>()
@@ -46,8 +43,7 @@ actual class RepositoryConfig internal constructor(
             var replicationSubscriptionMode = ReplicationSubscriptionMode.AUTO
 
             fun build() : RepositoryConfig{
-                val effectiveAttachmentDir = attachmentsDir ?: defaultAttachmentDir(context, endpoint)
-                return RepositoryConfig(context, endpoint, auth, nodeId, httpClient, json, effectiveAttachmentDir,
+                return RepositoryConfig(context, endpoint, auth, nodeId, httpClient, json,
                     useReplicationSubscription, replicationSubscriptionMode, replicationSubscriptionInitListener,
                     attachmentFilters.toList())
             }

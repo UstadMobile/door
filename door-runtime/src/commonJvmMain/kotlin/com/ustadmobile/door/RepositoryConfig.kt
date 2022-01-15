@@ -16,7 +16,6 @@ actual class RepositoryConfig internal constructor(
     actual val httpClient: HttpClient,
     val okHttpClient: OkHttpClient,
     actual val json: Json,
-    actual val attachmentsDir: String,
     actual val useReplicationSubscription: Boolean,
     actual val replicationSubscriptionMode: ReplicationSubscriptionMode,
     actual val replicationSubscriptionInitListener: ReplicationSubscriptionManager.SubscriptionInitializedListener?,
@@ -46,9 +45,8 @@ actual class RepositoryConfig internal constructor(
             var replicationSubscriptionMode = ReplicationSubscriptionMode.AUTO
 
             fun build() : RepositoryConfig{
-                val effectiveAttachmentDir = attachmentsDir ?: defaultAttachmentDir(context, endpoint)
                 return RepositoryConfig(context, endpoint, auth, nodeId, httpClient, okHttpClient, json,
-                        effectiveAttachmentDir, useReplicationSubscription, replicationSubscriptionMode,
+                        useReplicationSubscription, replicationSubscriptionMode,
                         replicationSubscriptionInitListener, attachmentFilters.toList())
             }
 

@@ -63,4 +63,8 @@ interface DoorDatabaseJdbc {
 
     val invalidationTracker: DoorInvalidationTracker
 
+
+    val realAttachmentStorageUri: DoorUri?
+
+
 }

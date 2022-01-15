@@ -27,6 +27,7 @@ import java.io.File
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException
+import javax.lang.model.element.ElementKind
 import javax.tools.Diagnostic
 
 /**
@@ -224,6 +225,14 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
                 messager.printMessage(Diagnostic.Kind.ERROR,
                     "Class ${entity.simpleName} used as entity on database does not have @Entity annotation",
                     entity)
+            }
+
+            val missingPkFields = entity.getAnnotation(Entity::class.java).primaryKeys.filter { pkFieldName ->
+                !entity.enclosedElements.any { it.simpleName.toString() == pkFieldName && it.kind == ElementKind.FIELD}
+            }
+            if(missingPkFields.isNotEmpty()) {
+                messager.printMessage(Diagnostic.Kind.ERROR, "Class ${entity.simpleName} Entity annotation primary key " +
+                        "fields not found: ${missingPkFields.joinToString()}", entity)
             }
 
             if(entity.entityPrimaryKeys.isEmpty()) {

@@ -261,8 +261,7 @@ private fun TypeSpec.Builder.addRepoDbDaoAccessor(
     addProperty(PropertySpec.builder("_${daoTypeEl.simpleName}",
                 daoTypeEl.asClassNameWithSuffix(SUFFIX_REPOSITORY2))
             .delegate(CodeBlock.builder().beginControlFlow("lazy")
-                    .add("%T(db, this, db.%L, _httpClient, clientId, _endpoint, " +
-                            "config.attachmentsDir) ",
+                    .add("%T(db, this, db.%L, _httpClient, clientId, _endpoint)",
                             daoTypeEl.asClassNameWithSuffix(SUFFIX_REPOSITORY2),
                             daoGetter.makeAccessorCodeBlock())
                     .endControlFlow()
@@ -308,8 +307,6 @@ fun FileSpec.Builder.addDaoRepoType(daoTypeSpec: TypeSpec,
                     .initializer("_clientId").build())
             .addProperty(PropertySpec.builder("_endpoint", String::class)
                     .initializer("_endpoint").build())
-            .addProperty(PropertySpec.builder("_attachmentsDir", String::class)
-                    .initializer("_attachmentsDir").build())
             .superclass(daoClassName)
             .addAnnotation(AnnotationSpec.builder(Suppress::class)
                     .addMember("%S, %S, %S", "REDUNDANT_PROJECTION", "LocalVariableName",
@@ -322,7 +319,6 @@ fun FileSpec.Builder.addDaoRepoType(daoTypeSpec: TypeSpec,
                     .addParameter("_httpClient", HttpClient::class)
                     .addParameter("_clientId", Long::class)
                     .addParameter("_endpoint", String::class)
-                    .addParameter("_attachmentsDir", String::class)
                     .apply {
                         takeIf { extraConstructorParams.isNotEmpty() }?.addParameters(extraConstructorParams)
                     }
@@ -404,28 +400,6 @@ fun TypeSpec.Builder.addDaoRepoFun(
 }
 
 
-private fun CodeBlock.Builder.beginAttachmentStorageFlow(daoFunSpec: FunSpec) {
-    val entityParam = daoFunSpec.parameters.first()
-    val isList = entityParam.type.isListOrArray()
-
-    if(!daoFunSpec.isSuspended)
-        beginRunBlockingControlFlow()
-
-    if(isList)
-        beginControlFlow("${entityParam.name}.forEach")
-}
-
-private fun CodeBlock.Builder.endAttachmentStorageFlow(daoFunSpec: FunSpec) {
-    val entityParam = daoFunSpec.parameters.first()
-    val isList = entityParam.type.isListOrArray()
-
-    if(!daoFunSpec.isSuspended)
-        endControlFlow()
-
-    if(isList)
-        endControlFlow()
-}
-
 
 
 /**
@@ -442,29 +416,6 @@ fun CodeBlock.Builder.addRepoDelegateToDaoCode(
     isAlwaysSqlite: Boolean,
     processingEnv: ProcessingEnvironment
 ) : CodeBlock.Builder{
-
-    if(daoFunSpec.hasAnyAnnotation(Update::class.java, Delete::class.java, Insert::class.java)) {
-        val entityParam = daoFunSpec.parameters.first()
-        val entityComponentType = entityParam.type.unwrapListOrArrayComponentType()
-
-        if(daoFunSpec.hasAnyAnnotation(Update::class.java, Insert::class.java)
-                && entityComponentType.hasAttachments(processingEnv)) {
-            val isList = entityParam.type.isListOrArray()
-
-            beginAttachmentStorageFlow(daoFunSpec)
-
-            val entityClassName = entityComponentType as ClassName
-
-            add("_repo.%M(%L.%M())\n",
-                    MemberName("com.ustadmobile.door.attachments", "storeAttachment"),
-                    if(isList) "it" else entityParam.name,
-                    MemberName(entityClassName.packageName, "asEntityWithAttachment"))
-
-            endAttachmentStorageFlow(daoFunSpec)
-        }
-    }
-
-
 
     if(daoFunSpec.hasReturnType)
         add("val _result = ")

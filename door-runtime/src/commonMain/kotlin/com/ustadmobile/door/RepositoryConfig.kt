@@ -20,8 +20,6 @@ expect class RepositoryConfig {
 
     val json: Json
 
-    val attachmentsDir: String
-
     /**
      * If true, the repository will automatically create a replication subscription manager and connect to start
      * replication.

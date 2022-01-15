@@ -7,6 +7,7 @@ import com.ustadmobile.door.migration.DoorMigrationAsync
 import com.ustadmobile.door.migration.DoorMigrationStatementList
 import com.ustadmobile.door.migration.DoorMigrationSync
 import kotlinx.coroutines.runBlocking
+import java.io.File
 import java.lang.IllegalStateException
 import java.sql.Connection
 import java.sql.ResultSet
@@ -20,15 +21,24 @@ import kotlin.reflect.KClass
 
 
 @Suppress("unused") //This is used as an API
-actual class DatabaseBuilder<T: DoorDatabase> internal constructor(private var context: Any, private var dbClass: KClass<T>, private var dbName: String){
+actual class DatabaseBuilder<T: DoorDatabase> internal constructor(
+    private var context: Any,
+    private var dbClass: KClass<T>,
+    private var dbName: String,
+    private var attachmentDir: File? = null
+){
 
     private val callbacks = mutableListOf<DoorDatabaseCallback>()
 
     private val migrationList = mutableListOf<DoorMigration>()
 
     companion object {
-        fun <T : DoorDatabase> databaseBuilder(context: Any, dbClass: KClass<T>, dbName: String): DatabaseBuilder<T>
-            = DatabaseBuilder(context, dbClass, dbName)
+        fun <T : DoorDatabase> databaseBuilder(
+            context: Any, dbClass:
+            KClass<T>,
+            dbName: String,
+            attachmentDir: File? = null
+        ): DatabaseBuilder<T> = DatabaseBuilder(context, dbClass, dbName, attachmentDir)
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -38,7 +48,7 @@ actual class DatabaseBuilder<T: DoorDatabase> internal constructor(private var c
         val dbImplClass = Class.forName("${dbClass.java.canonicalName}_JdbcKt") as Class<T>
 
         val doorDb = dbImplClass.getConstructor(DoorDatabase::class.java, DataSource::class.java,
-                String::class.java).newInstance(null, dataSource, dbName)
+                String::class.java, File::class.java).newInstance(null, dataSource, dbName, attachmentDir)
 
 
         if(!doorDb.tableNames.any {it.lowercase() == DoorDatabaseCommon.DBINFO_TABLENAME}) {

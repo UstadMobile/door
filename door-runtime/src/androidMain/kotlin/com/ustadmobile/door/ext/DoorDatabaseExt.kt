@@ -18,6 +18,8 @@ import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KClass
+import com.ustadmobile.door.attachments.requireAttachmentStorageUri
+import com.ustadmobile.door.ext.toFile
 
 actual fun DoorDatabase.dbType(): Int = DoorDbType.SQLITE
 
@@ -41,13 +43,10 @@ actual fun <T: DoorDatabase, R> T.withDoorTransaction(dbKClass: KClass<T>, block
  * The DoorDatabase
  */
 fun DoorDatabase.resolveAttachmentAndroidUri(attachmentUri: String): Uri {
-    val thisRepo = this as? DoorDatabaseRepository
-            ?: throw IllegalArgumentException("resolveAttachmentAndroidUri must be used on the repository, not the database!")
-
-    val attachmentsDir = thisRepo.config.attachmentsDir
+    val attachmentsDir = requireAttachmentStorageUri().toFile()
 
     if(attachmentUri.startsWith(DOOR_ATTACHMENT_URI_PREFIX)) {
-        val attachmentFile = File(File(attachmentsDir),
+        val attachmentFile = File(attachmentsDir,
             attachmentUri.substringAfter(DOOR_ATTACHMENT_URI_PREFIX))
 
         return Uri.fromFile(attachmentFile)
@@ -201,20 +200,9 @@ internal val DoorDatabase.dbClassName: String
     get() = this::class.qualifiedName?.substringBefore("_")
         ?: throw IllegalArgumentException("No class name!")
 
-/**
- * The Door Android room helper is mapped 1:1 with each database to provide some Door-specific functions
- */
-private val doorAndroidRoomHelperMap = WeakHashMap<DoorDatabase, DoorAndroidRoomHelper>()
 
 internal val DoorDatabase.doorAndroidRoomHelper: DoorAndroidRoomHelper
-    get() {
-        synchronized(doorAndroidRoomHelperMap) {
-            val rootDb = this.rootDatabase
-            return doorAndroidRoomHelperMap.getOrPut(rootDb) {
-                DoorAndroidRoomHelper(this)
-            }
-        }
-    }
+    get()  = DoorAndroidRoomHelper.lookupHelper(this)
 
 actual val DoorDatabase.replicationNotificationDispatcher : ReplicationNotificationDispatcher
     get() = doorAndroidRoomHelper.replicationNotificationDispatcher

@@ -1,5 +1,6 @@
 package com.ustadmobile.door.attachments
 
+import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.DoorUri
 
@@ -18,7 +19,7 @@ import com.ustadmobile.door.DoorUri
  * will be done
  *
  */
-expect suspend fun DoorDatabaseRepository.storeAttachment(entityWithAttachment: EntityWithAttachment)
+expect suspend fun DoorDatabase.storeAttachment(entityWithAttachment: EntityWithAttachment)
 
 /**
  * Get a platform specific URI for the given attachment URI.
@@ -26,7 +27,7 @@ expect suspend fun DoorDatabaseRepository.storeAttachment(entityWithAttachment: 
  * @param attachmentUri The attachmentUri: this can be a platform dependent URI string, or it could
  *
  */
-expect suspend fun DoorDatabaseRepository.retrieveAttachment(attachmentUri: String): DoorUri
+expect suspend fun DoorDatabase.retrieveAttachment(attachmentUri: String): DoorUri
 
 /**
  * After an update has been performed on a table that has attachments, this function is called
@@ -40,4 +41,9 @@ expect suspend fun DoorDatabaseRepository.deleteZombieAttachments(entityWithAtta
 expect suspend fun DoorDatabaseRepository.uploadAttachment(entityWithAttachment: EntityWithAttachment)
 
 expect suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<EntityWithAttachment>)
+
+/**
+ * The uri for storage to be used when saving attachments
+ */
+expect val DoorDatabase.attachmentsStorageUri: DoorUri?
 

@@ -4,6 +4,7 @@ import com.ustadmobile.door.DoorConstants
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.ext.dbSchemaVersion
 import com.ustadmobile.door.ext.doorNodeAndVersionHeaders
+import com.ustadmobile.door.ext.toFile
 import com.ustadmobile.door.ext.writeToFile
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -16,9 +17,7 @@ import java.net.URLEncoder
 import java.net.HttpURLConnection
 
 
-fun DoorDatabaseRepository.requireAttachmentDirFile(): File {
-    return File(config.attachmentsDir)
-}
+
 
 /**
  * Upload the given attachment uri to the endpoint.
@@ -30,7 +29,7 @@ actual suspend fun DoorDatabaseRepository.uploadAttachment(entityWithAttachment:
     val attachmentMd5 = entityWithAttachment.attachmentMd5
             ?: throw IllegalArgumentException("uploadAttachment: Entity attachment must not be null")
 
-    val attachmentFile = File(requireAttachmentDirFile(),
+    val attachmentFile = File(db.requireAttachmentStorageUri().toFile(),
         attachmentUri.substringAfter(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX))
     val endpointUrl = URL(URL(config.endpoint), "attachments/upload")
 
@@ -52,7 +51,7 @@ actual suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<E
     withContext(Dispatchers.IO) {
         entitiesWithAttachmentData.forEach { attachmentUri ->
             val destPath = attachmentUri.substringAfter(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX)
-            val destFile = File(requireAttachmentDirFile(), destPath)
+            val destFile = File(db.requireAttachmentStorageUri().toFile(), destPath)
 
             if(!destFile.exists()) {
                 val url = URL(URL(config.endpoint),
