@@ -325,6 +325,15 @@ fun <A: Annotation> TypeElement.firstFieldWithAnnotation(annotationClass: Class<
     return enclosedElementsWithAnnotation(annotationClass).first()
 }
 
+fun <A: Annotation> TypeElement.firstFieldWithAnnotationNameOrNull(annotationClass: Class<A>): CodeBlock {
+    val annotatedElement = enclosedElementsWithAnnotation(annotationClass).firstOrNull()
+    return if(annotatedElement != null) {
+        CodeBlock.of("%S", annotatedElement.simpleName)
+    }else {
+        CodeBlock.of("null")
+    }
+}
+
 fun  <A: Annotation> TypeElement.kmPropertiesWithAnnotation(annotationClass: Class<A>): List<ImmutableKmProperty> {
     val kmClass = getAnnotation(Metadata::class.java).toImmutableKmClass()
     val elementsWithAnnotationNames = enclosedElementsWithAnnotation(annotationClass).map { it.simpleName.toString() }

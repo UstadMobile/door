@@ -1,6 +1,8 @@
 package com.ustadmobile.lib.annotationprocessor.core.replication
 
 import com.ustadmobile.door.*
+import com.ustadmobile.door.attachments.doorAttachmentsRoute
+import com.ustadmobile.door.attachments.retrieveAttachment
 import com.ustadmobile.door.entities.DoorNode
 import com.ustadmobile.door.entities.NodeIdAndAuth
 import com.ustadmobile.door.ext.*
@@ -21,11 +23,15 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import org.junit.*
+import org.junit.rules.TemporaryFolder
 import org.kodein.di.*
 import org.kodein.di.ktor.DIFeature
+import org.kodein.type.TypeToken
 import org.kodein.type.erased
 import repdb.RepDb
 import repdb.RepEntity
+import repdb.RepEntityWithAttachment
+import java.io.File
 
 class TestDoorDatabaseRepositoryReplicationExt  {
 
@@ -51,8 +57,20 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     private lateinit var jsonSerializer: Json
 
+    private lateinit var catPicFile: File
+
+    @JvmField
+    @Rule
+    var temporaryFolder = TemporaryFolder()
+
+
     @Before
     fun setup() {
+        catPicFile = temporaryFolder.newFile()
+        this::class.java.getResourceAsStream("/cat-pic0.jpg").writeToFile(catPicFile)
+
+        val remoteAttachmentDir = temporaryFolder.newFolder()
+
         jsonSerializer = Json {
             encodeDefaults = true
         }
@@ -66,12 +84,14 @@ class TestDoorDatabaseRepositoryReplicationExt  {
             }
         }
 
-        remoteRepDb = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "RepDbRemote")
+        remoteRepDb = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "RepDbRemote",
+                remoteAttachmentDir)
             .build().also {
                 it.clearAllTables()
             }
 
-        localRepDb = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "RepDbLocal")
+        localRepDb = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "RepDbLocal",
+            temporaryFolder.newFolder("attachments-local1"))
             .build().also {
                 it.clearAllTables()
             }
@@ -104,6 +124,8 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
             routing {
                 doorReplicationRoute(erased(), RepDb::class, jsonSerializer)
+                val typeToken: TypeToken<RepDb> = erased()
+                doorAttachmentsRoute("attachments", typeToken)
             }
         }
         remoteServer.start()
@@ -117,7 +139,8 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     //Setup a second local copy (e.g. simulate a second client)
     private fun setupLocalDb2() {
-        localRepDb2 = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "RepDbLocal2")
+        localRepDb2 = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "RepDbLocal2",
+                temporaryFolder.newFolder("attachments-local2"))
             .build().also {
                 it.clearAllTables()
             }
@@ -475,16 +498,39 @@ class TestDoorDatabaseRepositoryReplicationExt  {
     }
 
     @Test
-    fun givenTwoActiveClients_whenEntityCreatedAndThenUpdatedOnLocalOne_thenLatestVersionShouldReplicate() {
+    fun givenTwoActiveClients_whenEntityWithAttachmentCreated_thenAttachmentDataShouldReplicate() {
         setupLocalDb2()
 
-        val entity = RepEntity().apply {
-            reString = "Subscribe and replicate"
-            rePrimaryKey = localRepDb.repDao.insert(this)
+        val entityWithAttachment = RepEntityWithAttachment().apply {
+            waAttachmentUri = catPicFile.toDoorUri().toString()
+            waUid = localRepDb.repWithAttachmentDao.insert(this)
         }
 
+        runBlocking {
+            localRepDb2.repWithAttachmentDao.findByUidLive(entityWithAttachment.waUid).waitUntilWithTimeout(10100 * 1000) {
+                it != null
+            }
+        }
+
+        val entityOnRemote = remoteRepDb.repWithAttachmentDao.findByUid(entityWithAttachment.waUid)
+        val attachmentDataOnRemoteUri = runBlocking {
+            remoteRepDb.retrieveAttachment(entityOnRemote?.waAttachmentUri ?: throw IllegalStateException("no uri!"))
+        }
+
+        Assert.assertArrayEquals("Attachment data on remote and loacl is the sam",
+            catPicFile.md5Sum, attachmentDataOnRemoteUri.toFile().md5Sum)
 
 
+        val entityOnLocalDb2 = localRepDb2.repWithAttachmentDao.findByUid(entityWithAttachment.waUid)
+        Assert.assertNotNull("Entity is transferred to localdb2", entityOnLocalDb2)
+
+        val local2AttachmentDataUri = runBlocking {
+            localRepDb2.retrieveAttachment(entityOnLocalDb2?.waAttachmentUri ?:
+                throw IllegalStateException("No attachment uri!"))
+        }
+
+        Assert.assertArrayEquals("Data on attachment is the same on local2",
+            catPicFile.md5Sum, local2AttachmentDataUri.toFile().md5Sum)
     }
 
 

@@ -317,7 +317,11 @@ private fun CodeBlock.Builder.addReplicateEntityMetaDataCode(
     add("%S, ", trackerTypeEl.firstFieldWithAnnotation(ReplicationVersionId::class.java))
     add("%S, \n", trackerTypeEl.firstFieldWithAnnotation(ReplicationPending::class.java))
     addFieldsCodeBlock(entity).add(",\n")
-    addFieldsCodeBlock(trackerTypeEl).add("\n")
+    addFieldsCodeBlock(trackerTypeEl).add(",\n")
+    add(entity.firstFieldWithAnnotationNameOrNull(AttachmentUri::class.java)).add(",\n")
+    add(entity.firstFieldWithAnnotationNameOrNull(AttachmentMd5::class.java)).add(",\n")
+    add(entity.firstFieldWithAnnotationNameOrNull(AttachmentSize::class.java)).add(",\n")
+    add("%L", repEntityAnnotation.batchSize)
     add(")")
     return this
 }

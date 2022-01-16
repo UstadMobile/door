@@ -24,7 +24,7 @@ abstract class RepDao {
                DoorNode.nodeId AS trkrDestination
           FROM ChangeLog
                JOIN RepEntity 
-                    ON ChangeLog.chTableId = 500 AND ChangeLog.chEntityPk = RepEntity.rePrimaryKey
+                    ON ChangeLog.chTableId = ${RepEntity.TABLE_ID} AND ChangeLog.chEntityPk = RepEntity.rePrimaryKey
                JOIN DoorNode ON DoorNode.nodeId = DoorNode.nodeId
          WHERE RepEntity.reLastChangeTime != COALESCE(
                 (SELECT trkrVersionId

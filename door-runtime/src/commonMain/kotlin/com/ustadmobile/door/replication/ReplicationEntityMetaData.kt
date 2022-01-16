@@ -19,6 +19,9 @@ class ReplicationEntityMetaData(
     val trackerPendingFieldName: String,
     val entityFields: List<ReplicationFieldMetaData>,
     val trackerFields: List<ReplicationFieldMetaData>,
+    val attachmentUriField: String?,
+    val attachmentMd5SumField: String?,
+    val attachmentSizeField: String?,
     val batchSize: Int = 1000
 ) {
 
@@ -151,7 +154,6 @@ class ReplicationEntityMetaData(
     internal fun entityJsonArrayToReplicationTrackSummaryArray(entityArray: JsonArray): JsonArray {
         return JsonArray(entityArray.map { entityToReplicationTrackerSummary(it as JsonObject) })
     }
-
     companion object {
         const val KEY_PRIMARY_KEY = "primaryKey"
 

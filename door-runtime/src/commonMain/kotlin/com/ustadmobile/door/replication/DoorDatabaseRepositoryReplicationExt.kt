@@ -9,6 +9,9 @@ import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_MARK_REPLI
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_RECEIVE_ENTITIES
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.PATH_REPLICATION
 import com.ustadmobile.door.IncomingReplicationEvent
+import com.ustadmobile.door.attachments.JsonEntityWithAttachment
+import com.ustadmobile.door.attachments.downloadAttachments
+import com.ustadmobile.door.attachments.uploadAttachment
 import com.ustadmobile.door.ext.*
 import io.github.aakira.napier.Napier
 import io.ktor.client.request.*
@@ -18,6 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.GlobalScope
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlin.math.max
 import kotlin.math.min
 
@@ -67,6 +71,14 @@ suspend fun DoorDatabaseRepository.sendPendingReplications(
         val pendingReplicationToSend = db.findPendingReplications(dbMetaData, remoteNodeId, tableId)
         Napier.d("$this : tableId $tableId : sendPendingReplications - sending " +
                 "${pendingReplicationToSend.size} entities to remote", tag = DoorTag.LOG_TAG)
+
+        if(repEntityMetaData.attachmentUriField != null) {
+            //we need to upload the attachment data
+            pendingReplicationToSend.forEach {
+                uploadAttachment(JsonEntityWithAttachment(it.jsonObject, repEntityMetaData))
+            }
+        }
+
         config.httpClient.put<Unit> {
             url {
                 takeFrom(this@sendPendingReplications.config.endpoint)
@@ -187,6 +199,13 @@ suspend fun DoorDatabaseRepository.fetchPendingReplications(
         val pendingReplicationsJson = jsonSerializer.decodeFromString(JsonArray.serializer(), pendingReplicationsStr)
         Napier.d("$this : tableId $tableId : fetchPendingReplications - received - " +
                 "${pendingReplicationsJson.size} entities from remote", tag = DoorTag.LOG_TAG)
+
+        //Download attachments if needed
+        if(repEntityMetaData.attachmentUriField != null){
+            downloadAttachments(pendingReplicationsJson.map {
+                JsonEntityWithAttachment(it.jsonObject, repEntityMetaData)
+            })
+        }
 
         db.insertReplicationsIntoReceiveView(dbMetaData, dbKClass, remoteNodeId, tableId, pendingReplicationsJson)
         Napier.d("$this : tableId $tableId : fetchPendingReplications - received - " +

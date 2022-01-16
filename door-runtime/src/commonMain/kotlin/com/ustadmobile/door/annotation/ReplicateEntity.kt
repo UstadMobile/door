@@ -27,7 +27,12 @@ annotation class ReplicateEntity(
      *
      * Lower values are higher priority.
      */
-    val priority: Int = DEFAULT_PRIORITY
+    val priority: Int = DEFAULT_PRIORITY,
+
+    /**
+     * The number of entities to transfer at a time. By default, 1000.
+     */
+    val batchSize: Int = 1000
 ) {
     companion object {
         const val HIGHEST_PRIORITY = 0
