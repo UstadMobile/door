@@ -14,7 +14,7 @@ import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.ext.doorAndroidRoomHelper
 
 suspend fun DoorDatabase.filterAttachment(entityWithAttachment: EntityWithAttachment): EntityWithAttachment {
-    TODO("Foo - attachmentFilter must move to the db itself")
+    return entityWithAttachment
 
 //    val tmpDir = File.createTempFile("attachmentfilter", systemTimeInMillis().toString()).also {
 //        it.delete()

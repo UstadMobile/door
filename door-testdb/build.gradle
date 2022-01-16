@@ -111,7 +111,7 @@ kotlin {
 
 kapt {
     arguments {
-        arg("doordb_android_out", "$buildDir/generated/source/door-android")
+        arg("doordb_android_out", project.file("../test-app-android/build/generated/source/door-test-db"))
         //Uncomment lines below to allow debugging on generated source code.
         //arg("doordb_ktor_out", "$buildDir/generated/source/doordb-jvm")
         //arg("doordb_jvm_out", "$buildDir/generated/source/doordb-jvm")
