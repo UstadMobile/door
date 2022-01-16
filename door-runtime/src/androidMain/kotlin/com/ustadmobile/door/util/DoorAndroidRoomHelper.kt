@@ -3,6 +3,7 @@ package com.ustadmobile.door.util
 import android.content.Context
 import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.IncomingReplicationListenerHelper
+import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.dbClassName
 import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
 import com.ustadmobile.door.replication.ReplicationRunOnChangeRunner
@@ -19,7 +20,8 @@ import java.io.File
 class DoorAndroidRoomHelper(
     val db: DoorDatabase,
     val context: Context,
-    val attachmentsDir: File?
+    val attachmentsDir: File?,
+    val attachmentFilters: List<AttachmentFilter>
 ) {
 
     val incomingReplicationListenerHelper = IncomingReplicationListenerHelper()
@@ -47,8 +49,15 @@ class DoorAndroidRoomHelper(
 
         @JvmStatic
         @Synchronized
-        internal fun createAndRegisterHelper(db: DoorDatabase, context: Context, attachmentsDir: File?) {
-            doorAndroidRoomHelperMap.getOrPut(db) { DoorAndroidRoomHelper(db, context, attachmentsDir) }
+        internal fun createAndRegisterHelper(
+            db: DoorDatabase,
+            context: Context,
+            attachmentsDir: File?,
+            attachmentFilters: List<AttachmentFilter>
+        ) {
+            doorAndroidRoomHelperMap.getOrPut(db) {
+                DoorAndroidRoomHelper(db, context, attachmentsDir, attachmentFilters)
+            }
         }
 
         @JvmStatic

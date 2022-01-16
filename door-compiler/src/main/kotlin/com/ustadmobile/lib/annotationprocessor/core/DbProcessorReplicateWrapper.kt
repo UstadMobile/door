@@ -162,7 +162,7 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(
                             if(isListParam) {
                                 varName = "it"
                                 add("val _generatedPks = mutableListOf<Long>()\n")
-                                beginControlFlow("${overridingFunction.parameters.first().name}.forEach ")
+                                beginControlFlow("${overridingFunction.parameters.first().name}.iterator().forEach ")
                             }
 
                             if(setPk) {

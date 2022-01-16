@@ -14,16 +14,15 @@ import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.ext.doorAndroidRoomHelper
 
 suspend fun DoorDatabase.filterAttachment(entityWithAttachment: EntityWithAttachment): EntityWithAttachment {
-    return entityWithAttachment
 
-//    val tmpDir = File.createTempFile("attachmentfilter", systemTimeInMillis().toString()).also {
-//        it.delete()
-//        it.mkdirs()
-//    }
-//
-//    return config.attachmentFilters.fold(entityWithAttachment) {lastVal : EntityWithAttachment, filter->
-//        filter.filter(lastVal, tmpDir.absolutePath, config.context)
-//    }
+    val tmpDir = File.createTempFile("attachmentfilter", systemTimeInMillis().toString()).also {
+        it.delete()
+        it.mkdirs()
+    }
+
+    return attachmentFilters.fold(entityWithAttachment) {lastVal : EntityWithAttachment, filter->
+        filter.filter(lastVal, tmpDir.absolutePath, doorAndroidRoomHelper.context)
+    }
 }
 
 actual suspend fun DoorDatabase.storeAttachment(entityWithAttachment: EntityWithAttachment) {
@@ -74,3 +73,5 @@ actual suspend fun DoorDatabase.retrieveAttachment(attachmentUri:  String): Door
 actual val DoorDatabase.attachmentsStorageUri: DoorUri?
     get() = doorAndroidRoomHelper.attachmentsDir?.toDoorUri()
 
+actual val DoorDatabase.attachmentFilters: List<AttachmentFilter>
+    get() = doorAndroidRoomHelper.attachmentFilters

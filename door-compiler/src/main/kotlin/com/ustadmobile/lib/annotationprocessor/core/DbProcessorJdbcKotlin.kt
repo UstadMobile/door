@@ -19,6 +19,7 @@ import javax.lang.model.util.SimpleTypeVisitor7
 import javax.tools.Diagnostic
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.annotation.*
+import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.DoorDatabaseMetadata
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
 import com.ustadmobile.door.replication.ReplicationRunOnChangeRunner
@@ -1300,6 +1301,8 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .applyIf(target == DoorTarget.JVM) {
                     addParameter("attachmentDir", File::class.asTypeName().copy(nullable = true))
                 }
+                .addParameter("realAttachmentFilters", List::class.parameterizedBy(AttachmentFilter::class),
+                    KModifier.OVERRIDE)
                 .addCode("setupFromDataSource()\n")
                 .build())
             .addDbVersionProperty(dbTypeElement)
@@ -1321,6 +1324,11 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     .initializer("null")
                     .build())
             }
+            .addProperty(PropertySpec.builder("realAttachmentFilters",
+                    List::class.parameterizedBy(AttachmentFilter::class))
+                .addModifiers(KModifier.OVERRIDE)
+                .initializer("realAttachmentFilters")
+                .build())
             .addProperty(PropertySpec.builder("doorJdbcSourceDatabase",
                     DoorDatabase::class.asTypeName().copy(nullable = true))
                 .initializer("doorJdbcSourceDatabase")

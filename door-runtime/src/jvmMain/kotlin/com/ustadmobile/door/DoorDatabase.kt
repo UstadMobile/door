@@ -37,7 +37,7 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
     private val constructorFun: Constructor<DoorDatabase> by lazy(LazyThreadSafetyMode.NONE) {
         @Suppress("UNCHECKED_CAST")
         this::class.java.getConstructor(DoorDatabase::class.java, DataSource::class.java,
-            String::class.java, File::class.java) as Constructor<DoorDatabase>
+            String::class.java, File::class.java, List::class.java) as Constructor<DoorDatabase>
     }
 
     override val tableNames: List<String> by lazy {
@@ -89,7 +89,8 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
         connection.setAutoCommit(false)
         val transactionDataSource = DoorTransactionDataSourceWrapper(rootDb, connection)
         val transactionDb = rootDb.constructorFun.newInstance(rootDb, transactionDataSource,
-                "Transaction wrapper for $rootDb", rootDb.realAttachmentStorageUri?.toFile())
+                "Transaction wrapper for $rootDb", rootDb.realAttachmentStorageUri?.toFile(),
+                rootJdbcDb.realAttachmentFilters)
 
         (transactionDb as DoorDatabaseJdbc).transactionDepthCounter.incrementTransactionDepth()
 

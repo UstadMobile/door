@@ -1,5 +1,6 @@
 package com.ustadmobile.door
 
+import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
@@ -63,8 +64,9 @@ interface DoorDatabaseJdbc {
 
     val invalidationTracker: DoorInvalidationTracker
 
-
     val realAttachmentStorageUri: DoorUri?
+
+    val realAttachmentFilters: List<AttachmentFilter>
 
 
 }

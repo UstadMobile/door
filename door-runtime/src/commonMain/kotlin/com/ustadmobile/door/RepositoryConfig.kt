@@ -33,8 +33,6 @@ expect class RepositoryConfig {
      */
     val replicationSubscriptionMode: ReplicationSubscriptionMode
 
-    val attachmentFilters: List<AttachmentFilter>
-
     /**
      * The nodeId for the local node (not the remote node - which is only discovered after connecting to it). This
      * will match the single row that is in SyncNode.

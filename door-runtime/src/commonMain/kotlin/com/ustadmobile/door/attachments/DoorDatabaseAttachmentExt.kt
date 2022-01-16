@@ -47,3 +47,4 @@ expect suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<E
  */
 expect val DoorDatabase.attachmentsStorageUri: DoorUri?
 
+expect val DoorDatabase.attachmentFilters: List<AttachmentFilter>

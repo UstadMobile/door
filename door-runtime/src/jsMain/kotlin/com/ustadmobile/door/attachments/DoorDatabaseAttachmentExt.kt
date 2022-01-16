@@ -53,3 +53,6 @@ actual suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<E
 
 actual val DoorDatabase.attachmentsStorageUri: DoorUri?
     get() = (rootDatabase as DoorDatabaseJdbc).realAttachmentStorageUri
+
+actual val DoorDatabase.attachmentFilters: List<AttachmentFilter>
+    get() = (rootDatabase as DoorDatabaseJdbc).realAttachmentFilters

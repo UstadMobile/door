@@ -19,7 +19,6 @@ actual class RepositoryConfig internal constructor(
     actual val useReplicationSubscription: Boolean,
     actual val replicationSubscriptionMode: ReplicationSubscriptionMode,
     actual val replicationSubscriptionInitListener: ReplicationSubscriptionManager.SubscriptionInitializedListener?,
-    actual val attachmentFilters: List<AttachmentFilter>
 ) {
 
     companion object {
@@ -47,7 +46,7 @@ actual class RepositoryConfig internal constructor(
             fun build() : RepositoryConfig{
                 return RepositoryConfig(context, endpoint, auth, nodeId, httpClient, okHttpClient, json,
                         useReplicationSubscription, replicationSubscriptionMode,
-                        replicationSubscriptionInitListener, attachmentFilters.toList())
+                        replicationSubscriptionInitListener)
             }
 
         }

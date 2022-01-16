@@ -5,6 +5,7 @@ import androidx.room.Room
 import kotlin.reflect.KClass
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.isWrappable
 import com.ustadmobile.door.ext.wrap
 import com.ustadmobile.door.migration.DoorMigration
@@ -17,6 +18,7 @@ actual class DatabaseBuilder<T: DoorDatabase>(
     private val dbClass: KClass<T>,
     private val appContext: Context,
     private val attachmentsDir: File?,
+    private val attachmentFilters: List<AttachmentFilter>,
 ) {
 
     companion object {
@@ -24,11 +26,12 @@ actual class DatabaseBuilder<T: DoorDatabase>(
             context: Any,
             dbClass: KClass<T>,
             dbName: String,
-            attachmentsDir: File? = null
+            attachmentsDir: File? = null,
+            attachmentFilters: List<AttachmentFilter> = listOf(),
         ): DatabaseBuilder<T> {
             val applicationContext = (context as Context).applicationContext
             val builder = DatabaseBuilder(Room.databaseBuilder(applicationContext, dbClass.java, dbName),
-                dbClass, applicationContext, attachmentsDir)
+                dbClass, applicationContext, attachmentsDir, attachmentFilters)
 
             val callbackClassName = "${dbClass.java.canonicalName}_AndroidReplicationCallback"
             println("Attempt to load callback $callbackClassName")
@@ -45,7 +48,7 @@ actual class DatabaseBuilder<T: DoorDatabase>(
 
     fun build(): T {
         val db = roomBuilder.build()
-        DoorAndroidRoomHelper.createAndRegisterHelper(db, appContext, attachmentsDir)
+        DoorAndroidRoomHelper.createAndRegisterHelper(db, appContext, attachmentsDir, attachmentFilters)
         return if(db.isWrappable(dbClass)) {
             db.wrap(dbClass)
         }else {
