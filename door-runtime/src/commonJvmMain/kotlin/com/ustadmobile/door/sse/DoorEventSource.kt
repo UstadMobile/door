@@ -26,7 +26,7 @@ actual class DoorEventSource actual constructor(
 ) {
 
     private val logPrefix: String
-        get() = "[DoorEventSource@${this.doorIdentityHashCode}]"
+        get() = "[DoorEventSource@${this.doorIdentityHashCode} - $url]"
 
     private lateinit var eventSource: EventSource
 

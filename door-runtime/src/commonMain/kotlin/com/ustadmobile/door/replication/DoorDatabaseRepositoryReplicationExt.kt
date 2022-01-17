@@ -74,8 +74,9 @@ suspend fun DoorDatabaseRepository.sendPendingReplications(
 
         if(repEntityMetaData.attachmentUriField != null) {
             //we need to upload the attachment data
-            pendingReplicationToSend.forEach {
-                uploadAttachment(JsonEntityWithAttachment(it.jsonObject, repEntityMetaData))
+            pendingReplicationToSend.map { JsonEntityWithAttachment(it.jsonObject, repEntityMetaData) }
+                    .filter { it.attachmentUri != null }.forEach {
+                uploadAttachment(it)
             }
         }
 

@@ -2,10 +2,7 @@ package com.ustadmobile.door.attachments
 
 import com.ustadmobile.door.DoorConstants
 import com.ustadmobile.door.DoorDatabaseRepository
-import com.ustadmobile.door.ext.dbSchemaVersion
-import com.ustadmobile.door.ext.doorNodeAndVersionHeaders
-import com.ustadmobile.door.ext.toFile
-import com.ustadmobile.door.ext.writeToFile
+import com.ustadmobile.door.ext.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import java.io.File
@@ -15,7 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.URLEncoder
 import java.net.HttpURLConnection
-
+import io.github.aakira.napier.Napier
 
 
 
@@ -33,14 +30,21 @@ actual suspend fun DoorDatabaseRepository.uploadAttachment(entityWithAttachment:
         attachmentUri.substringAfter(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX))
     val endpointUrl = URL(URL(config.endpoint), "attachments/upload")
 
+    Napier.d("Uploading attachment: $attachmentUri", tag = DoorTag.LOG_TAG)
     //val inputFile = Paths.get(systemUri).toFile()
-    config.httpClient.post<Unit>(endpointUrl.toString()) {
-        doorNodeAndVersionHeaders(this@uploadAttachment)
-        parameter("md5", attachmentMd5)
-        parameter("uri", attachmentUri)
+    try {
+        config.httpClient.post<Unit>(endpointUrl.toString()) {
+            doorNodeAndVersionHeaders(this@uploadAttachment)
+            parameter("md5", attachmentMd5)
+            parameter("uri", attachmentUri)
 
-        body = LocalFileContent(file = attachmentFile, contentType = ContentType.Application.OctetStream)
+            body = LocalFileContent(file = attachmentFile, contentType = ContentType.Application.OctetStream)
+        }
+    }catch(e: Exception) {
+        Napier.e("Error uploading attachment: $attachmentUri", e)
+        throw e
     }
+
 }
 
 actual suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<EntityWithAttachment>) {
@@ -49,23 +53,29 @@ actual suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<E
         return
 
     withContext(Dispatchers.IO) {
-        entitiesWithAttachmentData.forEach { attachmentUri ->
-            val destPath = attachmentUri.substringAfter(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX)
-            val destFile = File(db.requireAttachmentStorageUri().toFile(), destPath)
+        var currentUri: String? = null
+        try {
+            entitiesWithAttachmentData.forEach { attachmentUri ->
+                currentUri = attachmentUri
+                val destPath = attachmentUri.substringAfter(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX)
+                val destFile = File(db.requireAttachmentStorageUri().toFile(), destPath)
 
-            if(!destFile.exists()) {
-                val url = URL(URL(config.endpoint),
+                if(!destFile.exists()) {
+                    val url = URL(URL(config.endpoint),
                         "attachments/download?uri=${URLEncoder.encode(attachmentUri, "UTF-8")}")
 
-                destFile.parentFile.takeIf { !it.exists() }?.mkdirs()
+                    destFile.parentFile.takeIf { !it.exists() }?.mkdirs()
 
-                val urlConnection = url.openConnection() as HttpURLConnection
-                urlConnection.setRequestProperty(DoorConstants.HEADER_DBVERSION,
+                    val urlConnection = url.openConnection() as HttpURLConnection
+                    urlConnection.setRequestProperty(DoorConstants.HEADER_DBVERSION,
                         db.dbSchemaVersion().toString())
-                urlConnection.setRequestProperty(DoorConstants.HEADER_NODE,
-                    "${this@downloadAttachments.config.nodeId}/${this@downloadAttachments.config.auth}")
-                urlConnection.inputStream.writeToFile(destFile)
+                    urlConnection.setRequestProperty(DoorConstants.HEADER_NODE,
+                        "${this@downloadAttachments.config.nodeId}/${this@downloadAttachments.config.auth}")
+                    urlConnection.inputStream.writeToFile(destFile)
+                }
             }
+        }catch(e: Exception) {
+            Napier.e("Exception downloading an attachment: $currentUri", e, tag = DoorTag.LOG_TAG)
         }
     }
 }

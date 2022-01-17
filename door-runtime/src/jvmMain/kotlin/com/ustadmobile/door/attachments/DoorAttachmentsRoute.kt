@@ -6,6 +6,7 @@ import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.toFile
 import com.ustadmobile.door.ext.toHexString
 import com.ustadmobile.door.ext.writeToFileAndGetMd5
+import io.github.aakira.napier.Napier
 import io.ktor.application.*
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -50,13 +51,20 @@ fun <T: DoorDatabase> Route.doorAttachmentsRoute(path: String, typeToken: TypeTo
                 if(finalDestFile.exists()) {
                     //actually we already have it. It's fine, no need to do anything
                     tmpOut.delete()
+                    Napier.d("Received attachment upload : $uriParam (already present). Deleting tmp file ",
+                        tag = DoorTag.LOG_TAG)
                     call.respond(HttpStatusCode.NoContent)
                 }else if(tmpOut.renameTo(finalDestFile)) {
                     call.respond(HttpStatusCode.NoContent)
+                    Napier.d("Received and stored upload: $uriParam")
                 }else {
+                    Napier.e("Attachment upload: could not rename to final " +
+                            "destination ${finalDestFile.absolutePath}", tag = DoorTag.LOG_TAG)
                     throw IOException("could not rename to final destination ${finalDestFile.absolutePath}")
                 }
             }else {
+                Napier.e("Attachment upload: body md5 / md5 parameter mismatch! " +
+                        "Expected: $md5Param . Data MD5 = $dataMd5")
                 call.respond(HttpStatusCode.BadRequest, "Body md5 does not match md5 parameter")
             }
         }
@@ -73,6 +81,7 @@ fun <T: DoorDatabase> Route.doorAttachmentsRoute(path: String, typeToken: TypeTo
             if(attachmentFile.exists()) {
                 call.respondFile(attachmentFile)
             }else {
+                Napier.w("Attachment TableName/MD5 not found: $uriParam")
                 call.respond(HttpStatusCode.NotFound, "Not found: $uriParam")
             }
         }

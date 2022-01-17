@@ -12,6 +12,7 @@ import java.io.IOException
 import com.ustadmobile.door.attachments.requireAttachmentStorageUri
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.ext.doorAndroidRoomHelper
+import io.github.aakira.napier.Napier
 
 suspend fun DoorDatabase.filterAttachment(entityWithAttachment: EntityWithAttachment): EntityWithAttachment {
 
@@ -61,6 +62,8 @@ actual suspend fun DoorDatabase.storeAttachment(entityWithAttachment: EntityWith
 
         filteredEntity.attachmentUri = entityWithAttachment.makeAttachmentUriFromTableNameAndMd5()
         filteredEntity.attachmentSize = finalDestFile.length().toInt()
+        Napier.d("Stored attachment on ${filteredEntity.tableName} : MD5 = ${filteredEntity.attachmentMd5}",
+            tag = DoorTag.LOG_TAG)
     }
 }
 

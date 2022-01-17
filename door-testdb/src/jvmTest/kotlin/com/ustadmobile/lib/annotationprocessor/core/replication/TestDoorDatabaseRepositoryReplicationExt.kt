@@ -507,7 +507,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         }
 
         runBlocking {
-            localRepDb2.repWithAttachmentDao.findByUidLive(entityWithAttachment.waUid).waitUntilWithTimeout(10100 * 1000) {
+            localRepDb2.repWithAttachmentDao.findByUidLive(entityWithAttachment.waUid).waitUntilWithTimeout(10100) {
                 it != null
             }
         }
@@ -532,6 +532,49 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         Assert.assertArrayEquals("Data on attachment is the same on local2",
             catPicFile.md5Sum, local2AttachmentDataUri.toFile().md5Sum)
     }
+
+    @Test
+    fun givenTwoActiveClients_whenEntityWithAttachmentAndWithoutAttachmentCreated_thenBothShouldReplicate() {
+        setupLocalDb2()
+
+        val entityWithoutAttachment = RepEntityWithAttachment().apply {
+            waAttachmentUri = null
+            waUid = localRepDb.repWithAttachmentDao.insert(this)
+        }
+
+
+        //wait for the first entity (without any attachment) to replicate
+        runBlocking {
+            localRepDb2.repWithAttachmentDao.findByUidLive(entityWithoutAttachment.waUid).waitUntilWithTimeout(10100 * 1000) {
+                it != null
+            }
+        }
+
+        val entityWithAttachment = RepEntityWithAttachment().apply {
+            waAttachmentUri = catPicFile.toDoorUri().toString()
+            waUid = localRepDb.repWithAttachmentDao.insert(this)
+        }
+
+        //wait for the second entity (with attachment) to replicate
+        runBlocking {
+            localRepDb2.repWithAttachmentDao.findByUidLive(entityWithAttachment.waUid).waitUntilWithTimeout(10110 * 1000) {
+                it != null
+            }
+        }
+
+        val entityOnLocalDb2 = localRepDb2.repWithAttachmentDao.findByUid(entityWithAttachment.waUid)
+        Assert.assertNotNull("Entity is transferred to localdb2", entityOnLocalDb2)
+
+        val local2AttachmentDataUri = runBlocking {
+            localRepDb2.retrieveAttachment(entityOnLocalDb2?.waAttachmentUri ?:
+            throw IllegalStateException("No attachment uri!"))
+        }
+
+        Assert.assertArrayEquals("Data on attachment is the same on local2",
+            catPicFile.md5Sum, local2AttachmentDataUri.toFile().md5Sum)
+
+    }
+
 
 
     companion object {

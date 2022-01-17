@@ -1,9 +1,8 @@
 package com.ustadmobile.door.attachments
 
+import com.ustadmobile.door.ext.jsonNullableString
 import com.ustadmobile.door.replication.ReplicationEntityMetaData
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 
 class JsonEntityWithAttachment(
     private val jsonObject: JsonObject,
@@ -20,13 +19,13 @@ class JsonEntityWithAttachment(
         get() = replicationEntityMetaData.attachmentSizeField ?: throw IllegalArgumentException("no attachment size field!")
 
     override var attachmentUri: String?
-        get() = jsonObject.get(attachmentUriFieldName)?.jsonPrimitive?.content
+        get() = jsonObject.get(attachmentUriFieldName)?.jsonNullableString
         set(value) {
             throw IllegalStateException("JsonEntityWithAttachment is read only!")
         }
 
     override var attachmentMd5: String?
-        get() =jsonObject.get(attachmentMd5FieldName)?.jsonPrimitive?.content
+        get() =jsonObject.get(attachmentMd5FieldName)?.jsonPrimitive?.jsonNullableString
         set(value) {
             throw IllegalStateException("JsonEntityWithAttachment is read only!")
         }
