@@ -79,7 +79,8 @@ class RepositoryLoadHelper<T>(
         private set
 
     init {
-        repository.addWeakConnectivityListener(this)
+        //TODO: Actually - this does not need to be weak. This can be done using the onactive and oninactive to add and remove listeners
+        //repository.addWeakConnectivityListener(this)
     }
 
     private val logPrefix

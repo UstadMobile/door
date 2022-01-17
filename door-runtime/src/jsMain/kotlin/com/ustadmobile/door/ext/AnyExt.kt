@@ -10,7 +10,7 @@ import kotlinext.js.asJsObject
  */
 
 actual val Any.doorIdentityHashCode: Int
-    get() = generateHashCode(this)
+    get() = 42
 
 private fun generateHashCode(value: Any): Int{
     val type = js("value == undefined ? undefined : typeof value")

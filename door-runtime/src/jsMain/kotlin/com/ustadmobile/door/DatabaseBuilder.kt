@@ -1,5 +1,6 @@
 package com.ustadmobile.door
 
+import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.createInstance
 import com.ustadmobile.door.jdbc.SQLException
 import com.ustadmobile.door.migration.DoorMigration
@@ -18,7 +19,8 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(private val bu
     suspend fun build(): T {
         val dataSource = SQLiteDatasourceJs(builderOptions.dbName,
             Worker(builderOptions.webWorkerPath))
-        val dbImpl = builderOptions.dbImplClass.js.createInstance(dataSource, false) as T
+        val dbImpl = builderOptions.dbImplClass.js.createInstance(null, dataSource, false,
+            listOf<AttachmentFilter>()) as T
         val exists = IndexedDb.checkIfExists(builderOptions.dbName)
         SaveToIndexedDbChangeListener(dbImpl, dataSource, builderOptions.saveToIndexedDbDelayTime)
         if(exists){

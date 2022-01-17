@@ -72,4 +72,13 @@ abstract class RepWithAttachmentDao {
     """)
     abstract fun findByUid(uid: Long): RepEntityWithAttachment?
 
+    @Query("""
+        SELECT RepEntityWithAttachment.*
+          FROM RepEntityWithAttachment
+         WHERE waUid = :uid
+    """)
+    @RepoHttpAccessible
+    @Repository(Repository.METHOD_DELEGATE_TO_WEB)
+    abstract fun findByUidDelegateToWebSync(uid: Long): RepEntityWithAttachment?
+
 }

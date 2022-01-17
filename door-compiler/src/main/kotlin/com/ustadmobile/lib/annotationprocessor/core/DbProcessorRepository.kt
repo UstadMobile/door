@@ -9,6 +9,7 @@ import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.attachments.EntityWithAttachment
 import com.ustadmobile.door.replication.ReplicationSubscriptionManager
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_ANDROID_OUTPUT
+import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JS_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JVM_DIRS
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorRepository.Companion.BOUNDARY_CALLBACK_CLASSNAME
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorRepository.Companion.DATASOURCEFACTORY_TO_BOUNDARYCALLBACK_VARNAME
@@ -134,7 +135,8 @@ fun FileSpec.Builder.addDbRepoType(
                 .build())
             .addFunction(FunSpec.builder("clearAllTables")
                     .addModifiers(KModifier.OVERRIDE)
-                    .addCode("throw %T(%S)\n", IllegalAccessException::class, "Cannot use a repository to clearAllTables!")
+                    .addCode("throw %T(%S)\n", ClassName("kotlin", "IllegalStateException"),
+                        "Cannot use a repository to clearAllTables!")
                     .build())
 
             .addRepositoryHelperDelegateCalls("_repositoryHelper")
@@ -142,7 +144,7 @@ fun FileSpec.Builder.addDbRepoType(
                 addFunction(FunSpec.builder("createAllTables")
                         .addModifiers(KModifier.OVERRIDE)
                         .addCode("throw %T(%S)\n",
-                                IllegalAccessException::class,
+                                ClassName("kotlin", "IllegalStateException"),
                                 "Cannot use a repository to createAllTables!")
                         .build())
             }
@@ -253,7 +255,7 @@ private fun TypeSpec.Builder.addRepoDbDaoAccessor(
             ?: throw IllegalArgumentException("Dao getter has no return type")
     if(!daoTypeEl.hasAnnotation(Repository::class.java)) {
         addAccessorOverride(daoGetter, CodeBlock.of("throw %T(%S)\n",
-                IllegalStateException::class,
+                ClassName("kotlin", "IllegalStateException"),
                 "${daoTypeEl.simpleName} is not annotated with @Repository"))
         return this
     }
@@ -285,14 +287,16 @@ private fun TypeSpec.Builder.addRepoDbDaoAccessor(
  * on Android), false otherwise (e.g. JDBC server)
  *
  */
-fun FileSpec.Builder.addDaoRepoType(daoTypeSpec: TypeSpec,
-                                    daoClassName: ClassName,
-                                    processingEnv: ProcessingEnvironment,
-                                    allKnownEntityTypesMap: Map<String, TypeElement>,
-                                    pagingBoundaryCallbackEnabled: Boolean = false,
-                                    isAlwaysSqlite: Boolean = false,
-                                    extraConstructorParams: List<ParameterSpec> = listOf(),
-                                    syncHelperClassName: ClassName = daoClassName.withSuffix("_SyncHelper")): FileSpec.Builder {
+fun FileSpec.Builder.addDaoRepoType(
+    daoTypeSpec: TypeSpec,
+    daoClassName: ClassName,
+    processingEnv: ProcessingEnvironment,
+    target: DoorTarget,
+    allKnownEntityTypesMap: Map<String, TypeElement>,
+    pagingBoundaryCallbackEnabled: Boolean = false,
+    isAlwaysSqlite: Boolean = false,
+    extraConstructorParams: List<ParameterSpec> = listOf(),
+): FileSpec.Builder {
 
     addType(TypeSpec.classBuilder("${daoTypeSpec.name}$SUFFIX_REPOSITORY2")
             .addProperty(PropertySpec.builder("_db", DoorDatabase::class)
@@ -325,7 +329,7 @@ fun FileSpec.Builder.addDaoRepoType(daoTypeSpec: TypeSpec,
                     .build())
             .apply {
                 daoTypeSpec.funSpecs.forEach {
-                    addDaoRepoFun(it, daoClassName.simpleName, processingEnv,
+                    addDaoRepoFun(it, daoClassName.simpleName, processingEnv, target,
                             allKnownEntityTypesMap, pagingBoundaryCallbackEnabled, isAlwaysSqlite)
                 }
             }
@@ -347,6 +351,7 @@ fun TypeSpec.Builder.addDaoRepoFun(
     daoFunSpec: FunSpec,
     daoName: String,
     processingEnv: ProcessingEnvironment,
+    doorTarget: DoorTarget,
     allKnownEntityTypesMap: Map<String, TypeElement>,
     pagingBoundaryCallbackEnabled: Boolean,
     isAlwaysSqlite: Boolean = false
@@ -371,6 +376,7 @@ fun TypeSpec.Builder.addDaoRepoFun(
 
     addFunction(daoFunSpec.toBuilder()
             .removeAbstractModifier()
+            .removeAnnotations()
             .addModifiers(KModifier.OVERRIDE)
             .addCode(CodeBlock.builder().apply {
                 when(repoMethodType) {
@@ -389,7 +395,12 @@ fun TypeSpec.Builder.addDaoRepoFun(
                             processingEnv.messager.printMessage(Diagnostic.Kind.ERROR,
                                 "$daoName#${daoFunSpec.name} uses delegate to web, but is not marked as http accessible")
 
-                        addDelegateToWebCode(daoFunSpec, daoName)
+                        if(doorTarget == DoorTarget.JS && !daoFunSpec.isSuspended) {
+                            add("throw %T(%S)\n", ClassName("kotlin", "IllegalStateException"),
+                                "Synchronous HTTP is not supported on Door/Javascript!")
+                        }else {
+                            addDelegateToWebCode(daoFunSpec, daoName)
+                        }
                     }
 
                 }
@@ -424,25 +435,7 @@ fun CodeBlock.Builder.addRepoDelegateToDaoCode(
             .add(daoFunSpec.parameters.joinToString { it.name })
             .add(")\n")
 
-    //if this table has attachments and an update was done, check to delete old data
-    if(daoFunSpec.hasAnnotation(Update::class.java)) {
-        val entityParam = daoFunSpec.parameters.first()
-        val entityComponentType = entityParam.type.unwrapListOrArrayComponentType()
-        if(entityComponentType.hasAttachments(processingEnv)) {
-            val entityClassName = entityComponentType as ClassName
-            val isList = entityParam.type.isListOrArray()
 
-            beginAttachmentStorageFlow(daoFunSpec)
-
-            add("_repo.%M(%L.%M())\n",
-                MemberName("com.ustadmobile.door.attachments", "deleteZombieAttachments"),
-                if(isList) "it" else entityParam.name,
-                MemberName(entityClassName.packageName, "asEntityWithAttachment"))
-
-            endAttachmentStorageFlow(daoFunSpec)
-        }
-
-    }
 
     if(daoFunSpec.hasReturnType) {
         add("return _result\n")
@@ -511,6 +504,16 @@ class DbProcessorRepository: AbstractDbProcessor() {
                         overrideWrapDbForTransaction = true)
                     .build()
                     .writeToDirsFromArg(OPTION_JVM_DIRS)
+
+            FileSpec.builder(dbTypeEl.packageName, "${dbTypeEl.simpleName}$SUFFIX_REPOSITORY2")
+                .addDbRepoType(dbTypeEl, processingEnv,
+                    syncDaoMode = REPO_SYNCABLE_DAO_CONSTRUCT,
+                    addDbVersionProp = true,
+                    overrideDataSourceProp = true,
+                    overrideWrapDbForTransaction = false)
+                .build()
+                .writeToDirsFromArg(OPTION_JS_OUTPUT)
+
             FileSpec.builder(dbTypeEl.packageName, "${dbTypeEl.simpleName}$SUFFIX_REPOSITORY2")
                     .addDbRepoType(dbTypeEl, processingEnv,
                         syncDaoMode = REPO_SYNCABLE_DAO_FROMDB, overrideClearAllTables = false,
@@ -524,7 +527,7 @@ class DbProcessorRepository: AbstractDbProcessor() {
                                 .addEntityWithAttachmentAdapterType(entityEl, processingEnv)
                                 .addAsEntityWithAttachmentAdapterExtensionFun(entityEl)
                                 .build()
-                                .writeToDirsFromArg(listOf(OPTION_JVM_DIRS, OPTION_ANDROID_OUTPUT))
+                                .writeToDirsFromArg(listOf(OPTION_JVM_DIRS, OPTION_ANDROID_OUTPUT, OPTION_JS_OUTPUT))
             }
         }
 
@@ -533,18 +536,21 @@ class DbProcessorRepository: AbstractDbProcessor() {
         for(daoElement in daos) {
             val daoTypeEl = daoElement as TypeElement
             if(daoTypeEl.isDaoWithRepository) {
-                FileSpec.builder(daoElement.packageName,
+                val targets = mapOf(DoorTarget.JVM to OPTION_JVM_DIRS, DoorTarget.JS to OPTION_JS_OUTPUT)
+                targets.forEach { target ->
+                    FileSpec.builder(daoElement.packageName,
                         "${daoTypeEl.simpleName}$SUFFIX_REPOSITORY2")
                         .addDaoRepoType(daoTypeEl.asTypeSpecStub(processingEnv),
-                            daoTypeEl.asClassName(), processingEnv,
+                            daoTypeEl.asClassName(), processingEnv, target.key,
                             allKnownEntityTypesMap = allKnownEntityTypesMap)
                         .build()
-                        .writeToDirsFromArg(OPTION_JVM_DIRS)
+                        .writeToDirsFromArg(target.value)
+                }
 
                 FileSpec.builder(daoElement.packageName,
                         "${daoTypeEl.simpleName}$SUFFIX_REPOSITORY2")
                         .addDaoRepoType(daoTypeEl.asTypeSpecStub(processingEnv),
-                                daoTypeEl.asClassName(), processingEnv,
+                                daoTypeEl.asClassName(), processingEnv, DoorTarget.ANDROID,
                                 allKnownEntityTypesMap = allKnownEntityTypesMap,
                                 pagingBoundaryCallbackEnabled = false,
                                 isAlwaysSqlite = true)

@@ -66,32 +66,6 @@ internal fun TypeSpec.Builder.addRepositoryHelperDelegateCalls(delegatePropName:
             .addCode("$delegatePropName.removeWeakConnectivityListener(listener)\n")
             .build())
 
-    val syncListenerTypeVar = TypeVariableName.Companion.invoke("T", Any::class)
-    addFunction(FunSpec.builder("addSyncListener")
-            .addModifiers(KModifier.OVERRIDE)
-            .addTypeVariable(syncListenerTypeVar)
-            .addParameter("entityClass", KClass::class.asClassName().parameterizedBy(syncListenerTypeVar))
-            .addParameter("listener", SyncListener::class.asClassName().parameterizedBy(syncListenerTypeVar))
-            .addCode("$delegatePropName.addSyncListener(entityClass, listener)\n")
-            .build())
-
-    addFunction(FunSpec.builder("removeSyncListener")
-        .addModifiers(KModifier.OVERRIDE)
-        .addTypeVariable(syncListenerTypeVar)
-        .addParameter("entityClass", KClass::class.asClassName().parameterizedBy(syncListenerTypeVar))
-        .addParameter("listener", SyncListener::class.asClassName().parameterizedBy(syncListenerTypeVar))
-        .addCode("$delegatePropName.removeSyncListener(entityClass, listener)\n")
-        .build())
-
-    addFunction(FunSpec.builder("handleSyncEntitiesReceived")
-        .addModifiers(KModifier.OVERRIDE)
-        .addTypeVariable(syncListenerTypeVar)
-        .addParameter("entityClass", KClass::class.asClassName().parameterizedBy(syncListenerTypeVar))
-        .addParameter("entitiesIncoming", List::class.asClassName().parameterizedBy(syncListenerTypeVar))
-        .addCode("$delegatePropName.handleSyncEntitiesReceived(entityClass, entitiesIncoming)\n")
-        .build())
-
-
     return this
 }
 

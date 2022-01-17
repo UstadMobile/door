@@ -92,7 +92,8 @@ fun CodeBlock.Builder.endAttachmentStorageFlow(daoFunSpec: FunSpec) {
 fun TypeSpec.Builder.addDaoFunctionDelegate(
     daoMethod: ExecutableElement,
     daoTypeEl: TypeElement,
-    processingEnv: ProcessingEnvironment
+    processingEnv: ProcessingEnvironment,
+    doorTarget: DoorTarget,
 ) : TypeSpec.Builder {
 
     val methodResolved = daoMethod.asMemberOf(daoTypeEl, processingEnv)
@@ -109,9 +110,18 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(
     lateinit var entityTypeEl : TypeElement
     var pkField : Element? = null
 
+    //If running on JS, non-suspended (sync) version is NOT allowed
+    val isSyncFunctionOnJs = doorTarget == DoorTarget.JS && !overridingFunction.isSuspended
+
     addFunction(overridingFunction.toBuilder()
         .addCode(CodeBlock.builder()
-                .apply {
+                .applyIf(isSyncFunctionOnJs) {
+                    if(doorTarget == DoorTarget.JS && !overridingFunction.isSuspended) {
+                        add("throw %T(%S)\n", ClassName("kotlin", "IllegalStateException"),
+                            "Synchronous attachment storage is NOT possible on Javascript!")
+                    }
+                }
+                .applyIf(!isSyncFunctionOnJs) {
                     if(daoMethod.hasAnyAnnotation(Insert::class.java, Update::class.java, Delete::class.java) &&
                         (overridingFunction.entityParamComponentType as? ClassName)?.isReplicateEntity(processingEnv) == true) {
 
@@ -128,6 +138,22 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(
 
                             add("_db.%M(%L.%M())\n",
                                 MemberName("com.ustadmobile.door.attachments", "storeAttachment"),
+                                if(isList) "it" else entityParam.name,
+                                MemberName(entityClassName.packageName, "asEntityWithAttachment"))
+
+                            endAttachmentStorageFlow(overridingFunction)
+                        }
+
+                        //if this table has attachments and an update was done, check to delete old data
+                        if(daoMethod.hasAnnotation(Update::class.java) &&
+                                entityComponentType.hasAttachments(processingEnv)) {
+                            val entityClassName = entityComponentType as ClassName
+                            val isList = entityParam.type.isListOrArray()
+
+                            beginAttachmentStorageFlow(overridingFunction)
+
+                            add("_repo.%M(%L.%M())\n",
+                                MemberName("com.ustadmobile.door.attachments", "deleteZombieAttachments"),
                                 if(isList) "it" else entityParam.name,
                                 MemberName(entityClassName.packageName, "asEntityWithAttachment"))
 
@@ -194,18 +220,20 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(
                         add("return ")
                     }
                 }
-                .addDelegateFunctionCall("_dao", overridingFunction)
-                .add("\n")
-                .applyIf(setPk && overridingFunction.returnType != null && overridingFunction.returnType != UNIT) {
-                    //We need to override this to return the PKs that were really generated
-                    val entityParamType = overridingFunction.parameters.first().type
-                    if(entityParamType.isListOrArray()) {
-                        add("return _generatedPks")
-                        if(entityParamType.isArrayType())
-                            add("toTypedArray()")
-                        add("\n")
-                    }else {
-                        add("return ${overridingFunction.parameters.first().name}.${pkField?.simpleName}\n")
+                .applyIf(!isSyncFunctionOnJs) {
+                    addDelegateFunctionCall("_dao", overridingFunction)
+                    .add("\n")
+                    .applyIf(setPk && overridingFunction.returnType != null && overridingFunction.returnType != UNIT) {
+                        //We need to override this to return the PKs that were really generated
+                        val entityParamType = overridingFunction.parameters.first().type
+                        if(entityParamType.isListOrArray()) {
+                            add("return _generatedPks")
+                            if(entityParamType.isArrayType())
+                                add("toTypedArray()")
+                            add("\n")
+                        }else {
+                            add("return ${overridingFunction.parameters.first().name}.${pkField?.simpleName}\n")
+                        }
                     }
                 }
                 .build())
@@ -220,8 +248,7 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(
 fun FileSpec.Builder.addDbWrapperTypeSpec(
     dbTypeEl: TypeElement,
     processingEnv: ProcessingEnvironment,
-    addJdbcOverrides: Boolean = true,
-    addRoomOverrides: Boolean = false
+    target: DoorTarget,
 ): FileSpec.Builder {
     val dbClassName = dbTypeEl.asClassName()
     addType(
@@ -236,13 +263,15 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
                             .build())
                     .addProperty(PropertySpec.builder("_db", dbClassName, KModifier.PRIVATE)
                             .initializer("_db").build())
-                    .applyIf(addJdbcOverrides) {
+                    .applyIf(target == DoorTarget.JS || target == DoorTarget.JVM) {
                         addDbVersionProperty(dbTypeEl)
                         addFunction(FunSpec.builder("createAllTables")
                                 .addModifiers(KModifier.OVERRIDE)
                                 .returns(List::class.parameterizedBy(String::class))
                                 .addCode("return _db.createAllTables()\n")
                                 .build())
+                    }
+                    .applyIf(target == DoorTarget.JVM) {
                         addFunction(FunSpec.builder("wrapForNewTransaction")
                             .addOverrideWrapNewTransactionFun()
                             .addCode("return transactionDb.%M(dbKClass) as T\n",
@@ -274,7 +303,7 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
                                     "Runnable"))
                             .addCode("_db.runInTransaction(body)\n")
                             .build())
-                    .applyIf(addRoomOverrides) {
+                    .applyIf(target == DoorTarget.ANDROID) {
                         addRoomDatabaseCreateOpenHelperFunction()
                         addRoomCreateInvalidationTrackerFunction()
                         addOverrideGetRoomInvalidationTracker("_db")
@@ -290,7 +319,8 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
  */
 fun FileSpec.Builder.addDaoWrapperTypeSpec(
     daoTypeElement: TypeElement,
-    processingEnv: ProcessingEnvironment
+    processingEnv: ProcessingEnvironment,
+    target: DoorTarget
 ): FileSpec.Builder {
     addType(TypeSpec.classBuilder(daoTypeElement.asClassNameWithSuffix(DoorDatabaseReplicateWrapper.SUFFIX))
             .superclass(daoTypeElement.asClassName())
@@ -308,7 +338,7 @@ fun FileSpec.Builder.addDaoWrapperTypeSpec(
                     .build())
             .apply {
                 daoTypeElement.allOverridableMethods(processingEnv).forEach {daoMethodEl ->
-                    addDaoFunctionDelegate(daoMethodEl, daoTypeElement, processingEnv)
+                    addDaoFunctionDelegate(daoMethodEl, daoTypeElement, processingEnv, target)
                 }
             }
             .build())
@@ -337,37 +367,34 @@ private fun TypeElement.daoHasRepositoryWriteFunctions(
 class DbProcessorReplicateWrapper: AbstractDbProcessor()  {
 
     override fun process(annotations: MutableSet<out TypeElement>?, roundEnv: RoundEnvironment): Boolean {
+        val targetMap = mapOf(DoorTarget.JVM to AnnotationProcessorWrapper.OPTION_JVM_DIRS,
+            DoorTarget.JS to AnnotationProcessorWrapper.OPTION_JS_OUTPUT,
+            DoorTarget.ANDROID to AnnotationProcessorWrapper.OPTION_ANDROID_OUTPUT)
+
         roundEnv.getElementsAnnotatedWith(Database::class.java).map { it as TypeElement }.forEach {dbTypeEl ->
             //jvm version
             if(dbTypeEl.dbHasReplicateWrapper(processingEnv)) {
-                FileSpec.builder(dbTypeEl.qualifiedPackageName(processingEnv),
+                targetMap.forEach { target ->
+                    FileSpec.builder(dbTypeEl.qualifiedPackageName(processingEnv),
                         "${dbTypeEl.simpleName}${DoorDatabaseReplicateWrapper.SUFFIX}")
-                        .addDbWrapperTypeSpec(dbTypeEl, processingEnv)
+                        .addDbWrapperTypeSpec(dbTypeEl, processingEnv, target.key)
                         .build()
-                        .writeToDirsFromArg(AnnotationProcessorWrapper.OPTION_JVM_DIRS)
-
-                FileSpec.builder(dbTypeEl.packageName,
-                        "${dbTypeEl.simpleName}${DoorDatabaseReplicateWrapper.SUFFIX}")
-                        .addDbWrapperTypeSpec(
-                            dbTypeEl, processingEnv,
-                            addJdbcOverrides = false,
-                            addRoomOverrides = true
-                        )
-                        .build()
-                        .writeToDirsFromArg(AnnotationProcessorWrapper.OPTION_ANDROID_OUTPUT)
+                        .writeToDirsFromArg(target.value)
+                }
             }
         }
 
+
+
         roundEnv.getElementsAnnotatedWith(Dao::class.java).map { it as TypeElement }.forEach {daoTypeEl ->
             if(daoTypeEl.daoHasRepositoryWriteFunctions(processingEnv)) {
-                FileSpec.builder(daoTypeEl.packageName,
+                targetMap.forEach { target ->
+                    FileSpec.builder(daoTypeEl.packageName,
                         "${daoTypeEl.simpleName}${DoorDatabaseReplicateWrapper.SUFFIX}")
-                        .addDaoWrapperTypeSpec(daoTypeEl, processingEnv)
-                        .build().apply {
-                            writeToDirsFromArg(AnnotationProcessorWrapper.OPTION_JVM_DIRS)
-                            writeToDirsFromArg(AnnotationProcessorWrapper.OPTION_ANDROID_OUTPUT)
-                        }
-
+                        .addDaoWrapperTypeSpec(daoTypeEl, processingEnv, target.key)
+                        .build()
+                        .writeToDirsFromArg(target.value)
+                }
             }
         }
 

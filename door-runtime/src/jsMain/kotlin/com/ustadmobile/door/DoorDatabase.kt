@@ -1,5 +1,6 @@
 package com.ustadmobile.door
 
+import com.ustadmobile.door.ext.rootDatabase
 import com.ustadmobile.door.ext.sourceDatabase
 import com.ustadmobile.door.jdbc.ResultSet
 import com.ustadmobile.door.jdbc.SQLException
@@ -26,15 +27,14 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon() {
         get() = throw Exception("This can't be used in JS, only on JVM use getTableNamesAsync")
 
     suspend fun getTableNamesAsync(): List<String> {
-        val delegatedDatabaseVal = sourceDatabase
-        return if(delegatedDatabaseVal != null) {
-            delegatedDatabaseVal.getTableNamesAsync()
+        return if(this != rootDatabase) {
+            rootDatabase.getTableNamesAsync()
         } else {
             var con = null as SQLiteConnectionJs?
             val tableNamesList = mutableListOf<String>()
             val tableResult: ResultSet?
             try {
-                con = transactionRootJdbcDb.openConnection() as SQLiteConnectionJs
+                con = (rootDatabase as DoorDatabaseJdbc).openConnection() as SQLiteConnectionJs
                 val metadata = con.getMetaData() as SQLiteDatabaseMetadataJs
                 tableResult = metadata.getTablesAsync(null, null, "%", arrayOf("TABLE"))
                 while(tableResult.next()) {
