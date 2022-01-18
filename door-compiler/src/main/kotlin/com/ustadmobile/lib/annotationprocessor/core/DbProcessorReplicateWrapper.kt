@@ -293,6 +293,12 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
                             .getter(FunSpec.getterBuilder().addCode("return _db\n")
                                     .build())
                             .build())
+                    .applyIf(target == DoorTarget.JS) {
+                        addFunction(FunSpec.builder("clearAllTablesAsync")
+                            .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
+                            .addCode("_db.clearAllTablesAsync()\n")
+                            .build())
+                    }
                     .addFunction(FunSpec.builder("clearAllTables")
                             .addModifiers(KModifier.OVERRIDE)
                             .addCode("_db.clearAllTables()\n")

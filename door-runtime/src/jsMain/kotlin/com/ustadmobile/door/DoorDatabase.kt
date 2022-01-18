@@ -19,6 +19,8 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon() {
 
     actual abstract fun clearAllTables()
 
+    abstract suspend fun clearAllTablesAsync()
+
     actual override fun runInTransaction(runnable: Runnable) {
         super.runInTransaction(runnable)
     }

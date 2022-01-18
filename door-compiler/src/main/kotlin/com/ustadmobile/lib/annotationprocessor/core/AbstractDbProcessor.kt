@@ -948,6 +948,8 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
 
         val CLASSNAME_ILLEGALARGUMENTEXCEPTION = ClassName("kotlin", "IllegalArgumentException")
 
+        val CLASSNAME_ILLEGALSTATEEXCEPTION = ClassName("kotlin", "IllegalStateException")
+
         val MEMBERNAME_ASYNC_QUERY = MemberName("com.ustadmobile.door.jdbc.ext", "executeQueryAsyncKmp")
 
         val MEMBERNAME_RESULTSET_USERESULTS = MemberName("com.ustadmobile.door.ext", "useResults")

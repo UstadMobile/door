@@ -31,7 +31,9 @@ class TestDbBuilder {
         val workerBlobUrl = URL.createObjectURL(data as Blob)
         val builderOptions = DatabaseBuilderOptions(
             ExampleDatabase2::class, ExampleDatabase2JsImplementations, "jsDb1",workerBlobUrl)
-        exampleDb2 = DatabaseBuilder.databaseBuilder<ExampleDatabase2>(builderOptions).build()
+        exampleDb2 = DatabaseBuilder.databaseBuilder<ExampleDatabase2>(builderOptions).build().also {
+            it.clearAllTablesAsync()
+        }
          //TODO Still running synchronously, we need async for this
         //exampleDb2.clearAllTables()
     }

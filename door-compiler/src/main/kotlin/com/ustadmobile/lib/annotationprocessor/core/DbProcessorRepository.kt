@@ -53,7 +53,8 @@ fun FileSpec.Builder.addDbRepoType(
     addDbVersionProp: Boolean = false,
     overrideKtorHelpers: Boolean = false,
     overrideDataSourceProp: Boolean = false,
-    overrideWrapDbForTransaction: Boolean = false
+    overrideWrapDbForTransaction: Boolean = false,
+    target: DoorTarget
 ): FileSpec.Builder {
     addType(TypeSpec.classBuilder(dbTypeElement.asClassNameWithSuffix(SUFFIX_REPOSITORY2))
             .superclass(dbTypeElement.asClassName())
@@ -138,6 +139,9 @@ fun FileSpec.Builder.addDbRepoType(
                     .addCode("throw %T(%S)\n", ClassName("kotlin", "IllegalStateException"),
                         "Cannot use a repository to clearAllTables!")
                     .build())
+            .applyIf(target == DoorTarget.JS) {
+                addThrowExceptionOverride("clearAllTablesAsync", suspended = true)
+            }
 
             .addRepositoryHelperDelegateCalls("_repositoryHelper")
             .applyIf(overrideClearAllTables) {
@@ -500,7 +504,8 @@ class DbProcessorRepository: AbstractDbProcessor() {
                         syncDaoMode = REPO_SYNCABLE_DAO_CONSTRUCT,
                         addDbVersionProp = true,
                         overrideDataSourceProp = true,
-                        overrideWrapDbForTransaction = true)
+                        overrideWrapDbForTransaction = true,
+                        target = DoorTarget.JVM)
                     .build()
                     .writeToDirsFromArg(OPTION_JVM_DIRS)
 
@@ -509,7 +514,8 @@ class DbProcessorRepository: AbstractDbProcessor() {
                     syncDaoMode = REPO_SYNCABLE_DAO_CONSTRUCT,
                     addDbVersionProp = true,
                     overrideDataSourceProp = true,
-                    overrideWrapDbForTransaction = false)
+                    overrideWrapDbForTransaction = false,
+                    target = DoorTarget.JS)
                 .build()
                 .writeToDirsFromArg(OPTION_JS_OUTPUT)
 
@@ -517,7 +523,8 @@ class DbProcessorRepository: AbstractDbProcessor() {
                     .addDbRepoType(dbTypeEl, processingEnv,
                         syncDaoMode = REPO_SYNCABLE_DAO_FROMDB, overrideClearAllTables = false,
                         overrideSyncDao = true, overrideOpenHelper = true,
-                        overrideKtorHelpers = true)
+                        overrideKtorHelpers = true,
+                        target = DoorTarget.ANDROID)
                     .build()
                     .writeToDirsFromArg(OPTION_ANDROID_OUTPUT)
             dbTypeEl.allDbEntities(processingEnv)

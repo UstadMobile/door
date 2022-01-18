@@ -15,6 +15,7 @@ import javax.lang.model.element.TypeElement
 import androidx.room.Query
 import kotlin.reflect.KClass
 import com.ustadmobile.door.SyncListener
+import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_ILLEGALSTATEEXCEPTION
 
 /**
  * Add a method or property that overrides the given accessor. The ExecutableElement could be a
@@ -227,4 +228,19 @@ fun TypeSpec.toCreateTableSql(
  */
 fun TypeSpec.functionsToImplement() = funSpecs.filter { KModifier.ABSTRACT in it.modifiers }
 
+fun TypeSpec.Builder.addThrowExceptionOverride(
+    funName: String = "clearAllTables",
+    suspended: Boolean = false,
+    exceptionMessage: String = "Cannot use this to run $funName",
+    exceptionClass: ClassName = CLASSNAME_ILLEGALSTATEEXCEPTION
+): TypeSpec.Builder {
+    addFunction(FunSpec.builder(funName)
+        .applyIf(suspended) {
+            addModifiers(KModifier.SUSPEND)
+        }
+        .addModifiers(KModifier.OVERRIDE)
+        .addCode("throw %T(%S)\n", exceptionClass,  exceptionMessage)
+        .build())
 
+    return this
+}

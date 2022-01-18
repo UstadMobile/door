@@ -1468,7 +1468,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     .build())
                 .build())
             .addCreateAllTablesFunction(dbTypeElement)
-            .addClearAllTablesFunction(dbTypeElement)
+            .addClearAllTablesFunction(dbTypeElement, target)
             .apply {
                 val daoGetters = dbTypeElement.enclosedElements
                     .filter { it.kind == ElementKind.METHOD }
@@ -1570,25 +1570,40 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
 
 
     fun TypeSpec.Builder.addClearAllTablesFunction(
-        dbTypeElement: TypeElement
+        dbTypeElement: TypeElement,
+        target: DoorTarget
     ) : TypeSpec.Builder {
-        addFunction(FunSpec.builder("clearAllTables")
-            .addModifiers(KModifier.OVERRIDE)
-            .addCode("var _con = null as %T?\n", CLASSNAME_CONNECTION)
-            .addCode("var _stmt = null as %T?\n", CLASSNAME_STATEMENT)
-            .beginControlFlow("try")
-            .addCode("_con = openConnection()!!\n")
-            .addCode("_stmt = _con.createStatement()!!\n")
+
+        addFunction(FunSpec.builder("makeClearAllTablesSql")
+            .returns(List::class.parameterizedBy(String::class))
+            .addCode("val _stmtList = mutableListOf<String>()\n")
             .apply {
                 dbTypeElement.allDbEntities(processingEnv).forEach {  entityType ->
-                    addCode("_stmt.executeUpdate(%S)\n", "DELETE FROM ${entityType.simpleName}")
+                    addCode("_stmtList += %S\n", "DELETE FROM ${entityType.simpleName}")
                 }
             }
-            .nextControlFlow("finally")
-            .addCode("_stmt?.close()\n")
-            .addCode("_con?.close()\n")
-            .endControlFlow()
+            .addCode("return _stmtList\n")
             .build())
+        addFunction(FunSpec.builder("clearAllTables")
+            .addModifiers(KModifier.OVERRIDE)
+            .applyIf(target == DoorTarget.JVM) {
+                addCode("%M(*makeClearAllTablesSql().%M())\n",
+                    MemberName("com.ustadmobile.door.ext", "execSqlBatch"),
+                    MemberName("kotlin.collections", "toTypedArray"))
+            }
+            .applyIf(target == DoorTarget.JS) {
+                addCode("throw %T(%S)\n", CLASSNAME_ILLEGALSTATEEXCEPTION,
+                        "clearAllTables synchronous not supported on Javascript")
+            }
+            .build())
+
+        if(target == DoorTarget.JS) {
+            addFunction(FunSpec.builder("clearAllTablesAsync")
+                .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
+                .addCode("execSQLBatchAsync(*makeClearAllTablesSql().%M())\n",
+                    MemberName("kotlin.collections", "toTypedArray"))
+                .build())
+        }
         return this
     }
 
