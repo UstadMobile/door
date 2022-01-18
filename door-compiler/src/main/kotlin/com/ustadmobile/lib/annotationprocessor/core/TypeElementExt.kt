@@ -179,6 +179,9 @@ fun TypeElement.dbHasReplicateWrapper(processingEnv: ProcessingEnvironment) : Bo
     return hasRepos && hasReplicatedEntities
 }
 
+fun TypeElement.dbHasRepositories(processingEnv: ProcessingEnvironment) : Boolean {
+    return dbEnclosedDaos(processingEnv).any { it.hasAnnotation(Repository::class.java) }
+}
 
 /**
  * If the given TypeElement represents a Dao, this will return a map of the ClassNames for DAOs

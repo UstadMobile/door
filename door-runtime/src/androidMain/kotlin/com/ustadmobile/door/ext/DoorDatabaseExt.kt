@@ -169,9 +169,8 @@ fun <T: DoorDatabase> DoorDatabase.isWrappable(dbClass: KClass<T>): Boolean {
 }
 
 /**
- * Wrap a syncable database to prevent accidental use of the database instead of the repo on queries
- * that modify syncable entities. All modification queries (e.g. update, insert etc) must be done on
- * the repo.
+ * Wrap a database with replication support. The wrapper manages setting primary keys, (if an entity has a field
+ * annotated with @LastChangedTime) setting the last changed time as the version id, and storing attachment data.
  */
 @Suppress("UNCHECKED_CAST")
 actual fun <T: DoorDatabase> T.wrap(dbClass: KClass<T>) : T {

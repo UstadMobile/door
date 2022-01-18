@@ -1,9 +1,6 @@
 package com.ustadmobile.door.ext
 
-import com.ustadmobile.door.DoorDatabase
-import com.ustadmobile.door.DoorDbType
-import com.ustadmobile.door.DoorSqlDatabase
-import com.ustadmobile.door.RepositoryConfig
+import com.ustadmobile.door.*
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlin.reflect.KClass
@@ -58,15 +55,21 @@ actual fun DoorDatabase.execSqlBatch(vararg sqlStatements: String) {
 }
 
 actual fun <T : DoorDatabase> KClass<T>.doorDatabaseMetadata(): DoorDatabaseMetadata<T> {
-    TODO("Not yet implemented")
+    return DatabaseBuilder.lookupImplementations(this).metadata
 }
 
 actual fun <T : DoorDatabase> T.wrap(dbClass: KClass<T>): T {
-    TODO("wrap: Not yet implemented")
+    val jsImplClasses = DatabaseBuilder.lookupImplementations(dbClass)
+    val rootDb = rootDatabase
+    val wrapperKClass = jsImplClasses.replicateWrapperImplClass
+        ?: throw IllegalArgumentException("$this has no replicate wrapper")
+    val wrapperImpl = wrapperKClass.js.createInstance(rootDb)
+    return wrapperImpl as T
 }
 
 actual fun <T : DoorDatabase> T.unwrap(dbClass: KClass<T>): T {
-    TODO("unwrap: Not yet implemented")
+    return (this as? DoorDatabaseReplicateWrapper)?.realDatabase as? T
+        ?: throw IllegalArgumentException("$this is not a replicate wrapper!")
 }
 
 actual inline fun <reified T : DoorDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T {

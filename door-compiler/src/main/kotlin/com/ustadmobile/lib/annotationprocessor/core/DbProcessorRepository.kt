@@ -490,8 +490,7 @@ class DbProcessorRepository: AbstractDbProcessor() {
 
 
         for(dbTypeEl in dbs) {
-            val hasRepos = (dbTypeEl as TypeElement).dbEnclosedDaos(processingEnv)
-                    .any { it.hasAnnotation(Repository::class.java) }
+            val hasRepos = (dbTypeEl as TypeElement).dbHasRepositories(processingEnv)
 
             if(!hasRepos)
                 continue //This database has no repositories - skip it

@@ -2,6 +2,7 @@ import com.ustadmobile.door.DatabaseBuilder
 import com.ustadmobile.door.DatabaseBuilderOptions
 import com.ustadmobile.door.util.systemTimeInMillis
 import db2.ExampleDatabase2
+import db2.ExampleDatabase2JsImplementations
 import db2.ExampleDatabase2_JdbcKt
 import db2.ExampleEntity2
 import kotlinx.browser.window
@@ -9,12 +10,17 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.json.*
 import org.w3c.dom.url.URL
 import org.w3c.files.Blob
+import repdb.RepDb
+import repdb.RepDbJsImplementations
+import repdb.RepEntity
 import kotlin.js.Promise
 import kotlin.test.*
 
 class TestDbBuilder {
 
      private lateinit var exampleDb2: ExampleDatabase2
+
+     private lateinit var repDb: RepDb
 
      //We can not use @BeforeTest here, it is async call test will run before it finishes the setting up.
      private suspend fun openClearDb() {
@@ -24,11 +30,23 @@ class TestDbBuilder {
         val data = (res.blob() as Promise<dynamic>).await()
         val workerBlobUrl = URL.createObjectURL(data as Blob)
         val builderOptions = DatabaseBuilderOptions(
-            ExampleDatabase2::class,
-            ExampleDatabase2_JdbcKt::class, "jsDb1",workerBlobUrl)
+            ExampleDatabase2::class, ExampleDatabase2JsImplementations, "jsDb1",workerBlobUrl)
         exampleDb2 = DatabaseBuilder.databaseBuilder<ExampleDatabase2>(builderOptions).build()
          //TODO Still running synchronously, we need async for this
         //exampleDb2.clearAllTables()
+    }
+
+    private suspend fun openRepoDb() {
+        val res = (window.fetch("""
+            https://raw.githubusercontent.com/UstadMobile/door/dev-js-2/app-testdb/src/main/resources/worker.sql-asm.js
+        """.trimIndent()) as Promise<dynamic>).await()
+        val data = (res.blob() as Promise<dynamic>).await()
+        val workerBlobUrl = URL.createObjectURL(data as Blob)
+
+        val builderOptions = DatabaseBuilderOptions(
+            RepDb::class, RepDbJsImplementations, "resDb", workerBlobUrl)
+        repDb = DatabaseBuilder.databaseBuilder(builderOptions).build()
+
     }
 
     @Test
@@ -69,5 +87,21 @@ class TestDbBuilder {
         entityToInsert.uid = exampleDb2.exampleDao2().insertAsyncAndGiveId(entityToInsert)
         assertEquals(entityToInsert.name, exampleDb2.exampleDao2().findNameByUidAsync(entityToInsert.uid),
             "Select single column method returns expected value")
+    }
+
+    @Test
+    fun givenRepDbCreated_whenEntityInserted_thenWillUsePkManager() = GlobalScope.promise {
+        val startTime = systemTimeInMillis()
+        openRepoDb()
+        val repEntity = RepEntity().apply {
+            this.reNumField = 42
+        }
+        repEntity.rePrimaryKey =  repDb.repDao.insertAsync(repEntity)
+        println("Primary key = ${repEntity.rePrimaryKey}")
+        val entityFromDb = repDb.repDao.findByUidAsync(repEntity.rePrimaryKey)
+        assertEquals(repEntity.reNumField, entityFromDb!!.reNumField, message = "Found same field value from db")
+        assertTrue(entityFromDb.rePrimaryKey > 1000)
+        assertTrue(entityFromDb.reLastChangeTime > startTime, message = "Last changed time was set")
+
     }
 }

@@ -104,6 +104,16 @@ abstract class RepDao {
     """)
     abstract fun findByUid(uid: Long): RepEntity?
 
+
+    @Query("""
+    SELECT RepEntity.*
+      FROM RepEntity
+     WHERE RepEntity.rePrimaryKey = :uid 
+    """)
+    abstract suspend fun findByUidAsync(uid: Long): RepEntity?
+
+
+
     @Query("""
     SELECT RepEntity.*
       FROM RepEntity

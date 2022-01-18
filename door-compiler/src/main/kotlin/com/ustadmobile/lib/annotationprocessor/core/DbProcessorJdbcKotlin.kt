@@ -37,6 +37,8 @@ import kotlin.reflect.KClass
 import com.ustadmobile.door.util.NodeIdAuthCache
 import com.ustadmobile.door.util.TransactionDepthCounter
 import com.ustadmobile.door.util.DoorInvalidationTracker
+import com.ustadmobile.lib.annotationprocessor.core.DbProcessorJdbcKotlin.Companion.SUFFIX_JDBC_KT2
+import com.ustadmobile.lib.annotationprocessor.core.DbProcessorJdbcKotlin.Companion.SUFFIX_JS_IMPLEMENTATION_CLASSES
 import io.github.aakira.napier.Napier
 import java.io.File
 
@@ -284,6 +286,60 @@ fun FileSpec.Builder.addDatabaseMetadataType(dbTypeElement: TypeElement, process
             .addTableIdMapProperty(dbTypeElement, processingEnv)
             .build())
         .build())
+
+    return this
+}
+
+
+fun FileSpec.Builder.addJsImplementationsClassesObject(
+    dbTypeElement: TypeElement,
+    processingEnv: ProcessingEnvironment
+) : FileSpec.Builder {
+    val jsImplClassName = ClassName("com.ustadmobile.door.util", "DoorJsImplClasses")
+    addType(TypeSpec.objectBuilder(dbTypeElement.simpleName.toString() + SUFFIX_JS_IMPLEMENTATION_CLASSES)
+        .superclass(jsImplClassName.parameterizedBy(dbTypeElement.asClassName()))
+        .addProperty(PropertySpec.builder("dbKClass",
+                KClass::class.asClassName().parameterizedBy(dbTypeElement.asClassName()))
+            .addModifiers(KModifier.OVERRIDE)
+            .initializer("%T::class", dbTypeElement)
+            .build())
+        .addProperty(PropertySpec.builder("dbImplKClass", KClass::class.asTypeName().parameterizedBy(STAR))
+            .addModifiers(KModifier.OVERRIDE)
+            .initializer("%T::class", dbTypeElement.asClassNameWithSuffix(SUFFIX_JDBC_KT2))
+            .build())
+        .addProperty(PropertySpec.builder("replicateWrapperImplClass", KClass::class.asTypeName()
+                .parameterizedBy(STAR).copy(nullable = true))
+            .addModifiers(KModifier.OVERRIDE)
+            .initializer(CodeBlock.builder()
+                .apply {
+                    if(dbTypeElement.dbHasReplicateWrapper(processingEnv)) {
+                        add("%T::class", dbTypeElement.asClassNameWithSuffix(DoorDatabaseReplicateWrapper.SUFFIX))
+                    }else {
+                        add("null")
+                    }
+                }
+                .build())
+            .build())
+        .addProperty(PropertySpec.builder("repositoryImplClass",
+            KClass::class.asTypeName().parameterizedBy(STAR).copy(nullable = true))
+            .addModifiers(KModifier.OVERRIDE)
+            .initializer(CodeBlock.builder()
+                .apply {
+                    if(dbTypeElement.dbHasRepositories(processingEnv)) {
+                        add("%T::class", dbTypeElement.asClassNameWithSuffix(SUFFIX_REPOSITORY2))
+                    }else {
+                        add("null")
+                    }
+                }
+                .build())
+            .build())
+        .addProperty(PropertySpec.builder("metadata",
+            DoorDatabaseMetadata::class.asClassName().parameterizedBy(dbTypeElement.asClassName()))
+            .addModifiers(KModifier.OVERRIDE)
+            .initializer("%T()", dbTypeElement.asClassNameWithSuffix(SUFFIX_DOOR_METADATA))
+            .build())
+        .build())
+
 
     return this
 }
@@ -612,6 +668,11 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .addJdbcDbImplType(dbTypeEl, DoorTarget.JS)
                 .build()
                 .writeToDirsFromArg(listOf(OPTION_JS_OUTPUT))
+
+            FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_JS_IMPLEMENTATION_CLASSES)
+                .addJsImplementationsClassesObject(dbTypeEl, processingEnv)
+                .build()
+                .writeToDirsFromArg(OPTION_JS_OUTPUT)
 
             Napier.d("Creating metadata for ${dbTypeEl.simpleName}")
             FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_DOOR_METADATA)
@@ -1542,6 +1603,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
 
         const val SUFFIX_REP_RUN_ON_CHANGE_RUNNER = "_ReplicationRunOnChangeRunner"
 
+        const val SUFFIX_JS_IMPLEMENTATION_CLASSES = "JsImplementations"
 
     }
 }
