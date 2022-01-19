@@ -1,5 +1,6 @@
 plugins {
     id 'org.jetbrains.kotlin.js'
+    id 'org.jetbrains.kotlin.plugin.serialization'
 }
 
 group = rootProject.group
@@ -26,6 +27,9 @@ dependencies {
     implementation "org.jetbrains.kotlin-wrappers:kotlin-react-dom:$version_kotlin_react"
     implementation "org.jetbrains.kotlin-wrappers:kotlin-styled:$version_kotlin_styled"
     implementation "org.jetbrains.kotlin-wrappers:kotlin-react-router-dom:$version_kotlin_react_router_dom"
+    implementation "io.github.aakira:napier:$version_napier"
+    implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
+
     implementation project(":door-runtime")
     implementation project(":door-testdb")
     implementation "io.ktor:ktor-client-js:$version_ktor"

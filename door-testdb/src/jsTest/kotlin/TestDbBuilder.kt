@@ -1,5 +1,7 @@
+import com.ustadmobile.door.ChangeListenerRequest
 import com.ustadmobile.door.DatabaseBuilder
 import com.ustadmobile.door.DatabaseBuilderOptions
+import com.ustadmobile.door.ext.addInvalidationListener
 import com.ustadmobile.door.util.systemTimeInMillis
 import db2.ExampleDatabase2
 import db2.ExampleDatabase2JsImplementations
@@ -61,10 +63,12 @@ class TestDbBuilder {
     @Test
     fun givenDbShouldOpen() = GlobalScope.promise {
         openClearDb()
+        delay(10000)
         val exampleDao2 = exampleDb2.exampleDao2()
         assertNotNull(exampleDao2)
         val exList = listOf(ExampleEntity2(0, "bob",42))
         exampleDao2.insertListAsync(exList)
+        println("All done")
         assertTrue(true)
     }
 
@@ -105,5 +109,25 @@ class TestDbBuilder {
         assertTrue(entityFromDb.rePrimaryKey > 1000)
         assertTrue(entityFromDb.reLastChangeTime > startTime, message = "Last changed time was set")
 
+    }
+
+    @Test
+    fun givenInvalidationListenerActive_whenEntityInserted_thenWillReceiveEvent() = GlobalScope.promise {
+        openRepoDb()
+        val repEntity = RepEntity().apply {
+            this.reNumField = 42
+        }
+
+        val completableDeferred = CompletableDeferred<Boolean>()
+        repDb.addInvalidationListener(ChangeListenerRequest(listOf("RepEntity")) {
+            if("RepEntity" in it)
+                completableDeferred.complete(true)
+        })
+
+        repEntity.rePrimaryKey = repDb.repDao.insertAsync(repEntity)
+        withTimeout(5000) {
+            completableDeferred.await()
+        }
+        assertTrue(completableDeferred.await(), "RepEntity change triggered")
     }
 }

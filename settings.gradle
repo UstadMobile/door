@@ -3,3 +3,5 @@ include 'door-runtime', 'door-compiler', 'room-annotations', 'door-testdb'
 include 'app-testdb'
 include 'door-room-jdbc'
 include ':test-app-android'
+include 'door-testdb-server'
+

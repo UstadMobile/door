@@ -235,6 +235,7 @@ suspend fun DoorDatabaseRepository.fetchPendingReplications(
 fun DoorDatabaseRepository.makeNewSubscriptionManager(
     coroutineScope: CoroutineScope = GlobalScope
 ): ReplicationSubscriptionManager {
+    Napier.d("Create new subscription manager for $this...\n")
     val dbMetadata = this.db::class.doorDatabaseMetadata()
     return ReplicationSubscriptionManager(dbMetadata.version, config.json, db.replicationNotificationDispatcher,
         this, coroutineScope, dbMetadata, dbMetadata.dbClass,

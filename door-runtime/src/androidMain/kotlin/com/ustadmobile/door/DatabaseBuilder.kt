@@ -6,6 +6,7 @@ import kotlin.reflect.KClass
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.ustadmobile.door.attachments.AttachmentFilter
+import com.ustadmobile.door.ext.execSqlBatch
 import com.ustadmobile.door.ext.isWrappable
 import com.ustadmobile.door.ext.wrap
 import com.ustadmobile.door.migration.DoorMigration
@@ -36,7 +37,7 @@ actual class DatabaseBuilder<T: DoorDatabase>(
             val callbackClassName = "${dbClass.java.canonicalName}_AndroidReplicationCallback"
             println("Attempt to load callback $callbackClassName")
 
-            val callbackClass = Class.forName(callbackClassName).newInstance() as DoorDatabaseCallback
+            val callbackClass = Class.forName(callbackClassName).newInstance() as DoorDatabaseCallbackSync
 
             builder.addCallback(callbackClass)
 
@@ -58,9 +59,21 @@ actual class DatabaseBuilder<T: DoorDatabase>(
 
     actual fun addCallback(callback: DoorDatabaseCallback) : DatabaseBuilder<T> {
         roomBuilder.addCallback(object: RoomDatabase.Callback() {
-            override fun onCreate(db: SupportSQLiteDatabase)  = callback.onCreate(db)
+            override fun onCreate(db: SupportSQLiteDatabase) {
+                when(callback) {
+                    is DoorDatabaseCallbackSync -> callback.onCreate(db)
+                    is DoorDatabaseCallbackStatementList ->
+                        db.execSqlBatch(*callback.onCreate(db).toTypedArray())
+                }
+            }
 
-            override fun onOpen(db: SupportSQLiteDatabase) = callback.onOpen(db)
+            override fun onOpen(db: SupportSQLiteDatabase) {
+                when(callback){
+                    is DoorDatabaseCallbackSync -> callback.onOpen(db)
+                    is DoorDatabaseCallbackStatementList ->
+                        db.execSqlBatch(*callback.onOpen(db).toTypedArray())
+                }
+            }
         })
 
         return this

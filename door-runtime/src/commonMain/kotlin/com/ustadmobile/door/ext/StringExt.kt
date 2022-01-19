@@ -15,3 +15,12 @@ fun String.minifySql(): String {
     return STR_REGEX.replace(this, " ")
 }
 
+private val sanitizeRegex: Regex by lazy(LazyThreadSafetyMode.NONE) {
+    Regex("\\W")
+}
+
+fun String.sanitizeDbName(): String {
+    return  this.removePrefix("https://")
+        .removePrefix("http://")
+        .replace(sanitizeRegex, "_")
+}

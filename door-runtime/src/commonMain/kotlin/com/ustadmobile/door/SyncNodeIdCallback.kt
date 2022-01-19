@@ -6,7 +6,7 @@ import com.ustadmobile.door.ext.execSqlBatch
  * Callback class. This class will set the nodeId, and insert required rows into SqliteChangeSeqNums and
  * TableSyncStatus
  */
-class SyncNodeIdCallback(val nodeId: Long): DoorDatabaseCallback {
+class SyncNodeIdCallback(val nodeId: Long): DoorDatabaseCallbackSync {
 
     private fun setSyncNode(execSqlFn: (Array<String>) -> Unit) {
         execSqlFn(arrayOf("DELETE FROM SyncNode",

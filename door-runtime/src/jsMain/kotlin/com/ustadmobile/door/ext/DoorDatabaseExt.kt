@@ -1,6 +1,7 @@
 package com.ustadmobile.door.ext
 
 import com.ustadmobile.door.*
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlin.reflect.KClass
@@ -73,5 +74,17 @@ actual fun <T : DoorDatabase> T.unwrap(dbClass: KClass<T>): T {
 }
 
 actual inline fun <reified T : DoorDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T {
-    TODO("asRepository: Not yet implemented")
+    val dbClass = T::class
+    val repoClass = DatabaseBuilder.lookupImplementations(dbClass).repositoryImplClass
+        ?: throw IllegalArgumentException("Database ${dbClass.simpleName} does not have a repository!")
+    val dbUnwrapped = if(this is DoorDatabaseReplicateWrapper) {
+        this.unwrap(dbClass)
+    }else {
+        this
+    }
+
+    val repo: T = repoClass.js.createInstance(this, dbUnwrapped, repositoryConfig, true) as T
+
+    Napier.d("Created JS repo $repo", tag = DoorTag.LOG_TAG)
+    return repo
 }

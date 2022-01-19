@@ -1,6 +1,7 @@
 import com.ustadmobile.door.*
 import com.ustadmobile.door.jdbc.types.Date
 import db2.ExampleDatabase2
+import db2.ExampleDatabase2JsImplementations
 import db2.ExampleDatabase2_JdbcKt
 import db2.ExampleEntity2
 import kotlinx.coroutines.GlobalScope
@@ -22,7 +23,7 @@ class ExamplePresenter<V :  ExampleView> (private val view: V, private val lifec
         GlobalScope.launch {
             val builderOptions = DatabaseBuilderOptions(
                 ExampleDatabase2::class,
-                ExampleDatabase2_JdbcKt::class, "jsDb1","./worker.sql-asm.js")
+                ExampleDatabase2JsImplementations, "jsDb1","./worker.sql-asm.js")
 
             database =  DatabaseBuilder.databaseBuilder<ExampleDatabase2>(builderOptions).build()
 

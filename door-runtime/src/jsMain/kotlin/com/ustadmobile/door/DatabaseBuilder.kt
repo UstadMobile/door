@@ -25,8 +25,8 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(
         val dataSource = SQLiteDatasourceJs(builderOptions.dbName, Worker(builderOptions.webWorkerPath))
         register(builderOptions.dbImplClasses)
 
-        val dbImpl = builderOptions.dbImplClasses.dbImplKClass.js.createInstance(null, dataSource, false,
-            listOf<AttachmentFilter>()) as T
+        val dbImpl = builderOptions.dbImplClasses.dbImplKClass.js.createInstance(null, dataSource,
+            builderOptions.dbName, listOf<AttachmentFilter>()) as T
         val exists = IndexedDb.checkIfExists(builderOptions.dbName)
         SaveToIndexedDbChangeListener(dbImpl, dataSource, builderOptions.saveToIndexedDbDelayTime)
         if(exists){
@@ -34,7 +34,13 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(
         }else{
             if(!dbImpl.getTableNamesAsync().any {it.lowercase() == DoorDatabaseCommon.DBINFO_TABLENAME}) {
                 dbImpl.execSQLBatchAsync(*dbImpl.createAllTables().toTypedArray())
-                callbacks.forEach { it.onCreate(dbImpl.sqlDatabaseImpl) }
+                callbacks.forEach {
+                    when(it) {
+                        is DoorDatabaseCallbackSync -> throw NotSupportedException("Cannot use sync callback on JS")
+                        is DoorDatabaseCallbackStatementList ->
+                            dbImpl.execSQLBatchAsync(*it.onCreate(dbImpl.sqlDatabaseImpl).toTypedArray())
+                    }
+                }
             }else{
                 var sqlCon = null as SQLiteConnectionJs?
                 var stmt = null as SQLitePreparedStatementJs?
@@ -104,7 +110,7 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(
             builderOptions: DatabaseBuilderOptions<T>
         ): DatabaseBuilder<T> = DatabaseBuilder(builderOptions)
 
-        internal fun <T: DoorDatabase> lookupImplementations(dbKClass: KClass<T>): DoorJsImplClasses<T> {
+        fun <T: DoorDatabase> lookupImplementations(dbKClass: KClass<T>): DoorJsImplClasses<T> {
             return implementationMap[dbKClass] as? DoorJsImplClasses<T>
                 ?: throw IllegalArgumentException("${dbKClass.simpleName} is not registered through DatabaseBuilder.register")
         }

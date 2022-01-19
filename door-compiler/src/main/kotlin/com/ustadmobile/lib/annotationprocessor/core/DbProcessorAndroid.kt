@@ -11,7 +11,7 @@ import java.nio.file.Paths
 import javax.annotation.processing.RoundEnvironment
 import javax.lang.model.element.TypeElement
 import javax.tools.Diagnostic
-import com.ustadmobile.door.DoorDatabaseCallback
+import com.ustadmobile.door.DoorDatabaseCallbackSync
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.DoorSqlDatabase
 import com.ustadmobile.door.annotation.ReplicateEntity
@@ -21,7 +21,7 @@ class DbProcessorAndroid: AbstractDbProcessor() {
     fun FileSpec.Builder.addAndroidReplicationCallbackType(dbTypeElement: TypeElement): FileSpec.Builder {
         addType(TypeSpec
             .classBuilder("${dbTypeElement.simpleName}$SUFFIX_ANDROID_REPLICATION_CALLBACK")
-            .addSuperinterface(DoorDatabaseCallback::class)
+            .addSuperinterface(DoorDatabaseCallbackSync::class)
             .addFunction(FunSpec.builder("onCreate")
                 .addParameter("db", DoorSqlDatabase::class)
                 .addModifiers(KModifier.OVERRIDE)

@@ -99,6 +99,7 @@ abstract class DoorDatabaseCommon {
 
 
     fun handleTableChangedInternal(changeTableNames: List<String>) {
+        Napier.d("$this : handleTableChanged: ${changeTableNames.joinToString()}")
         transactionRootJdbcDb.invalidationTracker.onTablesInvalidated(changeTableNames.toSet())
     }
 
@@ -176,10 +177,11 @@ abstract class DoorDatabaseCommon {
     }
 
     override fun toString(): String {
-        val name = when {
-            this is DoorDatabaseRepository -> this.dbName
-            this is DoorDatabaseReplicateWrapper -> this.dbName
-            this is DoorDatabaseJdbc -> this.dbName
+        Napier.d("DoorDatabaseCommon.toString()\n")
+        val name = when(this) {
+            is DoorDatabaseRepository -> this.dbName
+            is DoorDatabaseReplicateWrapper -> this.dbName
+            is DoorDatabaseJdbc -> this.dbName
             else -> "Unknown"
         }
         return "${this::class.simpleName}: $name@${this.doorIdentityHashCode}"

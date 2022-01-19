@@ -112,13 +112,14 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(
 
     //If running on JS, non-suspended (sync) version is NOT allowed
     val isSyncFunctionOnJs = doorTarget == DoorTarget.JS && !overridingFunction.isSuspended
+            && !(overridingFunction.returnType?.isDataSourceFactoryOrLiveData() == true)
 
     addFunction(overridingFunction.toBuilder()
         .addCode(CodeBlock.builder()
                 .applyIf(isSyncFunctionOnJs) {
                     if(doorTarget == DoorTarget.JS && !overridingFunction.isSuspended) {
                         add("throw %T(%S)\n", ClassName("kotlin", "IllegalStateException"),
-                            "Synchronous attachment storage is NOT possible on Javascript!")
+                            "Synchronous db access is NOT possible on Javascript!")
                     }
                 }
                 .applyIf(!isSyncFunctionOnJs) {

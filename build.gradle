@@ -28,6 +28,7 @@ buildscript {
 
     ext.kotlin_version = "1.6.0"
     ext.atomicfu_version = '0.17.0'
+    ext.version_shadow = "7.1.0"
 
     repositories {
         google()

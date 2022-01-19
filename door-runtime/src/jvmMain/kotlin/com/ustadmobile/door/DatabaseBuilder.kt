@@ -14,9 +14,7 @@ import java.sql.Connection
 import java.sql.ResultSet
 import java.sql.SQLException
 import java.sql.Statement
-import java.util.*
 import javax.naming.InitialContext
-import javax.naming.NamingException
 import javax.sql.DataSource
 import kotlin.reflect.KClass
 
@@ -57,7 +55,14 @@ actual class DatabaseBuilder<T: DoorDatabase> internal constructor(
 
         if(!doorDb.tableNames.any {it.lowercase() == DoorDatabaseCommon.DBINFO_TABLENAME}) {
             doorDb.sqlDatabaseImpl.execSQLBatch(doorDb.createAllTables().toTypedArray())
-            callbacks.forEach { it.onCreate(doorDb.sqlDatabaseImpl) }
+            callbacks.forEach {
+                when(it) {
+                    is DoorDatabaseCallbackSync -> it.onCreate(doorDb.sqlDatabaseImpl)
+                    is DoorDatabaseCallbackStatementList -> {
+                        doorDb.execSQLBatch(*it.onCreate(doorDb.sqlDatabaseImpl).toTypedArray())
+                    }
+                }
+            }
         }else {
             var sqlCon = null as Connection?
             var stmt = null as Statement?
@@ -98,7 +103,14 @@ actual class DatabaseBuilder<T: DoorDatabase> internal constructor(
             }
         }
 
-        callbacks.forEach { it.onOpen(doorDb.sqlDatabaseImpl)}
+        callbacks.forEach {
+            when(it) {
+                is DoorDatabaseCallbackSync -> it.onOpen(doorDb.sqlDatabaseImpl)
+                is DoorDatabaseCallbackStatementList -> {
+                    doorDb.execSQLBatch(*it.onOpen(doorDb.sqlDatabaseImpl).toTypedArray())
+                }
+            }
+        }
 
         return if(doorDb::class.doorDatabaseMetadata().hasReadOnlyWrapper) {
             doorDb.wrap(dbClass)
