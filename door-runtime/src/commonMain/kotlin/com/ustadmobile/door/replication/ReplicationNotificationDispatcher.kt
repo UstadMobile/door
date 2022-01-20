@@ -86,6 +86,8 @@ class ReplicationNotificationDispatcher(
         Napier.d("ReplicationNotificationDispatcher for [$db]: processing changes to ${changedTables.joinToString()}",
             tag = DoorTag.LOG_TAG)
         val replicationsToCheck = replicationRunOnChangeRunner.runReplicationRunOnChange(changedTables)
+        Napier.d("ReplicationNotificationDispatcher: findPendingReplications for ${replicationsToCheck.joinToString()}",
+            tag = DoorTag.LOG_TAG)
         findAndSendPendingReplicationNotifications(replicationsToCheck)
     }
 

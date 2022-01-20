@@ -29,7 +29,7 @@ actual class DoorEventSource actual constructor(
             Napier.d("$logPrefix message received ${event.lastEventId} ${event.origin}" +
                     "- ${event.data.toString()}")
             listener.onMessage(
-                DoorServerSentEvent(event.lastEventId, event.origin, event.data.toString())
+                DoorServerSentEvent.parse(event.data.toString())
             )
         }
 

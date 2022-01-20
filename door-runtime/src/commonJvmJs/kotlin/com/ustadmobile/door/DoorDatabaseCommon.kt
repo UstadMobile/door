@@ -177,7 +177,6 @@ abstract class DoorDatabaseCommon {
     }
 
     override fun toString(): String {
-        Napier.d("DoorDatabaseCommon.toString()\n")
         val name = when(this) {
             is DoorDatabaseRepository -> this.dbName
             is DoorDatabaseReplicateWrapper -> this.dbName

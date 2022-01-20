@@ -185,4 +185,15 @@ class SQLiteResultSet(private val results: Array<Any>): ResultSet {
 
     override fun isClosed() = closed
 
+    override fun toString(): String {
+        var str = "[SQLiteResultSet] Columns=$columns"
+
+        if(results.isEmpty()) {
+            str += " - no rows"
+            return str
+        }
+
+        return str
+    }
+
 }

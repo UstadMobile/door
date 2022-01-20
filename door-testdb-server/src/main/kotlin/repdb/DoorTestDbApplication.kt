@@ -31,6 +31,8 @@ fun Application.doorTestDbApplication() {
         method(HttpMethod.Post)
         method(HttpMethod.Put)
         method(HttpMethod.Options)
+        header("door-dbversion")
+        header("door-node")
         header(HttpHeaders.ContentType)
         anyHost()
     }

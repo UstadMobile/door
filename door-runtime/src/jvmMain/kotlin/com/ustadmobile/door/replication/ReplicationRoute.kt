@@ -169,14 +169,13 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
                 db.replicationNotificationDispatcher.addReplicationPendingEventListener(remoteNodeIdAndAuth.first,
                     pendingReplicationListener)
 
+                call.response.header("Cache-Control", "no-cache")
                 call.respondTextWriter(contentType = ContentType.Text.EventStream) {
                     flush()
                     for(notification in channel) {
-                        write("id: ${notification.id}\n")
-                        write("event: ${notification.event}\n")
-                        write("data: ${notification.data}\n\n")
+                        write("data: ${notification.stringify()}\n\n")
                         flush()
-                        Napier.d("Sent event ${notification.id} for data: ${notification.data} to " +
+                        Napier.d("Sent event id #${notification.id} ${notification.event} for data: ${notification.data} to " +
                                 "${remoteNodeIdAndAuth.first}", tag = DoorTag.LOG_TAG)
                     }
                 }

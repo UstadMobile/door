@@ -36,7 +36,7 @@ actual class DoorEventSource actual constructor(
 
     private val eventSourceListener = object:  EventSourceListener() {
         override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
-            listener.onMessage(DoorServerSentEvent(id ?: "", type ?: "", data))
+            listener.onMessage(DoorServerSentEvent.parse(data))
         }
 
         override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
