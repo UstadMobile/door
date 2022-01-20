@@ -54,6 +54,9 @@ class ReplicationSubscriptionManager(
     var onSubscriptionInitialized : SubscriptionInitializedListener? = null
 ): DoorEventListener, ReplicationPendingListener {
 
+    val logPrefix: String
+        get() = "ReplicationSubscriptionManager for $repository"
+
     fun interface SubscriptionInitializedListener {
         suspend fun onSubscriptionInitialized(repo: DoorDatabaseRepository, remoteNodeId: Long)
     }
@@ -107,7 +110,7 @@ class ReplicationSubscriptionManager(
             if(value) {
                 //start the subscription to the endpoint. When the endpoint replies, it can provide the node id as a header or
                 // as a message itself.
-                Napier.i("ReplicationSubscriptionManager for $repository : enabling")
+                Napier.i("$logPrefix : enabling", tag = DoorTag.LOG_TAG)
                 val queryParams = mapOf(
                     DoorConstants.HEADER_DBVERSION to dbSchemaVersion.toString(),
                     DoorConstants.HEADER_NODE to "${repository.config.nodeId}/${repository.config.auth}")
@@ -120,7 +123,7 @@ class ReplicationSubscriptionManager(
 
                 checkQueueSignal.trySend(true)
             }else {
-                Napier.i("ReplicationSubscriptionManager for $repository : disabling")
+                Napier.i("$logPrefix : disabling")
                 val oldEventSource = eventSource.getAndSet(null)
                 oldEventSource?.close()
             }
@@ -175,6 +178,7 @@ class ReplicationSubscriptionManager(
     @ExperimentalCoroutinesApi
     private fun CoroutineScope.produceJobs() = produce {
         do {
+            Napier.d("$logPrefix checking queue")
             checkQueueSignal.receive()
             if(enabled) {
                 val numProcessorsAvailable = numProcessors - activeTables.size
@@ -182,6 +186,8 @@ class ReplicationSubscriptionManager(
                     val tablesToReplicate = findTablesToReplicate().filter {
                         it.tableId !in activeTables
                     }
+                    Napier.d("$logPrefix: produceJobs need to replicate table ids " +
+                            "#${tablesToReplicate.joinToString{ it.tableId.toString() }}", tag = DoorTag.LOG_TAG)
 
                     val numTablesToSend = min(numProcessorsAvailable, tablesToReplicate.size)
                     for(i in 0 until numTablesToSend){
@@ -229,10 +235,14 @@ class ReplicationSubscriptionManager(
     @ExperimentalCoroutinesApi
     private fun CoroutineScope.launchProcessor(id: Int, channel: ReceiveChannel<ReplicationStatus>) = launch {
         for(item in channel) {
+            Napier.d("$logPrefix processor $id: Processing ${item.tableId}")
             if(item.lastLocalChangeTime > item.lastSendReplicationCompleteTime) {
+                Napier.d("$logPrefix processor $id table ${item.tableId} has replications to send",
+                    tag = DoorTag.LOG_TAG)
                 val timeNow = systemTimeInMillis()
                 try {
                     sendReplicationRunner.replicate(repository, item.tableId, item.nodeId)
+                    Napier.d("$logPrefix processor $id table ${item.tableId} replications sent")
                     repository.db.prepareAndUseStatementAsync(
                         "UPDATE ReplicationStatus SET lastSendReplicationCompleteTime = ? WHERE tableId = ? AND nodeId = ?") { stmt ->
                         stmt.setLong(1, timeNow)
@@ -242,15 +252,20 @@ class ReplicationSubscriptionManager(
                         stmt.executeUpdateAsyncKmp()
                     }
                 }catch(e: Exception) {
-                    Napier.e("Exception $id sending ${item.tableId}")
+                    Napier.e("$logPrefix processor $id table ${item.tableId} EXCEPTION sending replication", e,
+                        tag = DoorTag.LOG_TAG)
                     delay(1000)
                 }
             }
 
             if(item.lastRemoteChangeTime > item.lastFetchReplicationCompleteTime) {
+                Napier.d("$logPrefix processor $id table ${item.tableId} has replications to fetch",
+                    tag = DoorTag.LOG_TAG)
                 val timeNow = systemTimeInMillis()
 
                 fetchReplicationRunner.replicate(repository, item.tableId, item.nodeId)
+                Napier.d("$logPrefix processor $id table ${item.tableId} replications fetch complete")
+
                 repository.db.prepareAndUseStatementAsync(
                     "UPDATE ReplicationStatus SET lastFetchReplicationCompleteTime = ? WHERE tableId = ? AND nodeId = ?") { stmt ->
                     stmt.setLong(1, timeNow)
@@ -266,6 +281,7 @@ class ReplicationSubscriptionManager(
     }
 
     override fun onMessage(message: DoorServerSentEvent) {
+        Napier.d("$logPrefix: received message: #${message.id} ${message.event} - ${message.data}")
         when(message.event) {
             EVT_INIT -> coroutineScope.launch {
                 val remoteNodeIdLong = message.data.toLong()
@@ -307,6 +323,7 @@ class ReplicationSubscriptionManager(
             EVT_INVALIDATE -> coroutineScope.launch {
                 val tableIdsToInvalidate = message.data.split(",").mapNotNull { it.trim().toIntOrNull() }
                 initCompletable.await()
+                Napier.d("$logPrefix invalidate table ids: ${tableIdsToInvalidate.joinToString()}")
                 val timeNow = systemTimeInMillis()
                 repository.db.withDoorTransactionAsync(dbKClass) { transactionDb ->
                     transactionDb.prepareAndUseStatementAsync(

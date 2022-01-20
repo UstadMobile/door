@@ -2,10 +2,12 @@ package com.ustadmobile.door.util
 
 import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.entities.DoorNode
+import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.concurrentSafeListOf
 import com.ustadmobile.door.ext.concurrentSafeMapOf
 import com.ustadmobile.door.replication.getDoorNodeAuth
 import com.ustadmobile.door.replication.insertNewDoorNode
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -39,6 +41,7 @@ class NodeIdAuthCache(
                 cachedAuth[nodeId] = dbAuthResult
                 dbAuthResult == auth
             }else {
+                Napier.d("NodeIdAndAuthCache: New Node connected: $nodeId ", tag = DoorTag.LOG_TAG)
                 //new node just arrived
                 db.insertNewDoorNode(DoorNode().also {
                     it.auth = auth
@@ -46,6 +49,7 @@ class NodeIdAuthCache(
                     it.rel = DoorNode.SERVER_FOR
                 })
                 cachedAuth[nodeId] = auth
+                Napier.d("NodeIdAndAuthCache: Fire new node event to ${newNodeListeners.size} listeners")
                 newNodeListeners.forEach {
                     it.onNewDoorNode(nodeId, auth)
                 }

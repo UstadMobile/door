@@ -5,6 +5,7 @@ import com.ustadmobile.door.doortestdbserver.VirtualHostScope
 import com.ustadmobile.door.entities.NodeIdAndAuth
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.bindNewSqliteDataSourceIfNotExisting
+import com.ustadmobile.door.ext.nodeIdAuthCache
 import com.ustadmobile.door.ext.sanitizeDbName
 import com.ustadmobile.door.util.NodeIdAuthCache
 import io.github.aakira.napier.DebugAntilog
@@ -53,7 +54,7 @@ fun Application.doorTestDbApplication() {
         }
 
         bind<NodeIdAuthCache>() with scoped(VirtualHostScope.Default).singleton {
-            NodeIdAuthCache(instance<RepDb>(tag = DoorTag.TAG_DB))
+            instance<RepDb>(tag = DoorTag.TAG_DB).nodeIdAuthCache
         }
 
 

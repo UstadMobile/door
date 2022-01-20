@@ -68,17 +68,9 @@ class ReplicationNotificationDispatcher(
         coroutineScope.launch {
             val tablesChanged = replicationRunOnChangeRunner.runOnNewNode(newNodeId)
             Napier.d("ReplicationNotificationDispatcher for [$db] - onNewDoorNode nodeId $newNodeId " +
-                    "check for pending replications on table(s): ${tablesChanged.joinToString()}")
+                    "check for pending replications on table(s): ${tablesChanged.joinToString()}", tag = DoorTag.LOG_TAG)
             findAndSendPendingReplicationNotifications(tablesChanged.toSet())
         }
-    }
-
-    /**
-     * Connect with the given nodeIdAndAuthCache to receive
-     */
-    fun setupWithNodeIdAndAuthCache(nodeIdAuthCache: NodeIdAuthCache): ReplicationNotificationDispatcher {
-        nodeIdAuthCache.addNewNodeListener(this)
-        return this
     }
 
     private suspend fun onDispatch(event: List<List<String>>) {

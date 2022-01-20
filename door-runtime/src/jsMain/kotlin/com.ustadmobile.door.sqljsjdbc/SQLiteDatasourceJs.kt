@@ -83,10 +83,10 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
     }
 
     internal suspend fun sendQuery(sql: String, params: Array<Any?>? = null): ResultSet {
-        Napier.d("$logPrefix sending query: $sql ", tag = DoorTag.LOG_TAG)
+        Napier.d("$logPrefix sending query: $sql params=${params?.joinToString()}", tag = DoorTag.LOG_TAG)
         val results = sendMessage(makeMessage(sql, params)).results
         val sqliteResultSet = results?.let { SQLiteResultSet(it) } ?: SQLiteResultSet(arrayOf())
-        Napier.d("$logPrefix Got result: Ran: '$sql' result = $sqliteResultSet", tag = DoorTag.LOG_TAG)
+        Napier.d("$logPrefix Got result: Ran: '$sql' params=${params?.joinToString()} result = $sqliteResultSet", tag = DoorTag.LOG_TAG)
         return sqliteResultSet
     }
 

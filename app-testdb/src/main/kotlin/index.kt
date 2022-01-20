@@ -1,6 +1,7 @@
 import com.ustadmobile.door.*
 import com.ustadmobile.door.ext.asRepository
 import com.ustadmobile.door.ext.rootDatabase
+import com.ustadmobile.door.util.systemTimeInMillis
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
 import io.ktor.client.*
@@ -14,6 +15,7 @@ import org.w3c.files.Blob
 import repdb.RepDb
 import repdb.RepDbJsImplementations
 import repdb.RepEntity
+import kotlin.js.Date
 import kotlin.js.Promise
 import kotlin.random.Random
 
@@ -60,14 +62,9 @@ fun main() {
         GlobalScope.launch {
             openRepoDb()
 
-            val completable = CompletableDeferred<RepEntity>()
-            repDb.repDao.findByUidLive(42L).observeForever {
-                if(it != null)
-                    completable.complete(it)
-            }
-
             Napier.i("Inserting into repDb")
             repDb.repDao.insertAsync(RepEntity().apply {
+                this.reString = "From ${Date().toUTCString()}"
                 this.reNumField = 500
             })
 
@@ -76,6 +73,7 @@ fun main() {
 
             delay(5000)
             val entityAsyncQueryResult = repDb.repDao.findByUidAsync(42L)
+            repDb.exportDatabase()
 
             console.log("GOT ENTITY FROM SERVER:? $entityAsyncQueryResult")
 

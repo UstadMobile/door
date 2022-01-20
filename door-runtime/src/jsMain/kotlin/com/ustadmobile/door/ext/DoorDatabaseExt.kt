@@ -85,6 +85,6 @@ actual inline fun <reified T : DoorDatabase> T.asRepository(repositoryConfig: Re
 
     val repo: T = repoClass.js.createInstance(this, dbUnwrapped, repositoryConfig, true) as T
 
-    Napier.d("Created JS repo $repo", tag = DoorTag.LOG_TAG)
+    Napier.d("Created JS repo $repo Node Id ${repositoryConfig.nodeId}", tag = DoorTag.LOG_TAG)
     return repo
 }
