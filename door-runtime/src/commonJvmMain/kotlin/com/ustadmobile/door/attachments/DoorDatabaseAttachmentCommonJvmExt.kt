@@ -2,6 +2,7 @@ package com.ustadmobile.door.attachments
 
 import com.ustadmobile.door.DoorConstants
 import com.ustadmobile.door.DoorDatabaseRepository
+import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.ext.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -80,7 +81,7 @@ actual suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<E
     }
 }
 
-actual suspend fun DoorDatabaseRepository.deleteZombieAttachments(entityWithAttachment: EntityWithAttachment) {
+actual suspend fun DoorDatabase.deleteZombieAttachments(entityWithAttachment: EntityWithAttachment) {
     //TODO: transaction support for this, rework to use replicateentities instead.
     /*
     val syncRepo = this as? DoorDatabaseSyncRepository ?: throw IllegalStateException("Database hosting attachments must be syncable")

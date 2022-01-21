@@ -153,7 +153,7 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(
 
                             beginAttachmentStorageFlow(overridingFunction)
 
-                            add("_repo.%M(%L.%M())\n",
+                            add("_db.%M(%L.%M())\n",
                                 MemberName("com.ustadmobile.door.attachments", "deleteZombieAttachments"),
                                 if(isList) "it" else entityParam.name,
                                 MemberName(entityClassName.packageName, "asEntityWithAttachment"))

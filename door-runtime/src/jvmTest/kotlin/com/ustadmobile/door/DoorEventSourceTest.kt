@@ -54,10 +54,8 @@ class DoorEventSourceTest {
                 get("subscribe") {
                     call.respondTextWriter(contentType = io.ktor.http.ContentType.Text.EventStream) {
                         for(notification in eventChannel) {
-                            write("id: ${notification.id}\n")
-                            write("event: ${notification.event}\n")
                             notification.data.lines().forEach { line ->
-                                write("data: $line\n")
+                                write("data: ${notification.stringify()}\n")
                             }
                             write("\n")
                             flush()
@@ -86,14 +84,14 @@ class DoorEventSourceTest {
         verify(eventListener, timeout(5000)).onMessage(argWhere { it.id == "42" })
 
         GlobalScope.launch {
-            delay(10000)
+            delay(2000)
             eventChannel.trySend(DoorServerSentEvent("50", "UPDATE", "Hello World"))
         }
 
         verify(eventListener, timeout(20000)).onMessage(argWhere { it.id == "50" })
         eventSource.close()
 
-        testServer.stop(5000, 5000)
+        testServer.stop(1000, 1000)
     }
 
     @Test
@@ -119,6 +117,7 @@ class DoorEventSourceTest {
         eventChannel2.trySend(DoorServerSentEvent("43", "UPDATE", "Hello World"))
         verify(eventListener, timeout(5000)).onMessage(argWhere { it.id == "43" })
         testServer2.stop(1000, 1000)
+        eventSource.close()
     }
 
 }

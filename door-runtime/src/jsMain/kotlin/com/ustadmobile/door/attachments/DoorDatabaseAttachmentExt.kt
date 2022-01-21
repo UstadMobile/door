@@ -39,7 +39,7 @@ actual suspend fun DoorDatabase.retrieveAttachment(attachmentUri: String): DoorU
  * After an update has been performed on a table that has attachments, this function is called
  * to delete old/unused data by the generated repository code
  */
-actual suspend fun DoorDatabaseRepository.deleteZombieAttachments(entityWithAttachment: EntityWithAttachment) {
+actual suspend fun DoorDatabase.deleteZombieAttachments(entityWithAttachment: EntityWithAttachment) {
 }
 
 /**
