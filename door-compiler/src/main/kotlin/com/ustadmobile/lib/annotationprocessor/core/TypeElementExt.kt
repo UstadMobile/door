@@ -259,6 +259,11 @@ val TypeElement.entityHasAttachments: Boolean
     get() = hasAnnotation(Entity::class.java) &&
             enclosedElementsWithAnnotation(AttachmentUri::class.java, ElementKind.FIELD).isNotEmpty()
 
+val TypeElement.entityAttachmentAnnotatedFields: List<Element>
+    get() = enclosedElementsWithAnnotation(AttachmentUri::class.java) +
+            enclosedElementsWithAnnotation(AttachmentSize::class.java) +
+            enclosedElementsWithAnnotation(AttachmentMd5::class.java)
+
 
 val TypeElement.entityPrimaryKey: Element?
     get() = enclosedElements.firstOrNull {

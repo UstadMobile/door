@@ -12,7 +12,6 @@ import db2.ExampleDatabase2.Companion.DB_VERSION
     SyncNode::class,
     ExampleSyncableEntity::class,
     OtherSyncableEntity::class,
-    ExampleAttachmentEntity::class,
     ChangeLog::class,
     AccessGrant::class,
     UpdateNotification::class,
@@ -35,8 +34,6 @@ abstract class ExampleDatabase2 : DoorDatabase() {
     abstract fun examlpeDaoWithInterface(): ExampleDaoWithInterface
 
     abstract fun exampleEntityPkIntDao(): ExampleEntityPkIntDao
-
-    abstract fun exampleAttachmentDao(): ExampleAttachmentDao
 
     abstract fun accessGrantDao(): AccessGrantDao
 

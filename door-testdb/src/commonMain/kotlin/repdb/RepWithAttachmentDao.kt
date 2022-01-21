@@ -3,6 +3,7 @@ package repdb
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Update
 import com.ustadmobile.door.DoorLiveData
 import com.ustadmobile.door.annotation.*
 
@@ -80,5 +81,9 @@ abstract class RepWithAttachmentDao {
     @RepoHttpAccessible
     @Repository(Repository.METHOD_DELEGATE_TO_WEB)
     abstract fun findByUidDelegateToWebSync(uid: Long): RepEntityWithAttachment?
+
+
+    @Update
+    abstract fun update(entity: RepEntityWithAttachment)
 
 }

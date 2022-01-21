@@ -8,7 +8,7 @@ import io.ktor.http.*
 import javax.annotation.processing.ProcessingEnvironment
 import javax.lang.model.element.TypeElement
 import androidx.room.PrimaryKey
-import com.ustadmobile.door.util.DoorSqlGenerator
+import com.ustadmobile.door.annotation.ReplicateEntity
 
 /**
  * Generate a delegation style function call, e.g.
@@ -286,6 +286,26 @@ fun CodeBlock.Builder.beginRunBlockingControlFlow() =
                 .indent()
 
 /**
+ * Generate the SQL that will be used to insert into the Zombie SQL trigger where an old attachment md5 is no longer in
+ * use
+ */
+private fun TypeElement.generateZombieAttachmentInsertSql(): String {
+    val attachmentInfo = EntityAttachmentInfo(this)
+    val pkFieldName = enclosedElementsWithAnnotation(PrimaryKey::class.java).first().simpleName
+    val tableId = getAnnotation(ReplicateEntity::class.java).tableId
+
+    return """
+        INSERT INTO ZombieAttachmentData(zaTableId, zaPrimaryKey, zaMd5) 
+        SELECT $tableId AS zaTableId, OLD.$pkFieldName AS zaPrimaryKey, OLD.${attachmentInfo.md5PropertyName} AS zaMd5
+          FROM $entityTableName   
+         WHERE ${entityTableName}.$pkFieldName = OLD.$pkFieldName
+           AND (SELECT COUNT(*) 
+                  FROM $entityTableName
+                 WHERE ${attachmentInfo.md5PropertyName} = OLD.${attachmentInfo.md5PropertyName}) = 0
+    """
+}
+
+/**
  * Add code that will generate triggers to catch Zombie attachment uris on SQLite
  */
 fun CodeBlock.Builder.addGenerateAttachmentTriggerSqlite(
@@ -294,13 +314,12 @@ fun CodeBlock.Builder.addGenerateAttachmentTriggerSqlite(
     stmtListVar: String? = null
 ) : CodeBlock.Builder{
     val attachmentInfo = EntityAttachmentInfo(entity)
-    val pkFieldName = entity.enclosedElementsWithAnnotation(PrimaryKey::class.java).first().simpleName
     addSql(execSqlFn, stmtListVar, """
         CREATE TRIGGER ATTUPD_${entity.simpleName}
         AFTER UPDATE ON ${entity.simpleName} FOR EACH ROW WHEN
-        OLD.${attachmentInfo.md5PropertyName} IS NOT NULL AND (SELECT COUNT(*) FROM ${entity.simpleName} WHERE ${attachmentInfo.md5PropertyName} = OLD.${attachmentInfo.md5PropertyName}) = 0
+        OLD.${attachmentInfo.md5PropertyName} IS NOT NULL
         BEGIN
-        INSERT INTO ZombieAttachmentData(zaTableName, zaPrimaryKey, zaUri) VALUES('${entity.simpleName}', OLD.$pkFieldName, OLD.${attachmentInfo.uriPropertyName});
+        ${entity.generateZombieAttachmentInsertSql()}; 
         END
     """)
 
@@ -312,21 +331,18 @@ fun CodeBlock.Builder.addGenerateAttachmentTriggerSqlite(
  */
 fun CodeBlock.Builder.addGenerateAttachmentTriggerPostgres(entity: TypeElement, stmtListVar: String) : CodeBlock.Builder {
     val attachmentInfo = EntityAttachmentInfo(entity)
-    val pkFieldName = entity.enclosedElementsWithAnnotation(PrimaryKey::class.java).first().simpleName
     add("$stmtListVar += %S\n", """
         CREATE OR REPLACE FUNCTION attach_${entity.simpleName}_fn() RETURNS trigger AS ${'$'}${'$'}
         BEGIN
-        INSERT INTO ZombieAttachmentData(zaTableName, zaPrimaryKey, zaUri) 
-        SELECT '${entity.simpleName}' AS zaTableName, OLD.${pkFieldName} AS zaPrimaryKey, OLD.${attachmentInfo.uriPropertyName} AS zaUri
-        WHERE (SELECT COUNT(*) FROM ${entity.simpleName} WHERE ${attachmentInfo.md5PropertyName} = OLD.${attachmentInfo.md5PropertyName}) = 0;
-        RETURN null;
+        ${entity.generateZombieAttachmentInsertSql()};
+        RETURN NEW;
         END ${'$'}${'$'}
         LANGUAGE plpgsql
     """.trimIndent())
     add("$stmtListVar += %S\n", """
         CREATE TRIGGER attach_${entity.simpleName}_trig
         AFTER UPDATE ON ${entity.simpleName}
-        FOR EACH ROW WHEN (OLD.${attachmentInfo.uriPropertyName} IS NOT NULL)
+        FOR EACH ROW WHEN (OLD.${attachmentInfo.md5PropertyName} IS NOT NULL)
         EXECUTE PROCEDURE attach_${entity.simpleName}_fn();
     """.trimIndent())
 

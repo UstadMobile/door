@@ -82,17 +82,11 @@ actual suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<E
 }
 
 actual suspend fun DoorDatabase.deleteZombieAttachments(entityWithAttachment: EntityWithAttachment) {
-    //TODO: transaction support for this, rework to use replicateentities instead.
-    /*
-    val syncRepo = this as? DoorDatabaseSyncRepository ?: throw IllegalStateException("Database hosting attachments must be syncable")
-    val zombieAttachmentDataList = syncRepo.syncHelperEntitiesDao.findZombieAttachments(
-            entityWithAttachment.tableName, 0)
+    val tableId = this::class.doorDatabaseMetadata().getTableId(entityWithAttachment.tableName)
 
+    val zombieAttachmentDataList = findZombieAttachments(tableId)
     zombieAttachmentDataList.forEach {
-        val attachmentFile = File(requireAttachmentDirFile(), it.tableNameAndMd5Path)
+        val attachmentFile = File(requireAttachmentStorageUri().toFile(), it.tableNameAndMd5Path)
         attachmentFile.delete()
     }
-
-    syncRepo.syncHelperEntitiesDao.deleteZombieAttachments(zombieAttachmentDataList)
-     */
 }

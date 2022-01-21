@@ -14,10 +14,10 @@ class ZombieAttachmentData {
     @PrimaryKey(autoGenerate = true)
     var zaUid: Long = 0
 
-    var zaTableName: String? = null
+    var zaTableId: Int = 0
 
     var zaPrimaryKey: Long = 0
 
-    var zaUri: String? = null
+    var zaMd5: String? = null
 
 }

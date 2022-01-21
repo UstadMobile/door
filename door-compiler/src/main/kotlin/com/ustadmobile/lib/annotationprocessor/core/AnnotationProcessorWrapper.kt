@@ -20,6 +20,7 @@ import com.squareup.kotlinpoet.metadata.toImmutableKmClass
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.DoorDbType.Companion.PRODUCT_INT_TO_NAME_MAP
 import com.ustadmobile.door.annotation.*
+import com.ustadmobile.door.entities.ZombieAttachmentData
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
 import org.sqlite.SQLiteDataSource
@@ -343,7 +344,31 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
             }
         }
 
+        dbs.flatMap { it.allDbEntities(processingEnv) }.filter {
+            it.entityAttachmentAnnotatedFields.size.let { it != 0 && it != 3 }
+        }.forEach {
+            messager.printMessage(Diagnostic.Kind.ERROR,
+                "Entity ${it.qualifiedName} has some, but not all required attachment fields. Must have " +
+                        "@AttachmentUri, @AttachmentMd5, @AttachmentSize",
+                it)
+        }
 
+        dbs.flatMap { it.allDbEntities(processingEnv) }.filter {
+            it.entityHasAttachments && it.getAnnotation(ReplicateEntity::class.java) == null
+        }.forEach {
+            messager.printMessage(Diagnostic.Kind.ERROR,
+                "Entity ${it.qualifiedName} is annotated with attachment fields, must be annotated with " +
+                        "@ReplicateEntity", it)
+        }
+
+        dbs.filter {
+            it.allDbEntities(processingEnv).any { it.entityHasAttachments } &&
+                    !it.allDbEntities(processingEnv).any { it.qualifiedName.toString() == ZombieAttachmentData::class.qualifiedName }
+        }.forEach {
+            messager.printMessage(Diagnostic.Kind.ERROR,
+                "Database ${it.qualifiedName} has entities with attachments, must have ZombieAttachmentData entity. " +
+                        "Add ZombieAttachmentData to the entities list on the @Database annotation")
+        }
 
         //cleanup postgres so it can be used next time:
         pgConnection?.createStatement()?.use { pgStmt ->

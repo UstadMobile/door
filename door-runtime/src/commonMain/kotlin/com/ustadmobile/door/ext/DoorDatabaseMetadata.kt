@@ -40,6 +40,12 @@ abstract class DoorDatabaseMetadata<T: DoorDatabase> {
     fun requireReplicateEntityMetaData(tableId: Int) = replicateEntities[tableId]
         ?: throw IllegalArgumentException("No metadata for table id $tableId")
 
+    /**
+     * Lookup the table id of a given table name
+     */
+    fun getTableId(tableName: String) = replicateEntities.values.first{ it.entityTableName == tableName}.tableId
+
+
     companion object {
 
         /**

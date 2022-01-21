@@ -1,5 +1,6 @@
 package repdb
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.ustadmobile.door.annotation.*
@@ -36,6 +37,7 @@ class RepEntityWithAttachment {
     @AttachmentUri
     var waAttachmentUri: String? = null
 
+    @ColumnInfo(index = true)
     @AttachmentMd5
     var waMd5: String? = null
 
