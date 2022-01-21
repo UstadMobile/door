@@ -91,7 +91,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
         val initContext = InitialContext()
         initContext.bindNewSqliteDataSourceIfNotExisting("RepDbRemote_$dbTimeStamp")
-        remoteRepDb = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "RepDbRemote",
+        remoteRepDb = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "RepDbRemote_$dbTimeStamp",
                 remoteAttachmentDir)
             .build().also {
                 it.clearAllTables()
