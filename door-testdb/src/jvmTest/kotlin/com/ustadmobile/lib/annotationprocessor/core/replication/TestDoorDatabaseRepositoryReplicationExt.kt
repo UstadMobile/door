@@ -32,6 +32,7 @@ import repdb.RepDb
 import repdb.RepEntity
 import repdb.RepEntityWithAttachment
 import java.io.File
+import javax.naming.InitialContext
 
 class TestDoorDatabaseRepositoryReplicationExt  {
 
@@ -59,6 +60,8 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     private lateinit var catPicFile: File
 
+    private var dbTimeStamp: Long = 0
+
     @JvmField
     @Rule
     var temporaryFolder = TemporaryFolder()
@@ -66,6 +69,8 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     @Before
     fun setup() {
+        dbTimeStamp = systemTimeInMillis()
+        Napier.d("Db Timestamp = $dbTimeStamp")
         catPicFile = temporaryFolder.newFile()
         this::class.java.getResourceAsStream("/cat-pic0.jpg").writeToFile(catPicFile)
 
@@ -84,13 +89,16 @@ class TestDoorDatabaseRepositoryReplicationExt  {
             }
         }
 
+        val initContext = InitialContext()
+        initContext.bindNewSqliteDataSourceIfNotExisting("RepDbRemote_$dbTimeStamp")
         remoteRepDb = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "RepDbRemote",
                 remoteAttachmentDir)
             .build().also {
                 it.clearAllTables()
             }
 
-        localRepDb = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "RepDbLocal",
+        initContext.bindNewSqliteDataSourceIfNotExisting("RepDbLocal_$dbTimeStamp")
+        localRepDb = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "RepDbLocal_$dbTimeStamp",
             temporaryFolder.newFolder("attachments-local1"))
             .build().also {
                 it.clearAllTables()
@@ -139,7 +147,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     //Setup a second local copy (e.g. simulate a second client)
     private fun setupLocalDb2() {
-        localRepDb2 = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "RepDbLocal2",
+        localRepDb2 = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "RepDbLocal2_$dbTimeStamp",
                 temporaryFolder.newFolder("attachments-local2"))
             .build().also {
                 it.clearAllTables()
@@ -225,7 +233,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         }
 
         runBlocking {
-            localRepDb.repDao.findByUidLive(repEntity.rePrimaryKey).waitUntilWithTimeout(5000 * 1000) {
+            localRepDb.repDao.findByUidLive(repEntity.rePrimaryKey).waitUntilWithTimeout(5000) {
                 it != null
             }
         }
@@ -471,7 +479,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         }
 
         val entityOnLocal2 = runBlocking {
-            localRepDb2.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(10000) {
+            localRepDb2.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(10001) {
                 it != null
             }
         }
@@ -482,13 +490,13 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         })
 
         val updatedOnRemote = runBlocking {
-            remoteRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5000) {
+            remoteRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5002) {
                 it?.reString == "Updated"
             }
         }
 
         val updatedOnLocal1 = runBlocking {
-            localRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5001) {
+            localRepDb.repDao.findByUidLive(entity.rePrimaryKey).waitUntilWithTimeout(5003) {
                 it?.reString == "Updated"
             }
         }
@@ -545,7 +553,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
         //wait for the first entity (without any attachment) to replicate
         runBlocking {
-            localRepDb2.repWithAttachmentDao.findByUidLive(entityWithoutAttachment.waUid).waitUntilWithTimeout(10100 * 1000) {
+            localRepDb2.repWithAttachmentDao.findByUidLive(entityWithoutAttachment.waUid).waitUntilWithTimeout(10100) {
                 it != null
             }
         }
@@ -557,7 +565,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
         //wait for the second entity (with attachment) to replicate
         runBlocking {
-            localRepDb2.repWithAttachmentDao.findByUidLive(entityWithAttachment.waUid).waitUntilWithTimeout(10110 * 1000) {
+            localRepDb2.repWithAttachmentDao.findByUidLive(entityWithAttachment.waUid).waitUntilWithTimeout(10110) {
                 it != null
             }
         }

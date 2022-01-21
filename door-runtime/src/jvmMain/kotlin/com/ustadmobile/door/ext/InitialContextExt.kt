@@ -10,7 +10,6 @@ import javax.naming.InitialContext
  */
 fun InitialContext.bindNewSqliteDataSourceIfNotExisting(
     dbName: String,
-    isPrimary: Boolean = false,
     sqliteDir: File = File("build")
 ) {
     try {
