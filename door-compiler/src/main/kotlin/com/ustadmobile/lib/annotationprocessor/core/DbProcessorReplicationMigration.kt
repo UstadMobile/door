@@ -200,6 +200,13 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
                 }
                 .nextControlFlow("else")
                 .apply {
+                    dbTypeEl.allDbEntities(processingEnv).filter { it.hasAnnotation(ReplicateEntity::class.java) }.forEach { entityType ->
+                        val lastChangedField = entityType.enclosedElementsWithAnnotation(LastChangedTime::class.java).firstOrNull()
+                        if(lastChangedField != null)
+                            add("_stmtList += \"UPDATE·${entityType.entityTableName}·SET·${lastChangedField.simpleName}·=·\${%M()}·WHERE·${lastChangedField.simpleName}·=·0\"\n",
+                                MemberName("com.ustadmobile.door.util", "systemTimeInMillis"))
+                    }
+
                     dbTypeEl.allDbEntities(processingEnv).filter{ it.hasAnnotation(ReplicateEntity::class.java) }.forEach { entityType ->
                         addCreateTrackerTableAndIndex(entityType, "BIGINT", "BOOL")
 
