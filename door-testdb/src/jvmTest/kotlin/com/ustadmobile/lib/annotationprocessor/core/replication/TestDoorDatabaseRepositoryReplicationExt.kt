@@ -147,6 +147,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     //Setup a second local copy (e.g. simulate a second client)
     private fun setupLocalDb2() {
+        InitialContext().bindNewSqliteDataSourceIfNotExisting("RepDbLocal2_$dbTimeStamp")
         localRepDb2 = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "RepDbLocal2_$dbTimeStamp",
                 temporaryFolder.newFolder("attachments-local2"))
             .build().also {
