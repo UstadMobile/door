@@ -23,6 +23,17 @@ android {
         targetSdkVersion 30
     }
 
+    compileOptions {
+        sourceCompatibility = '1.8'
+        targetCompatibility = '1.8'
+    }
+
+    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile) {
+        kotlinOptions {
+            jvmTarget = "1.8"
+        }
+    }
+
     buildTypes {
         release {
             consumerProguardFiles 'proguard-rules.pro'
@@ -92,6 +103,7 @@ kotlin {
         androidMain {
             dependsOn commonJvmMain
             dependencies {
+                implementation project(":door-room-jdbc")
                 implementation "androidx.room:room-runtime:$version_android_room"
                 implementation "androidx.room:room-ktx:$version_android_room"
                 implementation "androidx.lifecycle:lifecycle-livedata-ktx:$version_androidx_lifecycle"
@@ -107,7 +119,11 @@ kotlin {
         }
 
         commonJvmJs {
+            dependsOn commonMain
 
+            dependencies {
+                implementation kotlin('stdlib-common')
+            }
         }
 
 
@@ -140,6 +156,7 @@ kotlin {
                 implementation "io.ktor:ktor-gson:$version_ktor"
                 implementation "io.ktor:ktor-client-okhttp:$version_ktor"
                 implementation "io.ktor:ktor-client-gson:$version_ktor"
+                implementation "io.ktor:ktor-server-test-host:$version_ktor"
             }
         }
         jsMain {

@@ -1,4 +1,5 @@
 package com.ustadmobile.door.sqljsjdbc
+import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.jdbc.ResultSet
@@ -7,6 +8,7 @@ import com.ustadmobile.door.sqljsjdbc.IndexedDb.DATABASE_VERSION
 import com.ustadmobile.door.sqljsjdbc.IndexedDb.DB_STORE_KEY
 import com.ustadmobile.door.sqljsjdbc.IndexedDb.DB_STORE_NAME
 import com.ustadmobile.door.sqljsjdbc.IndexedDb.indexedDb
+import io.github.aakira.napier.Napier
 import kotlinx.browser.document
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.GlobalScope
@@ -28,6 +30,8 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
     private val executedSqlQueries = mutableMapOf<Int, String>()
 
     private val sendUpdateLock = Mutex()
+
+    private val logPrefix: String = "SQLiteDataSourceJs [$dbName]"
 
     init {
         worker.onmessage = { dbEvent: dynamic ->
@@ -59,11 +63,14 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
     private suspend fun sendMessage(message: Json): WorkerResult {
         val completable = CompletableDeferred<WorkerResult>()
         val actionId = ++idCounter
+        Napier.d("$logPrefix sendMessage #$actionId - sending", tag = DoorTag.LOG_TAG)
         pendingMessages[actionId] = completable
         executedSqlQueries[actionId] = message["sql"].toString()
         message["id"] = actionId
         worker.postMessage(message)
-        return completable.await()
+        val result = completable.await()
+        Napier.d("$logPrefix sendMessage #$actionId - got result", tag = DoorTag.LOG_TAG)
+        return result
     }
 
     private fun makeMessage(sql: String, params: Array<Any?>? = arrayOf()): Json {
@@ -76,18 +83,24 @@ class SQLiteDatasourceJs(private val dbName: String, private val worker: Worker)
     }
 
     internal suspend fun sendQuery(sql: String, params: Array<Any?>? = null): ResultSet {
+        Napier.d("$logPrefix sending query: $sql params=${params?.joinToString()}", tag = DoorTag.LOG_TAG)
         val results = sendMessage(makeMessage(sql, params)).results
-        return results?.let { SQLiteResultSet(it) } ?: SQLiteResultSet(arrayOf())
+        val sqliteResultSet = results?.let { SQLiteResultSet(it) } ?: SQLiteResultSet(arrayOf())
+        Napier.d("$logPrefix Got result: Ran: '$sql' params=${params?.joinToString()} result = $sqliteResultSet", tag = DoorTag.LOG_TAG)
+        return sqliteResultSet
     }
 
     internal suspend fun sendUpdate(sql: String, params: Array<Any?>?, returnGeneratedKey: Boolean = false): UpdateResult {
         sendUpdateLock.withLock {
+            Napier.d("$logPrefix sending update: '$sql', params=${params?.joinToString()}",
+                tag = DoorTag.LOG_TAG)
             sendMessage(makeMessage(sql, params))
             val generatedKey = if(returnGeneratedKey) {
                 sendMessage(makeMessage("SELECT last_insert_rowid()")).results?.let { SQLiteResultSet(it) }
             }else {
                 null
             }
+            Napier.d("$logPrefix update done: '$sql'", tag = DoorTag.LOG_TAG)
             return UpdateResult(1, generatedKey)
         }
     }

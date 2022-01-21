@@ -132,7 +132,7 @@ abstract class ExampleDao2 {
     abstract fun queryAllLive(): DoorDataSourceFactory<Int, ExampleEntity2>
 
     @Query("SELECT * FROM ExampleEntity2")
-    abstract suspend fun queryAllLiveAsync(): DoorDataSourceFactory<Int, ExampleEntity2>
+    abstract fun queryAllLiveAsync(): DoorDataSourceFactory<Int, ExampleEntity2>
 
     @RawQuery
     abstract fun rawQueryWithArrParam(query: DoorQuery): List<ExampleEntity2>

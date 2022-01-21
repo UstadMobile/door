@@ -1,50 +1,67 @@
 package com.ustadmobile.door
 
 import com.ustadmobile.door.attachments.AttachmentFilter
+import com.ustadmobile.door.replication.ReplicationSubscriptionMode
+import com.ustadmobile.door.replication.ReplicationSubscriptionManager
 import io.ktor.client.*
 import okhttp3.OkHttpClient
+import kotlinx.serialization.json.Json
 
-actual class RepositoryConfig internal constructor(actual val context: Any,
-                                                   actual val endpoint: String,
-                                                   actual val auth: String,
-                                                   actual val nodeId: Int,
-                                                   actual val httpClient: HttpClient,
-                                                   val okHttpClient: OkHttpClient,
-                                                   actual val attachmentsDir: String,
-                                                   actual val updateNotificationManager: ServerUpdateNotificationManager?,
-                                                   actual val useClientSyncManager: Boolean,
-                                                   actual val attachmentFilters: List<AttachmentFilter>) {
+
+actual class RepositoryConfig internal constructor(
+    actual val context: Any,
+    actual val endpoint: String,
+    actual val auth: String,
+    actual val nodeId: Long,
+    actual val httpClient: HttpClient,
+    val okHttpClient: OkHttpClient,
+    actual val json: Json,
+    actual val useReplicationSubscription: Boolean,
+    actual val replicationSubscriptionMode: ReplicationSubscriptionMode,
+    actual val replicationSubscriptionInitListener: ReplicationSubscriptionManager.SubscriptionInitializedListener?,
+) {
 
     companion object {
 
-        class Builder internal constructor(val context: Any, val endpoint: String, val nodeId: Int,
-                                           val auth: String, val httpClient: HttpClient, val okHttpClient: OkHttpClient) {
+        class Builder internal constructor(
+            val context: Any,
+            val endpoint: String,
+            val nodeId: Long,
+            val auth: String,
+            val httpClient: HttpClient,
+            val okHttpClient: OkHttpClient,
+            val json: Json,
+        ) {
 
             var attachmentsDir: String? = null
 
-            var updateNotificationManager: ServerUpdateNotificationManager? = null
-
-            var useClientSyncManager: Boolean = false
+            var useReplicationSubscription = true
 
             val attachmentFilters = mutableListOf<AttachmentFilter>()
 
+            var replicationSubscriptionInitListener : ReplicationSubscriptionManager.SubscriptionInitializedListener? = null
+
+            var replicationSubscriptionMode = ReplicationSubscriptionMode.AUTO
+
             fun build() : RepositoryConfig{
-                val effectiveAttachmentDir = attachmentsDir ?: defaultAttachmentDir(context, endpoint)
-                return RepositoryConfig(context, endpoint, auth, nodeId, httpClient, okHttpClient, effectiveAttachmentDir,
-                        updateNotificationManager, useClientSyncManager, attachmentFilters.toList())
+                return RepositoryConfig(context, endpoint, auth, nodeId, httpClient, okHttpClient, json,
+                        useReplicationSubscription, replicationSubscriptionMode,
+                        replicationSubscriptionInitListener)
             }
 
         }
 
-        fun repositoryConfig(context: Any,
-                             endpoint: String,
-                             nodeId: Int,
-                             auth: String,
-                             httpClient: HttpClient,
-                             okHttpClient: OkHttpClient,
-                             block: Builder.() -> Unit = {}
+        fun repositoryConfig(
+            context: Any,
+            endpoint: String,
+            nodeId: Long,
+            auth: String,
+            httpClient: HttpClient,
+            okHttpClient: OkHttpClient,
+            json: Json = Json { encodeDefaults = true },
+            block: Builder.() -> Unit = {}
         ) : RepositoryConfig {
-            val builder = Builder(context, endpoint, nodeId, auth, httpClient, okHttpClient)
+            val builder = Builder(context, endpoint, nodeId, auth, httpClient, okHttpClient, json)
             block(builder)
             return builder.build()
         }

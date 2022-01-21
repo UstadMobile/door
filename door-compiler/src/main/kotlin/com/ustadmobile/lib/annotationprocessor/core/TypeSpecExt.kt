@@ -1,5 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
+import androidx.room.ColumnInfo
 import androidx.room.Database
 import androidx.room.PrimaryKey
 import com.squareup.kotlinpoet.*
@@ -14,6 +15,7 @@ import javax.lang.model.element.TypeElement
 import androidx.room.Query
 import kotlin.reflect.KClass
 import com.ustadmobile.door.SyncListener
+import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_ILLEGALSTATEEXCEPTION
 
 /**
  * Add a method or property that overrides the given accessor. The ExecutableElement could be a
@@ -22,7 +24,7 @@ import com.ustadmobile.door.SyncListener
  */
 fun TypeSpec.Builder.addAccessorOverride(methodName: String, returnType: TypeName, codeBlock: CodeBlock) {
     if(methodName.startsWith("get")) {
-        val propName = methodName.substring(3, 4).toLowerCase(Locale.ROOT) + methodName.substring(4)
+        val propName = methodName.substring(3, 4).lowercase() + methodName.substring(4)
         val getterFunSpec = FunSpec.getterBuilder().addCode(codeBlock)
         addProperty(PropertySpec.builder(propName, returnType,
                 KModifier.OVERRIDE).getter(getterFunSpec.build()).build())
@@ -42,8 +44,7 @@ fun TypeSpec.Builder.addAccessorOverride(executableElement: ExecutableElement, c
  * Implement the DoorDatabaseRepository methods for add/remove mirror etc. by delegating to a
  * RepositoryHelper.
  */
-internal fun TypeSpec.Builder.addRepositoryHelperDelegateCalls(delegatePropName: String,
-    clientSyncMgrVarName: String? = null): TypeSpec.Builder {
+internal fun TypeSpec.Builder.addRepositoryHelperDelegateCalls(delegatePropName: String): TypeSpec.Builder {
     addProperty(PropertySpec.builder("connectivityStatus", INT)
             .addModifiers(KModifier.OVERRIDE)
             .mutable(true)
@@ -53,30 +54,7 @@ internal fun TypeSpec.Builder.addRepositoryHelperDelegateCalls(delegatePropName:
             .setter(FunSpec.setterBuilder()
                     .addParameter("newValue", INT)
                     .addCode("$delegatePropName.connectivityStatus = newValue\n")
-                    .apply { takeIf { clientSyncMgrVarName != null }
-                            ?.addCode("$clientSyncMgrVarName?.connectivityStatus = newValue\n") }
                     .build())
-            .build())
-    addFunction(FunSpec.builder("addMirror")
-            .returns(INT)
-            .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-            .addParameter("mirrorEndpoint", String::class)
-            .addParameter("initialPriority", INT)
-            .addCode("return $delegatePropName.addMirror(mirrorEndpoint, initialPriority)\n")
-            .build())
-    addFunction(FunSpec.builder("removeMirror")
-            .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-            .addParameter("mirrorId", INT)
-            .addCode("$delegatePropName.removeMirror(mirrorId)\n")
-            .build())
-    addFunction(FunSpec.builder("updateMirrorPriorities")
-            .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-            .addParameter("newPriorities", Map::class.asClassName().parameterizedBy(INT, INT))
-            .addCode("$delegatePropName.updateMirrorPriorities(newPriorities)\n")
-            .build())
-    addFunction(FunSpec.builder("activeMirrors")
-            .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-            .addCode("return $delegatePropName.activeMirrors()\n")
             .build())
     addFunction(FunSpec.builder("addWeakConnectivityListener")
             .addModifiers(KModifier.OVERRIDE)
@@ -88,47 +66,6 @@ internal fun TypeSpec.Builder.addRepositoryHelperDelegateCalls(delegatePropName:
             .addParameter("listener", RepositoryConnectivityListener::class)
             .addCode("$delegatePropName.removeWeakConnectivityListener(listener)\n")
             .build())
-    addFunction(FunSpec.builder("addTableChangeListener")
-            .addModifiers(KModifier.OVERRIDE)
-            .addParameter("listener", TableChangeListener::class)
-            .addCode("$delegatePropName.addTableChangeListener(listener)\n")
-            .build())
-    addFunction(FunSpec.builder("removeTableChangeListener")
-            .addModifiers(KModifier.OVERRIDE)
-            .addParameter("listener", TableChangeListener::class)
-            .addCode("$delegatePropName.removeTableChangeListener(listener)\n")
-            .build())
-    addFunction(FunSpec.builder("handleTableChanged")
-            .addModifiers(KModifier.OVERRIDE)
-            .addParameter("tableName", String::class)
-            .addCode("$delegatePropName.handleTableChanged(tableName)\n")
-            .build())
-
-    val syncListenerTypeVar = TypeVariableName.Companion.invoke("T", Any::class)
-    addFunction(FunSpec.builder("addSyncListener")
-            .addModifiers(KModifier.OVERRIDE)
-            .addTypeVariable(syncListenerTypeVar)
-            .addParameter("entityClass", KClass::class.asClassName().parameterizedBy(syncListenerTypeVar))
-            .addParameter("listener", SyncListener::class.asClassName().parameterizedBy(syncListenerTypeVar))
-            .addCode("$delegatePropName.addSyncListener(entityClass, listener)\n")
-            .build())
-
-    addFunction(FunSpec.builder("removeSyncListener")
-        .addModifiers(KModifier.OVERRIDE)
-        .addTypeVariable(syncListenerTypeVar)
-        .addParameter("entityClass", KClass::class.asClassName().parameterizedBy(syncListenerTypeVar))
-        .addParameter("listener", SyncListener::class.asClassName().parameterizedBy(syncListenerTypeVar))
-        .addCode("$delegatePropName.removeSyncListener(entityClass, listener)\n")
-        .build())
-
-    addFunction(FunSpec.builder("handleSyncEntitiesReceived")
-        .addModifiers(KModifier.OVERRIDE)
-        .addTypeVariable(syncListenerTypeVar)
-        .addParameter("entityClass", KClass::class.asClassName().parameterizedBy(syncListenerTypeVar))
-        .addParameter("entitiesIncoming", List::class.asClassName().parameterizedBy(syncListenerTypeVar))
-        .addCode("$delegatePropName.handleSyncEntitiesReceived(entityClass, entitiesIncoming)\n")
-        .build())
-
 
     return this
 }
@@ -183,8 +120,6 @@ fun TypeSpec.Builder.addRoomCreateInvalidationTrackerFunction() : TypeSpec.Build
  * preparedstatement insert with or without an autoincrement id can share the same code to set
  * all other parameters.
  *
- * @param entityTypeElement The TypeElement representing the entity, from which we wish to get
- * the field names
  * @param getAutoIncLast if true, then always return any field that is auto increment at the very end
  * @return List of VariableElement representing the entity fields that are persisted
  */
@@ -223,10 +158,15 @@ fun TypeSpec.Builder.addOverrideGetRoomInvalidationTracker(realDbVarName: String
  *
  * @param dbType Integer constant as per DoorDbType
  */
-fun TypeSpec.toCreateTableSql(dbType: Int): String {
+fun TypeSpec.toCreateTableSql(
+    dbType: Int,
+    packageName: String,
+    processingEnv: ProcessingEnvironment
+): String {
     var sql = "CREATE TABLE IF NOT EXISTS ${name} ("
     var commaNeeded = false
 
+    var fieldAnnotatedPk: PropertySpec? = null
     entityFields(getAutoIncLast = true).forEach {fieldEl ->
         sql += """${if(commaNeeded) "," else " "} ${fieldEl.name} """
         val pkAutoGenerate = fieldEl.annotations
@@ -242,6 +182,7 @@ fun TypeSpec.toCreateTableSql(dbType: Int): String {
         }
 
         if(fieldEl.annotations.any { it.className == PrimaryKey::class.asClassName()} ) {
+            fieldAnnotatedPk = fieldEl
             sql += " PRIMARY KEY "
             if(pkAutoGenerate && dbType == DoorDbType.SQLITE)
                 sql += " AUTOINCREMENT "
@@ -252,8 +193,30 @@ fun TypeSpec.toCreateTableSql(dbType: Int): String {
             sql += " NOT NULL "
         }
 
+        val columnInfoSpec = fieldEl.annotations.getAnnotationSpec(ColumnInfo::class.asClassName())
+        val defaultVal = columnInfoSpec?.memberToString("defaultValue")
+        if(defaultVal != null && defaultVal != ColumnInfo.VALUE_UNSPECIFIED) {
+            //Postgres uses an actual boolean type. SQLite / Room is using an Integer with a 0 or 1 value.
+            if(dbType == DoorDbType.POSTGRES && fieldEl.type == BOOLEAN) {
+                sql += " DEFAULT " + if(defaultVal == "1") {
+                    "true"
+                }else {
+                    "false"
+                }
+            }else {
+                sql += " DEFAULT $defaultVal "
+            }
+        }
+
         commaNeeded = true
     }
+
+    val typeEl = processingEnv.elementUtils.getTypeElement("$packageName.${this.name}")
+    val typeElPrimaryKeyFields = typeEl?.entityPrimaryKeys
+    if(typeElPrimaryKeyFields != null && typeElPrimaryKeyFields.isNotEmpty() && fieldAnnotatedPk == null) {
+        sql += ", PRIMARY KEY (${typeElPrimaryKeyFields.joinToString()}) "
+    }
+
 
     sql += ")"
 
@@ -261,48 +224,23 @@ fun TypeSpec.toCreateTableSql(dbType: Int): String {
 }
 
 /**
- * Where the given TypeSpec represents a DAO, get a list of all the syncable entities that are
- * part of this DAO
- */
-fun TypeSpec.daoSyncableEntitiesInSelectResults(processingEnv: ProcessingEnvironment) : List<ClassName> {
-    val syncableEntities = mutableSetOf<ClassName>()
-    funSpecs.filter { it.hasAnnotation(Query::class.java) }.forEach { funSpec ->
-        val returnType = funSpec.returnType?.unwrapQueryResultComponentType()
-        if (!funSpec.daoQuerySql().isSQLAModifyingQuery() && returnType is ClassName) {
-            syncableEntities += returnType.entitySyncableTypes(processingEnv)
-        }
-    }
-
-    return syncableEntities.toList()
-}
-
-/**
- * Returns whether or not this DAO has Syncable Entities in select results. If there are syncable
- * entities in the return type, then a SyncHelper is required.
- */
-fun TypeSpec.isDaoWithSyncableEntitiesInSelectResults(processingEnv: ProcessingEnvironment): Boolean =
-        daoSyncableEntitiesInSelectResults(processingEnv).isNotEmpty()
-
-/**
  * Provide a list of all functions that require implementation (e.g. DAO functions etc)
  */
 fun TypeSpec.functionsToImplement() = funSpecs.filter { KModifier.ABSTRACT in it.modifiers }
 
-
-/**
- * Convenience wrapper to get a list of all FunSpecs that represent a function annotated with
- * Query that have SyncableEntity in their results
- */
-fun TypeSpec.funSpecsWithSyncableSelectResults(processingEnv: ProcessingEnvironment): List<FunSpec>
-        = funSpecs.filter { it.isQueryWithSyncableResults(processingEnv) }
-
-//Add a property that will provide the required datasource abstract val by delegating to the 'real' database
-fun TypeSpec.Builder.addDataSourceProperty(dbVarName: String): TypeSpec.Builder {
-    addProperty(PropertySpec.builder("dataSource", AbstractDbProcessor.CLASSNAME_DATASOURCE,
-        KModifier.OVERRIDE)
-        .getter(FunSpec.getterBuilder()
-            .addCode("return $dbVarName.dataSource\n")
-            .build())
+fun TypeSpec.Builder.addThrowExceptionOverride(
+    funName: String = "clearAllTables",
+    suspended: Boolean = false,
+    exceptionMessage: String = "Cannot use this to run $funName",
+    exceptionClass: ClassName = CLASSNAME_ILLEGALSTATEEXCEPTION
+): TypeSpec.Builder {
+    addFunction(FunSpec.builder(funName)
+        .applyIf(suspended) {
+            addModifiers(KModifier.SUSPEND)
+        }
+        .addModifiers(KModifier.OVERRIDE)
+        .addCode("throw %T(%S)\n", exceptionClass,  exceptionMessage)
         .build())
+
     return this
 }

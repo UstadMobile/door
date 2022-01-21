@@ -1,5 +1,5 @@
 package com.ustadmobile.door
-
+import com.ustadmobile.door.ext.*
 import io.github.aakira.napier.Napier
 import com.ustadmobile.door.jdbc.*
 import kotlinx.coroutines.GlobalScope
@@ -7,40 +7,51 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Runnable
 import com.ustadmobile.door.ext.concurrentSafeListOf
 import com.ustadmobile.door.ext.DoorTag
+import com.ustadmobile.door.ext.rootTransactionDatabase
 
 abstract class DoorDatabaseCommon {
-
-    abstract val dataSource: DataSource
 
     abstract val dbVersion: Int
 
     abstract val jdbcDbType: Int
 
-    /**
-     * Sometimes we want to create a new instance of the database that is just a wrapper e.g.
-     * SyncableReadOnlyWrapper, possibly a transaction wrapper. When this happens, all calls to
-     * listen for changes, opening connections, etc. should be redirected to the source database
-     */
-    var sourceDatabase: DoorDatabase? = null
-        protected set
+    private val transactionRootDatabase: DoorDatabase
+        get() {
+            @Suppress("CAST_NEVER_SUCCEEDS") //In reality it will succeed
+            var db = (this as DoorDatabase)
+            while(db is DoorDatabaseRepository || db is DoorDatabaseReplicateWrapper) {
+                db = db.sourceDatabase ?: throw IllegalStateException("sourceDatabase cannot be null on repo or wrapper")
+            }
+
+            return db
+        }
+
+    val transactionRootJdbcDb : DoorDatabaseJdbc
+        get() = ((this as? DoorDatabase)?.rootTransactionDatabase as? DoorDatabaseJdbc)
+            ?: throw IllegalStateException("Database does not have jdbc transaction root")
 
     /**
      * Convenience variable that will be the sourceDatabase if it is not null, or this database
      * itself otherwise
      */
+    @Suppress("CAST_NEVER_SUCCEEDS") // This is incorrect
     protected val effectiveDatabase: DoorDatabase
-        get() = sourceDatabase ?: (this as DoorDatabase)
+        get() = (this as DoorDatabase).sourceDatabase ?: (this as DoorDatabase)
 
 
+    @Suppress("CAST_NEVER_SUCCEEDS")
     var arraySupported: Boolean = false
-        get() = sourceDatabase?.arraySupported ?: field
+        get() = (this as DoorDatabase).sourceDatabase?.arraySupported ?: field
         private set
 
     abstract val jdbcArraySupported: Boolean
 
     abstract val tableNames: List<String>
 
-    val changeListeners = concurrentSafeListOf<ChangeListenerRequest>() as MutableList<ChangeListenerRequest>
+    val changeListeners = concurrentSafeListOf<ChangeListenerRequest>()
+
+    protected val rootDatabaseJdbc: DoorDatabaseJdbc
+        get() = (this as DoorDatabase).rootDatabase as DoorDatabaseJdbc
 
     inner class DoorSqlDatabaseImpl : DoorSqlDatabase {
 
@@ -71,9 +82,6 @@ abstract class DoorDatabaseCommon {
         }
     }
 
-
-    fun openConnection() =  effectiveDatabase.dataSource.getConnection()
-
     abstract fun createAllTables(): List<String>
 
     open fun runInTransaction(runnable: Runnable) {
@@ -81,21 +89,18 @@ abstract class DoorDatabaseCommon {
     }
 
 
-    open fun addChangeListener(changeListenerRequest: ChangeListenerRequest) = effectiveDatabase.apply {
-        changeListeners.add(changeListenerRequest)
+    fun addChangeListener(doorInvalidationObserver: ChangeListenerRequest) {
+        rootDatabaseJdbc.invalidationTracker.addInvalidationListener(doorInvalidationObserver)
     }
 
-    open fun removeChangeListener(changeListenerRequest: ChangeListenerRequest) = effectiveDatabase.apply {
-        changeListeners.remove(changeListenerRequest)
+    fun removeChangeListener(doorInvalidationObserver: ChangeListenerRequest) {
+        rootDatabaseJdbc.invalidationTracker.removeInvalidationListener(doorInvalidationObserver)
     }
 
 
-    open fun handleTableChanged(changeTableNames: List<String>) = effectiveDatabase.apply {
-        GlobalScope.launch {
-            changeListeners.filter { it.tableNames.isEmpty() || it.tableNames.any { changeTableNames.contains(it) } }.forEach {
-                it.onChange.invoke(changeTableNames)
-            }
-        }
+    fun handleTableChangedInternal(changeTableNames: List<String>) {
+        Napier.d("$this : handleTableChanged: ${changeTableNames.joinToString()}")
+        transactionRootJdbcDb.invalidationTracker.onTablesInvalidated(changeTableNames.toSet())
     }
 
     /**
@@ -105,19 +110,25 @@ abstract class DoorDatabaseCommon {
     open fun execSQLBatch(vararg sqlStatements: String) {
         var connection: Connection? = null
         var statement: Statement? = null
+        val rootDb = (this as DoorDatabase).rootDatabase
+        val jdbcDb = (rootDb as DoorDatabaseJdbc)
         try {
-            connection = openConnection()
+            connection = jdbcDb.openConnection()
             connection.setAutoCommit(false)
             statement = connection.createStatement()
             sqlStatements.forEach { sql ->
-                statement.executeUpdate(sql)
+                try {
+                    statement.executeUpdate(sql)
+                }catch(eInner: SQLException) {
+                    Napier.e("execSQLBatch: Exception running SQL: $sql")
+                    throw eInner
+                }
             }
             connection.commit()
         }catch(e: SQLException) {
             throw e
         }finally {
             statement?.close()
-            connection?.setAutoCommit(true)
             connection?.close()
         }
     }
@@ -127,73 +138,27 @@ abstract class DoorDatabaseCommon {
      * use builtin support for arrays if required and available, or fallback to using
      * PreparedStatementArrayProxy otherwise.
      */
-    protected fun Connection.prepareStatement(stmtConfig: PreparedStatementConfig) : PreparedStatement {
+    internal fun Connection.prepareStatement(stmtConfig: PreparedStatementConfig) : PreparedStatement {
+        val pgSql = stmtConfig.postgreSql
+        val sqlToUse = if(pgSql != null && jdbcDbType == DoorDbType.POSTGRES ) {
+            pgSql
+        }else {
+            stmtConfig.sql
+        }
+
         return when {
-            !stmtConfig.hasListParams -> prepareStatement(stmtConfig.sql, stmtConfig.generatedKeys)
-            jdbcArraySupported -> prepareStatement(adjustQueryWithSelectInParam(stmtConfig.sql))
-            else -> PreparedStatementArrayProxy(stmtConfig.sql, this)
-        } ?: throw IllegalStateException("Null statement")
-    }
-
-    /**
-     * Suspended wrapper that will prepare a Statement, execute a code block, and return the code block result
-     */
-    fun <R> prepareAndUseStatement(
-        sql: String,
-        block: (PreparedStatement) -> R
-    ) = prepareAndUseStatement(PreparedStatementConfig(sql), block)
-
-    /**
-     * Wrapper that will prepare a Statement, execute a code block, and return the code block result
-     */
-    fun <R> prepareAndUseStatement(stmtConfig: PreparedStatementConfig, block: (PreparedStatement) -> R) : R {
-        var connection: Connection? = null
-        var stmt: PreparedStatement? = null
-        try {
-            connection = openConnection()
-            stmt = connection.prepareStatement(stmtConfig)
-            return block(stmt)
-        }catch(e: Exception) {
-            Napier.e("prepareAndUseStatement: Exception running SQL: '${stmtConfig.sql}'", e, tag = DoorTag.LOG_TAG)
-            throw e
-        } finally {
-            stmt?.close()
-            connection?.close()
+            !stmtConfig.hasListParams -> prepareStatement(sqlToUse, stmtConfig.generatedKeys)
+            jdbcArraySupported -> prepareStatement(adjustQueryWithSelectInParam(sqlToUse))
+            else -> PreparedStatementArrayProxy(sqlToUse, this)
         }
     }
 
-    /**
-     * Suspended wrapper that will prepare a Statement, execute a code block, and return the code block result
-     */
-    suspend fun <R> prepareAndUseStatementAsync(
-        sql: String,
-        block: suspend (PreparedStatement) -> R
-    ) = prepareAndUseStatementAsync(PreparedStatementConfig(sql), block)
-
-    /**
-     * Suspended wrapper that will prepare a Statement, execute a code block, and return the code block result
-     */
-    suspend fun <R> prepareAndUseStatementAsync(stmtConfig: PreparedStatementConfig, block: suspend (PreparedStatement) -> R) : R {
-        var connection: Connection? = null
-        var stmt: PreparedStatement? = null
-        try {
-            connection = openConnection()
-            stmt = connection.prepareStatement(stmtConfig)
-
-            return block(stmt)
-        }catch(e: Exception) {
-            Napier.e("prepareAndUseStatementAsync: Exception running SQL: '${stmtConfig.sql}'", e, tag = DoorTag.LOG_TAG)
-            throw e
-        }finally {
-            stmt?.close()
-            connection?.close()
-        }
-    }
 
     /**
      * Wrapper for Connection.createArrayOf. If the underlying database supports jdbc arrays, that support will be
      * used. Otherwise the PreparedStatementArrayProxy type will be used
      */
+    @Suppress("RemoveRedundantQualifierName") // It's important to be sure which one we are referring to here
     fun createArrayOf(connection: Connection, arrayType: String, objects: kotlin.Array<out Any?>): com.ustadmobile.door.jdbc.Array {
         return if(jdbcArraySupported) {
             connection.createArrayOf(arrayType, objects)
@@ -211,6 +176,13 @@ abstract class DoorDatabaseCommon {
             RegexOption.IGNORE_CASE)
     }
 
-
-
+    override fun toString(): String {
+        val name = when(this) {
+            is DoorDatabaseRepository -> this.dbName
+            is DoorDatabaseReplicateWrapper -> this.dbName
+            is DoorDatabaseJdbc -> this.dbName
+            else -> "Unknown"
+        }
+        return "${this::class.simpleName}: $name@${this.doorIdentityHashCode}"
+    }
 }

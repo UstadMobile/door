@@ -1,5 +1,6 @@
 package com.ustadmobile.door
 
+import com.ustadmobile.door.replication.ReplicationSubscriptionManager
 import kotlin.reflect.KClass
 
 /**
@@ -10,21 +11,19 @@ interface DoorDatabaseRepository {
 
     val config: RepositoryConfig
 
-    val dbPath: String
-
     /**
      * This provides access to the underlying database for this repository. It must be wrapped with
      * The SyncableReadOnlyWrapper if this is a syncable database.
      */
     val db: DoorDatabase
 
-    suspend fun addMirror(mirrorEndpoint: String, initialPriority: Int): Int
+    val dbName: String
 
-    suspend fun removeMirror(mirrorId: Int)
-
-    suspend fun updateMirrorPriorities(newPriorities: Map<Int, Int>)
-
-    suspend fun activeMirrors(): List<MirrorEndpoint>
+    /**
+     * Indicates whether this is the root repository that corresponds to the root database. This is used on
+     * initialization by the repo code to determine if it should create a ReplicationSubscriptionManager
+     */
+    val isRootRepository: Boolean
 
     /**
      * Adds a weak reference to the given connectivity listener - useful for RepositoryLoadHelper
@@ -46,52 +45,7 @@ interface DoorDatabaseRepository {
      */
     val tableIdMap: Map<String, Int>
 
-    /**
-     * This function will be generated on all repositories. It is intended to be used on the primary
-     * server side.  It will dispatch update notifications
-     * for values that are in the changelog for that table. It will use the notifyOnUpdate query
-     * that is on the SyncableEntity annotation of an entity to find which devices should be
-     * notified of changes. This will result in creating / updating the UpdateNotification table.
-     *
-     * It will also call the UpdateNotificationManager (if provided) so that any client which is
-     * currently subscribed for updates will be notified.
-     *
-     * This function is used by ChangeLogMonitor to tell the repository on the server side when to
-     * go and look at tables for purposes of dispatching notifications.
-     */
-    suspend fun dispatchUpdateNotifications(tableId: Int)
-
-    /**
-     * Add a listener that will be triggered whenever any table has been changed by the repository.
-     * The listener won't be triggered when changes are made directly to the database (e.g. incoming
-     * sync data). This is used by ClientSyncManager to watch for when changes have been made locally
-     * to trigger a sync.
-     *
-     * @param listener the TableChangeListener to call when any table has been changed
-     */
-    fun addTableChangeListener(listener: TableChangeListener)
-
-    /**
-     * Remove a listener that was added using addTableChangeListener
-     *
-     * @param listener TableChangeListener to remove
-     */
-    fun removeTableChangeListener(listener: TableChangeListener)
-
-    fun handleTableChanged(tableName: String)
-
-    /**
-     * Add a listener that will be called when entities are received from another device.
-     */
-    fun <T : Any> addSyncListener(entityClass: KClass<T>, syncListener: SyncListener<T>)
-
-    fun <T: Any> removeSyncListener(entityClass: KClass<T>, syncListener: SyncListener<T>)
-
-    /**
-     * This function is called by generated code to trigger the SyncListener onSyncEntitiesReceived event. It should
-     * NOT be called manually.
-     */
-    fun <T: Any> handleSyncEntitiesReceived(entityClass: KClass<T>, entitiesIncoming: List<T>)
+    val replicationSubscriptionManager: ReplicationSubscriptionManager?
 
     companion object {
 
@@ -102,5 +56,25 @@ interface DoorDatabaseRepository {
         const val DOOR_ATTACHMENT_URI_SCHEME = "door-attachment"
 
         val DOOR_ATTACHMENT_URI_PREFIX = "$DOOR_ATTACHMENT_URI_SCHEME://"
+
+        val PATH_REPLICATION = "replication"
+
+        val ENDPOINT_SUBSCRIBE_SSE = "subscribe"
+
+        val ENDPOINT_CHECK_PENDING_REPLICATION_TRACKERS = "checkPendingReplicationTrackers"
+
+        val ENDPOINT_RECEIVE_ENTITIES = "receive"
+
+        val ENDPOINT_CHECK_FOR_ENTITIES_ALREADY_RECEIVED = "checkForEntitiesAlreadyReceived"
+
+        val ENDPOINT_FIND_PENDING_REPLICATION_TRACKERS = "findPendingReplicationTrackers"
+
+        val ENDPOINT_FIND_PENDING_REPLICATIONS = "findPendingReplication"
+
+        val ENDPOINT_MARK_REPLICATE_TRACKERS_AS_PROCESSED = "markReplicateTrackersAsProcessed"
+
+
+
+
     }
 }

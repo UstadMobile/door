@@ -2,10 +2,8 @@ package com.ustadmobile.door.attachments
 
 import com.ustadmobile.door.DoorConstants
 import com.ustadmobile.door.DoorDatabaseRepository
-import com.ustadmobile.door.DoorDatabaseSyncRepository
-import com.ustadmobile.door.ext.dbSchemaVersion
-import com.ustadmobile.door.ext.doorNodeAndVersionHeaders
-import com.ustadmobile.door.ext.writeToFile
+import com.ustadmobile.door.DoorDatabase
+import com.ustadmobile.door.ext.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import java.io.File
@@ -15,34 +13,39 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.URLEncoder
 import java.net.HttpURLConnection
+import io.github.aakira.napier.Napier
 
 
-fun DoorDatabaseRepository.requireAttachmentDirFile(): File {
-    return config.attachmentsDir?.let { File(it) }
-            ?: throw IllegalStateException("requireAttachmentDirFile called on repository with null attachment dir")
-}
 
 /**
  * Upload the given attachment uri to the endpoint.
  */
+@Suppress("BlockingMethodInNonBlockingContext")
 actual suspend fun DoorDatabaseRepository.uploadAttachment(entityWithAttachment: EntityWithAttachment) {
     val attachmentUri = entityWithAttachment.attachmentUri
             ?: throw IllegalArgumentException("uploadAttachment: Entity with attachment uri must not be null")
     val attachmentMd5 = entityWithAttachment.attachmentMd5
             ?: throw IllegalArgumentException("uploadAttachment: Entity attachment must not be null")
 
-    val attachmentFile = File(requireAttachmentDirFile(),
+    val attachmentFile = File(db.requireAttachmentStorageUri().toFile(),
         attachmentUri.substringAfter(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX))
-    val endpointUrl = URL(URL(config.endpoint), "$dbPath/attachments/upload")
+    val endpointUrl = URL(URL(config.endpoint), "attachments/upload")
 
+    Napier.d("Uploading attachment: $attachmentUri", tag = DoorTag.LOG_TAG)
     //val inputFile = Paths.get(systemUri).toFile()
-    config.httpClient.post<Unit>(endpointUrl.toString()) {
-        doorNodeAndVersionHeaders(this@uploadAttachment)
-        parameter("md5", attachmentMd5)
-        parameter("uri", attachmentUri)
+    try {
+        config.httpClient.post<Unit>(endpointUrl.toString()) {
+            doorNodeAndVersionHeaders(this@uploadAttachment)
+            parameter("md5", attachmentMd5)
+            parameter("uri", attachmentUri)
 
-        body = LocalFileContent(file = attachmentFile, contentType = ContentType.Application.OctetStream)
+            body = LocalFileContent(file = attachmentFile, contentType = ContentType.Application.OctetStream)
+        }
+    }catch(e: Exception) {
+        Napier.e("Error uploading attachment: $attachmentUri", e)
+        throw e
     }
+
 }
 
 actual suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<EntityWithAttachment>) {
@@ -51,29 +54,36 @@ actual suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<E
         return
 
     withContext(Dispatchers.IO) {
-        entitiesWithAttachmentData.forEach { attachmentUri ->
-            val destPath = attachmentUri.substringAfter(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX)
-            val destFile = File(requireAttachmentDirFile(), destPath)
+        var currentUri: String? = null
+        try {
+            entitiesWithAttachmentData.forEach { attachmentUri ->
+                currentUri = attachmentUri
+                val destPath = attachmentUri.substringAfter(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX)
+                val destFile = File(db.requireAttachmentStorageUri().toFile(), destPath)
 
-            if(!destFile.exists()) {
-                val url = URL(URL(config.endpoint),
-                        "$dbPath/attachments/download?uri=${URLEncoder.encode(attachmentUri, "UTF-8")}")
+                if(!destFile.exists()) {
+                    val url = URL(URL(config.endpoint),
+                        "attachments/download?uri=${URLEncoder.encode(attachmentUri, "UTF-8")}")
 
-                destFile.parentFile.takeIf { !it.exists() }?.mkdirs()
+                    destFile.parentFile.takeIf { !it.exists() }?.mkdirs()
 
-                val urlConnection = url.openConnection() as HttpURLConnection
-                urlConnection.setRequestProperty(DoorConstants.HEADER_DBVERSION,
+                    val urlConnection = url.openConnection() as HttpURLConnection
+                    urlConnection.setRequestProperty(DoorConstants.HEADER_DBVERSION,
                         db.dbSchemaVersion().toString())
-                urlConnection.setRequestProperty(DoorConstants.HEADER_NODE,
-                    "${this@downloadAttachments.config.nodeId}/${this@downloadAttachments.config.auth}")
-                urlConnection.inputStream.writeToFile(destFile)
+                    urlConnection.setRequestProperty(DoorConstants.HEADER_NODE,
+                        "${this@downloadAttachments.config.nodeId}/${this@downloadAttachments.config.auth}")
+                    urlConnection.inputStream.writeToFile(destFile)
+                }
             }
+        }catch(e: Exception) {
+            Napier.e("Exception downloading an attachment: $currentUri", e, tag = DoorTag.LOG_TAG)
         }
     }
 }
 
-actual suspend fun DoorDatabaseRepository.deleteZombieAttachments(entityWithAttachment: EntityWithAttachment) {
-    //TODO: transaction support for this
+actual suspend fun DoorDatabase.deleteZombieAttachments(entityWithAttachment: EntityWithAttachment) {
+    //TODO: transaction support for this, rework to use replicateentities instead.
+    /*
     val syncRepo = this as? DoorDatabaseSyncRepository ?: throw IllegalStateException("Database hosting attachments must be syncable")
     val zombieAttachmentDataList = syncRepo.syncHelperEntitiesDao.findZombieAttachments(
             entityWithAttachment.tableName, 0)
@@ -84,4 +94,5 @@ actual suspend fun DoorDatabaseRepository.deleteZombieAttachments(entityWithAtta
     }
 
     syncRepo.syncHelperEntitiesDao.deleteZombieAttachments(zombieAttachmentDataList)
+     */
 }

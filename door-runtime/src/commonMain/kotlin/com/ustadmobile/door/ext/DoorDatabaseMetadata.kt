@@ -1,6 +1,7 @@
 package com.ustadmobile.door.ext
 
 import com.ustadmobile.door.DoorDatabase
+import com.ustadmobile.door.replication.ReplicationEntityMetaData
 import kotlin.reflect.KClass
 
 /**
@@ -20,6 +21,24 @@ abstract class DoorDatabaseMetadata<T: DoorDatabase> {
      * The KClass object for this database.
      */
     abstract val dbClass: KClass<T>
+
+    abstract val replicateEntities: Map<Int, ReplicationEntityMetaData>
+
+    /**
+     * Shorthand to get a list of all the table names that are used by replicate entities
+     */
+    val replicateTableNames: List<String>
+        get() = replicateEntities.values.map { it.entityTableName}
+
+    /**
+     * If true, this database has a corresponding DoorDatabaseSyncableReadOnlyWrapper
+     */
+    abstract val hasReadOnlyWrapper: Boolean
+
+    abstract val version: Int
+
+    fun requireReplicateEntityMetaData(tableId: Int) = replicateEntities[tableId]
+        ?: throw IllegalArgumentException("No metadata for table id $tableId")
 
     companion object {
 

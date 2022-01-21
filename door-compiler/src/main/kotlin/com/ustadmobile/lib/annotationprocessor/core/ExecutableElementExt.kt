@@ -9,7 +9,6 @@ import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
 import javax.lang.model.type.DeclaredType
 import javax.lang.model.type.ExecutableType
-import com.ustadmobile.door.annotation.SyncableEntity
 import org.jetbrains.annotations.Nullable
 import javax.lang.model.element.Modifier
 import javax.lang.model.element.VariableElement
@@ -36,29 +35,6 @@ internal fun ExecutableElement.makeAccessorCodeBlock(): CodeBlock {
  */
 fun ExecutableElement.asMemberOf(typeElement: TypeElement, processingEnvironment: ProcessingEnvironment) : ExecutableType {
     return processingEnvironment.typeUtils.asMemberOf(typeElement.asType() as DeclaredType, this) as ExecutableType
-}
-
-/**
- * Where the ExecutableElement represents a DAO method, determine if that DAO method is modifying
- * a syncable entity. This would include any update, delete, or insert method as well as any
- * query method that uses insert, update, or delete in the query.
- */
-fun ExecutableElement.isDaoMethodModifyingSyncableEntity(daoTypeElement: TypeElement,
-                                                         processingEnv: ProcessingEnvironment,
-                                                         allKnownEntityTypesMap: Map<String, TypeElement>) : Boolean {
-    val executableType = asMemberOf(daoTypeElement, processingEnv)
-
-    val querySql = getAnnotation(Query::class.java)?.value
-    val entityTypeEl: TypeElement? = if(querySql != null) {
-        val entityModifiedSimpleName = findEntityModifiedByQuery(querySql,
-                allKnownEntityTypesMap.keys.toList())
-        allKnownEntityTypesMap[entityModifiedSimpleName]
-    }else {
-        executableType.parameterTypes.first().unwrapListOrArrayComponentType()
-                .asTypeElement(processingEnv)
-    }
-
-    return entityTypeEl?.hasAnnotation(SyncableEntity::class.java) == true
 }
 
 /**

@@ -1,32 +1,45 @@
 package com.ustadmobile.door
 
+import com.ustadmobile.door.attachments.AttachmentFilter
+import com.ustadmobile.door.ext.doorDatabaseMetadata
+import com.ustadmobile.door.ext.wrap
 import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.migration.DoorMigrationAsync
 import com.ustadmobile.door.migration.DoorMigrationStatementList
 import com.ustadmobile.door.migration.DoorMigrationSync
 import kotlinx.coroutines.runBlocking
+import java.io.File
 import java.lang.IllegalStateException
 import java.sql.Connection
 import java.sql.ResultSet
 import java.sql.SQLException
 import java.sql.Statement
-import java.util.*
 import javax.naming.InitialContext
-import javax.naming.NamingException
 import javax.sql.DataSource
 import kotlin.reflect.KClass
 
 
 @Suppress("unused") //This is used as an API
-actual class DatabaseBuilder<T: DoorDatabase> internal constructor(private var context: Any, private var dbClass: KClass<T>, private var dbName: String){
+actual class DatabaseBuilder<T: DoorDatabase> internal constructor(
+    private var context: Any,
+    private var dbClass: KClass<T>,
+    private var dbName: String,
+    private var attachmentDir: File? = null,
+    private var attachmentFilters: List<AttachmentFilter> = mutableListOf()
+){
 
     private val callbacks = mutableListOf<DoorDatabaseCallback>()
 
     private val migrationList = mutableListOf<DoorMigration>()
 
     companion object {
-        fun <T : DoorDatabase> databaseBuilder(context: Any, dbClass: KClass<T>, dbName: String): DatabaseBuilder<T>
-            = DatabaseBuilder(context, dbClass, dbName)
+        fun <T : DoorDatabase> databaseBuilder(
+            context: Any, dbClass:
+            KClass<T>,
+            dbName: String,
+            attachmentDir: File? = null,
+            attachmentFilters: List<AttachmentFilter> = listOf()
+        ): DatabaseBuilder<T> = DatabaseBuilder(context, dbClass, dbName, attachmentDir, attachmentFilters)
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -35,24 +48,21 @@ actual class DatabaseBuilder<T: DoorDatabase> internal constructor(private var c
         val dataSource = iContext.lookup("java:/comp/env/jdbc/${dbName}") as DataSource
         val dbImplClass = Class.forName("${dbClass.java.canonicalName}_JdbcKt") as Class<T>
 
-        val doorDb = if(SyncableDoorDatabase::class.java.isAssignableFrom(dbImplClass)) {
-            var isMaster = false
-            try {
-                val isMasterObj = iContext.lookup("java:/comp/env/doordb/$dbName/master")
-                isMaster = if(isMasterObj != null && isMasterObj is Boolean) { isMasterObj } else { false }
-            }catch(namingException: NamingException) {
-                System.err.println("Warning: could not check if $dbName is master or not, assuming false")
-            }
+        val doorDb = dbImplClass.getConstructor(DoorDatabase::class.java, DataSource::class.java,
+                String::class.java, File::class.java, List::class.java)
+            .newInstance(null, dataSource, dbName, attachmentDir, attachmentFilters)
 
-            dbImplClass.getConstructor(DataSource::class.java, Boolean::class.javaPrimitiveType)
-                    .newInstance(dataSource, isMaster)
-        }else {
-            dbImplClass.getConstructor(DataSource::class.java).newInstance(dataSource)
-        }
 
         if(!doorDb.tableNames.any {it.lowercase() == DoorDatabaseCommon.DBINFO_TABLENAME}) {
             doorDb.sqlDatabaseImpl.execSQLBatch(doorDb.createAllTables().toTypedArray())
-            callbacks.forEach { it.onCreate(doorDb.sqlDatabaseImpl) }
+            callbacks.forEach {
+                when(it) {
+                    is DoorDatabaseCallbackSync -> it.onCreate(doorDb.sqlDatabaseImpl)
+                    is DoorDatabaseCallbackStatementList -> {
+                        doorDb.execSQLBatch(*it.onCreate(doorDb.sqlDatabaseImpl).toTypedArray())
+                    }
+                }
+            }
         }else {
             var sqlCon = null as Connection?
             var stmt = null as Statement?
@@ -93,10 +103,17 @@ actual class DatabaseBuilder<T: DoorDatabase> internal constructor(private var c
             }
         }
 
-        callbacks.forEach { it.onOpen(doorDb.sqlDatabaseImpl)}
+        callbacks.forEach {
+            when(it) {
+                is DoorDatabaseCallbackSync -> it.onOpen(doorDb.sqlDatabaseImpl)
+                is DoorDatabaseCallbackStatementList -> {
+                    doorDb.execSQLBatch(*it.onOpen(doorDb.sqlDatabaseImpl).toTypedArray())
+                }
+            }
+        }
 
-        return if(doorDb is SyncableDoorDatabase) {
-            doorDb.wrap(dbClass as KClass<SyncableDoorDatabase>) as T
+        return if(doorDb::class.doorDatabaseMetadata().hasReadOnlyWrapper) {
+            doorDb.wrap(dbClass)
         }else {
             doorDb
         }

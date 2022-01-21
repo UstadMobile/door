@@ -1,5 +1,7 @@
 package com.ustadmobile.door.attachments
 
+import com.ustadmobile.door.DoorDatabase
+import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.DOOR_ATTACHMENT_URI_PREFIX
 import com.ustadmobile.door.DoorUri
@@ -12,9 +14,9 @@ import java.io.IOException
 import java.net.URI
 import java.nio.file.Paths
 
-actual suspend fun DoorDatabaseRepository.storeAttachment(entityWithAttachment: EntityWithAttachment) {
+actual suspend fun DoorDatabase.storeAttachment(entityWithAttachment: EntityWithAttachment) {
     val attachmentUri = entityWithAttachment.attachmentUri
-    val attachmentDirVal = requireAttachmentDirFile()
+    val attachmentDirVal = requireAttachmentStorageUri().toFile()
 
     if(attachmentUri?.startsWith(DOOR_ATTACHMENT_URI_PREFIX) == true)
         //do nothing - attachment is already stored
@@ -36,7 +38,7 @@ actual suspend fun DoorDatabaseRepository.storeAttachment(entityWithAttachment: 
 
         val md5HexStr = md5.toHexString()
         entityWithAttachment.attachmentMd5 = md5.toHexString()
-        val finalDestFile = File(requireAttachmentDirFile(), entityWithAttachment.tableNameAndMd5Path)
+        val finalDestFile = File(attachmentDirVal, entityWithAttachment.tableNameAndMd5Path)
         finalDestFile.parentFile.takeIf { !it.exists() }?.mkdirs()
 
         if(!tmpDestFile.renameTo(finalDestFile)) {
@@ -48,9 +50,16 @@ actual suspend fun DoorDatabaseRepository.storeAttachment(entityWithAttachment: 
     }
 }
 
-actual suspend fun DoorDatabaseRepository.retrieveAttachment(attachmentUri: String): DoorUri {
-    val attachmentDirVal = config.attachmentsDir ?: throw IllegalStateException("No attachments dir!")
-    val file = File(attachmentDirVal, attachmentUri.substringAfter("door-attachment://"))
+actual suspend fun DoorDatabase.retrieveAttachment(attachmentUri: String): DoorUri {
+    val attachmentDirVal = requireAttachmentStorageUri().toFile()
+    val file = File(attachmentDirVal, attachmentUri.substringAfter(DOOR_ATTACHMENT_URI_PREFIX))
     return DoorUri(file.toURI())
 }
+
+actual val DoorDatabase.attachmentsStorageUri: DoorUri?
+    get() = (rootDatabase as DoorDatabaseJdbc).realAttachmentStorageUri
+
+actual val DoorDatabase.attachmentFilters: List<AttachmentFilter>
+    get() = (rootDatabase as DoorDatabaseJdbc).realAttachmentFilters
+
 

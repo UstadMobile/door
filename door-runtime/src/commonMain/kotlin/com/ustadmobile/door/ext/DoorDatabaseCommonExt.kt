@@ -1,16 +1,11 @@
 package com.ustadmobile.door.ext
 
 import com.ustadmobile.door.*
+import com.ustadmobile.door.jdbc.PreparedStatement
+import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
+import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
-import kotlin.reflect.KClass
-
-/**
- * Extension property that will be true if this database is both syncable and the primary (eg. server)
- * instance, false otherwise
- */
-val DoorDatabase.syncableAndPrimary: Boolean
-        get() = (this as? SyncableDoorDatabase)?.master ?: false
 
 /**
  * If this DoorDatabase represents a repository, then run the given block on the repository first
@@ -95,24 +90,61 @@ fun <T: DoorDatabase> T.requireDbAndRepo(): Pair<T, T> {
  * After clearing all the table data, the sync tables (e.g. TableSyncStatus,
  * The nodeId on SyncNode, etc) need to be setup again.
  */
-fun <T:DoorDatabase> T.clearAllTablesAndResetSync(nodeId: Int, isPrimary: Boolean = false) : T {
+fun <T:DoorDatabase> T.clearAllTablesAndResetNodeId(nodeId: Long) : T {
     clearAllTables()
-    val metadata = this::class.doorDatabaseMetadata()
-    DoorSyncableDatabaseCallback2(nodeId, metadata.syncableTableIdMap, isPrimary)
-        .initSyncTables(dbType(), forceReset = true)  {
+    SyncNodeIdCallback(nodeId)
+        .initSyncTables(forceReset = true)  {
             this.execSqlBatch(*it)
         }
     return this
 }
 
 /**
- * Shorthand to get the Syncable Table Id map using the DoorDatabaseMetadata
+ * Suspended wrapper that will prepare a Statement, execute a code block, and return the code block result
  */
-val DoorDatabase.syncableTableIdMap: Map<String, Int>
-    get() = this::class.doorDatabaseMetadata().syncableTableIdMap
+suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
+    sql: String,
+    block: suspend (PreparedStatement) -> R
+) = prepareAndUseStatementAsync(PreparedStatementConfig(sql), block)
 
 /**
- * Shorthand to get the Syncable Table Id map using the DoorDatabaseMetadata
+ * Suspended wrapper that will prepare a Statement, execute a code block, and return the code block result
  */
-val <T: DoorDatabase> KClass<T>.syncableTableIdMap: Map<String, Int>
-    get() = doorDatabaseMetadata().syncableTableIdMap
+fun <R> DoorDatabase.prepareAndUseStatement(
+    sql: String,
+    block: (PreparedStatement) -> R
+) = prepareAndUseStatement(PreparedStatementConfig(sql), block)
+
+/**
+ * This is used from generated code to delete ChangeLogs for the givne table id
+ */
+suspend fun DoorDatabase.deleteFromChangeLog(tableId: Int) {
+    prepareAndUseStatementAsync("DELETE FROM ChangeLog WHERE chTableId = ?") { stmt ->
+        stmt.setInt(1, tableId)
+        stmt.executeUpdateAsyncKmp()
+    }
+}
+
+/**
+ * Find tables which have pending changelogs that have not yet been processed.
+ */
+suspend fun DoorDatabase.findDistinctPendingChangeLogs(): List<Int> {
+    return prepareAndUseStatementAsync("SELECT DISTINCT chTableId FROM ChangeLog") { stmt ->
+        stmt.executeQueryAsyncKmp().useResults { it.mapRows {
+            it.getInt(1)
+        } }
+    }
+}
+
+/**
+ * Get the real, one and only, root database. This will get out of any wrappers, transactions, etc.
+ */
+val DoorDatabase.rootDatabase: DoorDatabase
+    get() {
+        var db = this
+        while (true) {
+            db = db.sourceDatabase ?: break
+        }
+
+        return db
+    }

@@ -5,6 +5,7 @@ import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.ustadmobile.door.DoorDataSourceFactory
 import com.ustadmobile.door.DoorLiveData
 import com.ustadmobile.door.DoorDbType
+import com.ustadmobile.door.jdbc.TypesKmp
 import javax.annotation.processing.ProcessingEnvironment
 
 /**
@@ -30,6 +31,22 @@ internal fun TypeName.toSqlType(dbType: Int = 0) = when {
     this == String::class.asClassName() -> "TEXT"
 
     else -> "ERR_UNSUPPORTED_TPYE-$this"
+}
+
+/**
+ * Map a Kotlin Type to JDBC Types constant
+ */
+fun TypeName.toSqlTypesInt() = when {
+    this == BOOLEAN -> TypesKmp.BOOLEAN
+    this == BYTE -> TypesKmp.SMALLINT
+    this == SHORT -> TypesKmp.SMALLINT
+    this == INT -> TypesKmp.INTEGER
+    this == LONG -> TypesKmp.BIGINT
+    this == FLOAT -> TypesKmp.FLOAT
+    this == DOUBLE -> TypesKmp.DOUBLE
+    this == String::class.asClassName() -> TypesKmp.LONGVARCHAR
+    this == String::class.asClassName().copy(nullable = true) -> TypesKmp.LONGVARCHAR
+    else -> throw IllegalArgumentException("Could not get sqlTypeInt for: $this")
 }
 
 /**
@@ -146,22 +163,6 @@ fun TypeName.unwrapQueryResultComponentType() = unwrapLiveDataOrDataSourceFactor
  */
 fun TypeName.isLiveData() = this is ParameterizedTypeName && rawType == DoorLiveData::class.asClassName()
 
-/**
- * Finds any syncable entities that are part of this TypeName. This works even if the TypeName
- * represents a parameterized type (e.g. List, LiveData, DataSource.Factory etc).
- */
-fun TypeName.syncableEntities(processingEnv: ProcessingEnvironment) : List<ClassName>{
-    val unwrappedType = unwrapQueryResultComponentType()
-    return (unwrappedType as? ClassName)?.findAllSyncableEntities(processingEnv)?.values?.toList() ?: listOf()
-}
-
-/**
- * Checks if the given TypeName is an entity that is either annotated with SyncableEntity
- * itself, is the descendant of any class with the syncable entity annotation, or contains
- * embedded syncable entities
- */
-fun TypeName.hasSyncableEntities(processingEnv: ProcessingEnvironment) = syncableEntities(processingEnv).isNotEmpty()
-
 fun TypeName.hasAttachments(processingEnv: ProcessingEnvironment): Boolean {
     if(this is ClassName){
         return processingEnv.elementUtils.getTypeElement(canonicalName)?.entityHasAttachments == true
@@ -206,6 +207,20 @@ fun TypeName.defaultTypeValueCode(): CodeBlock {
     }
 
     return codeBlock.build()
+}
+
+fun TypeName.defaultSqlValue(dbProductType: Int): String {
+    val kotlinType = javaToKotlinType()
+    return when(kotlinType) {
+        BOOLEAN -> if(dbProductType == DoorDbType.SQLITE) "0" else "false"
+        BYTE -> "0"
+        SHORT -> "0"
+        INT -> "0"
+        LONG -> "0"
+        FLOAT -> "0"
+        DOUBLE -> "0"
+        else -> "null"
+    }
 }
 
 /**

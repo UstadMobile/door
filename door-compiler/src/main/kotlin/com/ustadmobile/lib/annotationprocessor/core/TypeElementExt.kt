@@ -7,11 +7,13 @@ import javax.lang.model.element.*
 import javax.lang.model.type.DeclaredType
 import javax.lang.model.type.ExecutableType
 import androidx.room.*
-import com.ustadmobile.door.SyncableDoorDatabase
-import com.ustadmobile.door.annotation.AttachmentUri
-import com.ustadmobile.door.annotation.Repository
-import com.ustadmobile.door.annotation.SyncableEntity
+import com.squareup.kotlinpoet.metadata.ImmutableKmProperty
+import com.squareup.kotlinpoet.metadata.toImmutableKmClass
+import com.ustadmobile.door.annotation.*
+import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.SUFFIX_DEFAULT_RECEIVEVIEW
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SUFFIX_KTOR_HELPER
+import com.ustadmobile.lib.annotationprocessor.core.ext.findByClass
+import com.ustadmobile.lib.annotationprocessor.core.ext.getClassArrayValue
 import javax.lang.model.type.TypeMirror
 
 val ALL_QUERY_ANNOTATIONS = listOf(Query::class.java, Update::class.java, Delete::class.java,
@@ -127,8 +129,12 @@ fun <A: Annotation> TypeElement.allMethodsWithAnnotation(annotationList: List<Cl
 /**
  * Get a list of all the methods on this DAO that have a query that could modify the database
  */
-fun TypeElement.allDaoClassModifyingQueryMethods() : List<ExecutableElement> {
-    val annotations = listOf(Query::class.java, Update::class.java, Delete::class.java, Insert::class.java)
+fun TypeElement.allDaoClassModifyingQueryMethods(
+    checkQueryAnnotation: Boolean = true
+) : List<ExecutableElement> {
+    val annotations = listOf(Update::class.java, Delete::class.java, Insert::class.java) +
+            if(checkQueryAnnotation) listOf(Query::class.java) else listOf()
+
     return allMethodsWithAnnotation(annotations).filter {
         if(it.hasAnnotation(Query::class.java)) {
             it.getAnnotation(Query::class.java).value.isSQLAModifyingQuery()
@@ -142,38 +148,12 @@ fun TypeElement.allDaoClassModifyingQueryMethods() : List<ExecutableElement> {
  * Where the TypeElement represents a database class, get a list of TypeElements representing
  * all the entities as per the @Database annotation.
  */
+@Suppress("UNCHECKED_CAST")
 fun TypeElement.allDbEntities(processingEnv: ProcessingEnvironment): List<TypeElement> {
-    val entityTypeElements = mutableListOf<TypeElement>()
-    for (annotationMirror in getAnnotationMirrors()) {
-        val annotationTypeEl = processingEnv.typeUtils
-                .asElement(annotationMirror.getAnnotationType()) as TypeElement
-        if (annotationTypeEl.qualifiedName.toString() != "androidx.room.Database")
-            continue
-
-        val annotationEntryMap = annotationMirror.getElementValues()
-        for (entry in annotationEntryMap.entries) {
-            val key = entry.key.getSimpleName().toString()
-            val value = entry.value.getValue()
-            if (key == "entities") {
-                val typeMirrors = value as List<AnnotationValue>
-                for (entityValue in typeMirrors) {
-                    entityTypeElements.add(processingEnv.typeUtils
-                            .asElement(entityValue.value as TypeMirror) as TypeElement)
-                }
-            }
-        }
-    }
-
-
-    return entityTypeElements.toList()
+    val dbAnnotationMirror = annotationMirrors.findByClass(processingEnv, Database::class)
+        ?: throw IllegalArgumentException("allDbEntities: ${this.qualifiedName} has no database annotation!")
+    return dbAnnotationMirror.getClassArrayValue("entities", processingEnv)
 }
-
-/**
- * Where this TypeElement represents a database class, get a list of all the entities
- * that are syncable (e.g. annotated with @SyncableEntity).
- */
-fun TypeElement.allSyncableDbEntities(processingEnv: ProcessingEnvironment) =
-        allDbEntities(processingEnv).filter { it.hasAnnotation(SyncableEntity::class.java) }
 
 /**
  * Where this TypeElement represents a database class, get a list of all entities that have
@@ -189,9 +169,18 @@ fun TypeElement.asClassNameWithSuffix(suffix: String) =
         ClassName(packageName, "$simpleName$suffix")
 
 
-fun TypeElement.isDbSyncable(processingEnv: ProcessingEnvironment): Boolean {
-    return processingEnv.typeUtils.isAssignable(asType(),
-            processingEnv.elementUtils.getTypeElement(SyncableDoorDatabase::class.java.canonicalName).asType())
+/**
+ * Indicates whether or not this database should have a read only wrapper generated. The ReadOnlyWrapper should be
+ * be generated for databses that have repositories and replicated entities.
+ */
+fun TypeElement.dbHasReplicateWrapper(processingEnv: ProcessingEnvironment) : Boolean {
+    val hasRepos = dbEnclosedDaos(processingEnv).any { it.hasAnnotation(Repository::class.java) }
+    val hasReplicatedEntities = allDbEntities(processingEnv).any { it.hasAnnotation(ReplicateEntity::class.java) }
+    return hasRepos && hasReplicatedEntities
+}
+
+fun TypeElement.dbHasRepositories(processingEnv: ProcessingEnvironment) : Boolean {
+    return dbEnclosedDaos(processingEnv).any { it.hasAnnotation(Repository::class.java) }
 }
 
 /**
@@ -256,34 +245,12 @@ val TypeElement.isDaoThatRequiresKtorHelper: Boolean
     get() = isDaoWithRepository
 
 
-fun TypeElement.daoSyncableEntitiesInSelectResults(processingEnv: ProcessingEnvironment) : List<ClassName> {
-    return asTypeSpecStub(processingEnv).daoSyncableEntitiesInSelectResults(processingEnv)
-}
-
-fun TypeElement.isDaoThatRequiresSyncHelper(processingEnv: ProcessingEnvironment): Boolean {
-    return daoSyncableEntitiesInSelectResults(processingEnv).isNotEmpty()
-}
-
 fun TypeElement.dbEnclosedDaos(processingEnv: ProcessingEnvironment) : List<TypeElement> {
     return enclosedElements
             .filter { it.kind == ElementKind.METHOD && Modifier.ABSTRACT in it.modifiers}
             .mapNotNull { (it as ExecutableElement).returnType.asTypeElement(processingEnv) }
             .filter { it.hasAnnotation(Dao::class.java) }
 }
-
-/**
- * The SyncableEntity find all for a specific client may (or may not) have a clientId as a
- * parameter in the query itself.
- */
-val TypeElement.syncableEntityFindAllHasClientIdParam: Boolean
-    get() = getAnnotation(SyncableEntity::class.java).syncFindAllQuery.contains(":clientId")
-
-
-val TypeElement.syncableEntityFindAllHasMaxResultsParam: Boolean
-    get() = getAnnotation(SyncableEntity::class.java).syncFindAllQuery.let {
-        it.contains(":maxResults") || it == "" //A blank query would automatically have maxResults added
-    }
-
 
 /**
  * Shorthand to check if this is an entity that has attachments
@@ -298,8 +265,96 @@ val TypeElement.entityPrimaryKey: Element?
         it.kind == ElementKind.FIELD && it.hasAnnotation(PrimaryKey::class.java)
     }
 
+/**
+ * The preferred shorthand to get a list of the primary keys for a given table. The primary key could be
+ */
+val TypeElement.entityPrimaryKeys: List<VariableElement>
+    get() {
+        val entityPkVarNames = getAnnotation(Entity::class.java).primaryKeys
+        val annotatedPkVar = enclosedElements.firstOrNull {
+            it.kind == ElementKind.FIELD && it.hasAnnotation(PrimaryKey::class.java)
+        } as? VariableElement
+
+        if(annotatedPkVar != null) {
+            return listOf(annotatedPkVar)
+        }else {
+            return entityPkVarNames.mapNotNull { varName ->
+                enclosedElements.firstOrNull {
+                    it.kind == ElementKind.FIELD && it.simpleName.toString() == varName
+                } as? VariableElement
+            }
+        }
+    }
+
+
 val TypeElement.entityFields: List<Element>
     get() = enclosedElements.filter {
         it.kind == ElementKind.FIELD && it.simpleName.toString() != "Companion"
                 && !it.modifiers.contains(Modifier.STATIC)
+    }
+
+/**
+ * This is a placeholder that will, in future, allow for support of instances where the table name is different to the
+ * entity
+ */
+val TypeElement.entityTableName: String
+    get() = simpleName.toString()
+
+
+/**
+ * If the given element is an entity with the ReplicateEntity annotation, this will provide the TypeElement that
+ * represents the tracker entity
+ */
+fun TypeElement.getReplicationTracker(processingEnv: ProcessingEnvironment): TypeElement {
+    val repAnnotation = annotationMirrors.findByClass(processingEnv, ReplicateEntity::class)
+        ?: throw IllegalArgumentException("Class ${this.qualifiedName} has no replicate entity annotation")
+
+    val repTrkr = repAnnotation.elementValues.entries.first { it.key.simpleName.toString() == "tracker" }
+    val trkrTypeMirror = repTrkr.value.value as TypeMirror
+    return processingEnv.typeUtils.asElement(trkrTypeMirror) as TypeElement
+}
+
+/**
+ * Where this is a TypeElement representing a ReplicateEntity, provide the view name for the receive view
+ */
+val TypeElement.replicationEntityReceiveViewName: String
+    get() = getAnnotation(ReplicateReceiveView::class.java)?.name ?: (simpleName.toString() + SUFFIX_DEFAULT_RECEIVEVIEW)
+
+val TypeElement.replicationTrackerForeignKey: Element
+    get() = enclosedElementsWithAnnotation(ReplicationEntityForeignKey::class.java, ElementKind.FIELD).firstOrNull()
+        ?: throw IllegalArgumentException("${this.qualifiedName} has no replicationentityforeignkey")
+
+fun <A: Annotation> TypeElement.firstFieldWithAnnotation(annotationClass: Class<A>): Element {
+    return enclosedElementsWithAnnotation(annotationClass).first()
+}
+
+fun <A: Annotation> TypeElement.firstFieldWithAnnotationNameOrNull(annotationClass: Class<A>): CodeBlock {
+    val annotatedElement = enclosedElementsWithAnnotation(annotationClass).firstOrNull()
+    return if(annotatedElement != null) {
+        CodeBlock.of("%S", annotatedElement.simpleName)
+    }else {
+        CodeBlock.of("null")
+    }
+}
+
+fun  <A: Annotation> TypeElement.kmPropertiesWithAnnotation(annotationClass: Class<A>): List<ImmutableKmProperty> {
+    val kmClass = getAnnotation(Metadata::class.java).toImmutableKmClass()
+    val elementsWithAnnotationNames = enclosedElementsWithAnnotation(annotationClass).map { it.simpleName.toString() }
+    return kmClass.properties.filter { it.name in elementsWithAnnotationNames }
+}
+
+fun TypeElement.findDaoGetter(daoTypeElement: TypeElement, processingEnv: ProcessingEnvironment): CodeBlock {
+    val executableFunEl = enclosedElements
+        .first { it.kind == ElementKind.METHOD && (it as ExecutableElement).returnType.asTypeElement(processingEnv) == daoTypeElement }
+    return (executableFunEl as ExecutableElement).makeAccessorCodeBlock()
+}
+
+val TypeElement.isReplicateEntityWithAutoIncPrimaryKey: Boolean
+    get() {
+        if(!hasAnnotation(ReplicateEntity::class.java))
+            return false
+
+        val pkEntity = enclosedElementsWithAnnotation(PrimaryKey::class.java, ElementKind.FIELD).firstOrNull() ?: return false
+
+        return pkEntity.getAnnotation(PrimaryKey::class.java).autoGenerate
     }

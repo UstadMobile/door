@@ -1,0 +1,84 @@
+plugins {
+    id 'com.android.application'
+    id 'kotlin-android'
+    id 'kotlin-kapt'
+    id 'org.jetbrains.kotlin.plugin.serialization'
+    id 'kotlinx-atomicfu'
+}
+
+android {
+    compileSdkVersion 32
+    buildToolsVersion "32.0.0"
+
+    defaultConfig {
+        applicationId "com.ustadmobile.door.testandroid"
+        minSdkVersion 21
+        targetSdkVersion 32
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    sourceSets {
+        main.java.srcDirs += ["build/generated/source/door-test-db"]
+    }
+
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+}
+
+tasks.whenTaskAdded { task ->
+    if(task.name.startsWith("compile") || task.name.startsWith("build")) {
+        task.dependsOn(":door-testdb:jvmJar")
+    }
+}
+
+
+dependencies {
+    implementation project(":door-runtime")
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    implementation 'androidx.core:core-ktx:1.7.0'
+    implementation 'androidx.appcompat:appcompat:1.3.1'
+    implementation 'com.google.android.material:material:1.4.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.0.1'
+    implementation "org.nanohttpd:nanohttpd:$version_nanohttpd"
+    implementation "org.nanohttpd:nanohttpd-nanolets:$version_nanohttpd"
+
+    implementation "io.ktor:ktor-client-core:$version_ktor"
+    implementation "io.ktor:ktor-client-json:$version_ktor"
+    implementation "io.github.aakira:napier:$version_napier"
+    implementation "org.kodein.di:kodein-di:$version_kodein_di"
+    implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
+    implementation "org.jetbrains.kotlinx:atomicfu:$version_atomicfu"
+
+    implementation "io.ktor:ktor-gson:$version_ktor"
+    implementation "io.ktor:ktor-client-okhttp:$version_ktor"
+    implementation "io.ktor:ktor-client-gson:$version_ktor"
+
+
+    implementation "androidx.room:room-runtime:$version_android_room"
+    implementation "androidx.room:room-ktx:$version_android_room"
+    implementation "androidx.paging:paging-runtime:$version_androidx_paging"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.4.0'
+
+    kapt "androidx.room:room-compiler:$version_android_room"
+
+
+    testImplementation 'junit:junit:4.+'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.3'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
+}

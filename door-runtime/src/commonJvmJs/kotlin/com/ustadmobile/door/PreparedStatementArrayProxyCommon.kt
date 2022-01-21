@@ -2,7 +2,6 @@ package com.ustadmobile.door
 import com.ustadmobile.door.jdbc.*
 import com.ustadmobile.door.jdbc.types.*
 import com.ustadmobile.door.ext.useStatement
-import kotlin.jvm.JvmStatic
 import kotlin.math.max
 
 abstract class PreparedStatementArrayProxyCommon(
@@ -10,94 +9,114 @@ abstract class PreparedStatementArrayProxyCommon(
     protected val connectionInternal: Connection
 ) : PreparedStatement {
 
-    protected val queryParams = mutableMapOf<Int, Any?>()
+    private val queryParams = mutableMapOf<Int, Any?>()
 
-    protected val queryTypes = mutableMapOf<Int, Int>()
+    private val queryTypes = mutableMapOf<Int, Int>()
 
-    @Throws(SQLException::class)
-    override fun setBoolean(i: Int, b: Boolean) {
-        queryParams[i] = b
-        queryTypes[i] = TypesKmp.BOOLEAN
+    /**
+     * Get the index of the nth occurence of a character within a string
+     *
+     * @receiver a string in which to search for a given character
+     * @param char the character to search for
+     * @param n the occurence index to look for (starting from 1 NOT 0,
+     * because we are working with JDBC parameters indexes)
+     *
+     * @return the index of the nth occurrence of a character
+     */
+    private fun String.getNthIndexOf(char: Char, n: Int) : Int{
+        var foundCount = 0
+        var pos = 0
+        while(foundCount++ < n && pos != -1) {
+            pos = this.indexOf(char, pos + 1)
+        }
+
+        return pos
     }
 
     @Throws(SQLException::class)
-    override fun setByte(i: Int, b: Byte) {
-        queryParams[i] = b
-        queryTypes[i] = TypesKmp.SMALLINT
+    override fun setBoolean(index: Int, value: Boolean) {
+        queryParams[index] = value
+        queryTypes[index] = TypesKmp.BOOLEAN
     }
 
     @Throws(SQLException::class)
-    override fun setShort(i: Int, i1: Short) {
-        queryParams[i] = i1
-        queryTypes[i] = TypesKmp.SMALLINT
+    override fun setByte(index: Int, value: Byte) {
+        queryParams[index] = value
+        queryTypes[index] = TypesKmp.SMALLINT
     }
 
     @Throws(SQLException::class)
-    override fun setInt(i: Int, i1: Int) {
-        queryParams[i] = i1
-        queryTypes[i] = TypesKmp.INTEGER
+    override fun setShort(index: Int, value: Short) {
+        queryParams[index] = value
+        queryTypes[index] = TypesKmp.SMALLINT
     }
 
     @Throws(SQLException::class)
-    override fun setLong(i: Int, l: Long) {
-        queryParams[i] = l
-        queryTypes[i] = TypesKmp.BIGINT
+    override fun setInt(index: Int, value: Int) {
+        queryParams[index] = value
+        queryTypes[index] = TypesKmp.INTEGER
     }
 
     @Throws(SQLException::class)
-    override fun setFloat(i: Int, v: Float) {
-        queryParams[i] = v
-        queryTypes[i] = TypesKmp.FLOAT
+    override fun setLong(index: Int, value: Long) {
+        queryParams[index] = value
+        queryTypes[index] = TypesKmp.BIGINT
     }
 
     @Throws(SQLException::class)
-    override fun setDouble(i: Int, v: Double) {
-        queryParams[i] = v
-        queryTypes[i] = TypesKmp.DOUBLE
+    override fun setFloat(index: Int, value: Float) {
+        queryParams[index] = value
+        queryTypes[index] = TypesKmp.FLOAT
     }
 
     @Throws(SQLException::class)
-    override fun setString(i: Int, s: String?) {
-        queryParams[i] = s
-        queryTypes[i] = TypesKmp.VARCHAR
+    override fun setDouble(index: Int, value: Double) {
+        queryParams[index] = value
+        queryTypes[index] = TypesKmp.DOUBLE
     }
 
     @Throws(SQLException::class)
-    override fun setArray(i: Int, array: com.ustadmobile.door.jdbc.Array) {
-        queryParams[i] = array
-        queryTypes[i] = TypesKmp.ARRAY
+    override fun setString(index: Int, value: String?) {
+        queryParams[index] = value
+        queryTypes[index] = TypesKmp.VARCHAR
+    }
+
+    @Suppress("RemoveRedundantQualifierName")
+    @Throws(SQLException::class)
+    override fun setArray(index: Int, array: com.ustadmobile.door.jdbc.Array) {
+        queryParams[index] = array
+        queryTypes[index] = TypesKmp.ARRAY
     }
 
     @Throws(SQLException::class)
-    override fun setBigDecimal(i: Int, bigDecimal: BigDecimal) {
+    override fun setBigDecimal(index: Int, value: BigDecimal) {
         throw SQLException("PreparedStatementArrayProxy unsupported type: BigDecimal")
     }
 
     @Throws(SQLException::class)
-    override fun setBytes(i: Int, bytes: ByteArray) {
+    override fun setBytes(index: Int, value: ByteArray) {
         throw SQLException("PreparedStatementArrayProxy unsupported type: Bytes")
     }
 
     @Throws(SQLException::class)
-    override fun setDate(i: Int, date: Date) {
+    override fun setDate(index: Int, value: Date) {
         throw SQLException("PreparedStatementArrayProxy unsupported type: Date")
     }
 
 
     @Throws(SQLException::class)
-    override fun setTime(i: Int, time: Time) {
+    override fun setTime(index: Int, value: Time) {
 
     }
 
     @Throws(SQLException::class)
-    override fun setObject(i: Int, o: Any?) {
-        queryParams[i] = o
-        queryTypes[i] = ARR_PROXY_SET_OBJECT
+    override fun setObject(index: Int, value: Any?) {
+        queryParams[index] = value
+        queryTypes[index] = ARR_PROXY_SET_OBJECT
     }
 
-
-
-    protected fun prepareStatement(): PreparedStatement {
+    @Suppress("RemoveRedundantQualifierName")
+    internal fun prepareStatement(): PreparedStatement {
         var arrayOffset = 0
         val paramValues = mutableMapOf<Int, Any?>()
         val paramTypes = mutableMapOf<Int, Int>()
@@ -107,7 +126,7 @@ abstract class PreparedStatementArrayProxyCommon(
             if (value is com.ustadmobile.door.jdbc.Array) {
                 val arrayProxy = value as JdbcArrayProxy
                 val objects = arrayProxy.objects
-                val arrayParamPos = ordinalIndexOf(adjustedQuery, '?', paramIndex)
+                val arrayParamPos = adjustedQuery.getNthIndexOf('?', paramIndex + arrayOffset)
                 adjustedQuery = adjustedQuery.substring(0, arrayParamPos) +
                         makeArrayPlaceholders(objects.size) + adjustedQuery.substring(arrayParamPos + 1)
                 for (i in objects.indices) {
@@ -130,17 +149,17 @@ abstract class PreparedStatementArrayProxyCommon(
             for (paramIndex in paramValues.keys) {
                 val value = paramValues[paramIndex]
                 when (paramTypes[paramIndex]) {
-                    TypesKmp.INTEGER -> stmt!!.setInt(paramIndex, value as Int)
+                    TypesKmp.INTEGER -> stmt.setInt(paramIndex, value as Int)
 
-                    TypesKmp.BOOLEAN -> stmt!!.setBoolean(paramIndex, value as Boolean)
+                    TypesKmp.BOOLEAN -> stmt.setBoolean(paramIndex, value as Boolean)
 
-                    TypesKmp.VARCHAR, TypesKmp.LONGVARCHAR -> stmt!!.setString(paramIndex, value as String)
+                    TypesKmp.VARCHAR, TypesKmp.LONGVARCHAR -> stmt.setString(paramIndex, value as String)
 
-                    TypesKmp.BIGINT -> stmt!!.setLong(paramIndex, value as Long)
+                    TypesKmp.BIGINT -> stmt.setLong(paramIndex, value as Long)
 
-                    TypesKmp.FLOAT -> stmt!!.setFloat(paramIndex, value as Float)
+                    TypesKmp.FLOAT -> stmt.setFloat(paramIndex, value as Float)
 
-                    ARR_PROXY_SET_OBJECT -> stmt!!.setObject(paramIndex, value)
+                    ARR_PROXY_SET_OBJECT -> stmt.setObject(paramIndex, value)
                 }
 
             }
@@ -170,7 +189,7 @@ abstract class PreparedStatementArrayProxyCommon(
 
     override fun executeQuery(): ResultSet {
         val stmt = prepareStatement()
-        val resultSet = stmt!!.executeQuery()
+        val resultSet = stmt.executeQuery()
         return PreparedStatementResultSetWrapper(resultSet, stmt)
     }
 
@@ -185,14 +204,6 @@ abstract class PreparedStatementArrayProxyCommon(
 
 
     companion object {
-        fun ordinalIndexOf(str: String, c: Char, n: Int): Int {
-            var n = n
-            var pos = str.indexOf(c)
-            while (--n > 0 && pos != -1)
-                pos = str.indexOf(c, pos + 1)
-
-            return pos
-        }
 
         const val ARR_PROXY_SET_OBJECT = -5000
 

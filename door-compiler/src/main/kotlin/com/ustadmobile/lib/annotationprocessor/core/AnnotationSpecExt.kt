@@ -4,6 +4,7 @@ import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.CodeBlock
 import org.apache.commons.text.StringEscapeUtils
 import androidx.room.Query
+import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.asClassName
 
 /**
@@ -34,6 +35,10 @@ fun AnnotationSpec.memberToString(memberName: String = "value"): String? {
     strValue = StringEscapeUtils.unescapeJava(strValue)
 
     return strValue.trimMemberString(memberName)
+}
+
+fun List<AnnotationSpec>.getAnnotationSpec(annotationClassName: ClassName) : AnnotationSpec? {
+    return firstOrNull { it.typeName == annotationClassName }
 }
 
 /**

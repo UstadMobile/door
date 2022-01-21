@@ -1,0 +1,63 @@
+
+plugins {
+    id 'application'
+    id 'kotlin'
+    id 'maven-publish'
+
+    id 'com.github.johnrengelman.shadow' version "$version_shadow"
+    id 'kotlinx-serialization'
+}
+
+
+group 'com.ustadmobile.door'
+version '0.0.40av27'
+
+repositories {
+    mavenCentral()
+    mavenCentral()
+}
+
+mainClassName = "repdb.ServerAppMain"
+
+shadowJar {
+    manifest {
+        attributes 'Main-Class': mainClassName
+    }
+    archiveBaseName = "door-testdb-server-all"
+}
+
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib"
+
+    implementation project(":door-testdb")
+    implementation project(":door-runtime")
+
+    implementation "io.ktor:ktor-client-core:$version_ktor"
+    implementation "io.ktor:ktor-client-json:$version_ktor"
+    implementation "io.ktor:ktor-io:$version_ktor"
+
+    implementation "io.ktor:ktor-server-netty:$version_ktor"
+    implementation "io.ktor:ktor-server-servlet:$version_ktor"
+    implementation "io.ktor:ktor-jackson:$version_ktor"
+    implementation "io.ktor:ktor-gson:$version_ktor"
+    implementation "io.ktor:ktor-client-core:$version_ktor"
+    implementation "io.ktor:ktor-client-okhttp:$version_ktor"
+    implementation "org.kodein.di:kodein-di-framework-ktor-server-jvm:$version_kodein_di"
+    implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
+    implementation "io.github.aakira:napier:$version_napier"
+    implementation "ch.qos.logback:logback-classic:$version_logback"
+
+    implementation "com.github.h-thurow:simple-jndi:$version_simple_jndi"
+    implementation "org.apache.commons:commons-pool2:$version_apache_commons_pool2"
+    implementation "org.apache.commons:commons-dbcp2:$version_apache_commons_dbcp2"
+    implementation "org.xerial:sqlite-jdbc:$version_sqlite_jdbc"
+    implementation "org.postgresql:postgresql:$version_postgres_jdbc"
+
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.0'
+}
+
+test {
+    useJUnitPlatform()
+}

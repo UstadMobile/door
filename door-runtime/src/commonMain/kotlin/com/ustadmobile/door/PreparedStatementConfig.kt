@@ -8,5 +8,16 @@ import com.ustadmobile.door.jdbc.StatementConstantsKmp
 data class PreparedStatementConfig(
     val sql: String,
     val hasListParams: Boolean = false,
-    val generatedKeys: Int = StatementConstantsKmp.NO_GENERATED_KEYS
-)
+    val generatedKeys: Int = StatementConstantsKmp.NO_GENERATED_KEYS,
+    /**
+     * Where needed, a different query can be specified to run on Postgres. It should still have the same number of
+     * parameters in the same order.
+     */
+    val postgreSql: String? = null
+) {
+    fun sqlToUse(dbType: Int) = if(dbType == DoorDbType.SQLITE) {
+        sql
+    }else {
+        postgreSql ?: sql
+    }
+}

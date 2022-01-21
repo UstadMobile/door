@@ -1,13 +1,8 @@
 package com.ustadmobile.door.attachments
 
+import com.ustadmobile.door.*
+import com.ustadmobile.door.ext.*
 import org.mockito.kotlin.mock
-import com.ustadmobile.door.DoorDatabaseRepository
-import com.ustadmobile.door.DummyEntityWithAttachment
-import com.ustadmobile.door.RepositoryConfig
-import com.ustadmobile.door.ext.hexStringToByteArray
-import com.ustadmobile.door.ext.md5Sum
-import com.ustadmobile.door.ext.toFile
-import com.ustadmobile.door.ext.writeToFile
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert
 import org.junit.Before
@@ -27,19 +22,15 @@ class DoorDatabaseAttachmentExtTest {
 
     lateinit var attachmentPath: String
 
-    lateinit var repo: DoorDatabaseRepository
+    lateinit var db: DoorDatabase
 
     @Before
     fun setup() {
         attachmentPath = tempDir.newFile().absolutePath
         this::class.java.getResourceAsStream("/test-resources/cat-pic0.jpg").writeToFile(File(attachmentPath))
 
-        val mockConfig = mock<RepositoryConfig> {
-            on { attachmentsDir }.thenReturn(tempDir.newFolder().absolutePath)
-            on { context }.thenReturn(Any())
-        }
-        repo = mock {
-            on { config }.thenReturn(mockConfig)
+        db = mock(extraInterfaces = arrayOf(DoorDatabaseJdbc::class)) {
+            on { (this as DoorDatabaseJdbc).realAttachmentStorageUri}.thenReturn(tempDir.newFolder().toDoorUri())
         }
     }
 
@@ -50,16 +41,14 @@ class DoorDatabaseAttachmentExtTest {
         }
 
         runBlocking {
-            repo.storeAttachment(dummyEntity)
+            db.storeAttachment(dummyEntity)
         }
-
-
 
         Assert.assertArrayEquals("Md5 sum assigned matches", File(attachmentPath).md5Sum,
                 dummyEntity.attachmentMd5?.hexStringToByteArray())
 
         runBlocking {
-            val storedUri = repo.retrieveAttachment(dummyEntity.attachmentUri!!)
+            val storedUri = db.retrieveAttachment(dummyEntity.attachmentUri!!)
             val storedFile = storedUri.toFile()
             Assert.assertArrayEquals("Data stored is the same as data provided",
                     File(attachmentPath).md5Sum, storedFile.md5Sum)

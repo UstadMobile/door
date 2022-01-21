@@ -20,6 +20,7 @@ annotation class Repository(val methodType: Int = 0) {
 
         const val METHOD_DELEGATE_TO_WEB = 2
 
+        @Deprecated("Syncable entity is removed")
         const val METHOD_SYNCABLE_GET = 3
 
         const val METHOD_NOT_ALLOWED = 4

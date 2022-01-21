@@ -1,24 +1,32 @@
 package com.ustadmobile.door
 
+import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.createInstance
+import com.ustadmobile.door.ext.wrap
 import com.ustadmobile.door.jdbc.SQLException
 import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.migration.DoorMigrationAsync
 import com.ustadmobile.door.migration.DoorMigrationStatementList
 import com.ustadmobile.door.migration.DoorMigrationSync
 import com.ustadmobile.door.sqljsjdbc.*
+import com.ustadmobile.door.util.DoorJsImplClasses
 import org.w3c.dom.Worker
+import kotlin.reflect.KClass
 
-actual class DatabaseBuilder<T: DoorDatabase> private constructor(private val builderOptions: DatabaseBuilderOptions){
+actual class DatabaseBuilder<T: DoorDatabase> private constructor(
+    private val builderOptions: DatabaseBuilderOptions<T>
+) {
 
     private val callbacks = mutableListOf<DoorDatabaseCallback>()
 
     private val migrationList = mutableListOf<DoorMigration>()
 
     suspend fun build(): T {
-        val dataSource = SQLiteDatasourceJs(builderOptions.dbName,
-            Worker(builderOptions.webWorkerPath))
-        val dbImpl = builderOptions.dbImplClass.js.createInstance(dataSource, false) as T
+        val dataSource = SQLiteDatasourceJs(builderOptions.dbName, Worker(builderOptions.webWorkerPath))
+        register(builderOptions.dbImplClasses)
+
+        val dbImpl = builderOptions.dbImplClasses.dbImplKClass.js.createInstance(null, dataSource,
+            builderOptions.dbName, listOf<AttachmentFilter>()) as T
         val exists = IndexedDb.checkIfExists(builderOptions.dbName)
         SaveToIndexedDbChangeListener(dbImpl, dataSource, builderOptions.saveToIndexedDbDelayTime)
         if(exists){
@@ -26,7 +34,13 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(private val bu
         }else{
             if(!dbImpl.getTableNamesAsync().any {it.lowercase() == DoorDatabaseCommon.DBINFO_TABLENAME}) {
                 dbImpl.execSQLBatchAsync(*dbImpl.createAllTables().toTypedArray())
-                callbacks.forEach { it.onCreate(dbImpl.sqlDatabaseImpl) }
+                callbacks.forEach {
+                    when(it) {
+                        is DoorDatabaseCallbackSync -> throw NotSupportedException("Cannot use sync callback on JS")
+                        is DoorDatabaseCallbackStatementList ->
+                            dbImpl.execSQLBatchAsync(*it.onCreate(dbImpl.sqlDatabaseImpl).toTypedArray())
+                    }
+                }
             }else{
                 var sqlCon = null as SQLiteConnectionJs?
                 var stmt = null as SQLitePreparedStatementJs?
@@ -69,7 +83,13 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(private val bu
                 }
             }
         }
-        return dbImpl
+
+        val dbMetaData = lookupImplementations(builderOptions.dbClass).metadata
+        return if(dbMetaData.hasReadOnlyWrapper) {
+            dbImpl.wrap(builderOptions.dbClass)
+        }else {
+            dbImpl
+        }
     }
 
     actual fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
@@ -84,9 +104,27 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(private val bu
 
     companion object {
 
+        private val implementationMap = mutableMapOf<KClass<*>, DoorJsImplClasses<*>>()
+
         fun <T : DoorDatabase> databaseBuilder(
-            builderOptions: DatabaseBuilderOptions
+            builderOptions: DatabaseBuilderOptions<T>
         ): DatabaseBuilder<T> = DatabaseBuilder(builderOptions)
+
+        fun <T: DoorDatabase> lookupImplementations(dbKClass: KClass<T>): DoorJsImplClasses<T> {
+            return implementationMap[dbKClass] as? DoorJsImplClasses<T>
+                ?: throw IllegalArgumentException("${dbKClass.simpleName} is not registered through DatabaseBuilder.register")
+        }
+
+        internal fun register(implClasses: DoorJsImplClasses<*>) {
+            implementationMap[implClasses.dbKClass] = implClasses
+            implementationMap[implClasses.dbImplKClass] = implClasses
+            implClasses.repositoryImplClass?.also {
+                implementationMap[it] = implClasses
+            }
+            implClasses.replicateWrapperImplClass?.also {
+                implementationMap[it]  =implClasses
+            }
+        }
 
     }
 }

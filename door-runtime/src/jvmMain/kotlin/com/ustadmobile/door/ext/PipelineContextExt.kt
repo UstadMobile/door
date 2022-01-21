@@ -1,11 +1,13 @@
 package com.ustadmobile.door.ext
 
+import com.ustadmobile.door.DoorConstants
 import com.ustadmobile.door.DoorDatabase
-import com.ustadmobile.door.DoorDatabaseSyncableReadOnlyWrapper
+import com.ustadmobile.door.DoorDatabaseReplicateWrapper
 import io.ktor.application.*
+import io.ktor.request.*
 import io.ktor.util.pipeline.*
 import org.kodein.di.direct
-import org.kodein.di.ktor.di
+import org.kodein.di.ktor.closestDI
 import org.kodein.di.on
 import org.kodein.type.TypeToken
 
@@ -17,10 +19,23 @@ import org.kodein.type.TypeToken
  */
 @Suppress("UNCHECKED_CAST")
 fun <T: DoorDatabase> PipelineContext<Unit, ApplicationCall>.unwrappedDbOnCall(typeToken: TypeToken<T>, tag: Int = DoorTag.TAG_DB): T{
-    val db = di().on(call).direct.Instance(typeToken, tag = tag)
-    return if(db is DoorDatabaseSyncableReadOnlyWrapper) {
+    val db = closestDI().on(call).direct.Instance(typeToken, tag = tag)
+    return if(db is DoorDatabaseReplicateWrapper) {
         db.realDatabase as T
     }else {
         db
     }
 }
+
+/**
+ * Convenience function to get the remote node id (e.g. the node that is making the http
+ * request) and the node auth. Throws an exception if this does not exist
+ */
+fun PipelineContext<Unit, ApplicationCall>.requireRemoteNodeIdAndAuth(): Pair<Long, String> {
+    val header = context.request.header(DoorConstants.HEADER_NODE)
+        ?: context.request.queryParameters[DoorConstants.HEADER_NODE]
+        ?: throw IllegalStateException("remoteNodeIdAndAuth: no id and auth header or query param provided")
+    val (nodeIdStr, nodeAuth) = header.split('/', limit = 2)
+    return Pair(nodeIdStr.toLong(), nodeAuth)
+}
+

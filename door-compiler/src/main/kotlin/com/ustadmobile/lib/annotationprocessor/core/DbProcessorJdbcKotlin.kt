@@ -7,7 +7,6 @@ import javax.lang.model.element.*
 import javax.lang.model.type.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.ustadmobile.door.*
-import com.ustadmobile.door.annotation.SyncableEntity
 import net.sf.jsqlparser.parser.CCJSqlParserUtil
 import net.sf.jsqlparser.statement.select.Select
 import net.sf.jsqlparser.util.TablesNamesFinder
@@ -19,16 +18,29 @@ import kotlin.reflect.jvm.internal.impl.builtins.jvm.JavaToKotlinClassMap
 import javax.lang.model.util.SimpleTypeVisitor7
 import javax.tools.Diagnostic
 import com.ustadmobile.door.DoorDbType
-import com.ustadmobile.door.annotation.QueryLiveTables
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorSync.Companion.TRACKER_SUFFIX
-import com.ustadmobile.door.annotation.PgOnConflict
+import com.ustadmobile.door.annotation.*
+import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.DoorDatabaseMetadata
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
+import com.ustadmobile.door.replication.ReplicationRunOnChangeRunner
+import com.ustadmobile.door.replication.ReplicationEntityMetaData
+import com.ustadmobile.door.replication.ReplicationFieldMetaData
+import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_ANDROID_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JS_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JVM_DIRS
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorRepository.Companion.SUFFIX_REPOSITORY2
+import com.ustadmobile.lib.annotationprocessor.core.ext.getClassArrayValue
+import com.ustadmobile.lib.annotationprocessor.core.ext.getClassValue
+import kotlinx.coroutines.GlobalScope
 import kotlin.reflect.KClass
+import com.ustadmobile.door.util.NodeIdAuthCache
+import com.ustadmobile.door.util.TransactionDepthCounter
+import com.ustadmobile.door.util.DoorInvalidationTracker
+import com.ustadmobile.lib.annotationprocessor.core.DbProcessorJdbcKotlin.Companion.SUFFIX_JDBC_KT2
+import com.ustadmobile.lib.annotationprocessor.core.DbProcessorJdbcKotlin.Companion.SUFFIX_JS_IMPLEMENTATION_CLASSES
+import io.github.aakira.napier.Napier
+import java.io.File
 
 val QUERY_SINGULAR_TYPES = listOf(INT, LONG, SHORT, BYTE, BOOLEAN, FLOAT, DOUBLE,
         String::class.asTypeName(), String::class.asTypeName().copy(nullable = true))
@@ -203,7 +215,6 @@ fun resolveQueryResultType(returnTypeName: TypeName)  =
 fun makeInsertAdapterMethodName(
     paramType: TypeName,
     returnType: TypeName,
-    processingEnv: ProcessingEnvironment,
     async: Boolean = false
 ): String {
     var methodName = "insert"
@@ -224,46 +235,6 @@ fun makeInsertAdapterMethodName(
 }
 
 /**
- * For SQL with named parameters (e.g. "SELECT * FROM Table WHERE uid = :paramName") return a
- * list of all named parameters.
- *
- * @param querySql SQL that may contain named parameters
- * @return String list of named parameters (e.g. "paramName"). Empty if no named parameters are present.
- */
-fun getQueryNamedParameters(querySql: String): List<String> {
-    val namedParams = mutableListOf<String>()
-    var insideQuote = false
-    var insideDoubleQuote = false
-    var lastC: Char = 0.toChar()
-    var startNamedParam = -1
-    for (i in 0 until querySql.length) {
-        val c = querySql[i]
-        if (c == '\'' && lastC != '\\')
-            insideQuote = !insideQuote
-        if (c == '\"' && lastC != '\\')
-            insideDoubleQuote = !insideDoubleQuote
-
-        if (!insideQuote && !insideDoubleQuote) {
-            if (c == ':') {
-                startNamedParam = i
-            } else if (!(Character.isLetterOrDigit(c) || c == '_') && startNamedParam != -1) {
-                //process the parameter
-                namedParams.add(querySql.substring(startNamedParam + 1, i))
-                startNamedParam = -1
-            } else if (i == querySql.length - 1 && startNamedParam != -1) {
-                namedParams.add(querySql.substring(startNamedParam + 1, i + 1))
-                startNamedParam = -1
-            }
-        }
-
-
-        lastC = c
-    }
-
-    return namedParams
-}
-
-/**
  * Generate the DatabaseMetadata object for the given database.
  */
 fun FileSpec.Builder.addDatabaseMetadataType(dbTypeElement: TypeElement, processingEnv: ProcessingEnvironment): FileSpec.Builder {
@@ -275,11 +246,41 @@ fun FileSpec.Builder.addDatabaseMetadataType(dbTypeElement: TypeElement, process
                 .addCode("return %T::class\n", dbTypeElement)
                 .build())
             .build())
+        .addProperty(PropertySpec.builder("hasReadOnlyWrapper", Boolean::class)
+            .addModifiers(KModifier.OVERRIDE)
+            .getter(FunSpec.getterBuilder()
+                .addCode("return %L\n", dbTypeElement.dbHasReplicateWrapper(processingEnv))
+                .build())
+            .build())
         .addProperty(PropertySpec.builder("syncableTableIdMap", Map::class.parameterizedBy(String::class, Int::class))
             .addModifiers(KModifier.OVERRIDE)
             .getter(FunSpec.getterBuilder()
                 .addCode("return TABLE_ID_MAP\n", dbTypeElement.asClassNameWithSuffix(SUFFIX_REPOSITORY2))
                 .build())
+            .build())
+        .addProperty(PropertySpec.builder("version", INT)
+            .addModifiers(KModifier.OVERRIDE)
+            .getter(FunSpec.getterBuilder()
+                .addCode("return ${dbTypeElement.getAnnotation(Database::class.java).version}\n")
+                .build())
+            .build())
+        .addProperty(PropertySpec.builder("replicateEntities", Map::class.parameterizedBy(Int::class, ReplicationEntityMetaData::class))
+            .addModifiers(KModifier.OVERRIDE)
+            .delegate(
+                CodeBlock.builder()
+                    .beginControlFlow("lazy(%T.NONE)", LazyThreadSafetyMode::class)
+                    .add("mapOf<%T, %T>(\n", INT, ReplicationEntityMetaData::class)
+                    .apply {
+                        dbTypeElement.allDbEntities(processingEnv)
+                            .filter { it.hasAnnotation(ReplicateEntity::class.java)}.forEach { replicateEntity ->
+                                add("%L to ", replicateEntity.getAnnotation(ReplicateEntity::class.java).tableId)
+                                addReplicateEntityMetaDataCode(replicateEntity, processingEnv)
+                                add(",\n")
+                        }
+                    }
+                    .add(")\n")
+                    .endControlFlow()
+                    .build())
             .build())
         .addType(TypeSpec.companionObjectBuilder()
             .addTableIdMapProperty(dbTypeElement, processingEnv)
@@ -288,6 +289,100 @@ fun FileSpec.Builder.addDatabaseMetadataType(dbTypeElement: TypeElement, process
 
     return this
 }
+
+
+fun FileSpec.Builder.addJsImplementationsClassesObject(
+    dbTypeElement: TypeElement,
+    processingEnv: ProcessingEnvironment
+) : FileSpec.Builder {
+    val jsImplClassName = ClassName("com.ustadmobile.door.util", "DoorJsImplClasses")
+    addType(TypeSpec.objectBuilder(dbTypeElement.simpleName.toString() + SUFFIX_JS_IMPLEMENTATION_CLASSES)
+        .superclass(jsImplClassName.parameterizedBy(dbTypeElement.asClassName()))
+        .addProperty(PropertySpec.builder("dbKClass",
+                KClass::class.asClassName().parameterizedBy(dbTypeElement.asClassName()))
+            .addModifiers(KModifier.OVERRIDE)
+            .initializer("%T::class", dbTypeElement)
+            .build())
+        .addProperty(PropertySpec.builder("dbImplKClass", KClass::class.asTypeName().parameterizedBy(STAR))
+            .addModifiers(KModifier.OVERRIDE)
+            .initializer("%T::class", dbTypeElement.asClassNameWithSuffix(SUFFIX_JDBC_KT2))
+            .build())
+        .addProperty(PropertySpec.builder("replicateWrapperImplClass", KClass::class.asTypeName()
+                .parameterizedBy(STAR).copy(nullable = true))
+            .addModifiers(KModifier.OVERRIDE)
+            .initializer(CodeBlock.builder()
+                .apply {
+                    if(dbTypeElement.dbHasReplicateWrapper(processingEnv)) {
+                        add("%T::class", dbTypeElement.asClassNameWithSuffix(DoorDatabaseReplicateWrapper.SUFFIX))
+                    }else {
+                        add("null")
+                    }
+                }
+                .build())
+            .build())
+        .addProperty(PropertySpec.builder("repositoryImplClass",
+            KClass::class.asTypeName().parameterizedBy(STAR).copy(nullable = true))
+            .addModifiers(KModifier.OVERRIDE)
+            .initializer(CodeBlock.builder()
+                .apply {
+                    if(dbTypeElement.dbHasRepositories(processingEnv)) {
+                        add("%T::class", dbTypeElement.asClassNameWithSuffix(SUFFIX_REPOSITORY2))
+                    }else {
+                        add("null")
+                    }
+                }
+                .build())
+            .build())
+        .addProperty(PropertySpec.builder("metadata",
+            DoorDatabaseMetadata::class.asClassName().parameterizedBy(dbTypeElement.asClassName()))
+            .addModifiers(KModifier.OVERRIDE)
+            .initializer("%T()", dbTypeElement.asClassNameWithSuffix(SUFFIX_DOOR_METADATA))
+            .build())
+        .build())
+
+
+    return this
+}
+
+private fun CodeBlock.Builder.addReplicateEntityMetaDataCode(
+    entity: TypeElement,
+    processingEnv: ProcessingEnvironment
+): CodeBlock.Builder {
+
+    fun CodeBlock.Builder.addFieldsCodeBlock(typeEl: TypeElement) : CodeBlock.Builder{
+        add("listOf(")
+        typeEl.entityFields.forEach {
+            add("%T(%S, %L),", ReplicationFieldMetaData::class, it.simpleName,
+                it.asType().asTypeName().javaToKotlinType().toSqlTypesInt())
+        }
+        add(")")
+        return this
+    }
+
+    val repEntityAnnotation = entity.getAnnotation(ReplicateEntity::class.java)
+    val trackerTypeEl = entity.getReplicationTracker(processingEnv)
+    add("%T(", ReplicationEntityMetaData::class)
+    add("%L, ", repEntityAnnotation.tableId)
+    add("%L, ", repEntityAnnotation.priority)
+    add("%S, ", entity.entityTableName)
+    add("%S, ", trackerTypeEl.entityTableName)
+    add("%S, ", entity.replicationEntityReceiveViewName)
+    add("%S, ", entity.entityPrimaryKey?.simpleName.toString())
+    add("%S, ", entity.firstFieldWithAnnotation(ReplicationVersionId::class.java).simpleName)
+    add("%S, ", trackerTypeEl.firstFieldWithAnnotation(ReplicationEntityForeignKey::class.java))
+    add("%S, ", trackerTypeEl.firstFieldWithAnnotation(ReplicationDestinationNodeId::class.java))
+    add("%S, ", trackerTypeEl.firstFieldWithAnnotation(ReplicationVersionId::class.java))
+    add("%S, \n", trackerTypeEl.firstFieldWithAnnotation(ReplicationPending::class.java))
+    addFieldsCodeBlock(entity).add(",\n")
+    addFieldsCodeBlock(trackerTypeEl).add(",\n")
+    add(entity.firstFieldWithAnnotationNameOrNull(AttachmentUri::class.java)).add(",\n")
+    add(entity.firstFieldWithAnnotationNameOrNull(AttachmentMd5::class.java)).add(",\n")
+    add(entity.firstFieldWithAnnotationNameOrNull(AttachmentSize::class.java)).add(",\n")
+    add("%L", repEntityAnnotation.batchSize)
+    add(")")
+    return this
+}
+
 
 /**
  * This class represents a POKO object in the result. It is a tree like structure (e.g. each item
@@ -562,21 +657,42 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         val dbs = roundEnv.getElementsAnnotatedWith(Database::class.java)
 
         for(dbTypeEl in dbs) {
+            Napier.d("Processing database: ${dbTypeEl.simpleName}")
             FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_JDBC_KT2)
-                .addJdbcDbImplType(dbTypeEl as TypeElement)
+                .addJdbcDbImplType(dbTypeEl as TypeElement, DoorTarget.JVM)
                 .build()
-                .writeToDirsFromArg(listOf(OPTION_JVM_DIRS, OPTION_JS_OUTPUT))
+                .writeToDirsFromArg(listOf(OPTION_JVM_DIRS))
 
+            Napier.d("Creating JS database for ${dbTypeEl.simpleName}")
+            FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_JDBC_KT2)
+                .addJdbcDbImplType(dbTypeEl, DoorTarget.JS)
+                .build()
+                .writeToDirsFromArg(listOf(OPTION_JS_OUTPUT))
+
+            FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_JS_IMPLEMENTATION_CLASSES)
+                .addJsImplementationsClassesObject(dbTypeEl, processingEnv)
+                .build()
+                .writeToDirsFromArg(OPTION_JS_OUTPUT)
+
+            Napier.d("Creating metadata for ${dbTypeEl.simpleName}")
             FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_DOOR_METADATA)
                 .addDatabaseMetadataType(dbTypeEl, processingEnv)
                 .build()
-                .writeToDirsFromArg(listOf(OPTION_JVM_DIRS, OPTION_ANDROID_OUTPUT))
+                .writeToDirsFromArg(listOf(OPTION_JVM_DIRS, OPTION_ANDROID_OUTPUT, OPTION_JS_OUTPUT))
+
+            Napier.d("Creating runOnChangeRunner for ${dbTypeEl.simpleName}")
+            FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_REP_RUN_ON_CHANGE_RUNNER)
+                .addReplicationRunOnChangeRunnerType(dbTypeEl)
+                .build()
+                .writeToDirsFromArg(listOf(OPTION_JVM_DIRS, OPTION_JS_OUTPUT, OPTION_ANDROID_OUTPUT, OPTION_JS_OUTPUT))
+            Napier.d("Done with ${dbTypeEl.simpleName}")
         }
 
 
         val daos = roundEnv.getElementsAnnotatedWith(Dao::class.java)
 
         for(daoElement in daos) {
+            Napier.d("Processing dao: ${daoElement.simpleName}")
             val daoTypeEl = daoElement as TypeElement
             FileSpec.builder(daoElement.packageName,
                 daoElement.simpleName.toString() + SUFFIX_JDBC_KT2)
@@ -585,12 +701,14 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .writeToDirsFromArg(listOf(OPTION_JVM_DIRS, OPTION_JS_OUTPUT))
         }
 
+        Napier.d("DbProcessJdbcKotlin: process complete")
         return true
     }
 
     fun FileSpec.Builder.addDaoJdbcImplType(
         daoTypeElement: TypeElement
     ) : FileSpec.Builder{
+        Napier.d("DbProcessorJdbcKotlin: addDaoJdbcImplType: start ${daoTypeElement.simpleName}")
         addImport("com.ustadmobile.door", "DoorDbType")
         addType(TypeSpec.classBuilder("${daoTypeElement.simpleName}$SUFFIX_JDBC_KT2")
             .primaryConstructor(FunSpec.constructorBuilder().addParameter("_db",
@@ -616,6 +734,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             }
             .build())
 
+        Napier.d("DbProcessorJdbcKotlin: addDaoJdbcImplType: finish ${daoTypeElement.simpleName}")
         return this
     }
 
@@ -623,6 +742,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         funElement: ExecutableElement,
         daoTypeElement: TypeElement
     ): TypeSpec.Builder {
+        Napier.d("DbProcessorJdbcKotlin: addDaoQueryFunction: start ${daoTypeElement.simpleName}#${funElement.simpleName}")
         val funSpec = funElement.asFunSpecConvertedToKotlinTypesForDaoFun(
             daoTypeElement.asType() as DeclaredType, processingEnv).build()
 
@@ -673,6 +793,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             .endControlFlow()
             .build()
 
+            Napier.d("DbProcessorJdbcKotlin: addDaoQueryFunction: end ${daoTypeElement.simpleName}#${funElement.simpleName}")
             return this
         }
 
@@ -749,14 +870,15 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         funElement: ExecutableElement,
         daoTypeElement: TypeElement
     ) : TypeSpec.Builder {
+        Napier.d("DbProcessorJdbcKotlin: addDaoDeleteFunction: start ${daoTypeElement.simpleName}#${funElement.simpleName}")
         val funSpec = funElement.asFunSpecConvertedToKotlinTypesForDaoFun(
             daoTypeElement.asType() as DeclaredType, processingEnv).build()
         val entityType = funSpec.parameters.first().type.unwrapListOrArrayComponentType()
         val entityTypeEl = (entityType as ClassName).asTypeElement(processingEnv)
             ?: throw IllegalStateException("Could not resolve ${entityType.canonicalName}")
-        val pkEl = entityTypeEl.entityPrimaryKey
-            ?: throw IllegalStateException("Could not find primary key for ${entityType.canonicalName}")
-        val stmtSql = "DELETE FROM ${entityTypeEl.simpleName} WHERE ${pkEl.simpleName} = ?"
+        val pkEls = entityTypeEl.entityPrimaryKeys
+        val stmtSql = "DELETE FROM ${entityTypeEl.simpleName} WHERE " +
+                pkEls.joinToString(separator = " AND ") { "${it.simpleName} = ?" }
         val firstParam = funSpec.parameters.first()
         var entityVarName = firstParam.name
 
@@ -769,15 +891,19 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .add("var _stmt = null as %T?\n", CLASSNAME_PREPARED_STATEMENT)
                 .add("var _numChanges = 0\n")
                 .beginControlFlow("try")
-                .add("_con = _db.openConnection()\n")
+                .add("_con = _db.transactionRootJdbcDb.openConnection()\n")
                 .add("_stmt = _con.prepareStatement(%S)\n", stmtSql)
                 .applyIf(firstParam.type.isListOrArray()) {
                     add("_con.setAutoCommit(false)\n")
                     beginControlFlow("for(_entity in ${firstParam.name})")
                     entityVarName = "_entity"
                 }
-                .add("_stmt.set${pkEl.asType().asTypeName().preparedStatementSetterGetterTypeName}(1, %L)\n",
-                    "$entityVarName.${pkEl.simpleName}")
+                .apply {
+                    pkEls.forEachIndexed { index, pkEl ->
+                        add("_stmt.set${pkEl.asType().asTypeName().preparedStatementSetterGetterTypeName}(%L, %L)\n",
+                            index + 1, "$entityVarName.${pkEl.simpleName}")
+                    }
+                }
                 .add("_numChanges += _stmt.executeUpdate()\n")
                 .applyIf(firstParam.type.isListOrArray()) {
                     endControlFlow()
@@ -785,7 +911,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     add("_con.setAutoCommit(true)\n")
                 }
                 .beginControlFlow("if(_numChanges > 0)")
-                .add("_db.handleTableChanged(listOf(%S))\n", entityTypeEl.simpleName)
+                .add("_db.%M(listOf(%S))\n", MEMBERNAME_HANDLE_TABLES_CHANGED, entityTypeEl.simpleName)
                 .endControlFlow()
                 .nextControlFlow("catch(_e: %T)", CLASSNAME_SQLEXCEPTION)
                 .add("_e.printStackTrace()\n")
@@ -800,6 +926,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .build())
             .build())
 
+        Napier.d("DbProcessorJdbcKotlin: addDaoDeleteFunction: finish ${daoTypeElement.simpleName}#${funElement.simpleName}")
         return this
     }
 
@@ -807,16 +934,19 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         funElement: ExecutableElement,
         daoTypeElement: TypeElement
     ) : TypeSpec.Builder {
+        Napier.d("DbProcessorJdbcKotlin: addDaoUpdateFunction: start ${daoTypeElement.simpleName}#${funElement.simpleName}")
         val funSpec = funElement.asFunSpecConvertedToKotlinTypesForDaoFun(
             daoTypeElement.asType() as DeclaredType, processingEnv).build()
         val entityType = funSpec.parameters.first().type.unwrapListOrArrayComponentType()
         val entityTypeEl = (entityType as ClassName).asTypeElement(processingEnv)
             ?: throw IllegalStateException("Could not resolve ${entityType.canonicalName}")
-        val pkEl = entityTypeEl.entityPrimaryKey
-            ?: throw IllegalStateException("Could not find primary key for ${entityType.canonicalName}")
-        val nonPkFields = entityTypeEl.entityFields.filter { !it.hasAnnotation(PrimaryKey::class.java) }
+        val pkEls = entityTypeEl.entityPrimaryKeys
+        val nonPkFields = entityTypeEl.entityFields.filter {
+            it.simpleName !in pkEls.map { it.simpleName }
+        }
         val sqlSetPart = nonPkFields.map { "${it.simpleName} = ?" }.joinToString()
-        val sqlStmt  = "UPDATE ${entityTypeEl.simpleName} SET $sqlSetPart WHERE ${pkEl.simpleName} = ?"
+        val sqlStmt  = "UPDATE ${entityTypeEl.simpleName} SET $sqlSetPart " +
+                "WHERE ${pkEls.joinToString(separator = " AND ") { "${it.simpleName} = ?" }}"
         val firstParam = funSpec.parameters.first()
         var entityVarName = firstParam.name
 
@@ -829,7 +959,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     add("var _result = %L\n", funSpec.returnType?.defaultTypeValueCode())
                 }
                 .add("val _sql = %S\n", sqlStmt)
-                .beginControlFlow("_db.prepareAndUseStatement".withSuffixIf("Async")  { funSpec.isSuspended } +"(_sql)")
+                .beginControlFlow("_db.%M(_sql)", prepareAndUseStatmentMemberName(funSpec.isSuspended))
                 .add(" _stmt ->\n")
                 .applyIf(firstParam.type.isListOrArray()) {
                     add("_stmt.getConnection().setAutoCommit(false)\n")
@@ -842,8 +972,10 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                         add("_stmt.set${it.asType().asTypeName().preparedStatementSetterGetterTypeName}")
                         add("(%L, %L)\n", fieldIndex++, "$entityVarName.${it.simpleName}")
                     }
-                    add("_stmt.set${pkEl.asType().asTypeName().preparedStatementSetterGetterTypeName}")
-                    add("(%L, %L)\n", fieldIndex++, "$entityVarName.${pkEl.simpleName}")
+                    pkEls.forEach { pkEl ->
+                        add("_stmt.set${pkEl.asType().asTypeName().preparedStatementSetterGetterTypeName}")
+                        add("(%L, %L)\n", fieldIndex++, "$entityVarName.${pkEl.simpleName}")
+                    }
                 }
                 .applyIf(funSpec.hasReturnType) {
                     add("_result += ")
@@ -860,7 +992,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 }
                 .apply {
                     endControlFlow()
-                    add("_db.handleTableChanged(listOf(%S))\n", entityTypeEl.simpleName)
+                    add("_db.%M(listOf(%S))\n", MEMBERNAME_HANDLE_TABLES_CHANGED, entityTypeEl.simpleName)
                 }
                 .applyIf(funSpec.hasReturnType) {
                     add("return _result")
@@ -868,6 +1000,8 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .build())
 
             .build())
+
+        Napier.d("DbProcessorJdbcKotlin: addDaoUpdateFunction: finish ${daoTypeElement.simpleName}#${funElement.simpleName}")
         return this
     }
 
@@ -876,6 +1010,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         daoTypeElement: TypeElement,
         daoTypeBuilder: TypeSpec.Builder
     ): TypeSpec.Builder {
+        Napier.d("Start add dao insert function: ${funElement.simpleName} on ${daoTypeElement.simpleName}")
         val funSpec = funElement.asFunSpecConvertedToKotlinTypesForDaoFun(
             daoTypeElement.asType() as DeclaredType, processingEnv).build()
         val entityType = funSpec.parameters.first().type.unwrapListOrArrayComponentType() as ClassName
@@ -899,6 +1034,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     suspended = funSpec.isSuspended)
                 .build())
             .build())
+        Napier.d("Finish dao insert function: ${funElement.simpleName} on ${daoTypeElement.simpleName}")
         return this
     }
 
@@ -910,11 +1046,14 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         entityClassName: ClassName,
         propertyName: String,
         upsertMode: Boolean,
+        processingEnv: ProcessingEnvironment,
         supportedDbTypes: List<Int>,
         pgOnConflict: String? = null
     ) : TypeSpec.Builder {
         val entityFields = entityTypeSpec.entityFields(getAutoIncLast = false)
-        val pkField = entityFields.first { it.annotations.any { it.typeName == PrimaryKey::class.asClassName() } }
+        val pkFields = entityClassName.asTypeElement(processingEnv)?.entityPrimaryKeys?.map {
+                PropertySpec.builder(it.simpleName.toString(), it.asType().asTypeName()).build()
+            } ?: listOf(entityFields.first { it.annotations.any { it.typeName == PrimaryKey::class.asClassName() } })
         val insertAdapterSpec = TypeSpec.anonymousClassBuilder()
             .superclass(EntityInsertionAdapter::class.asClassName().parameterizedBy(entityClassName))
             .addSuperclassConstructorParameter("_db")
@@ -966,14 +1105,14 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                                 insertSql += pgOnConflict.replace(" ", " ")
                             }
                             upsertMode -> {
-                                insertSql += " ON CONFLICT (${pkField.name}) DO UPDATE SET "
+                                insertSql += " ON CONFLICT (${pkFields.joinToString {it.name} }) DO UPDATE SET "
                                 insertSql += entityFields.filter { !it.annotations.any { it.typeName == PrimaryKey::class.asTypeName() } }
                                     .joinToString(separator = ",") {
                                         "${it.name} = excluded.${it.name}"
                                     }
                             }
                         }
-                        add("%S·+·if(returnsId)·{·%S·}·else·\"\"·", insertSql, " RETURNING ${pkField.name}")
+                        add("%S·+·if(returnsId)·{·%S·}·else·\"\"·", insertSql, " RETURNING ${pkFields.first().name}")
                     }
                     .applyIf(supportedDbTypes.size != 1 && DoorDbType.POSTGRES in supportedDbTypes) {
                         add("\n")
@@ -1043,7 +1182,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         val entityInserterPropName = "_insertAdapter${entityTypeSpec.name}_${if(upsertMode) "upsert" else ""}$pgOnConflictHash"
         if(!daoTypeBuilder.propertySpecs.any { it.name == entityInserterPropName }) {
             daoTypeBuilder.addDaoJdbcEntityInsertAdapter(entityTypeSpec, entityClassName, entityInserterPropName,
-                upsertMode, supportedDbTypes, pgOnConflict)
+                upsertMode, processingEnv, supportedDbTypes, pgOnConflict)
         }
 
         if(returnType != UNIT) {
@@ -1051,7 +1190,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         }
 
 
-        val insertMethodName = makeInsertAdapterMethodName(paramType, returnType, processingEnv, suspended)
+        val insertMethodName = makeInsertAdapterMethodName(paramType, returnType, suspended)
         add("$entityInserterPropName.$insertMethodName(${parameterSpec.name})")
 
         if(returnType != UNIT) {
@@ -1066,7 +1205,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
 
         add("\n")
 
-        add("_db.handleTableChanged(listOf(%S))\n", entityTypeSpec.name)
+        add("_db.%M(listOf(%S))\n", MEMBERNAME_HANDLE_TABLES_CHANGED, entityTypeSpec.name)
 
         if(addReturnStmt) {
             if(returnType != UNIT) {
@@ -1086,33 +1225,250 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         return this
     }
 
+    fun FileSpec.Builder.addReplicationRunOnChangeRunnerType(
+        dbTypeElement: TypeElement
+    ): FileSpec.Builder {
+        //find all DAOs on the database that contain a ReplicationRunOnChange annotation
+        val daosWithRunOnChange = dbTypeElement.dbEnclosedDaos(processingEnv)
+            .filter { it.enclosedElementsWithAnnotation(ReplicationRunOnChange::class.java).isNotEmpty() }
+        val daosWithRunOnNewNode = dbTypeElement.dbEnclosedDaos(processingEnv)
+            .filter { it.enclosedElementsWithAnnotation(ReplicationRunOnNewNode::class.java).isNotEmpty() }
+
+        val allReplicateEntities = dbTypeElement.allDbEntities(processingEnv)
+            .filter { it.hasAnnotation(ReplicateEntity::class.java) }
+
+
+        addType(TypeSpec.classBuilder(dbTypeElement.asClassNameWithSuffix(SUFFIX_REP_RUN_ON_CHANGE_RUNNER))
+            .addSuperinterface(ReplicationRunOnChangeRunner::class)
+            .addAnnotation(AnnotationSpec.builder(Suppress::class)
+                .addMember("%S, %S, %S, %S", "LocalVariableName", "RedundantVisibilityModifier", "unused", "ClassName")
+                .build())
+            .primaryConstructor(FunSpec.constructorBuilder()
+                .addParameter("_db", dbTypeElement.asClassName(), KModifier.PRIVATE)
+                .build())
+            .addProperty(PropertySpec.builder("_db", dbTypeElement.asClassName())
+                .initializer("_db")
+                .build())
+            .apply {
+                allReplicateEntities.forEach { repEntity ->
+                    addFunction(FunSpec.builder("handle${repEntity.simpleName}Changed")
+                        .receiver(dbTypeElement.asClassName())
+                        .addModifiers(KModifier.SUSPEND)
+                        .addModifiers(KModifier.PRIVATE)
+                        .returns(Set::class.parameterizedBy(String::class))
+                        .addCode(CodeBlock.builder()
+                            .apply {
+                                val repTablesToCheck = mutableSetOf<String>()
+                                daosWithRunOnChange.forEach { dao ->
+                                    val daoFunsToRun = dao.enclosedElements
+                                        .filter { it.hasAnyAnnotation {
+                                            it.annotationType.asTypeName() == ReplicationRunOnChange::class.java.asTypeName() &&
+                                            it.getClassValue("value", processingEnv) == repEntity}
+                                        }
+                                    val daoAccessorCodeBlock = dbTypeElement.findDaoGetter(dao, processingEnv)
+                                    daoFunsToRun.mapNotNull { it as? ExecutableElement}.forEach { funToRun ->
+                                        add("%L.${funToRun.simpleName}(", daoAccessorCodeBlock)
+                                        if(funToRun.parameters.first().hasAnnotation(NewNodeIdParam::class.java)) {
+                                            add("0L")
+                                        }
+
+                                        add(")\n")
+                                        val checkingPendingRepTableNames = funToRun.annotationMirrors
+                                            .firstOrNull() { it.annotationType.asElement() == ReplicationCheckPendingNotificationsFor::class.asTypeElement(processingEnv) }
+                                            ?.getClassArrayValue("value", processingEnv)
+                                            ?.map { it.simpleName.toString() }  ?: listOf(repEntity.simpleName.toString())
+                                        repTablesToCheck.addAll(checkingPendingRepTableNames)
+                                    }
+                                }
+                                add("%M(%L)\n",
+                                    MemberName("com.ustadmobile.door.ext", "deleteFromChangeLog"),
+                                    repEntity.getAnnotation(ReplicateEntity::class.java).tableId)
+
+                                add("return setOf(${repTablesToCheck.joinToString { "\"$it\"" }})\n")
+                            }
+                            .build())
+                        .build())
+                }
+            }
+            .addFunction(FunSpec.builder("runReplicationRunOnChange")
+                .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
+                .addParameter("tableNames", Set::class.parameterizedBy(String::class))
+                .returns(Set::class.parameterizedBy(String::class))
+                .addCode(CodeBlock.builder()
+                    .apply {
+                        add("val _checkPendingNotifications = mutableSetOf<String>()\n")
+                        beginControlFlow("_db.%M(%T::class)",
+                            MemberName("com.ustadmobile.door.ext", "withDoorTransactionAsync"),
+                            dbTypeElement)
+                        add("_transactionDb ->\n")
+                        allReplicateEntities.forEach { repEntity ->
+                            beginControlFlow("if(%S in tableNames)", repEntity.simpleName)
+                            add("_checkPendingNotifications.addAll(_transactionDb.handle${repEntity.simpleName}Changed())\n")
+                            endControlFlow()
+                        }
+                        add("Unit\n")
+                        endControlFlow()
+                        add("return _checkPendingNotifications\n")
+                    }
+                    .build())
+                .build())
+            .addFunction(FunSpec.builder("runOnNewNode")
+                .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
+                .addParameter("newNodeId", LONG)
+                .returns(Set::class.parameterizedBy(String::class))
+                .addCode(CodeBlock.builder()
+                    .apply {
+                        val entitiesChanged = mutableSetOf<String>()
+                        beginControlFlow("_db.%M(%T::class)",
+                            MemberName("com.ustadmobile.door.ext", "withDoorTransactionAsync"),
+                            dbTypeElement)
+                        add("_transactionDb -> \n")
+                        daosWithRunOnNewNode.forEach { dao ->
+                            val daoAccessorCodeBlock = dbTypeElement.findDaoGetter(dao, processingEnv)
+                            dao.enclosedElementsWithAnnotation(ReplicationRunOnNewNode::class.java, ElementKind.METHOD).forEach { daoFun ->
+                                add("_transactionDb.%L.${daoFun.simpleName}(newNodeId)\n", daoAccessorCodeBlock)
+                                val funEntitiesChanged = daoFun.annotationMirrors
+                                    .firstOrNull() { it.annotationType.asElement() == ReplicationCheckPendingNotificationsFor::class.asTypeElement(processingEnv) }
+                                    ?.getClassArrayValue("value", processingEnv)  ?: listOf()
+
+                                entitiesChanged += funEntitiesChanged.map { it.entityTableName }
+                            }
+                        }
+                        endControlFlow()
+                        add("return setOf(${entitiesChanged.joinToString(separator = "\", \"", prefix = "\"", postfix = "\"")})\n")
+                    }
+                    .build())
+                .build())
+            .build())
+
+        return this
+    }
+
 
     fun FileSpec.Builder.addJdbcDbImplType(
-        dbTypeElement: TypeElement
+        dbTypeElement: TypeElement,
+        target: DoorTarget
     ) : FileSpec.Builder {
         addImport("com.ustadmobile.door.util", "systemTimeInMillis")
         addType(TypeSpec.classBuilder(dbTypeElement.asClassNameWithSuffix(SUFFIX_JDBC_KT2))
             .superclass(dbTypeElement.asClassName())
+            .addSuperinterface(DoorDatabaseJdbc::class)
             .primaryConstructor(FunSpec.constructorBuilder()
+                .addParameter("doorJdbcSourceDatabase", DoorDatabase::class.asTypeName().copy(nullable = true),
+                    KModifier.OVERRIDE)
                 .addParameter(ParameterSpec("dataSource",  CLASSNAME_DATASOURCE,
                     KModifier.OVERRIDE))
-                .applyIf(dbTypeElement.isDbSyncable(processingEnv)) {
-                    addParameter(ParameterSpec.builder("master", BOOLEAN)
-                        .defaultValue("false")
-                        .addModifiers(KModifier.OVERRIDE).build())
+                .addParameter("dbName", String::class, KModifier.OVERRIDE)
+                .applyIf(target == DoorTarget.JVM) {
+                    addParameter("attachmentDir", File::class.asTypeName().copy(nullable = true))
                 }
+                .addParameter("realAttachmentFilters", List::class.parameterizedBy(AttachmentFilter::class),
+                    KModifier.OVERRIDE)
                 .addCode("setupFromDataSource()\n")
                 .build())
             .addDbVersionProperty(dbTypeElement)
             .addProperty(PropertySpec.builder("dataSource", CLASSNAME_DATASOURCE)
                 .initializer("dataSource")
                 .build())
-            .applyIf(dbTypeElement.isDbSyncable(processingEnv)) {
-                addProperty(PropertySpec.builder("master", BOOLEAN)
-                    .initializer("master").build())
+            .applyIf(target == DoorTarget.JVM) {
+                addProperty(PropertySpec.builder("realAttachmentStorageUri",
+                        DoorUri::class.asTypeName().copy(nullable = true))
+                    .addModifiers(KModifier.OVERRIDE)
+                    .initializer("attachmentDir?.%M()\n",
+                        MemberName("com.ustadmobile.door.ext", "toDoorUri"))
+                    .build())
             }
+            .applyIf(target == DoorTarget.JS) {
+                addProperty(PropertySpec.builder("realAttachmentStorageUri",
+                    DoorUri::class.asTypeName().copy(nullable = true))
+                    .addModifiers(KModifier.OVERRIDE)
+                    .initializer("null")
+                    .build())
+            }
+            .addProperty(PropertySpec.builder("realAttachmentFilters",
+                    List::class.parameterizedBy(AttachmentFilter::class))
+                .addModifiers(KModifier.OVERRIDE)
+                .initializer("realAttachmentFilters")
+                .build())
+            .addProperty(PropertySpec.builder("doorJdbcSourceDatabase",
+                    DoorDatabase::class.asTypeName().copy(nullable = true))
+                .initializer("doorJdbcSourceDatabase")
+                .build())
+            .addProperty(PropertySpec.builder("dbName", String::class)
+                .initializer("dbName")
+                .build())
+            .addFunction(FunSpec.builder("openConnection")
+                .addModifiers(KModifier.OVERRIDE)
+                .returns(CLASSNAME_CONNECTION)
+                .addCode("return dataSource.getConnection()\n")
+                .build())
+            .addProperty(PropertySpec.builder("transactionDepthCounter", TransactionDepthCounter::class)
+                .addModifiers(KModifier.OVERRIDE)
+                .initializer("%T()\n", TransactionDepthCounter::class)
+                .build())
+            .addProperty(PropertySpec.builder("invalidationTracker", DoorInvalidationTracker::class)
+                .addModifiers(KModifier.OVERRIDE)
+                .initializer("%T(this)\n", DoorInvalidationTracker::class)
+                .build())
+            .applyIf(target == DoorTarget.JS) {
+                addProperty(PropertySpec.builder("isInTransaction", Boolean::class,
+                    KModifier.OVERRIDE)
+                    .getter(FunSpec.getterBuilder()
+                        .addCode("return false\n")
+                        .build())
+                    .build())
+            }
+            .addProperty(PropertySpec.builder("realReplicationNotificationDispatcher",
+                    ReplicationNotificationDispatcher::class)
+                .addModifiers(KModifier.OVERRIDE)
+                .delegate(CodeBlock.builder()
+                    .beginControlFlow("lazy")
+                    .beginControlFlow("if(this == %M)",
+                        MemberName("com.ustadmobile.door.ext", "rootDatabase"))
+                    .add("%T(this, %T(this), %T)\n", ReplicationNotificationDispatcher::class,
+                        dbTypeElement.asClassNameWithSuffix(SUFFIX_REP_RUN_ON_CHANGE_RUNNER), GlobalScope::class)
+                    .nextControlFlow("else")
+                    .add("rootDatabase.%M\n",
+                        MemberName("com.ustadmobile.door.ext", "replicationNotificationDispatcher"))
+                    .endControlFlow()
+                    .endControlFlow()
+                    .build())
+                .build())
+            .addProperty(PropertySpec.builder("realIncomingReplicationListenerHelper",
+                    IncomingReplicationListenerHelper::class)
+                .addModifiers(KModifier.OVERRIDE)
+                .initializer(CodeBlock.of("%T()\n", IncomingReplicationListenerHelper::class))
+                .build())
+            .addProperty(PropertySpec.builder("realNodeIdAuthCache", NodeIdAuthCache::class,
+                    KModifier.OVERRIDE)
+                .delegate(CodeBlock.builder()
+                    .beginControlFlow("lazy")
+                    .beginControlFlow("if(this == %M)",
+                        MemberName("com.ustadmobile.door.ext", "rootDatabase"))
+                    .add("val nodeIdAuthCache = %T(this)\n", NodeIdAuthCache::class)
+                    .add("nodeIdAuthCache.addNewNodeListener(realReplicationNotificationDispatcher)\n")
+                    .add("nodeIdAuthCache\n")
+                    .nextControlFlow("else")
+                    .add("rootDatabase.%M\n", MemberName("com.ustadmobile.door.ext", "nodeIdAuthCache"))
+                    .endControlFlow()
+                    .endControlFlow()
+                    .build())
+                .build())
+            .addProperty(PropertySpec.builder("realPrimaryKeyManager", DoorPrimaryKeyManager::class,
+                    KModifier.OVERRIDE)
+                .delegate(CodeBlock.builder()
+                    .beginControlFlow("lazy")
+                    .beginControlFlow("if(isInTransaction)")
+                    .add("throw %T(%S)\n", ClassName("kotlin", "IllegalStateException"),
+                        "doorPrimaryKeyManager must be used on root database ONLY, not transaction wrapper!")
+                    .endControlFlow()
+                    .add("%T(%T::class.%M().replicateEntities.keys)\n", DoorPrimaryKeyManager::class,
+                        dbTypeElement, MemberName("com.ustadmobile.door.ext", "doorDatabaseMetadata"))
+                    .endControlFlow()
+                    .build())
+                .build())
             .addCreateAllTablesFunction(dbTypeElement)
-            .addClearAllTablesFunction(dbTypeElement)
+            .addClearAllTablesFunction(dbTypeElement, target)
             .apply {
                 val daoGetters = dbTypeElement.enclosedElements
                     .filter { it.kind == ElementKind.METHOD }
@@ -1120,6 +1476,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     .filter { it.modifiers.contains(Modifier.ABSTRACT) }
 
                 daoGetters.forEach {
+                    Napier.d("CReating dao getter for ${it.simpleName}")
                     val daoTypeEl = processingEnv.typeUtils.asElement(it.returnType) as TypeElement
                     val daoImplClassName = daoTypeEl.asClassNameWithSuffix(SUFFIX_JDBC_KT2)
                     addProperty(PropertySpec.builder("_${daoTypeEl.simpleName}",
@@ -1136,11 +1493,12 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         dbTypeElement: TypeElement
     ) : TypeSpec.Builder {
         val initDbVersion = dbTypeElement.getAnnotation(Database::class.java).version
+        Napier.d("Door Wrapper: add create all tables function for ${dbTypeElement.simpleName}")
         addFunction(FunSpec.builder("createAllTables")
             .addModifiers(KModifier.OVERRIDE)
             .returns(List::class.parameterizedBy(String::class))
             .addCode(CodeBlock.builder()
-                .add("val _stmtList = mutableListOf<String>()\n")
+                .add("val _stmtList = %M<String>()\n", MEMBERNAME_MUTABLE_LINKEDLISTOF)
                 .beginControlFlow("when(jdbcDbType)")
                 .apply {
                     for(dbProductType in DoorDbType.SUPPORTED_TYPES) {
@@ -1151,61 +1509,52 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                                 "·(dbVersion·int·primary·key,·dbHash·varchar(255))\"\n")
                         add(" _stmtList += \"INSERT·INTO·${DoorDatabaseCommon.DBINFO_TABLENAME}·" +
                                 "VALUES·($initDbVersion,·'')\"\n")
+
+                        //All entities MUST be created first, triggers etc. can only be created after all entities exist
+                        val createEntitiesCodeBlock = CodeBlock.builder()
+                        val createTriggersAndViewsBlock = CodeBlock.builder()
+
                         dbTypeElement.allDbEntities(processingEnv).forEach { entityType ->
                             val fieldListStr = entityType.entityFields.joinToString { it.simpleName.toString() }
-                            add("//Begin: Create table ${entityType.simpleName} for $dbTypeName\n")
-                            add("/* START MIGRATION: \n")
+                            createEntitiesCodeBlock.add("//Begin: Create table ${entityType.simpleName} for $dbTypeName\n")
+                                .add("/* START MIGRATION: \n")
                                 .add("_stmt.executeUpdate(%S)\n",
                                     "ALTER TABLE ${entityType.simpleName} RENAME to ${entityType.simpleName}_OLD")
                                 .add("END MIGRATION */\n")
-                            addCreateTableCode(entityType.asEntityTypeSpec(),
-                                "_stmt.executeUpdate", dbProductType,
-                                entityType.indicesAsIndexMirrorList(), sqlListVar = "_stmtList")
-                            add("/* START MIGRATION: \n")
-                            add("_stmt.executeUpdate(%S)\n", "INSERT INTO ${entityType.simpleName} ($fieldListStr) " +
+                                .addCreateTableCode(entityType.asEntityTypeSpec(), entityType.packageName,
+                                    "_stmt.executeUpdate", dbProductType, processingEnv,
+                                    entityType.indicesAsIndexMirrorList(), sqlListVar = "_stmtList")
+                                .add("/* START MIGRATION: \n")
+                                .add("_stmt.executeUpdate(%S)\n", "INSERT INTO ${entityType.simpleName} ($fieldListStr) " +
                                     "SELECT $fieldListStr FROM ${entityType.simpleName}_OLD")
-                            add("_stmt.executeUpdate(%S)\n", "DROP TABLE ${entityType.simpleName}_OLD")
-                            add("END MIGRATION*/\n")
+                                .add("_stmt.executeUpdate(%S)\n", "DROP TABLE ${entityType.simpleName}_OLD")
+                                .add("END MIGRATION*/\n")
 
-                            if(entityType.hasAnnotation(SyncableEntity::class.java)) {
-                                val syncableEntityInfo = SyncableEntityInfo(entityType.asClassName(),
-                                    processingEnv)
-                                addSyncableEntityTriggers(entityType.asClassName(),
-                                    "_stmt.executeUpdate", dbProductType, sqlListVar = "_stmtList")
 
-                                if(dbProductType == DoorDbType.POSTGRES) {
-                                    add("/* START MIGRATION: \n")
-                                    add("_stmt.executeUpdate(%S)\n",
-                                        "DROP FUNCTION IF EXISTS inc_csn_${syncableEntityInfo.tableId}_fn")
-                                    add("_stmt.executeUpdate(%S)\n",
-                                        "DROP SEQUENCE IF EXISTS spk_seq_${syncableEntityInfo.tableId}")
-                                    add("END MIGRATION*/\n")
-                                }
-
-                                val trackerEntityClassName = generateTrackerEntity(entityType, processingEnv)
-                                add("_stmtList += %S\n", makeCreateTableStatement(
-                                    trackerEntityClassName, dbProductType))
-
-                                add(generateCreateIndicesCodeBlock(
-                                    arrayOf(IndexMirror(value = arrayOf(DbProcessorSync.TRACKER_DESTID_FIELDNAME,
-                                        DbProcessorSync.TRACKER_ENTITY_PK_FIELDNAME,
-                                        DbProcessorSync.TRACKER_CHANGESEQNUM_FIELDNAME)),
-                                        IndexMirror(value = arrayOf(DbProcessorSync.TRACKER_ENTITY_PK_FIELDNAME,
-                                            DbProcessorSync.TRACKER_DESTID_FIELDNAME), unique = true)),
-                                    trackerEntityClassName.name!!, "_stmtList"))
+                            if(entityType.hasAnnotation(ReplicateEntity::class.java)) {
+                                createTriggersAndViewsBlock
+                                    .addReplicateEntityChangeLogTrigger(entityType, "_stmtList", dbProductType)
+                                    .addCreateReceiveView(entityType, "_stmtList")
                             }
+
+                            createTriggersAndViewsBlock.addCreateTriggersCode(entityType, "_stmtList",
+                                dbProductType)
+
 
                             if(entityType.entityHasAttachments) {
                                 if(dbProductType == DoorDbType.SQLITE) {
-                                    addGenerateAttachmentTriggerSqlite(entityType,
+                                    createTriggersAndViewsBlock.addGenerateAttachmentTriggerSqlite(entityType,
                                         "_stmt.executeUpdate", "_stmtList")
                                 }else {
-                                    addGenerateAttachmentTriggerPostgres(entityType, "_stmtList")
+                                    createTriggersAndViewsBlock.addGenerateAttachmentTriggerPostgres(entityType, "_stmtList")
                                 }
                             }
 
-                            add("//End: Create table ${entityType.simpleName} for $dbTypeName\n\n")
+                            createEntitiesCodeBlock.add("//End: Create table ${entityType.simpleName} for $dbTypeName\n\n")
                         }
+                        add(createEntitiesCodeBlock.build())
+                        add(createTriggersAndViewsBlock.build())
+
                         endControlFlow()
                     }
                 }
@@ -1214,33 +1563,47 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .build())
             .build())
 
+        Napier.d("Door Wrapper: done with tables function for ${dbTypeElement.simpleName}")
         return this
     }
 
+
+
     fun TypeSpec.Builder.addClearAllTablesFunction(
-        dbTypeElement: TypeElement
+        dbTypeElement: TypeElement,
+        target: DoorTarget
     ) : TypeSpec.Builder {
-        addFunction(FunSpec.builder("clearAllTables")
-            .addModifiers(KModifier.OVERRIDE)
-            .addCode("var _con = null as %T?\n", CLASSNAME_CONNECTION)
-            .addCode("var _stmt = null as %T?\n", CLASSNAME_STATEMENT)
-            .beginControlFlow("try")
-            .addCode("_con = openConnection()!!\n")
-            .addCode("_stmt = _con.createStatement()!!\n")
+
+        addFunction(FunSpec.builder("makeClearAllTablesSql")
+            .returns(List::class.parameterizedBy(String::class))
+            .addCode("val _stmtList = mutableListOf<String>()\n")
             .apply {
                 dbTypeElement.allDbEntities(processingEnv).forEach {  entityType ->
-                    addCode("_stmt.executeUpdate(%S)\n", "DELETE FROM ${entityType.simpleName}")
-                    if(entityType.hasAnnotation(SyncableEntity::class.java)) {
-                        addCode("_stmt.executeUpdate(%S)\n",
-                            "DELETE FROM ${entityType.simpleName}$TRACKER_SUFFIX")
-                    }
+                    addCode("_stmtList += %S\n", "DELETE FROM ${entityType.simpleName}")
                 }
             }
-            .nextControlFlow("finally")
-            .addCode("_stmt?.close()\n")
-            .addCode("_con?.close()\n")
-            .endControlFlow()
+            .addCode("return _stmtList\n")
             .build())
+        addFunction(FunSpec.builder("clearAllTables")
+            .addModifiers(KModifier.OVERRIDE)
+            .applyIf(target == DoorTarget.JVM) {
+                addCode("%M(*makeClearAllTablesSql().%M())\n",
+                    MemberName("com.ustadmobile.door.ext", "execSqlBatch"),
+                    MemberName("kotlin.collections", "toTypedArray"))
+            }
+            .applyIf(target == DoorTarget.JS) {
+                addCode("throw %T(%S)\n", CLASSNAME_ILLEGALSTATEEXCEPTION,
+                        "clearAllTables synchronous not supported on Javascript")
+            }
+            .build())
+
+        if(target == DoorTarget.JS) {
+            addFunction(FunSpec.builder("clearAllTablesAsync")
+                .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
+                .addCode("execSQLBatchAsync(*makeClearAllTablesSql().%M())\n",
+                    MemberName("kotlin.collections", "toTypedArray"))
+                .build())
+        }
         return this
     }
 
@@ -1252,6 +1615,10 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
 
         //As it should be including the underscore - the above will be deprecated
         const val SUFFIX_JDBC_KT2 = "_JdbcKt"
+
+        const val SUFFIX_REP_RUN_ON_CHANGE_RUNNER = "_ReplicationRunOnChangeRunner"
+
+        const val SUFFIX_JS_IMPLEMENTATION_CLASSES = "JsImplementations"
 
     }
 }
