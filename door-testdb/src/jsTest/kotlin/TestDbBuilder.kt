@@ -1,6 +1,7 @@
 import com.ustadmobile.door.ChangeListenerRequest
 import com.ustadmobile.door.DatabaseBuilder
 import com.ustadmobile.door.DatabaseBuilderOptions
+import com.ustadmobile.door.SyncNodeIdCallback
 import com.ustadmobile.door.ext.addInvalidationListener
 import com.ustadmobile.door.util.systemTimeInMillis
 import db2.ExampleDatabase2
@@ -16,6 +17,7 @@ import repdb.RepDb
 import repdb.RepDbJsImplementations
 import repdb.RepEntity
 import kotlin.js.Promise
+import kotlin.random.Random
 import kotlin.test.*
 
 class TestDbBuilder {
@@ -23,6 +25,8 @@ class TestDbBuilder {
      private lateinit var exampleDb2: ExampleDatabase2
 
      private lateinit var repDb: RepDb
+
+     private var repNodeId: Long = 0L
 
      //We can not use @BeforeTest here, it is async call test will run before it finishes the setting up.
      private suspend fun openClearDb() {
@@ -47,9 +51,12 @@ class TestDbBuilder {
         val data = (res.blob() as Promise<dynamic>).await()
         val workerBlobUrl = URL.createObjectURL(data as Blob)
 
+        repNodeId = Random.nextLong(0, Long.MAX_VALUE)
         val builderOptions = DatabaseBuilderOptions(
             RepDb::class, RepDbJsImplementations, "resDb", workerBlobUrl)
-        repDb = DatabaseBuilder.databaseBuilder(builderOptions).build()
+        repDb = DatabaseBuilder.databaseBuilder(builderOptions)
+            .addCallback(SyncNodeIdCallback(repNodeId))
+            .build()
 
     }
 
@@ -109,6 +116,8 @@ class TestDbBuilder {
         assertTrue(entityFromDb.rePrimaryKey > 1000)
         assertTrue(entityFromDb.reLastChangeTime > startTime, message = "Last changed time was set")
 
+        assertEquals(repNodeId, repDb.repDao.selectSyncNodeId(),
+            message = "SyncNodeClientId was set by callback")
     }
 
     @Test

@@ -121,4 +121,17 @@ abstract class RepDao {
     """)
     abstract fun findByUidLive(uid: Long): DoorLiveData<RepEntity?>
 
+    @RepoHttpAccessible
+    @Repository(Repository.METHOD_DELEGATE_TO_WEB)
+    @Insert
+    abstract suspend fun insertHttp(entity: RepEntity) : Long
+
+    @Query("""
+        SELECT COALESCE(
+                    (SELECT nodeClientId 
+                       FROM SyncNode 
+                      LIMIT 1), 0)
+    """)
+    abstract suspend fun selectSyncNodeId(): Long
+
 }

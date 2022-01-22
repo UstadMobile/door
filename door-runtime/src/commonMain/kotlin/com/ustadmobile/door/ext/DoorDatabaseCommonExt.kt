@@ -92,10 +92,8 @@ fun <T: DoorDatabase> T.requireDbAndRepo(): Pair<T, T> {
  */
 fun <T:DoorDatabase> T.clearAllTablesAndResetNodeId(nodeId: Long) : T {
     clearAllTables()
-    SyncNodeIdCallback(nodeId)
-        .initSyncTables(forceReset = true)  {
-            this.execSqlBatch(*it)
-        }
+    execSqlBatch(*SyncNodeIdCallback(nodeId)
+        .initSyncNodeSync(forceReset = true).toTypedArray())
     return this
 }
 

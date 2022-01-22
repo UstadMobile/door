@@ -17,6 +17,7 @@ import io.ktor.response.*
 import io.ktor.routing.*
 import org.kodein.di.*
 import org.kodein.di.ktor.DIFeature
+import org.kodein.di.ktor.closestDI
 import java.nio.file.Files
 import javax.naming.InitialContext
 
@@ -75,6 +76,18 @@ fun Application.doorTestDbApplication() {
 
         get("/") {
             call.respondText { "Hello" }
+        }
+
+        get("/insertRepEntity") {
+            val uid = call.request.queryParameters["rePrimaryKey"]?.toLong() ?: throw IllegalArgumentException("No rePrimaryKey")
+            val str = call.request.queryParameters["reString"]
+
+            val repDb: RepDb = closestDI().direct.on(call).instance(tag = DoorTag.TAG_DB)
+            repDb.repDao.insertAsync(RepEntity().apply {
+                rePrimaryKey = uid
+                reString = str
+            })
+            call.respondText { "Inserted $uid" }
         }
     }
 

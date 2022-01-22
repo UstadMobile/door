@@ -6,7 +6,7 @@ import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
 import io.ktor.client.*
 import io.ktor.client.engine.js.*
-import kotlinx.browser.document
+import io.ktor.client.request.*
 import kotlinx.browser.window
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
@@ -77,6 +77,27 @@ fun main() {
 
             console.log("GOT ENTITY FROM SERVER:? $entityAsyncQueryResult")
 
+            console.log("Asking server to make something")
+            val serverInsertUid = systemTimeInMillis()
+            val response = httpClient.get<String>(
+                "http://localhost:8098/insertRepEntity") {
+                parameter("rePrimaryKey", serverInsertUid)
+                parameter("reString", "From server at ${Date().toUTCString()}")
+            }
+
+            console.log("Server says: $response ... Waiting...")
+
+            val completableDeferred = CompletableDeferred<RepEntity>()
+            val observer = DoorObserver<RepEntity?> {
+                if(it != null)
+                    completableDeferred.complete(it)
+            }
+            repDb.repDao.findByUidLive(serverInsertUid).observeForever(observer)
+            val entityReceived = withTimeout(5000) {
+                completableDeferred.await()
+            }
+
+            console.log("Got it back! $entityReceived")
         }
 
         Unit

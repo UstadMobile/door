@@ -1,33 +1,32 @@
 package com.ustadmobile.door
 
-import com.ustadmobile.door.ext.execSqlBatch
-
 /**
  * Callback class. This class will set the nodeId, and insert required rows into SqliteChangeSeqNums and
  * TableSyncStatus
  */
-class SyncNodeIdCallback(val nodeId: Long): DoorDatabaseCallbackSync {
+class SyncNodeIdCallback(val nodeId: Long): DoorDatabaseCallbackStatementList {
 
-    private fun setSyncNode(execSqlFn: (Array<String>) -> Unit) {
-        execSqlFn(arrayOf("DELETE FROM SyncNode",
+    private fun generateSetSyncNodeSql() : List<String>{
+        return listOf("DELETE FROM SyncNode",
             """
             INSERT INTO SyncNode(nodeClientId)
                     VALUES ($nodeId) 
-            """))
+            """)
     }
 
-    fun initSyncTables(forceReset: Boolean, execSqlFn: (Array<String>) -> Unit) {
+    fun initSyncNodeSync(forceReset: Boolean): List<String> {
         if(forceReset)
-            setSyncNode(execSqlFn)
-
+            return generateSetSyncNodeSql()
+        else
+            return listOf()
     }
 
-    override fun onCreate(db: DoorSqlDatabase) {
-        setSyncNode() { db.execSqlBatch(it) }
+    override fun onCreate(db: DoorSqlDatabase) : List<String> {
+        return generateSetSyncNodeSql()
     }
 
-    override fun onOpen(db: DoorSqlDatabase) {
-
+    override fun onOpen(db: DoorSqlDatabase) : List<String>{
+        return listOf()
     }
 
 }
