@@ -16,5 +16,5 @@ data class DatabaseBuilderOptions<T : DoorDatabase>(
     /**
      * Delay time before saving the database to indexed database
      */
-    val saveToIndexedDbDelayTime: Long = 5000
+    val saveToIndexedDbDelayTime: Long = 200
 )

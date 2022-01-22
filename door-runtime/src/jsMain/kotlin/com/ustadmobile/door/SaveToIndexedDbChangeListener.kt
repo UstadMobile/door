@@ -13,6 +13,7 @@ import com.ustadmobile.door.sqljsjdbc.SQLiteDatasourceJs
 class SaveToIndexedDbChangeListener(
     database: DoorDatabase,
     private val datasource: SQLiteDatasourceJs,
+    tablesToListen: List<String>,
     private val maxWaitTime: Long
 ) {
     private val changeListenerRequest: ChangeListenerRequest
@@ -20,7 +21,7 @@ class SaveToIndexedDbChangeListener(
     private var persistDbJob: Job? = null
 
     init {
-        changeListenerRequest = ChangeListenerRequest(listOf()){
+        changeListenerRequest = ChangeListenerRequest(tablesToListen){
             onTablesChanged()
         }
         database.addChangeListener(changeListenerRequest)

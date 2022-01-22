@@ -28,7 +28,6 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(
         val dbImpl = builderOptions.dbImplClasses.dbImplKClass.js.createInstance(null, dataSource,
             builderOptions.dbName, listOf<AttachmentFilter>()) as T
         val exists = IndexedDb.checkIfExists(builderOptions.dbName)
-        SaveToIndexedDbChangeListener(dbImpl, dataSource, builderOptions.saveToIndexedDbDelayTime)
         if(exists){
             dataSource.loadDbFromIndexedDb()
         }else{
@@ -85,6 +84,7 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(
         }
 
         val dbMetaData = lookupImplementations(builderOptions.dbClass).metadata
+        SaveToIndexedDbChangeListener(dbImpl, dataSource,dbMetaData.replicateTableNames, builderOptions.saveToIndexedDbDelayTime)
         return if(dbMetaData.hasReadOnlyWrapper) {
             dbImpl.wrap(builderOptions.dbClass)
         }else {
