@@ -382,7 +382,7 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
                 connectionMap.filter { it.value != null }.forEach { connectionEntry ->
                     val query = queryFun.getAnnotation(Query::class.java).value.let {
                         if(connectionEntry.key == DoorDbType.POSTGRES) {
-                            it.sqlToPostgresSql()
+                            queryFun.getAnnotation(PostgresQuery::class.java)?.value ?: it.sqlToPostgresSql()
                         }else {
                             it
                         }

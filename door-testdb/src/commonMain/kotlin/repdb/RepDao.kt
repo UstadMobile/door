@@ -53,9 +53,15 @@ abstract class RepDao {
                   FROM RepEntityTracker
                  WHERE RepEntityTracker.trkrForeignKey = RepEntity.rePrimaryKey
                    AND RepEntityTracker.trkrDestination = DoorNode.nodeId), 0)
-        /*psql ON CONFLICT(trkrForeignKey, trkrDestination) DO UPDATE 
+    """)
+    @PostgresQuery("""
+        INSERT INTO RepEntityTracker(trkrForeignKey, trkrDestination)
+        SELECT RepEntity.rePrimaryKey AS trkrForeignKey,
+               DoorNode.nodeId AS trkrDestination
+          FROM RepEntity
+               JOIN DoorNode ON DoorNode.nodeId = :newNodeId
+            ON CONFLICT(trkrForeignKey, trkrDestination) DO UPDATE 
               SET trkrPending = true
-        */      
     """)
     @ReplicationRunOnNewNode
     @ReplicationCheckPendingNotificationsFor([RepEntity::class])

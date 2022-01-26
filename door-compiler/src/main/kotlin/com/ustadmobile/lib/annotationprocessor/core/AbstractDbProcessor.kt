@@ -849,39 +849,6 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         return codeBlock.build()
     }
 
-    /**
-     * Given a TypeSpec for an abstract DAO class. At present this is only generating query
-     * functions but could be extended.
-     */
-    fun generateJdbcDaoImpl(daoTypeSpec: TypeSpec, implClassName: String, pkgName: String): TypeSpec {
-        val implTypeSpec =jdbcDaoTypeSpecBuilder(implClassName, ClassName(pkgName, daoTypeSpec.name!!))
-
-        daoTypeSpec.funSpecs.forEach {funSpec ->
-            if(funSpec.annotations. any { it.className == Query::class.asClassName() }) {
-                val queryAnnotation = funSpec.annotations.first { it.className == Query::class.asClassName()}
-
-                val overridingFun = funSpec.toBuilder()
-                        .addModifiers(KModifier.OVERRIDE)
-                        .addCode(CodeBlock.builder().addJdbcQueryCode(funSpec.returnType ?: UNIT,
-                                funSpec.parameters.map { it.name to it.type}.toMap(),
-                                queryAnnotation.memberToString(), null, null)
-                            .build())
-                if(funSpec.returnType != UNIT) {
-                    overridingFun.addCode("return _result\n")
-                }
-
-                overridingFun.annotations.clear()
-                overridingFun.modifiers.remove(KModifier.ABSTRACT)
-
-                implTypeSpec.addFunction(overridingFun.build())
-            }
-        }
-
-        return implTypeSpec.build()
-    }
-
-
-
 
     fun logMessage(kind: Diagnostic.Kind, message: String, enclosing: TypeElement? = null,
                    element: Element? = null, annotation: AnnotationMirror? = null) {

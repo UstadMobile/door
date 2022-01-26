@@ -748,6 +748,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
 
         val queryVarsMap = funSpec.parameters.map { it.name to it.type }.toMap()
         val querySql = funElement.getAnnotation(Query::class.java)?.value
+        val postgresQuerySql = funElement.getAnnotation(PostgresQuery::class.java)?.value
         val resultType = funSpec.returnType?.unwrapLiveDataOrDataSourceFactory() ?: UNIT
         val rawQueryParamName = if(funElement.hasAnnotation(RawQuery::class.java))
             funSpec.parameters.first().name
@@ -758,7 +759,8 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             liveQueryVarsMap: Map<String, TypeName> = queryVarsMap,
             liveResultType: TypeName = resultType,
             liveSql: String? = querySql,
-            liveRawQueryParamName: String? = rawQueryParamName
+            liveRawQueryParamName: String? = rawQueryParamName,
+            livePostgreSql: String? = postgresQuerySql
         ): CodeBlock.Builder {
             val tablesToWatch = mutableListOf<String>()
             val specifiedLiveTables = funElement.getAnnotation(QueryLiveTables::class.java)
@@ -784,7 +786,8 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 tablesToWatch.map {"\"$it\""}.joinToString())
             .addJdbcQueryCode(liveResultType, liveQueryVarsMap, liveSql,
                 daoTypeElement, funElement, resultVarName = "_liveResult",
-                suspended = true, rawQueryVarName = liveRawQueryParamName)
+                suspended = true, rawQueryVarName = liveRawQueryParamName,
+                querySqlPostgres = livePostgreSql)
             .add("_liveResult")
             .applyIf(liveResultType.isList()) {
                 add(".toList()")
@@ -826,7 +829,9 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                                 liveQueryVarsMap = queryVarsMap + mapOf("_offset" to INT, "_limit" to INT),
                                 liveResultType = List::class.asClassName().parameterizedBy(returnTypeUnwrapped),
                                 liveSql = querySql?.let { "SELECT * FROM ($it) LIMIT :_limit OFFSET :_offset " },
-                                liveRawQueryParamName = rawQueryParamName?.let { "_rawQuery" })
+                                liveRawQueryParamName = rawQueryParamName?.let { "_rawQuery" },
+                                livePostgreSql =  postgresQuerySql?.let { "SELECT * FROM ($it) LIMIT :_limit OFFSET :_offset " }
+                            )
                             .build())
                         .build())
                     .addFunction(FunSpec.builder("getLength")
@@ -842,7 +847,8 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                             .addLiveDataImpl(
                                 liveResultType = INT,
                                 liveSql = querySql?.let { "SELECT COUNT(*) FROM ($querySql) "},
-                                liveRawQueryParamName = rawQueryParamName?.let { "_rawQuery" })
+                                liveRawQueryParamName = rawQueryParamName?.let { "_rawQuery" },
+                                livePostgreSql = postgresQuerySql?.let { "SELECT COUNT(*) FROM ($querySql) "})
                             .build())
                         .build())
                     .build())
@@ -854,7 +860,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             }.applyIf(funSpec.returnType?.isDataSourceFactoryOrLiveData() != true) {
                 addCode(CodeBlock.builder().addJdbcQueryCode(resultType, queryVarsMap, querySql,
                     daoTypeElement, funElement, rawQueryVarName = rawQueryParamName,
-                    suspended = funSpec.isSuspended)
+                    suspended = funSpec.isSuspended, querySqlPostgres = postgresQuerySql)
                     .build())
             }
             .applyIf(funSpec.hasReturnType) {
