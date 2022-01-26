@@ -12,4 +12,6 @@ actual interface Statement {
 
     actual fun getGeneratedKeys(): ResultSet
 
+    actual fun setQueryTimeout(seconds: Int)
+
 }

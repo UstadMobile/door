@@ -28,7 +28,7 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(
         register(builderOptions.dbImplClasses)
 
         val dbImpl = builderOptions.dbImplClasses.dbImplKClass.js.createInstance(null, dataSource,
-            builderOptions.dbName, listOf<AttachmentFilter>()) as T
+            builderOptions.dbName, listOf<AttachmentFilter>(), builderOptions.jdbcQueryTimeout) as T
         val exists = IndexedDb.checkIfExists(builderOptions.dbName)
 
         if(exists){
@@ -124,6 +124,10 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(
         Napier.d("DatabaseBuilderJs: Add Callback: ${callback::class.simpleName}", tag = DoorTag.LOG_TAG)
         callbacks.add(callback)
         return this
+    }
+
+    fun queryTimeout(seconds: Int) {
+        builderOptions.jdbcQueryTimeout = seconds
     }
 
     companion object {

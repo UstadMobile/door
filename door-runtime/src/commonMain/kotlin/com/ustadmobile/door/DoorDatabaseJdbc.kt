@@ -68,5 +68,9 @@ interface DoorDatabaseJdbc {
 
     val realAttachmentFilters: List<AttachmentFilter>
 
+    /**
+     * The query timeout to use: in seconds
+     */
+    val jdbcQueryTimeout: Int
 
 }

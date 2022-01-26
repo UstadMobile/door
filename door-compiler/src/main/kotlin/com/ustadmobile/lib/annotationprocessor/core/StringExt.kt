@@ -131,7 +131,24 @@ fun String.sqlToPostgresSql() : String {
                 newSql.substring(pgSectionEnd + 2)
     }
 
-    return newSql
+    var inNoPgSection = false
+
+    var newSqlLines = ""
+    newSql.lines().forEach { line ->
+        val trimmedLine = line.trimStart()
+        if(trimmedLine.startsWith(AbstractDbProcessor.NOTPGSECTION_COMMENT_PREFIX)) {
+            inNoPgSection = true
+        }
+
+        if(!inNoPgSection)
+            newSqlLines += line + "\n"
+
+        if(trimmedLine.startsWith(AbstractDbProcessor.NOTPGSECTION_END_COMMENT_PREFIX))
+            inNoPgSection = false
+    }
+
+
+    return newSqlLines
 }
 
 fun String.useAsPostgresSqlIfNotBlankOrFallback(generalSql: String): String {

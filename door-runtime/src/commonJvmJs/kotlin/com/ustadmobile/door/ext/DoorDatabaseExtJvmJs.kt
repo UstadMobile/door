@@ -22,6 +22,7 @@ actual suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
         }
 
         stmt = connection.prepareStatement(stmtConfig)
+        stmt.setQueryTimeout((rootDatabase as DoorDatabaseJdbc).jdbcQueryTimeout)
         val blockStartTime = systemTimeInMillis()
         return block(stmt).also {
             val blockTime = systemTimeInMillis() - blockStartTime
@@ -51,6 +52,7 @@ actual fun <R> DoorDatabase.prepareAndUseStatement(
             Napier.w("WARNING: $this waited ${conWaitTime}ms for a connection!")
 
         stmt = connection.prepareStatement(stmtConfig)
+        stmt.setQueryTimeout((rootDatabase as DoorDatabaseJdbc).jdbcQueryTimeout)
         val blockStartTime = systemTimeInMillis()
         return block(stmt).also {
             val blockTime = systemTimeInMillis() - blockStartTime

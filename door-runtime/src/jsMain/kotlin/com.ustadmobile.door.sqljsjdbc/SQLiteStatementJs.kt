@@ -12,6 +12,8 @@ open class SQLiteStatementJs(
     //This is set when running executeUpdateAsync
     protected var lastGeneratedKey: ResultSet? = null
 
+    protected var queryTimeoutSecs: Int = 0
+
     override fun executeUpdate(sql: String): Int {
         throw SQLException("Synchronous SQL not supported!")
     }
@@ -34,4 +36,7 @@ open class SQLiteStatementJs(
         return lastGeneratedKey ?: SQLiteResultSet(arrayOf())
     }
 
+    override fun setQueryTimeout(seconds: Int) {
+        queryTimeoutSecs = seconds
+    }
 }

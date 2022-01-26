@@ -91,6 +91,6 @@ abstract class ExampleSyncableDao {
           FROM ExampleSyncableEntity
          WHERE esName = :name
     """)
-    abstract fun insertFromSelectQuery(name: String?, publik: Int)
+    abstract fun insertFromSelectQuery(name: String?, publik: Boolean)
 
 }

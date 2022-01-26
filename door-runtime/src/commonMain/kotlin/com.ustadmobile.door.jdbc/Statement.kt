@@ -10,4 +10,6 @@ expect interface Statement {
 
     fun getGeneratedKeys(): ResultSet
 
+    fun setQueryTimeout(seconds: Int)
+
 }

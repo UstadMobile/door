@@ -1371,6 +1371,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 }
                 .addParameter("realAttachmentFilters", List::class.parameterizedBy(AttachmentFilter::class),
                     KModifier.OVERRIDE)
+                .addParameter("jdbcQueryTimeout", Int::class, KModifier.OVERRIDE)
                 .addCode("setupFromDataSource()\n")
                 .build())
             .addDbVersionProperty(dbTypeElement)
@@ -1403,6 +1404,9 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .build())
             .addProperty(PropertySpec.builder("dbName", String::class)
                 .initializer("dbName")
+                .build())
+            .addProperty(PropertySpec.builder("jdbcQueryTimeout", Int::class)
+                .initializer("jdbcQueryTimeout")
                 .build())
             .addFunction(FunSpec.builder("openConnection")
                 .addModifiers(KModifier.OVERRIDE)

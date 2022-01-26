@@ -74,13 +74,7 @@ abstract class DoorDatabaseCommon {
     /**
      * Postgres queries with array parameters (e.g. SELECT IN (?) need to be adjusted
      */
-    fun adjustQueryWithSelectInParam(querySql: String): String {
-        return if(jdbcDbType == DoorDbType.POSTGRES) {
-            POSTGRES_SELECT_IN_PATTERN.replace(querySql, POSTGRES_SELECT_IN_REPLACEMENT)
-        }else {
-            querySql
-        }
-    }
+    fun adjustQueryWithSelectInParam(querySql: String): String = querySql.adjustQueryWithSelectInParam(jdbcDbType)
 
     abstract fun createAllTables(): List<String>
 
@@ -159,21 +153,15 @@ abstract class DoorDatabaseCommon {
      * used. Otherwise the PreparedStatementArrayProxy type will be used
      */
     @Suppress("RemoveRedundantQualifierName") // It's important to be sure which one we are referring to here
-    fun createArrayOf(connection: Connection, arrayType: String, objects: kotlin.Array<out Any?>): com.ustadmobile.door.jdbc.Array {
-        return if(jdbcArraySupported) {
-            connection.createArrayOf(arrayType, objects)
-        }else {
-            JdbcArrayProxy(arrayType, objects)
-        }
-    }
+    fun createArrayOf(
+        connection: Connection,
+        arrayType: String,
+        objects: kotlin.Array<out Any?>
+    ) = connection.createArrayOf(jdbcDbType, arrayType, objects)
 
     companion object {
         const val DBINFO_TABLENAME = "_doorwayinfo"
 
-        const val POSTGRES_SELECT_IN_REPLACEMENT = "IN (SELECT UNNEST(?))"
-
-        val POSTGRES_SELECT_IN_PATTERN = Regex("IN(\\s*)\\((\\s*)\\?(\\s*)\\)",
-            RegexOption.IGNORE_CASE)
     }
 
     override fun toString(): String {

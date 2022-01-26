@@ -1,5 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
+import androidx.room.*
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_ANDROID_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JS_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JVM_DIRS
@@ -9,9 +10,6 @@ import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.C
 import javax.annotation.processing.*
 import javax.lang.model.SourceVersion
 import javax.lang.model.element.TypeElement
-import androidx.room.Database
-import androidx.room.Entity
-import androidx.room.PrimaryKey
 import com.squareup.kotlinpoet.BOOLEAN
 import com.squareup.kotlinpoet.LONG
 import com.squareup.kotlinpoet.TypeSpec
@@ -19,17 +17,20 @@ import com.squareup.kotlinpoet.asTypeName
 import com.squareup.kotlinpoet.metadata.toImmutableKmClass
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.DoorDbType.Companion.PRODUCT_INT_TO_NAME_MAP
+import com.ustadmobile.door.PreparedStatementConfig
 import com.ustadmobile.door.annotation.*
 import com.ustadmobile.door.entities.ZombieAttachmentData
-import io.github.aakira.napier.DebugAntilog
+import com.ustadmobile.door.jdbc.SQLException
 import io.github.aakira.napier.Napier
 import org.sqlite.SQLiteDataSource
 import java.io.File
 import java.sql.Connection
 import java.sql.DriverManager
-import java.sql.SQLException
 import javax.lang.model.element.ElementKind
+import javax.lang.model.element.ExecutableElement
 import javax.tools.Diagnostic
+import com.ustadmobile.door.ext.prepareStatement
+import com.ustadmobile.lib.annotationprocessor.core.ext.setDefaultParamValue
 
 /**
  * This is the annotation processor as far as the compiler sees it. It will delegate the actual
@@ -54,12 +55,12 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
      * When we generate the code for a Query annotation function that performs an update or delete,
      * we use this so that we can match the case of the table name.
      */
-    protected var allKnownEntityNames = mutableListOf<String>()
+    private var allKnownEntityNames = mutableListOf<String>()
 
     /**
      * Provides a map that can be used to find the TypeElement for a given table name.
      */
-    protected var allKnownEntityTypesMap = mutableMapOf<String, TypeElement>()
+    private var allKnownEntityTypesMap = mutableMapOf<String, TypeElement>()
 
     private val Int.dbProductName: String
         get() = PRODUCT_INT_TO_NAME_MAP[this] ?: throw IllegalArgumentException("Not a valid db constant")
@@ -102,11 +103,12 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
      * This creates an instance of the database in SQLite that is used by the annotation
      * processors to check queries etc.
      */
-    internal fun setupDb(roundEnv: RoundEnvironment) {
+    private fun setupDb(roundEnv: RoundEnvironment) {
         allKnownEntityNames.clear()
         allKnownEntityTypesMap.clear()
 
         val dbs = roundEnv.getElementsAnnotatedWith(Database::class.java).map { it as TypeElement }
+        val daos = roundEnv.getElementsAnnotatedWith(Dao::class.java).map { it as TypeElement }
         val dataSource = SQLiteDataSource()
         val dbTmpFile = File.createTempFile("dbprocessorkt", ".db")
         println("Db tmp file: ${dbTmpFile.absolutePath}")
@@ -128,6 +130,9 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
                 null
             }
         }
+
+        val connectionMap = mapOf(DoorDbType.SQLITE to connectionVal,
+            DoorDbType.POSTGRES to pgConnection)
 
         val allReplicateEntities = dbs.flatMap { it.allDbEntities(processingEnv) }.toSet()
             .filter { it.hasAnnotation(ReplicateEntity::class.java) }
@@ -262,6 +267,7 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
                         allKnownEntityTypesMap[typeEntitySpec.name!!] = entity
                     }
                 }
+
             }
         }
 
@@ -344,8 +350,8 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
             }
         }
 
-        dbs.flatMap { it.allDbEntities(processingEnv) }.filter {
-            it.entityAttachmentAnnotatedFields.size.let { it != 0 && it != 3 }
+        dbs.flatMap { it.allDbEntities(processingEnv) }.filter { entity ->
+            entity.entityAttachmentAnnotatedFields.size.let { it != 0 && it != 3 }
         }.forEach {
             messager.printMessage(Diagnostic.Kind.ERROR,
                 "Entity ${it.qualifiedName} has some, but not all required attachment fields. Must have " +
@@ -361,14 +367,55 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
                         "@ReplicateEntity", it)
         }
 
-        dbs.filter {
-            it.allDbEntities(processingEnv).any { it.entityHasAttachments } &&
-                    !it.allDbEntities(processingEnv).any { it.qualifiedName.toString() == ZombieAttachmentData::class.qualifiedName }
+        dbs.filter { db ->
+            db.allDbEntities(processingEnv).any { it.entityHasAttachments } &&
+                    !db.allDbEntities(processingEnv).any { it.qualifiedName.toString() == ZombieAttachmentData::class.qualifiedName }
         }.forEach {
             messager.printMessage(Diagnostic.Kind.ERROR,
                 "Database ${it.qualifiedName} has entities with attachments, must have ZombieAttachmentData entity. " +
                         "Add ZombieAttachmentData to the entities list on the @Database annotation")
         }
+
+        //check validity of all queries
+        daos.forEach { dao ->
+            dao.enclosedElementsWithAnnotation(Query::class.java).map { it as ExecutableElement }.forEach { queryFun ->
+                connectionMap.filter { it.value != null }.forEach { connectionEntry ->
+                    val query = queryFun.getAnnotation(Query::class.java).value.let {
+                        if(connectionEntry.key == DoorDbType.POSTGRES) {
+                            it.sqlToPostgresSql()
+                        }else {
+                            it
+                        }
+                    }
+
+                    val queryNamedParams = query.getSqlQueryNamedParameters()
+                    val queryWithQuestionPlaceholders = query.replaceQueryNamedParamsWithQuestionMarks(queryNamedParams)
+                    val connectionEntryCon = connectionEntry.value!! //This is OK because of the filter above.
+
+                    try {
+                        val preparedStatementConfig = PreparedStatementConfig(queryWithQuestionPlaceholders,
+                            hasListParams = queryFun.hasAnyListOrArrayParams())
+                        connectionEntryCon.prepareStatement(preparedStatementConfig, connectionEntry.key).use { statement ->
+                            queryNamedParams.forEachIndexed { index, paramName ->
+                                statement.setDefaultParamValue(processingEnv, index + 1, paramName,
+                                    queryFun.parameters.first { it.simpleName.toString() == paramName }.asType(),
+                                    connectionEntry.key)
+                            }
+
+                            if(!query.isSQLAModifyingQuery()) {
+                                statement.executeQuery()
+                            }else {
+                                statement.executeUpdate()
+                            }
+                        }
+                    }catch(e: Exception) {
+                        messager.printMessage(Diagnostic.Kind.ERROR, "${dao.qualifiedName}#${queryFun.simpleName} : $e",
+                            queryFun)
+                    }
+                }
+            }
+        }
+
 
         //cleanup postgres so it can be used next time:
         pgConnection?.createStatement()?.use { pgStmt ->
@@ -376,6 +423,9 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
                 pgStmt.executeUpdate("DROP TABLE IF EXISTS ${entity.entityTableName}")
             }
         }
+
+
+
     }
 
     companion object {

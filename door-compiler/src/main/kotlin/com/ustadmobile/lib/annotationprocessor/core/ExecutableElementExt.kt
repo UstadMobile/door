@@ -12,6 +12,7 @@ import javax.lang.model.type.ExecutableType
 import org.jetbrains.annotations.Nullable
 import javax.lang.model.element.Modifier
 import javax.lang.model.element.VariableElement
+import javax.lang.model.type.TypeKind
 
 /**
  * An ExecutableElement could be a normal Kotlin function, or it could be a getter method. If it is
@@ -130,4 +131,11 @@ fun <A:Annotation> ExecutableElement.hasAnyAnnotation(
     vararg annotationsClasses: Class<out A>
 ) : Boolean {
     return annotationsClasses.any { this.hasAnnotation(it) }
+}
+
+fun ExecutableElement.hasAnyListOrArrayParams(): Boolean {
+    return parameters.any {
+        it.asType().kind == TypeKind.DECLARED  &&
+                ((it.asType() as DeclaredType).asElement() as TypeElement).qualifiedName.toString() == "java.util.List"
+    }
 }

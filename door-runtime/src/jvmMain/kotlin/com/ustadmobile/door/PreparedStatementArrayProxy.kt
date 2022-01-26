@@ -283,11 +283,6 @@ actual class PreparedStatementArrayProxy actual constructor(
     }
 
     @Throws(SQLException::class)
-    override fun setQueryTimeout(i: Int) {
-
-    }
-
-    @Throws(SQLException::class)
     override fun cancel() {
 
     }

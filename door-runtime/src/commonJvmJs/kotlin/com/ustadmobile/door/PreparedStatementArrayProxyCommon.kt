@@ -13,6 +13,8 @@ abstract class PreparedStatementArrayProxyCommon(
 
     private val queryTypes = mutableMapOf<Int, Int>()
 
+    protected var stmtQueryTimeout: Int = -1
+
     /**
      * Get the index of the nth occurence of a character within a string
      *
@@ -115,6 +117,10 @@ abstract class PreparedStatementArrayProxyCommon(
         queryTypes[index] = ARR_PROXY_SET_OBJECT
     }
 
+    override fun setQueryTimeout(seconds: Int) {
+        stmtQueryTimeout = seconds
+    }
+
     @Suppress("RemoveRedundantQualifierName")
     internal fun prepareStatement(): PreparedStatement {
         var arrayOffset = 0
@@ -146,6 +152,7 @@ abstract class PreparedStatementArrayProxyCommon(
         var stmt: PreparedStatement? = null
         try {
             stmt = connectionInternal.prepareStatement(adjustedQuery)
+            stmt.takeIf { stmtQueryTimeout > 0 }?.setQueryTimeout(stmtQueryTimeout)
             for (paramIndex in paramValues.keys) {
                 val value = paramValues[paramIndex]
                 when (paramTypes[paramIndex]) {

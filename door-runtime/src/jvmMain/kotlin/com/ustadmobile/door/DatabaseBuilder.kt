@@ -25,7 +25,8 @@ actual class DatabaseBuilder<T: DoorDatabase> internal constructor(
     private var dbClass: KClass<T>,
     private var dbName: String,
     private var attachmentDir: File? = null,
-    private var attachmentFilters: List<AttachmentFilter> = mutableListOf()
+    private var attachmentFilters: List<AttachmentFilter> = mutableListOf(),
+    private var queryTimeout: Int = PreparedStatementConfig.STATEMENT_DEFAULT_TIMEOUT_SECS,
 ){
 
     private val callbacks = mutableListOf<DoorDatabaseCallback>()
@@ -38,8 +39,10 @@ actual class DatabaseBuilder<T: DoorDatabase> internal constructor(
             KClass<T>,
             dbName: String,
             attachmentDir: File? = null,
-            attachmentFilters: List<AttachmentFilter> = listOf()
-        ): DatabaseBuilder<T> = DatabaseBuilder(context, dbClass, dbName, attachmentDir, attachmentFilters)
+            attachmentFilters: List<AttachmentFilter> = listOf(),
+            queryTimeout: Int = PreparedStatementConfig.STATEMENT_DEFAULT_TIMEOUT_SECS,
+        ): DatabaseBuilder<T> = DatabaseBuilder(context, dbClass, dbName, attachmentDir, attachmentFilters,
+            queryTimeout)
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -49,8 +52,8 @@ actual class DatabaseBuilder<T: DoorDatabase> internal constructor(
         val dbImplClass = Class.forName("${dbClass.java.canonicalName}_JdbcKt") as Class<T>
 
         val doorDb = dbImplClass.getConstructor(DoorDatabase::class.java, DataSource::class.java,
-                String::class.java, File::class.java, List::class.java)
-            .newInstance(null, dataSource, dbName, attachmentDir, attachmentFilters)
+                String::class.java, File::class.java, List::class.java, Int::class.javaPrimitiveType)
+            .newInstance(null, dataSource, dbName, attachmentDir, attachmentFilters, queryTimeout)
 
 
         if(!doorDb.tableNames.any {it.lowercase() == DoorDatabaseCommon.DBINFO_TABLENAME}) {
@@ -128,6 +131,10 @@ actual class DatabaseBuilder<T: DoorDatabase> internal constructor(
     actual fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
         migrationList.addAll(migrations)
         return this
+    }
+
+    fun queryTimeout(seconds: Int){
+        queryTimeout = seconds
     }
 
 }
