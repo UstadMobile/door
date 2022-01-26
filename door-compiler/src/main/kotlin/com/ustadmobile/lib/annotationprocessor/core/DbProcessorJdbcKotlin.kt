@@ -1323,10 +1323,17 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                             MemberName("com.ustadmobile.door.ext", "withDoorTransactionAsync"),
                             dbTypeElement)
                         add("_transactionDb -> \n")
+                        add("var fnTimeCounter = 0L\n")
                         daosWithRunOnNewNode.forEach { dao ->
                             val daoAccessorCodeBlock = dbTypeElement.findDaoGetter(dao, processingEnv)
                             dao.enclosedElementsWithAnnotation(ReplicationRunOnNewNode::class.java, ElementKind.METHOD).forEach { daoFun ->
+                                add("fnTimeCounter = %M()\n",
+                                    MemberName("com.ustadmobile.door.util", "systemTimeInMillis"))
                                 add("_transactionDb.%L.${daoFun.simpleName}(newNodeId)\n", daoAccessorCodeBlock)
+                                add("%T.d(%S + (%M() - fnTimeCounter) + %S)\n", Napier::class,
+                                    "Ran ${dao.simpleName}#${daoFun.simpleName} in ",
+                                    MemberName("com.ustadmobile.door.util", "systemTimeInMillis"),
+                                    "ms")
                                 val funEntitiesChanged = daoFun.annotationMirrors
                                     .firstOrNull() { it.annotationType.asElement() == ReplicationCheckPendingNotificationsFor::class.asTypeElement(processingEnv) }
                                     ?.getClassArrayValue("value", processingEnv)  ?: listOf()

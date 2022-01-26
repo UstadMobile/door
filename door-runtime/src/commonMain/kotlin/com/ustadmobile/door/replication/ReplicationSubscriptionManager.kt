@@ -67,25 +67,13 @@ class ReplicationSubscriptionManager(
 
     private class DefaultReplicationSender(private val json: Json): ReplicateRunner {
         override suspend fun replicate(repo: DoorDatabaseRepository, tableId: Int, remoteNodeId: Long) {
-            try {
-                repo.sendPendingReplications(json, tableId, remoteNodeId)
-            }catch(e: Exception) {
-                Napier.e("Exception attempting send pending replications for $tableId to $remoteNodeId" +
-                        " (${repo.config.endpoint})")
-            }
-
+            repo.sendPendingReplications(json, tableId, remoteNodeId)
         }
     }
 
     private class DefaultReplicationFetcher(private val json: Json): ReplicateRunner {
         override suspend fun replicate(repo: DoorDatabaseRepository, tableId: Int, remoteNodeId: Long) {
-            try {
-                repo.fetchPendingReplications(json, tableId, remoteNodeId)
-            }catch(e: Exception) {
-                Napier.e("Exception attempting fetch pending replications for $tableId from $remoteNodeId" +
-                        " (${repo.config.endpoint})")
-            }
-
+            repo.fetchPendingReplications(json, tableId, remoteNodeId)
         }
     }
 
@@ -259,20 +247,26 @@ class ReplicationSubscriptionManager(
             }
 
             if(item.lastRemoteChangeTime > item.lastFetchReplicationCompleteTime) {
-                Napier.d("$logPrefix processor $id table ${item.tableId} has replications to fetch",
-                    tag = DoorTag.LOG_TAG)
-                val timeNow = systemTimeInMillis()
+                try {
+                    Napier.d("$logPrefix processor $id table ${item.tableId} has replications to fetch",
+                        tag = DoorTag.LOG_TAG)
+                    val timeNow = systemTimeInMillis()
 
-                fetchReplicationRunner.replicate(repository, item.tableId, item.nodeId)
-                Napier.d("$logPrefix processor $id table ${item.tableId} replications fetch complete")
+                    fetchReplicationRunner.replicate(repository, item.tableId, item.nodeId)
+                    Napier.d("$logPrefix processor $id table ${item.tableId} replications fetch complete")
 
-                repository.db.prepareAndUseStatementAsync(
-                    "UPDATE ReplicationStatus SET lastFetchReplicationCompleteTime = ? WHERE tableId = ? AND nodeId = ?") { stmt ->
-                    stmt.setLong(1, timeNow)
-                    stmt.setInt(2, item.tableId)
-                    stmt.setLong(3, remoteNodeId.value)
+                    repository.db.prepareAndUseStatementAsync(
+                        "UPDATE ReplicationStatus SET lastFetchReplicationCompleteTime = ? WHERE tableId = ? AND nodeId = ?") { stmt ->
+                        stmt.setLong(1, timeNow)
+                        stmt.setInt(2, item.tableId)
+                        stmt.setLong(3, remoteNodeId.value)
 
-                    stmt.executeUpdateAsyncKmp()
+                        stmt.executeUpdateAsyncKmp()
+                    }
+                }catch(e: Exception) {
+                    Napier.e("$logPrefix processor $id table ${item.tableId} EXCEPTION fetching replication", e,
+                        tag = DoorTag.LOG_TAG)
+                    delay(1000)
                 }
             }
             activeTables -= item.tableId

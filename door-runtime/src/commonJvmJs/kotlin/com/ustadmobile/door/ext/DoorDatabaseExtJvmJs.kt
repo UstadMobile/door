@@ -4,6 +4,7 @@ import com.ustadmobile.door.*
 import com.ustadmobile.door.jdbc.*
 import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
 import com.ustadmobile.door.util.NodeIdAuthCache
+import com.ustadmobile.door.util.systemTimeInMillis
 import io.github.aakira.napier.Napier
 
 actual suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
@@ -12,11 +13,21 @@ actual suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
 ) : R {
     var connection: Connection? = null
     var stmt: PreparedStatement? = null
+    val startTime = systemTimeInMillis()
     try {
         connection = transactionRootJdbcDb.openConnection()
-        stmt = connection.prepareStatement(stmtConfig)
+        val conWaitTime = systemTimeInMillis() - startTime
+        if(conWaitTime > 1000) {
+            Napier.w("WARNING: $this waited ${conWaitTime}ms for connection")
+        }
 
-        return block(stmt)
+        stmt = connection.prepareStatement(stmtConfig)
+        val blockStartTime = systemTimeInMillis()
+        return block(stmt).also {
+            val blockTime = systemTimeInMillis() - blockStartTime
+            if(blockTime > 1000)
+                Napier.w("WARNING $this query ${stmtConfig.sql} took ${blockTime}ms")
+        }
     }catch(e: Exception) {
         Napier.e("prepareAndUseStatementAsync: Exception running SQL: '${stmtConfig.sqlToUse(this.dbType())}' on DB $this", e, tag = DoorTag.LOG_TAG)
         throw e
@@ -32,10 +43,20 @@ actual fun <R> DoorDatabase.prepareAndUseStatement(
 ) : R {
     var connection: Connection? = null
     var stmt: PreparedStatement? = null
+    val startTime = systemTimeInMillis()
     try {
         connection = transactionRootJdbcDb.openConnection()
+        val conWaitTime = systemTimeInMillis() - startTime
+        if(conWaitTime > 1000)
+            Napier.w("WARNING: $this waited ${conWaitTime}ms for a connection!")
+
         stmt = connection.prepareStatement(stmtConfig)
-        return block(stmt)
+        val blockStartTime = systemTimeInMillis()
+        return block(stmt).also {
+            val blockTime = systemTimeInMillis() - blockStartTime
+            if(blockTime > 1000)
+                Napier.w("WARNING $this query ${stmtConfig.sql} took ${blockTime}ms")
+        }
     }catch(e: Exception) {
         Napier.e("prepareAndUseStatement: Exception running SQL: '${stmtConfig.sqlToUse(this.dbType())}' on DB $this", e, tag = DoorTag.LOG_TAG)
         throw e
