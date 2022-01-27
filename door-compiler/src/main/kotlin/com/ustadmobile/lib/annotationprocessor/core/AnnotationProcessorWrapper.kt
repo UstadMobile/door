@@ -379,7 +379,9 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
         //check validity of all queries
         daos.forEach { dao ->
             dao.enclosedElementsWithAnnotation(Query::class.java).map { it as ExecutableElement }.forEach { queryFun ->
-                connectionMap.filter { it.value != null }.forEach { connectionEntry ->
+                connectionMap.filter {
+                    it.value != null && !(it.key == DoorDbType.POSTGRES && queryFun.hasAnnotation(SqliteOnly::class.java))
+                }.forEach { connectionEntry ->
                     val query = queryFun.getAnnotation(Query::class.java).value.let {
                         if(connectionEntry.key == DoorDbType.POSTGRES) {
                             queryFun.getAnnotation(PostgresQuery::class.java)?.value ?: it.sqlToPostgresSql()
@@ -409,8 +411,11 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
                             }
                         }
                     }catch(e: Exception) {
-                        messager.printMessage(Diagnostic.Kind.ERROR, "${dao.qualifiedName}#${queryFun.simpleName} : $e",
+                        messager.printMessage(Diagnostic.Kind.ERROR, "${dao.qualifiedName}#${queryFun.simpleName} : $e ",
                             queryFun)
+                        if(e !is SQLException) {
+                            e.printStackTrace()
+                        }
                     }
                 }
             }

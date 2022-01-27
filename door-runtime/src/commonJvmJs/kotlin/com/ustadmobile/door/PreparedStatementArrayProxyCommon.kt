@@ -143,8 +143,9 @@ abstract class PreparedStatementArrayProxyCommon(
 
                 arrayOffset += objects.size - 1
             } else {
-                paramValues[paramIndex + arrayOffset] = value!!
-                paramTypes[paramIndex + arrayOffset] = queryTypes[paramIndex]!!
+                paramValues[paramIndex + arrayOffset] = value
+                paramTypes[paramIndex + arrayOffset] = queryTypes[paramIndex] ?: throw IllegalStateException(
+                    "PreparedStatementArrayProxy: Cannot find query param type at index $paramIndex")
             }
         }
 
@@ -160,7 +161,7 @@ abstract class PreparedStatementArrayProxyCommon(
 
                     TypesKmp.BOOLEAN -> stmt.setBoolean(paramIndex, value as Boolean)
 
-                    TypesKmp.VARCHAR, TypesKmp.LONGVARCHAR -> stmt.setString(paramIndex, value as String)
+                    TypesKmp.VARCHAR, TypesKmp.LONGVARCHAR -> stmt.setString(paramIndex, value as String?)
 
                     TypesKmp.BIGINT -> stmt.setLong(paramIndex, value as Long)
 

@@ -364,7 +364,7 @@ private fun TypeElement.daoHasRepositoryWriteFunctions(
 ) : Boolean {
     return allOverridableMethods(processingEnv).any { daoMethodEl ->
         val fnResolved = daoMethodEl.asMemberOf(this, processingEnv)
-        val paramType = fnResolved.parameterTypes.firstOrNull()?.unwrapListOrArrayComponentType()
+        val paramType = fnResolved.parameterTypes.firstOrNull()?.unwrapListOrArrayComponentType(processingEnv)
         paramType?.asTypeElement(processingEnv)?.hasAnnotation(ReplicateEntity::class.java) == true
     }
 }

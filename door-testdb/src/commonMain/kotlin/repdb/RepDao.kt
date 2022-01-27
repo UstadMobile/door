@@ -140,4 +140,17 @@ abstract class RepDao {
     """)
     abstract suspend fun selectSyncNodeId(): Long
 
+
+    @Query("""
+        SELECT RepEntity.*
+          FROM RepEntity
+         WHERE reString IN (:strList) 
+    """)
+    abstract suspend fun findInStringList(strList: List<String>): List<RepEntity>
+
+
+    @Query("""SELECT MAX(:num1, :num2)""")
+    @SqliteOnly
+    abstract suspend fun sqliteOnlyFun(num1: Int, num2: Int): Long
+
 }
