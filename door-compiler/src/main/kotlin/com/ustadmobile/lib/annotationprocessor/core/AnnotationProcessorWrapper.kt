@@ -379,6 +379,21 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
         //check validity of all queries
         daos.forEach { dao ->
             dao.enclosedElementsWithAnnotation(Query::class.java).map { it as ExecutableElement }.forEach { queryFun ->
+
+                //check that the query parameters on both versions match
+                val sqliteQueryParams = queryFun.getAnnotation(Query::class.java).value.getSqlQueryNamedParameters()
+                val postgresQueryParams = (queryFun.getAnnotation(PostgresQuery::class.java)?.value ?:
+                    queryFun.getAnnotation(Query::class.java).value.sqlToPostgresSql()).getSqlQueryNamedParameters()
+
+                if(sqliteQueryParams != postgresQueryParams) {
+                    messager.printMessage(Diagnostic.Kind.ERROR,
+                        "${dao.simpleName}#${queryFun.simpleName} - query parameters don't match: " +
+                                "Query parameters must feature the same names in the same order on both platforms " +
+                                "SQLite params=${sqliteQueryParams.joinToString()} " +
+                                "Postgres params=${postgresQueryParams.joinToString()}", queryFun)
+                }
+
+
                 connectionMap.filter {
                     it.value != null && !(it.key == DoorDbType.POSTGRES && queryFun.hasAnnotation(SqliteOnly::class.java))
                 }.forEach { connectionEntry ->
