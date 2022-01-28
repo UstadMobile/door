@@ -106,13 +106,18 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
                      SELECT ${repEntity.entityTableName}.${repEntity.entityPrimaryKey?.simpleName} AS ${entityPrefix}Pk,
                             :newNodeId AS ${entityPrefix}Destination
                        FROM ${repEntity.entityTableName}
+                      --notpsql 
                       WHERE ${repEntity.entityTableName}.${entityVersionField?.simpleName} != COALESCE(
                             (SELECT ${entityPrefix}VersionId
                                FROM ${repEntity.simpleName}Replicate
                               WHERE ${entityPrefix}Pk = ${repEntity.entityTableName}.${repEntity.entityPrimaryKey?.simpleName}
-                                AND ${entityPrefix}Destination = :newNodeId), 0) 
+                                AND ${entityPrefix}Destination = :newNodeId), 0)
+                      --endnotpsql            
                      /*psql ON CONFLICT(${entityPrefix}Pk, ${entityPrefix}Destination) DO UPDATE
-                            SET ${entityPrefix}Pending = true
+                            SET ${entityPrefix}Pending = (SELECT ${repEntity.entityTableName}.${entityVersionField?.simpleName}
+                           FROM ${repEntity.entityTableName}
+                          WHERE ${repEntity.entityTableName}.${repEntity.entityPrimaryKey?.simpleName} = EXCLUDED.${entityPrefix}Pk ) 
+                                != ${repEntity.entityTableName}Replicate.${entityPrefix}VersionId
                      */       
                 ""${'"'})
                 @ReplicationRunOnNewNode
@@ -134,13 +139,18 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
                             SELECT nodeClientId 
                               FROM SyncNode
                              LIMIT 1)
+                        --notpsql     
                         AND ${repEntity.entityTableName}.${entityVersionField?.simpleName} != COALESCE(
                             (SELECT ${entityPrefix}VersionId
                                FROM ${repEntity.simpleName}Replicate
                               WHERE ${entityPrefix}Pk = ${repEntity.simpleName}.${repEntity.entityPrimaryKey?.simpleName}
                                 AND ${entityPrefix}Destination = UserSession.usClientNodeId), 0)
+                        --endnotpsql        
                     /*psql ON CONFLICT(${entityPrefix}Pk, ${entityPrefix}Destination) DO UPDATE
-                        SET ${entityPrefix}Pending = true
+                        SET ${entityPrefix}Pending = (SELECT ${repEntity.entityTableName}.${entityVersionField?.simpleName}
+                           FROM ${repEntity.entityTableName}
+                          WHERE ${repEntity.entityTableName}${repEntity.entityPrimaryKey?.simpleName} = EXCLUDED.${entityPrefix}Pk ) 
+                                != ${repEntity.entityTableName}.${entityPrefix}VersionId
                      */               
                     ""${'"'})
                     @ReplicationRunOnChange([${repEntity.simpleName}::class])
