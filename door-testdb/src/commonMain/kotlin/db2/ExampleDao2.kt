@@ -99,6 +99,9 @@ abstract class ExampleDao2 {
     @Delete
     abstract fun deleteList(deleteList: List<ExampleEntity2>)
 
+    @Delete
+    abstract suspend fun deleteListAsync(deleteList: List<ExampleEntity2>): Int
+
     @Query("SELECT COUNT(*) FROM ExampleEntity2")
     abstract fun countNumEntities(): Int
 

@@ -11,30 +11,21 @@ actual suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
     stmtConfig: PreparedStatementConfig,
     block: suspend (PreparedStatement) -> R
 ) : R {
-    var connection: Connection? = null
-    var stmt: PreparedStatement? = null
-    val startTime = systemTimeInMillis()
     try {
-        connection = transactionRootJdbcDb.openConnection()
-        val conWaitTime = systemTimeInMillis() - startTime
-        if(conWaitTime > 1000) {
-            Napier.w("WARNING: $this waited ${conWaitTime}ms for connection")
-        }
-
-        stmt = connection.prepareStatement(stmtConfig)
-        stmt.setQueryTimeout((rootDatabase as DoorDatabaseJdbc).jdbcQueryTimeout)
-        val blockStartTime = systemTimeInMillis()
-        return block(stmt).also {
-            val blockTime = systemTimeInMillis() - blockStartTime
-            if(blockTime > 1000)
-                Napier.w("WARNING $this query ${stmtConfig.sql} took ${blockTime}ms")
+        return transactionRootJdbcDb.useConnection { connection: Connection ->
+            connection.prepareStatement(stmtConfig).useStatement { stmt: PreparedStatement ->
+                stmt.setQueryTimeout((rootDatabase as DoorDatabaseJdbc).jdbcQueryTimeout)
+                val blockStartTime = systemTimeInMillis()
+                return@useConnection block(stmt).also {
+                    val blockTime = systemTimeInMillis() - blockStartTime
+                    if(blockTime > 1000)
+                        Napier.w("WARNING $this query ${stmtConfig.sql} took ${blockTime}ms")
+                }
+            }
         }
     }catch(e: Exception) {
-        Napier.e("prepareAndUseStatementAsync: Exception running SQL: '${stmtConfig.sqlToUse(this.dbType())}' on DB $this", e, tag = DoorTag.LOG_TAG)
+        Napier.e("prepareAndUseStatement: Exception running SQL: '${stmtConfig.sqlToUse(this.dbType())}' on DB $this", e, tag = DoorTag.LOG_TAG)
         throw e
-    }finally {
-        stmt?.close()
-        connection?.close()
     }
 }
 
@@ -42,29 +33,21 @@ actual fun <R> DoorDatabase.prepareAndUseStatement(
     stmtConfig: PreparedStatementConfig,
     block: (PreparedStatement) -> R
 ) : R {
-    var connection: Connection? = null
-    var stmt: PreparedStatement? = null
-    val startTime = systemTimeInMillis()
     try {
-        connection = transactionRootJdbcDb.openConnection()
-        val conWaitTime = systemTimeInMillis() - startTime
-        if(conWaitTime > 1000)
-            Napier.w("WARNING: $this waited ${conWaitTime}ms for a connection!")
-
-        stmt = connection.prepareStatement(stmtConfig)
-        stmt.setQueryTimeout((rootDatabase as DoorDatabaseJdbc).jdbcQueryTimeout)
-        val blockStartTime = systemTimeInMillis()
-        return block(stmt).also {
-            val blockTime = systemTimeInMillis() - blockStartTime
-            if(blockTime > 1000)
-                Napier.w("WARNING $this query ${stmtConfig.sql} took ${blockTime}ms")
+        return transactionRootJdbcDb.useConnection { connection: Connection ->
+            connection.prepareStatement(stmtConfig).useStatement { stmt: PreparedStatement ->
+                stmt.setQueryTimeout((rootDatabase as DoorDatabaseJdbc).jdbcQueryTimeout)
+                val blockStartTime = systemTimeInMillis()
+                return@useConnection block(stmt).also {
+                    val blockTime = systemTimeInMillis() - blockStartTime
+                    if(blockTime > 1000)
+                        Napier.w("WARNING $this query ${stmtConfig.sql} took ${blockTime}ms")
+                }
+            }
         }
     }catch(e: Exception) {
         Napier.e("prepareAndUseStatement: Exception running SQL: '${stmtConfig.sqlToUse(this.dbType())}' on DB $this", e, tag = DoorTag.LOG_TAG)
         throw e
-    }finally {
-        stmt?.close()
-        connection?.close()
     }
 }
 

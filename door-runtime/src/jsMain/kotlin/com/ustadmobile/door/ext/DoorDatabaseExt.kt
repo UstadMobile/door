@@ -41,18 +41,7 @@ actual fun DoorSqlDatabase.dbType(): Int {
  * The name deliberately lower cases sql to avoid name clashes
  */
 actual fun DoorDatabase.execSqlBatch(vararg sqlStatements: String) {
-    val connection = transactionRootJdbcDb.openConnection()
-    connection.setAutoCommit(false)
-    sqlStatements.forEach {
-        GlobalScope.launch {
-            val statement = connection.prepareStatement(it)
-            statement.executeUpdateAsync()
-            statement.close()
-        }
-    }
-    connection.commit()
-    connection.setAutoCommit(true)
-    connection.close()
+    throw IllegalStateException("Non-async execSqlBatch not supported on Javascript!")
 }
 
 actual fun <T : DoorDatabase> KClass<T>.doorDatabaseMetadata(): DoorDatabaseMetadata<T> {

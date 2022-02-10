@@ -893,14 +893,12 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             .removeAnnotations()
             .addModifiers(KModifier.OVERRIDE)
             .addCode(CodeBlock.builder()
-                .add("var _con = null as %T?\n", CLASSNAME_CONNECTION)
-                .add("var _stmt = null as %T?\n", CLASSNAME_PREPARED_STATEMENT)
                 .add("var _numChanges = 0\n")
-                .beginControlFlow("try")
-                .add("_con = _db.transactionRootJdbcDb.openConnection()\n")
-                .add("_stmt = _con.prepareStatement(%S)\n", stmtSql)
+                .beginControlFlow("_db.%M(%S)", prepareAndUseStatmentMemberName(funSpec.isSuspended),
+                    stmtSql)
+                .add(" _stmt ->\n")
                 .applyIf(firstParam.type.isListOrArray()) {
-                    add("_con.setAutoCommit(false)\n")
+                    add("_stmt.getConnection().setAutoCommit(false)\n")
                     beginControlFlow("for(_entity in ${firstParam.name})")
                     entityVarName = "_entity"
                 }
@@ -910,21 +908,17 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                             index + 1, "$entityVarName.${pkEl.simpleName}")
                     }
                 }
-                .add("_numChanges += _stmt.executeUpdate()\n")
+                .apply {
+                    if(funSpec.isSuspended) {
+                        add("_numChanges += _stmt.%M()\n", MEMBERNAME_EXEC_UPDATE_ASYNC)
+                    }else {
+                        add("_numChanges += _stmt.executeUpdate()\n")
+                    }
+                }
                 .applyIf(firstParam.type.isListOrArray()) {
                     endControlFlow()
-                    add("_con.commit()\n")
-                    add("_con.setAutoCommit(true)\n")
+                    add("_stmt.getConnection().commit()\n")
                 }
-                .beginControlFlow("if(_numChanges > 0)")
-                .add("_db.%M(listOf(%S))\n", MEMBERNAME_HANDLE_TABLES_CHANGED, entityTypeEl.simpleName)
-                .endControlFlow()
-                .nextControlFlow("catch(_e: %T)", CLASSNAME_SQLEXCEPTION)
-                .add("_e.printStackTrace()\n")
-                .add("throw %T(_e)\n", CLASSNAME_RUNTIME_EXCEPTION)
-                .nextControlFlow("finally")
-                .add("_stmt?.close()\n")
-                .add("_con?.close()\n")
                 .endControlFlow()
                 .applyIf(funSpec.hasReturnType) {
                     add("return _numChanges\n")
@@ -1413,11 +1407,6 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .build())
             .addProperty(PropertySpec.builder("jdbcQueryTimeout", Int::class)
                 .initializer("jdbcQueryTimeout")
-                .build())
-            .addFunction(FunSpec.builder("openConnection")
-                .addModifiers(KModifier.OVERRIDE)
-                .returns(CLASSNAME_CONNECTION)
-                .addCode("return dataSource.getConnection()\n")
                 .build())
             .addProperty(PropertySpec.builder("transactionDepthCounter", TransactionDepthCounter::class)
                 .addModifiers(KModifier.OVERRIDE)

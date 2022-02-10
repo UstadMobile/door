@@ -2,6 +2,8 @@ package com.ustadmobile.door
 
 import com.ustadmobile.door.ext.rootDatabase
 import com.ustadmobile.door.ext.sourceDatabase
+import com.ustadmobile.door.ext.useConnection
+import com.ustadmobile.door.ext.useStatement
 import com.ustadmobile.door.jdbc.ResultSet
 import com.ustadmobile.door.jdbc.SQLException
 import kotlinx.coroutines.Runnable
@@ -32,20 +34,15 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon() {
         return if(this != rootDatabase) {
             rootDatabase.getTableNamesAsync()
         } else {
-            var con = null as SQLiteConnectionJs?
             val tableNamesList = mutableListOf<String>()
-            val tableResult: ResultSet?
-            try {
-                con = (rootDatabase as DoorDatabaseJdbc).openConnection() as SQLiteConnectionJs
+            rootDatabaseJdbc.useConnection { con ->
                 val metadata = con.getMetaData() as SQLiteDatabaseMetadataJs
-                tableResult = metadata.getTablesAsync(null, null, "%", arrayOf("TABLE"))
+                val tableResult = metadata.getTablesAsync(null, null, "%", arrayOf("TABLE"))
                 while(tableResult.next()) {
                     tableResult.getString("TABLE_NAME")?.also {
                         tableNamesList.add(it)
                     }
                 }
-            }finally {
-                con?.close()
             }
 
             tableNamesList.toList()
@@ -53,16 +50,10 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon() {
     }
 
     suspend fun execSQLBatchAsync(vararg sqlStatements: String){
-        var connection: SQLiteConnectionJs? = null
-        try {
-            connection = transactionRootJdbcDb.openConnection() as SQLiteConnectionJs
-            val statement = connection.createStatement() as SQLiteStatementJs
-            statement.executeUpdateAsync(sqlStatements.joinToString(";"))
-            statement.close()
-        }catch(e: SQLException) {
-            throw e
-        }finally {
-            connection?.close()
+        transactionRootJdbcDb.useConnection { connection ->
+            connection.createStatement().useStatement { statement ->
+                (statement as SQLiteStatementJs).executeUpdateAsync(sqlStatements.joinToString(";"))
+            }
         }
     }
 
@@ -71,7 +62,8 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon() {
     }
 
     suspend fun exportDatabase() {
-        val con = (transactionRootJdbcDb.openConnection() as SQLiteConnectionJs)
-        con.datasource.exportDatabaseToFile()
+        transactionRootJdbcDb.useConnection { connection ->
+            (connection as SQLiteConnectionJs).datasource.exportDatabaseToFile()
+        }
     }
 }

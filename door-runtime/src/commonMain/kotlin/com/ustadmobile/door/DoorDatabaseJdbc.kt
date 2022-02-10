@@ -19,11 +19,6 @@ interface DoorDatabaseJdbc {
     val dataSource: DataSource
 
     /**
-     * Called to open a new database connection
-     */
-    fun openConnection(): Connection
-
-    /**
      * When this instance is a repository or ReplicationWrapper, the sourceDatabase must be the database that they
      * connect to.
      * When this instance is an actual implementation (e.g. JdbcKt) transaction wrapper, sourceDatabase will point

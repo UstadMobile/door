@@ -102,28 +102,22 @@ abstract class DoorDatabaseCommon {
      * than executing statements individually.
      */
     open fun execSQLBatch(vararg sqlStatements: String) {
-        var connection: Connection? = null
-        var statement: Statement? = null
         val rootDb = (this as DoorDatabase).rootDatabase
         val jdbcDb = (rootDb as DoorDatabaseJdbc)
-        try {
-            connection = jdbcDb.openConnection()
+
+        jdbcDb.useConnection { connection ->
             connection.setAutoCommit(false)
-            statement = connection.createStatement()
-            sqlStatements.forEach { sql ->
-                try {
-                    statement.executeUpdate(sql)
-                }catch(eInner: SQLException) {
-                    Napier.e("execSQLBatch: Exception running SQL: $sql")
-                    throw eInner
+            connection.createStatement().useStatement { statement ->
+                sqlStatements.forEach { sql ->
+                    try {
+                        statement.executeUpdate(sql)
+                    }catch(eInner: SQLException) {
+                        Napier.e("execSQLBatch: Exception running SQL: $sql")
+                        throw eInner
+                    }
                 }
             }
             connection.commit()
-        }catch(e: SQLException) {
-            throw e
-        }finally {
-            statement?.close()
-            connection?.close()
         }
     }
 

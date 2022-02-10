@@ -46,24 +46,13 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
             delegatedDatabaseVal.tableNames
         }else {
             val thisJdbc = this as DoorDatabaseJdbc
-            var con = null as Connection?
-            val tableNamesList = mutableListOf<String>()
-            var tableResult: ResultSet? = null
-            try {
-                con = openConnection()
-                val metadata = con.getMetaData()
-                tableResult = metadata.getTables(null, null, "%", arrayOf("TABLE"))
-                while(tableResult.next()) {
-                    tableResult.getString("TABLE_NAME")?.also {
-                        tableNamesList.add(it)
-                    }
-                }
-            }finally {
-                tableResult?.close()
-                con?.close()
-            }
 
-            tableNamesList.toList()
+            thisJdbc.useConnection { con ->
+                val metadata = con.metaData
+                metadata.getTables(null, null, "%", arrayOf("TABLE")).useResults { tableResult ->
+                    tableResult.mapRows { it.getString("TABLE_NAME") ?: "" }
+                }
+            }
         }
 
     }
@@ -72,7 +61,7 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
         val rootDb = rootDatabase
         if(this == rootDb) {
             val jdbcDb = (this as DoorDatabaseJdbc)
-            jdbcDb.openConnection().use { dbConnection ->
+            jdbcDb.useConnection { dbConnection ->
                 jdbcDbType = DoorDbType.typeIntFromProductName(dbConnection.metaData?.databaseProductName ?: "")
                 jdbcArraySupported = jdbcDbType == DoorDbType.POSTGRES
             }
@@ -85,7 +74,7 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
     private fun createTransactionDataSourceAndDb(): Pair<DoorTransactionDataSourceWrapper, DoorDatabase> {
         val rootDb = rootDatabase
         val rootJdbcDb = (rootDb as DoorDatabaseJdbc)
-        val connection = rootJdbcDb.openConnection()
+        val connection = rootJdbcDb.dataSource.connection
         connection.setAutoCommit(false)
         val transactionDataSource = DoorTransactionDataSourceWrapper(rootDb, connection)
         val transactionDb = rootDb.constructorFun.newInstance(rootDb, transactionDataSource,
