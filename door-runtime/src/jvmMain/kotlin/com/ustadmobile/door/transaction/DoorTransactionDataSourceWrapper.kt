@@ -51,7 +51,7 @@ class DoorTransactionDataSourceWrapper(
         }
     }
 
-    private val transactionConnectionWrapper: TransactionConnectionWrapper by lazy {
+    val transactionConnectionWrapper: TransactionConnectionWrapper by lazy {
         TransactionConnectionWrapper(connection)
     }
 
@@ -63,45 +63,29 @@ class DoorTransactionDataSourceWrapper(
         throw SQLException("TransactionDataSource: using username/password not supported currently.")
     }
 
-    fun <R> use(block: (DataSource) -> R): R {
+    fun assertTransactionNotClosed() {
         if(transactionClosed)
             throw SQLException("TransactionDataSource is closed!")
+    }
+
+    inline fun <R> use(block: (DataSource) -> R): R {
+        assertTransactionNotClosed()
 
         try {
             val result = block(this)
-            commit()
+            transactionConnectionWrapper.realConnection.commit()
             return result
         }catch(e: Throwable) {
-            rollback()
+            transactionConnectionWrapper.realConnection.rollback()
             throw e
         }finally {
-            transactionClosed = true
+            closeTransaction()
             transactionConnectionWrapper.realConnection.close()
         }
     }
 
-    suspend fun <R> useAsync(block: suspend (DataSource) -> R): R {
-        if(transactionClosed)
-            throw SQLException("TransactionDataSource is closed!")
-
-        try {
-            val result = block(this)
-            commit()
-            return result
-        }catch(e: Throwable) {
-            rollback()
-            throw e
-        }finally {
-            transactionClosed = true
-            transactionConnectionWrapper.realConnection.close()
-        }
+    fun closeTransaction() {
+        transactionClosed = true
     }
 
-    private fun commit() {
-        transactionConnectionWrapper.realConnection.commit()
-    }
-
-    private fun rollback() {
-        transactionConnectionWrapper.realConnection.rollback()
-    }
 }

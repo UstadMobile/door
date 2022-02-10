@@ -5,7 +5,6 @@ import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.*
 import com.ustadmobile.door.transaction.DoorTransactionDataSourceWrapper
 import io.github.aakira.napier.Napier
-import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -71,19 +70,32 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
         }
     }
 
-    private fun createTransactionDataSourceAndDb(): Pair<DoorTransactionDataSourceWrapper, DoorDatabase> {
-        val rootDb = rootDatabase
-        val rootJdbcDb = (rootDb as DoorDatabaseJdbc)
-        val connection = rootJdbcDb.dataSource.connection
-        connection.setAutoCommit(false)
-        val transactionDataSource = DoorTransactionDataSourceWrapper(rootDb, connection)
-        val transactionDb = rootDb.constructorFun.newInstance(rootDb, transactionDataSource,
-                "Transaction wrapper for $rootDb", rootDb.realAttachmentStorageUri?.toFile(),
-                rootJdbcDb.realAttachmentFilters, rootJdbcDb.jdbcQueryTimeout)
+    /**
+     * Creates a new JDBC Database implementation for use in a transaction. It will use the root database to get a
+     * connection, then set auto commit to false, and create a new jdbc database using DoorTransactionDataSourceWrapper
+     */
+    private inline fun <R> useTransactionDb(
+        block: (transactionDb: DoorDatabase) -> R
+    ) : R {
+        return try {
+            val rootDb = rootDatabase
+            val rootJdbcDb = (rootDb as DoorDatabaseJdbc)
+            val connection = rootJdbcDb.dataSource.connection
+            connection.setAutoCommit(false)
 
-        (transactionDb as DoorDatabaseJdbc).transactionDepthCounter.incrementTransactionDepth()
-
-        return Pair(transactionDataSource, transactionDb)
+            DoorTransactionDataSourceWrapper(rootDb, connection).use { transactionDataSource ->
+                val transactionDb = rootDb.constructorFun.newInstance(rootDb, transactionDataSource,
+                    "Transaction wrapper for $rootDb", rootDb.realAttachmentStorageUri?.toFile(),
+                    rootJdbcDb.realAttachmentFilters, rootJdbcDb.jdbcQueryTimeout)
+                (transactionDb as DoorDatabaseJdbc).transactionDepthCounter.incrementTransactionDepth()
+                block(transactionDb).also {
+                    transactionDb.transactionRootJdbcDb.invalidationTracker.onCommit()
+                }
+            }
+        }catch(e: Exception) {
+            Napier.e("Exception in useTransactionDataSourceAndDb", tag = DoorTag.LOG_TAG)
+            throw e
+        }
     }
 
     private fun KClass<*>.assertIsClassForThisDb() {
@@ -113,7 +125,7 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
      * Unfortunately, this can't really be internal because it is overriden in generated code
      */
     @Suppress("UNCHECKED_CAST")
-    fun <T: DoorDatabase, R> withDoorTransactionInternal(
+    internal fun <T: DoorDatabase, R> withDoorTransactionInternal(
         dbKClass: KClass<T>,
         block: (T) -> R
     ): R {
@@ -123,13 +135,9 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
         return if(!txRoot.isInTransaction) {
             runBlocking {
                 rootDatabase.transactionMutex.withLock {
-                    val (transactionDs, transactionDb) = createTransactionDataSourceAndDb()
-                    transactionDs.use {
+                    useTransactionDb { transactionDb ->
                         val transactionWrappedDb = wrapForNewTransaction(dbKClass, transactionDb as T)
-                        val result = block(transactionWrappedDb)
-                        result
-                    }.also {
-                        transactionDb.transactionRootJdbcDb.invalidationTracker.onCommit()
+                        block(transactionWrappedDb)
                     }
                 }
             }
@@ -144,7 +152,7 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
     }
 
     @Suppress("UNCHECKED_CAST")
-    suspend fun <T: DoorDatabase, R> withDoorTransactionInternalAsync(
+    internal suspend fun <T: DoorDatabase, R> withDoorTransactionInternalAsync(
         dbKClass: KClass<T>,
         block: suspend (T) -> R
     ): R {
@@ -152,13 +160,9 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
         val txRoot = transactionRootJdbcDb
         return if(!txRoot.isInTransaction) {
             rootDatabase.transactionMutex.withLock {
-                val (transactionDs, transactionDb) = createTransactionDataSourceAndDb()
-                transactionDs.useAsync {
+                useTransactionDb { transactionDb ->
                     val transactionWrappedDb = wrapForNewTransaction(dbKClass, transactionDb as T)
-                    val result = block(transactionWrappedDb)
-                    result
-                }.also {
-                    transactionDb.transactionRootJdbcDb.invalidationTracker.onCommit()
+                    block(transactionWrappedDb)
                 }
             }
         }else {
