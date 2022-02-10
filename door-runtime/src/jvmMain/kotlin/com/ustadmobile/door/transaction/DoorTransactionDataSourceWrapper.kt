@@ -34,6 +34,10 @@ class DoorTransactionDataSourceWrapper(
             //Block this
         }
 
+        override fun getAutoCommit(): Boolean {
+            return false
+        }
+
         override fun commit() {
             //Block this
         }
@@ -47,7 +51,7 @@ class DoorTransactionDataSourceWrapper(
         }
     }
 
-    val transactionConnectionWrapper: TransactionConnectionWrapper by lazy {
+    private val transactionConnectionWrapper: TransactionConnectionWrapper by lazy {
         TransactionConnectionWrapper(connection)
     }
 
