@@ -45,6 +45,11 @@ abstract class DoorDatabaseMetadata<T: DoorDatabase> {
      */
     fun getTableId(tableName: String) = replicateEntities.values.first{ it.entityTableName == tableName}.tableId
 
+    /**
+     * A list of all tables on the database (whether or not they are annotated with @ReplicateEntity)
+     */
+    abstract val allTables: List<String>
+
 
     companion object {
 

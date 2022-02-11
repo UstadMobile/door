@@ -264,6 +264,13 @@ fun FileSpec.Builder.addDatabaseMetadataType(dbTypeElement: TypeElement, process
                 .addCode("return ${dbTypeElement.getAnnotation(Database::class.java).version}\n")
                 .build())
             .build())
+        .addProperty(PropertySpec.builder("allTables", List::class.parameterizedBy(String::class))
+            .addModifiers(KModifier.OVERRIDE)
+            .initializer(CodeBlock.builder()
+                .add("listOf(%L)\n", dbTypeElement.allDbEntities(processingEnv).map { it.simpleName.toString() }
+                    .joinToString(prefix = "\"", postfix = "\"", separator = "\", \""))
+                .build())
+            .build())
         .addProperty(PropertySpec.builder("replicateEntities", Map::class.parameterizedBy(Int::class, ReplicationEntityMetaData::class))
             .addModifiers(KModifier.OVERRIDE)
             .delegate(

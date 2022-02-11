@@ -66,7 +66,7 @@ actual val DoorDatabase.doorPrimaryKeyManager: DoorPrimaryKeyManager
     get() = (rootDatabase as DoorDatabaseJdbc).realPrimaryKeyManager
 
 actual fun DoorDatabase.handleTablesChanged(changeTableNames: List<String>) {
-    handleTableChangedInternal(changeTableNames)
+    //handleTableChangedInternal(changeTableNames)
 }
 
 actual val DoorDatabase.replicationNotificationDispatcher: ReplicationNotificationDispatcher

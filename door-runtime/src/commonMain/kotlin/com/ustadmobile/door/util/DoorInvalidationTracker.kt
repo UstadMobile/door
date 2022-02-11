@@ -28,7 +28,7 @@ class DoorInvalidationTracker(
 
     private val listeners = concurrentSafeListOf<ChangeListenerRequest>()
 
-    internal fun onTablesInvalidated(tableNames: Set<String>) {
+    fun onTablesInvalidated(tableNames: Set<String>) {
         tablesChanged += tableNames
         if(!jdbcDatabase.isInTransaction) {
             fireChanges()

@@ -93,8 +93,8 @@ abstract class DoorDatabaseCommon {
 
 
     fun handleTableChangedInternal(changeTableNames: List<String>) {
-        Napier.d("$this : handleTableChanged: ${changeTableNames.joinToString()}")
-        transactionRootJdbcDb.invalidationTracker.onTablesInvalidated(changeTableNames.toSet())
+//        Napier.d("$this : handleTableChanged: ${changeTableNames.joinToString()}")
+//        transactionRootJdbcDb.invalidationTracker.onTablesInvalidated(changeTableNames.toSet())
     }
 
     /**

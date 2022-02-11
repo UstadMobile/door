@@ -57,7 +57,15 @@ actual class DatabaseBuilder<T: DoorDatabase> internal constructor(
 
 
         if(!doorDb.tableNames.any {it.lowercase() == DoorDatabaseCommon.DBINFO_TABLENAME}) {
-            doorDb.sqlDatabaseImpl.execSQLBatch(doorDb.createAllTables().toTypedArray())
+            //Do this directly to avoid conflicts with the change tracking systems before tables have been created
+            dataSource.connection.use { con ->
+                con.createStatement().use { stmt ->
+                    doorDb.createAllTables().forEach { sql ->
+                        stmt.executeUpdate(sql)
+                    }
+                }
+            }
+
             callbacks.forEach {
                 when(it) {
                     is DoorDatabaseCallbackSync -> it.onCreate(doorDb.sqlDatabaseImpl)

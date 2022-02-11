@@ -33,6 +33,7 @@ import repdb.RepEntity
 import repdb.RepEntityWithAttachment
 import java.io.File
 import javax.naming.InitialContext
+import kotlin.random.Random
 
 class TestDoorDatabaseRepositoryReplicationExt  {
 
@@ -62,6 +63,8 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     private var dbTimeStamp: Long = 0
 
+    private var portNum: Int = 0
+
     @JvmField
     @Rule
     var temporaryFolder = TemporaryFolder()
@@ -72,7 +75,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         dbTimeStamp = systemTimeInMillis()
         Napier.d("Db Timestamp = $dbTimeStamp")
         catPicFile = temporaryFolder.newFile()
-        this::class.java.getResourceAsStream("/cat-pic0.jpg").writeToFile(catPicFile)
+        this::class.java.getResourceAsStream("/cat-pic0.jpg")!!.writeToFile(catPicFile)
 
         val remoteAttachmentDir = temporaryFolder.newFolder()
 
@@ -122,7 +125,9 @@ class TestDoorDatabaseRepositoryReplicationExt  {
             registerContextTranslator { _: ApplicationCall -> "localhost" }
         }
 
-        remoteServer = embeddedServer(Netty, 8089, configure = {
+
+        portNum = Random.nextInt(1025, 65000)
+        remoteServer = embeddedServer(Netty, portNum, configure = {
             requestReadTimeoutSeconds = 600
             responseWriteTimeoutSeconds = 600
         }) {
@@ -138,7 +143,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         }
         remoteServer.start()
 
-        localRepDbRepo = localRepDb.asRepository(RepositoryConfig.repositoryConfig(Any(), "http://localhost:8089/",
+        localRepDbRepo = localRepDb.asRepository(RepositoryConfig.repositoryConfig(Any(), "http://localhost:$portNum/",
             LOCAL_NODE_ID, "secret", httpClient, okHttpClient, jsonSerializer
         ) {
             useReplicationSubscription = true
@@ -154,7 +159,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
                 it.clearAllTables()
             }
 
-        localRepDb2Repo = localRepDb2.asRepository(RepositoryConfig.repositoryConfig(Any(), "http://localhost:8089/",
+        localRepDb2Repo = localRepDb2.asRepository(RepositoryConfig.repositoryConfig(Any(), "http://localhost:$portNum/",
             LOCAL_NODE_ID2, "secret", httpClient, okHttpClient, jsonSerializer
         ) {
             useReplicationSubscription = true

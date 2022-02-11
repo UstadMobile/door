@@ -4,6 +4,7 @@ package com.ustadmobile.door
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.*
 import com.ustadmobile.door.transaction.DoorTransactionDataSourceWrapper
+import com.ustadmobile.door.util.SqliteChangeTracker
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
@@ -46,7 +47,9 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
         }else {
             val thisJdbc = this as DoorDatabaseJdbc
 
-            thisJdbc.useConnection { con ->
+            //Use the dataSource directly because this is called before the
+            // tables are created
+            thisJdbc.dataSource.connection.use { con ->
                 val metadata = con.metaData
                 metadata.getTables(null, null, "%", arrayOf("TABLE")).useResults { tableResult ->
                     tableResult.mapRows { it.getString("TABLE_NAME") ?: "" }
@@ -60,8 +63,8 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
         val rootDb = rootDatabase
         if(this == rootDb) {
             val jdbcDb = (this as DoorDatabaseJdbc)
-            jdbcDb.useConnection { dbConnection ->
-                jdbcDbType = DoorDbType.typeIntFromProductName(dbConnection.metaData?.databaseProductName ?: "")
+            jdbcDb.dataSource.connection.use { connection ->
+                jdbcDbType = DoorDbType.typeIntFromProductName(connection.metaData?.databaseProductName ?: "")
                 jdbcArraySupported = jdbcDbType == DoorDbType.POSTGRES
             }
         }else {
@@ -81,16 +84,27 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
             val rootDb = rootDatabase
             val rootJdbcDb = (rootDb as DoorDatabaseJdbc)
             val connection = rootJdbcDb.dataSource.connection
-            connection.setAutoCommit(false)
+            connection.autoCommit = false
 
+            val changedTables = mutableSetOf<String>()
             DoorTransactionDataSourceWrapper(rootDb, connection).use { transactionDataSource ->
                 val transactionDb = rootDb.constructorFun.newInstance(rootDb, transactionDataSource,
                     "Transaction wrapper for $rootDb", rootDb.realAttachmentStorageUri?.toFile(),
                     rootJdbcDb.realAttachmentFilters, rootJdbcDb.jdbcQueryTimeout)
                 (transactionDb as DoorDatabaseJdbc).transactionDepthCounter.incrementTransactionDepth()
-                block(transactionDb).also {
-                    transactionDb.transactionRootJdbcDb.invalidationTracker.onCommit()
+
+                lateinit var sqliteChangeTracker: SqliteChangeTracker
+                if(dbType() == DoorDbType.SQLITE) {
+                    sqliteChangeTracker = SqliteChangeTracker(transactionDb)
+                    sqliteChangeTracker.setupTriggers(connection)
                 }
+
+                block(transactionDb).also {
+                    if(dbType() == DoorDbType.SQLITE)
+                        changedTables.addAll(sqliteChangeTracker.findChangedTables(connection))
+                }
+            }.also {
+                rootJdbcDb.invalidationTracker.takeIf { changedTables.isNotEmpty() }?.onTablesInvalidated(changedTables)
             }
         }catch(e: Exception) {
             Napier.e("Exception in useTransactionDataSourceAndDb", tag = DoorTag.LOG_TAG)
