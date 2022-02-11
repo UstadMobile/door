@@ -98,6 +98,18 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
         }
     }
 
+    /**
+     * SQLite works in a one-at-a-time mode with a timeout. Hopefully this will not be needed after updating to use
+     * triggers for change detection.
+     */
+    private suspend inline fun <T> withTransactionMutexIfSqlite(block: () -> T): T {
+        return if(dbType() == DoorDbType.SQLITE) {
+            rootDatabase.transactionMutex.withLock(action = block)
+        }else {
+            block()
+        }
+    }
+
     private fun KClass<*>.assertIsClassForThisDb() {
         if(!this.java.isAssignableFrom(this@DoorDatabase::class.java))
             throw IllegalArgumentException("withDoorTransactionInternal wrong class param!")
@@ -134,7 +146,7 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
         val txRoot = transactionRootJdbcDb
         return if(!txRoot.isInTransaction) {
             runBlocking {
-                rootDatabase.transactionMutex.withLock {
+                withTransactionMutexIfSqlite {
                     useTransactionDb { transactionDb ->
                         val transactionWrappedDb = wrapForNewTransaction(dbKClass, transactionDb as T)
                         block(transactionWrappedDb)
@@ -159,7 +171,7 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
         dbKClass.assertIsClassForThisDb()
         val txRoot = transactionRootJdbcDb
         return if(!txRoot.isInTransaction) {
-            rootDatabase.transactionMutex.withLock {
+            withTransactionMutexIfSqlite {
                 useTransactionDb { transactionDb ->
                     val transactionWrappedDb = wrapForNewTransaction(dbKClass, transactionDb as T)
                     block(transactionWrappedDb)
