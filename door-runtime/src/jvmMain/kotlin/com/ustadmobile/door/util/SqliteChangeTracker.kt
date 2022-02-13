@@ -8,6 +8,17 @@ import com.ustadmobile.door.ext.useResults
 import com.ustadmobile.door.ext.useStatement
 import com.ustadmobile.door.jdbc.Connection
 
+/**
+ * The SQLite Change Tracker is based on using a temporary table and temporary triggers. Temporary tables and triggers
+ * are isolated between JDBC connections.
+ *
+ * For this to work, setupTriggers(connection) must be called when a connection is first obtained, and then
+ * findChangedTables(connection) must be called just before closing the connection.
+ *
+ * When not using a transaction, this is done by the DoorDatabaseJdbc.useConnection to detect changes and dispatch
+ * them using the DoorInvalidationTracker
+ *
+ */
 class SqliteChangeTracker(
     jdbcDatabase: DoorDatabaseJdbc
 ) {

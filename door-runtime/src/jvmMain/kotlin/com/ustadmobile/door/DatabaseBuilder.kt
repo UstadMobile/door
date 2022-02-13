@@ -1,12 +1,14 @@
 package com.ustadmobile.door
 
 import com.ustadmobile.door.attachments.AttachmentFilter
+import com.ustadmobile.door.ext.dbType
 import com.ustadmobile.door.ext.doorDatabaseMetadata
 import com.ustadmobile.door.ext.wrap
 import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.migration.DoorMigrationAsync
 import com.ustadmobile.door.migration.DoorMigrationStatementList
 import com.ustadmobile.door.migration.DoorMigrationSync
+import com.ustadmobile.door.util.PostgresChangeTracker
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.lang.IllegalStateException
@@ -121,6 +123,11 @@ actual class DatabaseBuilder<T: DoorDatabase> internal constructor(
                     doorDb.execSQLBatch(*it.onOpen(doorDb.sqlDatabaseImpl).toTypedArray())
                 }
             }
+        }
+
+        if(doorDb.dbType() == DoorDbType.POSTGRES) {
+            val postgresChangeTracker = PostgresChangeTracker(doorDb as DoorDatabaseJdbc)
+            postgresChangeTracker.setupTriggers()
         }
 
         return if(doorDb::class.doorDatabaseMetadata().hasReadOnlyWrapper) {
