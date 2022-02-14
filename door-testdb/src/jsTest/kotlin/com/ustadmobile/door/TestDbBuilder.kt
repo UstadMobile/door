@@ -1,13 +1,14 @@
-import com.ustadmobile.door.ChangeListenerRequest
-import com.ustadmobile.door.DatabaseBuilder
-import com.ustadmobile.door.DatabaseBuilderOptions
-import com.ustadmobile.door.SyncNodeIdCallback
+package com.ustadmobile.door
+
 import com.ustadmobile.door.ext.addInvalidationListener
+import com.ustadmobile.door.ext.withDoorTransactionAsync
 import com.ustadmobile.door.util.systemTimeInMillis
 import db2.ExampleDatabase2
 import db2.ExampleDatabase2JsImplementations
 import db2.ExampleDatabase2_JdbcKt
 import db2.ExampleEntity2
+import io.github.aakira.napier.DebugAntilog
+import io.github.aakira.napier.Napier
 import kotlinx.browser.window
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.*
@@ -36,12 +37,10 @@ class TestDbBuilder {
         val data = (res.blob() as Promise<dynamic>).await()
         val workerBlobUrl = URL.createObjectURL(data as Blob)
         val builderOptions = DatabaseBuilderOptions(
-            ExampleDatabase2::class, ExampleDatabase2JsImplementations, "jsDb1",workerBlobUrl)
+            ExampleDatabase2::class, ExampleDatabase2JsImplementations, "jsDb_${systemTimeInMillis()}",workerBlobUrl)
         exampleDb2 = DatabaseBuilder.databaseBuilder<ExampleDatabase2>(builderOptions).build().also {
             it.clearAllTablesAsync()
         }
-         //TODO Still running synchronously, we need async for this
-        //exampleDb2.clearAllTables()
     }
 
     private suspend fun openRepoDb() {
@@ -53,7 +52,7 @@ class TestDbBuilder {
 
         repNodeId = Random.nextLong(0, Long.MAX_VALUE)
         val builderOptions = DatabaseBuilderOptions(
-            RepDb::class, RepDbJsImplementations, "resDb", workerBlobUrl)
+            RepDb::class, RepDbJsImplementations, "resDb_${systemTimeInMillis()}", workerBlobUrl)
         repDb = DatabaseBuilder.databaseBuilder(builderOptions)
             .addCallback(SyncNodeIdCallback(repNodeId))
             .build()
@@ -110,7 +109,6 @@ class TestDbBuilder {
             this.reNumField = 42
         }
         repEntity.rePrimaryKey =  repDb.repDao.insertAsync(repEntity)
-        println("Primary key = ${repEntity.rePrimaryKey}")
         val entityFromDb = repDb.repDao.findByUidAsync(repEntity.rePrimaryKey)
         assertEquals(repEntity.reNumField, entityFromDb!!.reNumField, message = "Found same field value from db")
         assertTrue(entityFromDb.rePrimaryKey > 1000)
@@ -139,4 +137,43 @@ class TestDbBuilder {
         }
         assertTrue(completableDeferred.await(), "RepEntity change triggered")
     }
+
+    @Test
+    fun givenRunInTransactionUsed_whenInserted_thenCanBeRetrieved() = GlobalScope.promise {
+        openRepoDb()
+
+        repDb.withDoorTransactionAsync(RepDb::class) { txDb ->
+            val repEntity = RepEntity().apply {
+                reNumField = 42
+                rePrimaryKey = txDb.repDao.insertAsync(this)
+            }
+
+            val retrieved = txDb.repDao.findByUidAsync(repEntity.rePrimaryKey)
+            assertEquals(repEntity, retrieved, "Retrieved the same as was inserted into db")
+        }
+    }
+
+    @Test
+    fun givenNestedRunInTransactionUsed_whenInserted_thenCanBeRetrieved() = GlobalScope.promise {
+        Napier.base(DebugAntilog())
+        openRepoDb()
+        repDb.withDoorTransactionAsync(RepDb::class) { txDb1 ->
+            txDb1.withDoorTransactionAsync(RepDb::class) { txDb2 ->
+                Napier.i("==Attempting to insert on tx2\n")
+
+                val existingInDb = txDb2.repDao.findAllAsync()
+                Napier.i("\n==Existing Rep Entities = ${existingInDb.joinToString()}==\n")
+
+                val repEntity = RepEntity().apply {
+                    reNumField = 42
+                    rePrimaryKey = txDb2.repDao.insertAsync(this)
+                }
+
+                val retrieved = txDb2.repDao.findByUidAsync(repEntity.rePrimaryKey)
+                assertEquals(repEntity, retrieved, "Retrieved the same as was inserted into db")
+            }
+        }
+
+    }
+
 }

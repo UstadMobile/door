@@ -11,6 +11,7 @@ import com.ustadmobile.door.migration.DoorMigrationStatementList
 import com.ustadmobile.door.migration.DoorMigrationSync
 import com.ustadmobile.door.sqljsjdbc.*
 import com.ustadmobile.door.util.DoorJsImplClasses
+import com.ustadmobile.door.util.SqliteChangeTracker
 import io.github.aakira.napier.Napier
 import org.w3c.dom.Worker
 import kotlin.reflect.KClass
@@ -64,13 +65,13 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(
                             "${nextMigration.endVersion}", tag = DoorTag.LOG_TAG)
                     when(nextMigration) {
                         is DoorMigrationAsync -> nextMigration.migrateFn(dbImpl.sqlDatabaseImpl)
-                        is DoorMigrationStatementList -> dbImpl.execSQLBatchAsync(
+                        is DoorMigrationStatementList -> dbImpl.execSQLBatchAsyncJs(
                             *nextMigration.migrateStmts(dbImpl.sqlDatabaseImpl).toTypedArray())
                         else -> throw IllegalArgumentException("Cannot use DataMigrationSync on JS")
                     }
 
                     currentDbVersion = nextMigration.endVersion
-                    dbImpl.execSQLBatchAsync("UPDATE _doorwayinfo SET dbVersion = $currentDbVersion")
+                    dbImpl.execSQLBatchAsyncJs("UPDATE _doorwayinfo SET dbVersion = $currentDbVersion")
                     Napier.d("DatabaseBuilderJs: migrated up to $currentDbVersion", tag = DoorTag.LOG_TAG)
                 }else {
                     throw IllegalStateException("Need to migrate to version " +
@@ -80,14 +81,14 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(
         }else{
             if(!dbImpl.getTableNamesAsync().any {it.lowercase() == DoorDatabaseCommon.DBINFO_TABLENAME}) {
                 Napier.i("DatabaseBuilderJs: Creating database ${builderOptions.dbName}")
-                dbImpl.execSQLBatchAsync(*dbImpl.createAllTables().toTypedArray())
+                dbImpl.execSQLBatchAsyncJs(*dbImpl.createAllTables().toTypedArray())
                 Napier.d("DatabaseBuilderJs: Running onCreate callbacks...")
                 callbacks.forEach {
                     when(it) {
                         is DoorDatabaseCallbackSync -> throw NotSupportedException("Cannot use sync callback on JS")
                         is DoorDatabaseCallbackStatementList -> {
                             Napier.d("DatabaseBuilderJs: Running onCreate callback: ${it::class.simpleName}")
-                            dbImpl.execSQLBatchAsync(*it.onCreate(dbImpl.sqlDatabaseImpl).toTypedArray())
+                            dbImpl.execSQLBatchAsyncJs(*it.onCreate(dbImpl.sqlDatabaseImpl).toTypedArray())
                         }
                     }
                 }
@@ -99,11 +100,16 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(
         callbacks.forEach {
             when(it) {
                 is DoorDatabaseCallbackStatementList -> {
-                    dbImpl.execSQLBatchAsync(*it.onOpen(dbImpl.sqlDatabaseImpl).toTypedArray())
+                    dbImpl.execSQLBatchAsyncJs(*it.onOpen(dbImpl.sqlDatabaseImpl).toTypedArray())
                 }
                 else -> throw IllegalArgumentException("Cannot use sync callback on JS")
             }
         }
+
+        //Put the temp tables and triggers in place.
+        SqliteChangeTracker(builderOptions.dbImplClasses.metadata).setupTriggersOnDbAsync(
+            dbImpl, temporary = false)
+        dataSource.changeTrackingEnabled = true
 
         val dbMetaData = lookupImplementations(builderOptions.dbClass).metadata
         SaveToIndexedDbChangeListener(dbImpl, dataSource, dbMetaData.replicateTableNames,
@@ -138,6 +144,7 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(
             builderOptions: DatabaseBuilderOptions<T>
         ): DatabaseBuilder<T> = DatabaseBuilder(builderOptions)
 
+        @Suppress("UNCHECKED_CAST")
         fun <T: DoorDatabase> lookupImplementations(dbKClass: KClass<T>): DoorJsImplClasses<T> {
             return implementationMap[dbKClass] as? DoorJsImplClasses<T>
                 ?: throw IllegalArgumentException("${dbKClass.simpleName} is not registered through DatabaseBuilder.register")

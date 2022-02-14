@@ -11,3 +11,13 @@ inline fun <S:Statement, R> S.useStatement(block: (S) -> R) : R{
         close()
     }
 }
+
+suspend inline fun <S:Statement, R> S.useStatementAsync(block: suspend (S) -> R) : R{
+    try {
+        return block(this)
+    }catch(e: Exception) {
+        throw e
+    }finally {
+        close()
+    }
+}

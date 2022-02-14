@@ -1421,7 +1421,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .build())
             .addProperty(PropertySpec.builder("invalidationTracker", DoorInvalidationTracker::class)
                 .addModifiers(KModifier.OVERRIDE)
-                .initializer("%T(this)\n", DoorInvalidationTracker::class)
+                .initializer("%T(this.toString())\n", DoorInvalidationTracker::class)
                 .build())
             .applyIf(target == DoorTarget.JS) {
                 addProperty(PropertySpec.builder("isInTransaction", Boolean::class,
@@ -1613,7 +1613,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         if(target == DoorTarget.JS) {
             addFunction(FunSpec.builder("clearAllTablesAsync")
                 .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-                .addCode("execSQLBatchAsync(*makeClearAllTablesSql().%M())\n",
+                .addCode("execSQLBatchAsyncJs(*makeClearAllTablesSql().%M())\n",
                     MemberName("kotlin.collections", "toTypedArray"))
                 .build())
         }

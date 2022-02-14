@@ -8,7 +8,13 @@ import com.ustadmobile.door.util.TransactionMode
  * This is the main way that a Connection on the database should be used. It will setup any change tracking that is
  * required, and deliver change events to the invalidationTracker
  */
-expect inline fun <R> DoorDatabaseJdbc.useConnection(
+expect fun <R> DoorDatabaseJdbc.useConnection(
     transactionMode: TransactionMode,
     block: (Connection) -> R,
 ): R
+
+expect suspend fun <R> DoorDatabaseJdbc.useConnectionAsync(
+    transactionMode: TransactionMode,
+    block: suspend (Connection) -> R,
+): R
+

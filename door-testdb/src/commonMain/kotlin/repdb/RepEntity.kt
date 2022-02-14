@@ -73,6 +73,10 @@ class RepEntity {
         return result
     }
 
+    override fun toString(): String {
+        return "RepEntity(rePrimaryKey = $rePrimaryKey reString='$reString' reNumField=$reNumField)"
+    }
+
     companion object {
         const val TABLE_ID = 500
     }

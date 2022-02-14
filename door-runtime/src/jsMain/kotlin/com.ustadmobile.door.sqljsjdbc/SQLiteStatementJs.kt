@@ -18,9 +18,8 @@ open class SQLiteStatementJs(
         throw SQLException("Synchronous SQL not supported!")
     }
 
-    suspend fun executeUpdateAsync(sql: String): Int {
-        connection.datasource.sendQuery(sql)
-        return 1
+    override suspend fun executeUpdateAsyncJs(sql: String): Int {
+        return connection.datasource.sendUpdate(sql, emptyArray()).numRowsChanged
     }
 
     override fun close() {

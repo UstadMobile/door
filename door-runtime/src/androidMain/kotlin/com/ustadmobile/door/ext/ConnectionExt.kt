@@ -11,3 +11,13 @@ actual inline fun <R> Connection.useConnection(block: (Connection) -> R) : R {
         close()
     }
 }
+
+actual suspend inline fun <R> Connection.useConnectionAsync(block: suspend (Connection) -> R) : R {
+    try {
+        return block(this)
+    }catch(e: Exception) {
+        throw e
+    }finally {
+        close()
+    }
+}

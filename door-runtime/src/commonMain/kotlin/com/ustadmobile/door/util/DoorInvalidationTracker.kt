@@ -1,7 +1,6 @@
 package com.ustadmobile.door.util
 
 import com.ustadmobile.door.ChangeListenerRequest
-import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.concurrentSafeListOf
 import io.github.aakira.napier.Napier
@@ -13,7 +12,7 @@ import io.github.aakira.napier.Napier
  * TODO: Maybe rename this to DoorInvalidationEventDispatcher ?
  */
 class DoorInvalidationTracker(
-    private val jdbcDatabase: DoorDatabaseJdbc
+    private val logName: String
 ) {
 
     //private val tablesChanged = concurrentSafeListOf<String>()
@@ -29,7 +28,7 @@ class DoorInvalidationTracker(
         val affectedChangeListeners = listeners.filter { changeListener ->
             changeListener.tableNames.any { listToFire.contains(it) }
         }
-        Napier.d("Invalidation Tracker for [${this.jdbcDatabase}] notifying ${affectedChangeListeners.size} listeners of changes to " +
+        Napier.d("Invalidation Tracker for [$logName] notifying ${affectedChangeListeners.size} listeners of changes to " +
                 listToFire.joinToString(), tag = DoorTag.LOG_TAG)
         affectedChangeListeners.forEach {
             it.onInvalidated.onTablesInvalidated(listToFire.toList())

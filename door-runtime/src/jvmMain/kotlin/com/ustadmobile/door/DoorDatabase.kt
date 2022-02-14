@@ -95,13 +95,13 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
 
                 lateinit var sqliteChangeTracker: SqliteChangeTracker
                 if(dbType() == DoorDbType.SQLITE) {
-                    sqliteChangeTracker = SqliteChangeTracker(transactionDb)
-                    sqliteChangeTracker.setupTriggers(connection)
+                    sqliteChangeTracker = SqliteChangeTracker(this@DoorDatabase::class.doorDatabaseMetadata())
+                    sqliteChangeTracker.setupTriggersOnConnection(connection)
                 }
 
                 block(transactionDb).also {
                     if(dbType() == DoorDbType.SQLITE)
-                        changedTables.addAll(sqliteChangeTracker.findChangedTables(connection))
+                        changedTables.addAll(sqliteChangeTracker.findChangedTablesOnConnection(connection))
                 }
             }.also {
                 rootJdbcDb.invalidationTracker.takeIf { changedTables.isNotEmpty() }?.onTablesInvalidated(changedTables)

@@ -118,6 +118,11 @@ abstract class RepDao {
     """)
     abstract suspend fun findByUidAsync(uid: Long): RepEntity?
 
+    @Query("""
+    SELECT RepEntity.*
+      FROM RepEntity
+    """)
+    abstract suspend fun findAllAsync(): List<RepEntity>
 
 
     @Query("""

@@ -4,6 +4,8 @@ actual interface Statement {
 
     fun executeUpdate(sql: String): Int
 
+    suspend fun executeUpdateAsyncJs(sql: String): Int
+
     actual fun close()
 
     actual fun isClosed(): Boolean

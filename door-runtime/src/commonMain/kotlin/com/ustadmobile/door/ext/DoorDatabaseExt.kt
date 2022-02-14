@@ -59,6 +59,8 @@ expect fun <T: DoorDatabase, R> T.withDoorTransaction(dbKClass: KClass<T>, block
  */
 expect fun DoorDatabase.execSqlBatch(vararg sqlStatements: String)
 
+expect suspend fun DoorDatabase.execSqlBatchAsync(vararg sqlStatements: String)
+
 expect fun <T: DoorDatabase> KClass<T>.doorDatabaseMetadata(): DoorDatabaseMetadata<T>
 
 /**

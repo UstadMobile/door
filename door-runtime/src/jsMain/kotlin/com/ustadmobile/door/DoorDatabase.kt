@@ -1,10 +1,6 @@
 package com.ustadmobile.door
 
-import com.ustadmobile.door.ext.rootDatabase
-import com.ustadmobile.door.ext.sourceDatabase
-import com.ustadmobile.door.ext.useConnection
-import com.ustadmobile.door.ext.useStatement
-import com.ustadmobile.door.jdbc.ResultSet
+import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.SQLException
 import kotlinx.coroutines.Runnable
 import com.ustadmobile.door.sqljsjdbc.SQLiteConnectionJs
@@ -35,7 +31,7 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon() {
             rootDatabase.getTableNamesAsync()
         } else {
             val tableNamesList = mutableListOf<String>()
-            rootDatabaseJdbc.useConnection { con ->
+            rootDatabaseJdbc.useConnectionAsync { con ->
                 val metadata = con.getMetaData() as SQLiteDatabaseMetadataJs
                 val tableResult = metadata.getTablesAsync(null, null, "%", arrayOf("TABLE"))
                 while(tableResult.next()) {
@@ -49,10 +45,10 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon() {
         }
     }
 
-    suspend fun execSQLBatchAsync(vararg sqlStatements: String){
-        transactionRootJdbcDb.useConnection { connection ->
+    suspend fun execSQLBatchAsyncJs(vararg sqlStatements: String){
+        transactionRootJdbcDb.useConnectionAsync { connection ->
             connection.createStatement().useStatement { statement ->
-                (statement as SQLiteStatementJs).executeUpdateAsync(sqlStatements.joinToString(";"))
+                (statement as SQLiteStatementJs).executeUpdateAsyncJs(sqlStatements.joinToString(";"))
             }
         }
     }
@@ -62,7 +58,7 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon() {
     }
 
     suspend fun exportDatabase() {
-        transactionRootJdbcDb.useConnection { connection ->
+        transactionRootJdbcDb.useConnectionAsync { connection ->
             (connection as SQLiteConnectionJs).datasource.exportDatabaseToFile()
         }
     }

@@ -12,11 +12,11 @@ actual suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
     block: suspend (PreparedStatement) -> R
 ) : R {
     try {
-        return transactionRootJdbcDb.useConnection { connection: Connection ->
-            connection.prepareStatement(stmtConfig).useStatement { stmt: PreparedStatement ->
+        return transactionRootJdbcDb.useConnectionAsync { connection: Connection ->
+            connection.prepareStatement(stmtConfig).useStatementAsync { stmt: PreparedStatement ->
                 stmt.setQueryTimeout((rootDatabase as DoorDatabaseJdbc).jdbcQueryTimeout)
                 val blockStartTime = systemTimeInMillis()
-                return@useConnection block(stmt).also {
+                return@useConnectionAsync block(stmt).also {
                     val blockTime = systemTimeInMillis() - blockStartTime
                     if(blockTime > 1000)
                         Napier.w("WARNING $this query ${stmtConfig.sql} took ${blockTime}ms")

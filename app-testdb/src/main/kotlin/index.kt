@@ -62,22 +62,21 @@ fun main() {
         GlobalScope.launch {
             openRepoDb()
 
-            Napier.i("Inserting into repDb")
+            Napier.i("IndexTest: Inserting into repDb")
             repDb.repDao.insertAsync(RepEntity().apply {
-                this.reString = "From ${Date().toUTCString()}"
+                this.reString = "From client at ${Date().toUTCString()} UTC"
                 this.reNumField = 500
             })
 
-            Napier.i("Inserted into repDb")
+            Napier.i("IndexTest: Inserted into repDb")
 
 
             delay(5000)
             val entityAsyncQueryResult = repDb.repDao.findByUidAsync(42L)
-            repDb.exportDatabase()
 
-            console.log("GOT ENTITY FROM SERVER:? $entityAsyncQueryResult")
+            console.log("IndexTest: GOT ENTITY FROM SERVER:? $entityAsyncQueryResult")
 
-            console.log("Asking server to make something")
+            console.log("IndexTest: Asking server to make something")
             val serverInsertUid = systemTimeInMillis()
             val response = httpClient.get<String>(
                 "http://localhost:8098/insertRepEntity") {
@@ -85,7 +84,7 @@ fun main() {
                 parameter("reString", "From server at ${Date().toUTCString()}")
             }
 
-            console.log("Server says: $response ... Waiting...")
+            console.log("IndexTest: Server says: $response ... Waiting...")
 
             val completableDeferred = CompletableDeferred<RepEntity>()
             val observer = DoorObserver<RepEntity?> {
@@ -97,7 +96,8 @@ fun main() {
                 completableDeferred.await()
             }
 
-            console.log("Got it back! $entityReceived")
+            console.log("IndexTest: Got it back! $entityReceived")
+            //repDb.exportDatabase()
         }
 
         Unit

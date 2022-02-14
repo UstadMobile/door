@@ -1,6 +1,8 @@
 package com.ustadmobile.door.ext
 
 import com.ustadmobile.door.*
+import com.ustadmobile.door.jdbc.SQLException
+import com.ustadmobile.door.sqljsjdbc.SQLiteDatasourceJs
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -18,12 +20,31 @@ actual fun DoorDatabase.dbSchemaVersion(): Int = this.dbVersion
 /**
  * Run a transaction within a suspend coroutine context. Not really implemented at the moment.
  */
-actual suspend fun <T: DoorDatabase, R> T.withDoorTransactionAsync(dbKClass: KClass<out T>, block: suspend (T) -> R) : R {
-    return block(this)
+actual suspend fun <T: DoorDatabase, R> T.withDoorTransactionAsync(
+    dbKClass: KClass<out T>,
+    block: suspend (T) -> R
+) : R {
+    val rootJdbcDb = (rootDatabase as DoorDatabaseJdbc)
+    val wasInTransaction = rootJdbcDb.isInTransaction
+    rootJdbcDb.transactionDepthCounter.incrementTransactionDepth()
+    try {
+        val sqliteDataSource = rootJdbcDb.dataSource as SQLiteDatasourceJs
+
+        return sqliteDataSource.withTransactionLock {
+            val result = block(this)
+            if(!wasInTransaction) {
+                val changedTables = sqliteDataSource.findUpdatedTables(this::class.doorDatabaseMetadata())
+                rootJdbcDb.invalidationTracker.onTablesInvalidated(changedTables.toSet())
+            }
+            result
+        }
+    }finally {
+        rootJdbcDb.transactionDepthCounter.decrementTransactionDepth()
+    }
 }
 
 actual fun <T: DoorDatabase, R> T.withDoorTransaction(dbKClass: KClass<T>, block: (T) -> R) : R {
-    return block(this)
+    throw SQLException("withDoorTransaction non-async not support on Javascript!")
 }
 
 
@@ -44,6 +65,10 @@ actual fun DoorDatabase.execSqlBatch(vararg sqlStatements: String) {
     throw IllegalStateException("Non-async execSqlBatch not supported on Javascript!")
 }
 
+actual suspend fun DoorDatabase.execSqlBatchAsync(vararg sqlStatements: String) {
+    execSQLBatchAsyncJs(*sqlStatements)
+}
+
 actual fun <T : DoorDatabase> KClass<T>.doorDatabaseMetadata(): DoorDatabaseMetadata<T> {
     return DatabaseBuilder.lookupImplementations(this).metadata
 }
@@ -57,6 +82,7 @@ actual fun <T : DoorDatabase> T.wrap(dbClass: KClass<T>): T {
     return wrapperImpl as T
 }
 
+@Suppress("UNCHECKED_CAST")
 actual fun <T : DoorDatabase> T.unwrap(dbClass: KClass<T>): T {
     return (this as? DoorDatabaseReplicateWrapper)?.realDatabase as? T
         ?: throw IllegalArgumentException("$this is not a replicate wrapper!")

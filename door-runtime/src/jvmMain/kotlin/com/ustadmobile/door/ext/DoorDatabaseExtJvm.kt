@@ -4,6 +4,8 @@ import com.ustadmobile.door.*
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
 import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
 import com.ustadmobile.door.util.NodeIdAuthCache
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 import kotlin.reflect.KClass
 
@@ -52,6 +54,12 @@ fun <T: DoorDatabase> T.wrapDbAsRepositoryForTransaction(
 
 actual fun DoorDatabase.execSqlBatch(vararg sqlStatements: String) {
     execSQLBatch(*sqlStatements)
+}
+
+actual suspend fun DoorDatabase.execSqlBatchAsync(vararg sqlStatements: String) {
+    withContext(Dispatchers.IO) {
+        execSQLBatch(*sqlStatements)
+    }
 }
 
 private val metadataCache = mutableMapOf<KClass<*>, DoorDatabaseMetadata<*>>()

@@ -19,6 +19,10 @@ actual class PreparedStatementArrayProxy actual constructor(
         return prepareStatement().executeUpdateAsync()
     }
 
+    override suspend fun executeUpdateAsyncJs(sql: String): Int {
+        return prepareStatement().executeUpdateAsyncJs(sql)
+    }
+
     override suspend fun executeQueryAsyncInt(): ResultSet {
         return prepareStatement().executeQueryAsyncInt()
     }

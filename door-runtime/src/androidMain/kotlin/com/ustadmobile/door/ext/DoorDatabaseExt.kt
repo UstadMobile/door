@@ -73,6 +73,15 @@ actual fun DoorDatabase.execSqlBatch(vararg sqlStatements: String) {
         }
     }
 }
+
+actual suspend fun DoorDatabase.execSqlBatchAsync(vararg sqlStatements: String) {
+    withTransaction {
+        sqlStatements.forEach {
+            this.query(it, arrayOf())
+        }
+    }
+}
+
 actual suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
     stmtConfig: PreparedStatementConfig,
     block: suspend (PreparedStatement) -> R
