@@ -997,10 +997,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     endControlFlow()
                     add("_stmt.getConnection().commit()\n")
                 }
-                .apply {
-                    endControlFlow()
-                    add("_db.%M(listOf(%S))\n", MEMBERNAME_HANDLE_TABLES_CHANGED, entityTypeEl.simpleName)
-                }
+                .endControlFlow()
                 .applyIf(funSpec.hasReturnType) {
                     add("return _result")
                 }
@@ -1211,8 +1208,6 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         }
 
         add("\n")
-
-        add("_db.%M(listOf(%S))\n", MEMBERNAME_HANDLE_TABLES_CHANGED, entityTypeSpec.name)
 
         if(addReturnStmt) {
             if(returnType != UNIT) {

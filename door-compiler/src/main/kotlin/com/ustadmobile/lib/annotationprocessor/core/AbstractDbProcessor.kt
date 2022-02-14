@@ -298,38 +298,6 @@ fun getEntityPrimaryKey(entityEl: TypeElement) = entityEl.enclosedElements
 
 
 /**
- *
- */
-fun findEntityModifiedByQuery(querySql: String, allKnownEntityNames: List<String>): String? {
-    //Split the statement up. There might be a statement like
-    // INSERT INTO TableName(fieldName)
-    // Therefor the regex will split by space or open bracket
-    val stmtSplit = querySql.trim().split(Regex("(\\s|\\()+"), limit = 4)
-    val sqlKeyword = stmtSplit[0].uppercase()
-    val tableModified = if(sqlKeyword == "UPDATE") {
-        stmtSplit[1] // in case it is an update statement, will be the second word (e.g. update tablename)
-    }else if(sqlKeyword == "DELETE"){
-        stmtSplit[2] // in case it is a delete statement, will be the third word (e.g. delete from tablename)
-    }else if(sqlKeyword == "INSERT" || sqlKeyword == "REPLACE") {
-        stmtSplit[2] //in case it is an INSERT INTO or REPLACE INTO statement, will be the third word (e.g. INSERT INTO tablename)
-    } else {
-        null
-    }
-
-    /*
-     * If the entity did not exist, then our attempt to run the query would have thrown
-     * an SQLException . When calling handleTableChanged, we want to use the same case
-     * as the entity, so we look it up from the list of known entities to find the correct
-     * case to use.
-     */
-    return if(tableModified != null) {
-        allKnownEntityNames.first { it.equals(tableModified,  ignoreCase = true) }
-    }else {
-        null
-    }
-}
-
-/**
  * The parent class of all processors that generate implementations for door. Child processors
  * should implement process.
  */
@@ -632,12 +600,6 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                     add("executeUpdate()\n")
                 }
 
-                val entityModified = findEntityModifiedByQuery(querySql, allKnownEntityNames)
-
-                beginControlFlow("if(_numUpdates > 0)")
-                        .add("_db.%M(listOf(%S))\n", MEMBERNAME_HANDLE_TABLES_CHANGED, entityModified)
-                        .endControlFlow()
-
                 if(resultType != UNIT) {
                     add("$resultVarName = _numUpdates\n")
                 }
@@ -827,8 +789,6 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
 
         codeBlock.add("\n")
 
-        codeBlock.add("_db.%M(listOf(%S))\n", MEMBERNAME_HANDLE_TABLES_CHANGED, entityTypeSpec.name)
-
         if(addReturnStmt) {
             if(returnType != UNIT) {
                 codeBlock.add("return _retVal")
@@ -934,8 +894,6 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
             MEMBERNAME_PREPARE_AND_USE_STMT
 
         const val SUFFIX_DEFAULT_RECEIVEVIEW = "_ReceiveView"
-
-        val MEMBERNAME_HANDLE_TABLES_CHANGED = MemberName("com.ustadmobile.door.ext", "handleTablesChanged")
 
         const val PGSECTION_COMMENT_PREFIX = "/*psql"
 

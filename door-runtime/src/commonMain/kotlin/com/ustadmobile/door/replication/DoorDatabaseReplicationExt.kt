@@ -155,7 +155,6 @@ suspend fun DoorDatabase.insertReplicationsIntoReceiveView(
             }
 
             Napier.d("$transactionDb - notifying of changes to ${repEntityMetaData.entityTableName}")
-            transactionDb.handleTablesChanged(listOf(repEntityMetaData.entityTableName))
         }
     }
 

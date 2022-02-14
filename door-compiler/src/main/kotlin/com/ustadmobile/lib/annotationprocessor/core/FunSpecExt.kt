@@ -42,19 +42,6 @@ fun FunSpec.daoQuerySql() = annotations.daoQuerySql()
 val FunSpec.isAQueryThatModifiesTables: Boolean
     get() = hasAnnotation(Query::class.java) && daoQuerySql().isSQLAModifyingQuery()
 
-/**
- * Where this FunSpec represents a DAO annotated by with @Query, this function will determine
- * what entities (if any) it modifies.
- */
-fun FunSpec.getDaoFunEntityModifiedByQuery(allKnownEntityTypesMap: Map<String, TypeElement>): ClassName? {
-    val modifiedEntityName = findEntityModifiedByQuery(daoQuerySql(), allKnownEntityTypesMap.keys.toList())
-    if(modifiedEntityName != null) {
-        return allKnownEntityTypesMap[modifiedEntityName]?.asClassName()
-    }else {
-        return null
-    }
-}
-
 
 //Shorthand to check if this function is suspended
 val FunSpec.isSuspended: Boolean
