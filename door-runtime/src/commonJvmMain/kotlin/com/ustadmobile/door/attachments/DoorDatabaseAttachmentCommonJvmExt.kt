@@ -81,12 +81,17 @@ actual suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<E
     }
 }
 
-actual suspend fun DoorDatabase.deleteZombieAttachments(entityWithAttachment: EntityWithAttachment) {
-    val tableId = this::class.doorDatabaseMetadata().getTableId(entityWithAttachment.tableName)
-
-    val zombieAttachmentDataList = findZombieAttachments(tableId)
-    zombieAttachmentDataList.forEach {
-        val attachmentFile = File(requireAttachmentStorageUri().toFile(), it.tableNameAndMd5Path)
-        attachmentFile.delete()
+actual suspend fun DoorDatabase.deleteZombieAttachments() {
+    val zombieAttachmentDataList = findZombieAttachments()
+    val deletedZombies = mutableLinkedListOf<Int>()
+    zombieAttachmentDataList.forEach { zombieData ->
+        val zombieFileUri = zombieData.zaUri?.let { retrieveAttachment(it) } ?: return@forEach
+        val zombieFile = zombieFileUri.toFile()
+        zombieFile.delete()
+        if(!zombieFile.exists())
+            deletedZombies += zombieData.zaUid
     }
+
+    if(deletedZombies.isNotEmpty())
+        deleteZombieAttachmentData(deletedZombies)
 }

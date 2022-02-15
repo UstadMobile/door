@@ -10,6 +10,7 @@ import com.ustadmobile.door.replication.ReplicationRunOnChangeRunner
 import kotlinx.coroutines.GlobalScope
 import java.util.*
 import com.ustadmobile.door.ext.rootDatabase
+import java.io.Closeable
 import java.io.File
 
 /**
@@ -21,8 +22,9 @@ class DoorAndroidRoomHelper(
     val db: DoorDatabase,
     val context: Context,
     val attachmentsDir: File?,
-    val attachmentFilters: List<AttachmentFilter>
-) {
+    val attachmentFilters: List<AttachmentFilter>,
+    private val deleteZombieAttachmentsListener: DeleteZombieAttachmentsListener,
+) : Closeable {
 
     val incomingReplicationListenerHelper = IncomingReplicationListenerHelper()
 
@@ -39,6 +41,10 @@ class DoorAndroidRoomHelper(
         NodeIdAuthCache(db)
     }
 
+    override fun close() {
+        deleteZombieAttachmentsListener.close()
+    }
+
     companion object {
 
         /**
@@ -53,10 +59,11 @@ class DoorAndroidRoomHelper(
             db: DoorDatabase,
             context: Context,
             attachmentsDir: File?,
-            attachmentFilters: List<AttachmentFilter>
+            attachmentFilters: List<AttachmentFilter>,
+            deleteZombieAttachmentsListener: DeleteZombieAttachmentsListener
         ) {
             doorAndroidRoomHelperMap.getOrPut(db) {
-                DoorAndroidRoomHelper(db, context, attachmentsDir, attachmentFilters)
+                DoorAndroidRoomHelper(db, context, attachmentsDir, attachmentFilters, deleteZombieAttachmentsListener)
             }
         }
 

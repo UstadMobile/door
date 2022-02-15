@@ -1,9 +1,6 @@
 package repdb
 
-import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.Query
-import androidx.room.Update
+import androidx.room.*
 import com.ustadmobile.door.DoorLiveData
 import com.ustadmobile.door.annotation.*
 
@@ -58,6 +55,9 @@ abstract class RepWithAttachmentDao {
 
     @Insert
     abstract fun insert(entityWithAttachment: RepEntityWithAttachment): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract fun replace(entityWithAttachment: RepEntityWithAttachment)
 
     @Query("""
         SELECT RepEntityWithAttachment.*

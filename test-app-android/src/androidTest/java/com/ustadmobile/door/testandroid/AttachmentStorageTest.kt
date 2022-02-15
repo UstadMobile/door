@@ -7,6 +7,7 @@ import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.attachments.retrieveAttachment
 import com.ustadmobile.door.ext.openInputStream
 import com.ustadmobile.door.ext.toDoorUri
+import com.ustadmobile.door.ext.toFile
 import com.ustadmobile.door.ext.writeToFile
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert
@@ -28,6 +29,8 @@ class AttachmentStorageTest {
 
     private lateinit var tempImgFile: File
 
+    private lateinit var tempImgFile2: File
+
     @Before
     fun setup() {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -35,6 +38,7 @@ class AttachmentStorageTest {
                 temporaryFolder.newFolder())
             .build()
         tempImgFile = temporaryFolder.newFile()
+        tempImgFile2 = temporaryFolder.newFile()
         this::class.java.getResourceAsStream("/cat-pic0.jpg").writeToFile(tempImgFile)
     }
 
@@ -54,6 +58,25 @@ class AttachmentStorageTest {
 
         Assert.assertTrue("Attachment was stored using door attachments",
             repEntityWithAttachment.waAttachmentUri?.startsWith(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX) ?: false)
+    }
+
+    @Test
+    fun givenAttachmentStored_whenReplacedWithNewData_thenOldAttachmentShouldBeDeleted() {
+        val repEntityWithAttachment = RepEntityWithAttachment().apply {
+            waAttachmentUri = tempImgFile.toDoorUri().toString()
+        }
+        repEntityWithAttachment.waUid = repDb.repWithAttachmentDao.insert(repEntityWithAttachment)
+
+        val firstFileUri = repEntityWithAttachment.waAttachmentUri?.let {
+            runBlocking { repDb.retrieveAttachment(it) }
+        } ?: throw IllegalStateException("Could not get first file uri")
+
+        repEntityWithAttachment.waAttachmentUri = null
+        repDb.repWithAttachmentDao.update(repEntityWithAttachment)
+
+        Thread.sleep(100)
+
+        Assert.assertFalse("Old file attachment was deleted", firstFileUri.toFile().exists())
     }
 
 }

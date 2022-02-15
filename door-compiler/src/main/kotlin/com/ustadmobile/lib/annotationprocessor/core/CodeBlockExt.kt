@@ -292,11 +292,10 @@ fun CodeBlock.Builder.beginRunBlockingControlFlow() =
 private fun TypeElement.generateZombieAttachmentInsertSql(): String {
     val attachmentInfo = EntityAttachmentInfo(this)
     val pkFieldName = enclosedElementsWithAnnotation(PrimaryKey::class.java).first().simpleName
-    val tableId = getAnnotation(ReplicateEntity::class.java).tableId
 
     return """
-        INSERT INTO ZombieAttachmentData(zaTableId, zaPrimaryKey, zaMd5) 
-        SELECT $tableId AS zaTableId, OLD.$pkFieldName AS zaPrimaryKey, OLD.${attachmentInfo.md5PropertyName} AS zaMd5
+        INSERT INTO ZombieAttachmentData(zaUri) 
+        SELECT OLD.${attachmentInfo.uriPropertyName} AS zaUri
           FROM $entityTableName   
          WHERE ${entityTableName}.$pkFieldName = OLD.$pkFieldName
            AND (SELECT COUNT(*) 

@@ -152,17 +152,15 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
      */
     @Suppress("UNCHECKED_CAST")
     internal fun <T: DoorDatabase, R> withDoorTransactionInternal(
-        dbKClass: KClass<T>,
         block: (T) -> R
     ): R {
-        dbKClass.assertIsClassForThisDb()
-
         val txRoot = transactionRootJdbcDb
         return if(!txRoot.isInTransaction) {
             runBlocking {
                 withTransactionMutexIfSqlite {
                     useTransactionDb { transactionDb ->
-                        val transactionWrappedDb = wrapForNewTransaction(dbKClass, transactionDb as T)
+                        val dbKClassInt: KClass<T> = this@DoorDatabase::class.doorDatabaseMetadata().dbClass as KClass<T>
+                        val transactionWrappedDb = wrapForNewTransaction(dbKClassInt, transactionDb as T)
                         block(transactionWrappedDb)
                     }
                 }
@@ -179,15 +177,14 @@ actual abstract class DoorDatabase actual constructor(): DoorDatabaseCommon(){
 
     @Suppress("UNCHECKED_CAST")
     internal suspend fun <T: DoorDatabase, R> withDoorTransactionInternalAsync(
-        dbKClass: KClass<T>,
         block: suspend (T) -> R
     ): R {
-        dbKClass.assertIsClassForThisDb()
         val txRoot = transactionRootJdbcDb
         return if(!txRoot.isInTransaction) {
             withTransactionMutexIfSqlite {
                 useTransactionDb { transactionDb ->
-                    val transactionWrappedDb = wrapForNewTransaction(dbKClass, transactionDb as T)
+                    val dbKClassInt: KClass<T> = this@DoorDatabase::class.doorDatabaseMetadata().dbClass as KClass<T>
+                    val transactionWrappedDb = wrapForNewTransaction(dbKClassInt, transactionDb as T)
                     block(transactionWrappedDb)
                 }
             }

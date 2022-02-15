@@ -3,6 +3,7 @@ package com.ustadmobile.lib.annotationprocessor.core.attachments
 import com.ustadmobile.door.DatabaseBuilder
 import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.DOOR_ATTACHMENT_URI_PREFIX
+import com.ustadmobile.door.attachments.findZombieAttachments
 import com.ustadmobile.door.attachments.retrieveAttachment
 import com.ustadmobile.door.ext.*
 import kotlinx.coroutines.runBlocking
@@ -16,7 +17,6 @@ import repdb.RepEntityWithAttachment
 import java.io.File
 import kotlin.random.Random
 import com.ustadmobile.door.attachments.requireAttachmentStorageUri
-import com.ustadmobile.door.attachments.findZombieAttachments
 
 /**
  * Simple tests of local storage and retrieval that are independent of the repository.
@@ -73,12 +73,7 @@ class TestDatabaseAttachments {
             attachmentCatPic.md5Sum, retrievedMd5)
     }
 
-
-
-
-    //This test is disabled until we introduce invalidation tracking based on the database instead of the handlechange
-    // functions
-    //@Test
+    @Test
     fun givenEntityWithAttachment_whenAttachmentUpdatedWithNewData_thenZombieDataShouldBeDeleted() {
         val repEntityWithAttachment = RepEntityWithAttachment().apply {
             waAttachmentUri = attachmentCatPic.toDoorUri().toString()
@@ -87,14 +82,32 @@ class TestDatabaseAttachments {
         val oldUri = repEntityWithAttachment.waAttachmentUri
         val oldMd5File = File(repDb.requireAttachmentStorageUri().toFile(),
             oldUri!!.substringAfter(DOOR_ATTACHMENT_URI_PREFIX))
-        Assert.assertTrue("Attachment file exists after storage", oldMd5File.exists())
 
         repEntityWithAttachment.waAttachmentUri = attachmentStairsPic.toDoorUri().toString()
 
         repDb.repWithAttachmentDao.update(repEntityWithAttachment)
-        val zombies = runBlocking { repDb.findZombieAttachments(RepEntityWithAttachment.TABLE_ID)}
-        println(zombies)
-        Assert.assertFalse("Old attachment file deleted", oldMd5File.exists())
+
+        Thread.sleep(100)
+        Assert.assertFalse("Old attachment file does not exist anymore", oldMd5File.exists())
+        Assert.assertEquals("All ZombieAttachmentData entities have been deleted",
+            0, runBlocking { repDb.findZombieAttachments().size })
+    }
+
+    //This test is needed because on SQLite "replace" means delete anything that conflicts, then insert.
+    @Test
+    fun givenEntityWithAttachment_whenAttachmentEntityReplacedWithSameMd5_thenAttachmentDataShouldNotBeDeleted() {
+        val repEntityWithAttachment = RepEntityWithAttachment().apply {
+            waAttachmentUri = attachmentCatPic.toDoorUri().toString()
+        }
+        repDb.repWithAttachmentDao.insert(repEntityWithAttachment)
+
+        val attachmentUri = repEntityWithAttachment.waAttachmentUri
+        repDb.repWithAttachmentDao.replace(repEntityWithAttachment)
+        Thread.sleep(200)
+        val attachmentFile = attachmentUri?.let { runBlocking { repDb.retrieveAttachment(it) } }?.toFile()
+            ?: throw NullPointerException("Null attachmentFile!")
+        Assert.assertTrue("Attachment file still exists after replace operation",
+            attachmentFile.exists())
     }
 
 

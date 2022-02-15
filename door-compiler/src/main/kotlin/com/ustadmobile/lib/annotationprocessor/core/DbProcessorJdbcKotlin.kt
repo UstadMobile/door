@@ -26,6 +26,7 @@ import com.ustadmobile.door.replication.ReplicationRunOnChangeRunner
 import com.ustadmobile.door.replication.ReplicationEntityMetaData
 import com.ustadmobile.door.replication.ReplicationFieldMetaData
 import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
+import com.ustadmobile.door.util.DeleteZombieAttachmentsListener
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_ANDROID_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JS_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JVM_DIRS
@@ -250,6 +251,12 @@ fun FileSpec.Builder.addDatabaseMetadataType(dbTypeElement: TypeElement, process
             .addModifiers(KModifier.OVERRIDE)
             .getter(FunSpec.getterBuilder()
                 .addCode("return %L\n", dbTypeElement.dbHasReplicateWrapper(processingEnv))
+                .build())
+            .build())
+        .addProperty(PropertySpec.builder("hasAttachments", Boolean::class)
+            .addModifiers(KModifier.OVERRIDE)
+            .getter(FunSpec.getterBuilder()
+                .addCode("return %L\n", dbTypeElement.allDbEntities(processingEnv).any { it.entityHasAttachments })
                 .build())
             .build())
         .addProperty(PropertySpec.builder("syncableTableIdMap", Map::class.parameterizedBy(String::class, Int::class))
@@ -1441,6 +1448,13 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     .endControlFlow()
                     .endControlFlow()
                     .build())
+                .build())
+            .addProperty(PropertySpec.builder("_deleteZombieAttachmentsListener",
+                    DeleteZombieAttachmentsListener::class.asTypeName().copy(nullable = true))
+                .addModifiers(KModifier.PRIVATE)
+                .initializer("if(this == %M) { %T(this) } else { null }",
+                    MemberName("com.ustadmobile.door.ext", "rootDatabase"),
+                    DeleteZombieAttachmentsListener::class)
                 .build())
             .addProperty(PropertySpec.builder("realIncomingReplicationListenerHelper",
                     IncomingReplicationListenerHelper::class)

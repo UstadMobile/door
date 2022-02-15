@@ -209,22 +209,6 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(
                 .applyIf(!isSyncFunctionOnJs) {
                     addDelegateFunctionCall("_dao", overridingFunction)
                     .add("\n")
-                    .applyIf(daoMethod.hasAnnotation(Update::class.java) &&
-                                entityComponentType?.hasAttachments(processingEnv) == true) {
-                        //if this table has attachments and an update was done, check to delete old data
-
-                        val entityClassName = entityComponentType as ClassName
-                        val isList = entityParam.type.isListOrArray()
-
-                        beginAttachmentStorageFlow(overridingFunction)
-
-                        add("_db.%M(%L.%M())\n",
-                            MemberName("com.ustadmobile.door.attachments", "deleteZombieAttachments"),
-                            if(isList) "it" else entityParam.name,
-                            MemberName(entityClassName.packageName, "asEntityWithAttachment"))
-
-                        endAttachmentStorageFlow(overridingFunction)
-                    }
                     .applyIf(setPk && overridingFunction.returnType != null && overridingFunction.returnType != UNIT) {
                         //We need to override this to return the PKs that were really generated
                         val entityParamType = overridingFunction.parameters.first().type

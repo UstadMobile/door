@@ -10,6 +10,7 @@ import com.ustadmobile.door.ext.execSqlBatch
 import com.ustadmobile.door.ext.isWrappable
 import com.ustadmobile.door.ext.wrap
 import com.ustadmobile.door.migration.DoorMigration
+import com.ustadmobile.door.util.DeleteZombieAttachmentsListener
 import com.ustadmobile.door.util.DoorAndroidRoomHelper
 import java.io.File
 
@@ -49,7 +50,8 @@ actual class DatabaseBuilder<T: DoorDatabase>(
 
     fun build(): T {
         val db = roomBuilder.build()
-        DoorAndroidRoomHelper.createAndRegisterHelper(db, appContext, attachmentsDir, attachmentFilters)
+        DoorAndroidRoomHelper.createAndRegisterHelper(db, appContext, attachmentsDir, attachmentFilters,
+            DeleteZombieAttachmentsListener(db))
         return if(db.isWrappable(dbClass)) {
             db.wrap(dbClass)
         }else {

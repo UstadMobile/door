@@ -20,6 +20,7 @@ class TestMutexExt {
         GlobalScope.launch {
             delay(100)
             mutex.withReentrantLock {
+                delay(50)
                 time1 = systemTimeInMillis()
                 println("second\n")
             }

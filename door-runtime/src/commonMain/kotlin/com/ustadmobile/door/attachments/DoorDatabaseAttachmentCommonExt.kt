@@ -6,30 +6,44 @@ import com.ustadmobile.door.entities.ZombieAttachmentData
 import com.ustadmobile.door.ext.mapRows
 import com.ustadmobile.door.ext.prepareAndUseStatementAsync
 import com.ustadmobile.door.ext.useResults
+import com.ustadmobile.door.ext.withDoorTransactionAsync
 import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
+import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
 
 fun DoorDatabase.requireAttachmentStorageUri() : DoorUri {
     return attachmentsStorageUri ?: throw IllegalStateException("Database constructed without attachment storage dir! " +
             "Please set this on the builder!")
 }
 
-suspend fun DoorDatabase.findZombieAttachments(tableId: Int): List<ZombieAttachmentData> {
+suspend fun DoorDatabase.findZombieAttachments(): List<ZombieAttachmentData> {
     return prepareAndUseStatementAsync("""
         SELECT * 
           FROM ZombieAttachmentData
-         WHERE zaTableId = ?
     """) { stmt ->
-        stmt.setInt(1, tableId)
 
         stmt.executeQueryAsyncKmp().useResults { result ->
             result.mapRows {
                 ZombieAttachmentData().apply {
-                    this.zaUid = result.getLong("zaUid")
-                    this.zaPrimaryKey = result.getLong("zaPrimaryKey")
-                    this.zaMd5 = result.getString("zaMd5")
-                    this.zaTableId = result.getInt("zaTableId")
+                    this.zaUid = result.getInt("zaUid")
+                    this.zaUri = result.getString("zaUri")
                 }
             }
         }
     }
 }
+
+suspend fun DoorDatabase.deleteZombieAttachmentData(zaUids: List<Int>) {
+    withDoorTransactionAsync(DoorDatabase::class) { txDb ->
+        txDb.prepareAndUseStatementAsync("""
+            DELETE FROM ZombieAttachmentData
+                  WHERE zaUid = ?
+            """
+        ) { stmt ->
+            zaUids.forEach { zaUid ->
+                stmt.setInt(1, zaUid)
+                stmt.executeUpdateAsyncKmp()
+            }
+        }
+    }
+}
+

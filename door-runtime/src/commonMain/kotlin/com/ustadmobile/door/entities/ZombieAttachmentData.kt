@@ -12,12 +12,8 @@ import androidx.room.PrimaryKey
 class ZombieAttachmentData {
 
     @PrimaryKey(autoGenerate = true)
-    var zaUid: Long = 0
+    var zaUid: Int = 0
 
-    var zaTableId: Int = 0
-
-    var zaPrimaryKey: Long = 0
-
-    var zaMd5: String? = null
+    var zaUri: String? = null
 
 }
