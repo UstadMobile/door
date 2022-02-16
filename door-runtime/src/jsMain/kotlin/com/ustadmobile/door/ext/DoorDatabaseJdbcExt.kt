@@ -24,7 +24,7 @@ actual suspend fun <R> DoorDatabaseJdbc.useConnectionAsync(
     return dataSource.getConnection().useConnectionAsync { connection ->
         sqliteDs.withTransactionLock {
             block(connection).also {
-                if(!isInTransaction && sqliteDs.changeTrackingEnabled) {
+                if(!isInTransaction && invalidationTracker.active) {
                     val thisDb = this@useConnectionAsync as DoorDatabase
                     val dbMetaData = thisDb::class.doorDatabaseMetadata()
                     val changedTables = sqliteDs.findUpdatedTables(dbMetaData)

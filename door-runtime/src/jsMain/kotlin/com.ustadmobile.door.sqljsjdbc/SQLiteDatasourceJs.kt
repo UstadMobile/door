@@ -40,10 +40,6 @@ class SQLiteDatasourceJs(
 
     private val logPrefix: String = "SQLiteDataSourceJs [$dbName]"
 
-    // This starts out false so we don't create problems when the database is being built (e.g. create tables etc).
-    // The builder will set it to true once ready
-    internal var changeTrackingEnabled: Boolean = false
-
     private var transactionIdCounter = 0
 
     init {

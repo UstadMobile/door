@@ -63,6 +63,10 @@ abstract class DoorDatabaseCommon {
             this@DoorDatabaseCommon.execSQLBatch(*statements)
         }
 
+        override fun useConnection(block: (Connection) -> Unit) {
+            rootDatabaseJdbc.useConnection(block)
+        }
+
         val jdbcDbType: Int
             get() = this@DoorDatabaseCommon.jdbcDbType
 

@@ -130,6 +130,8 @@ actual class DatabaseBuilder<T: DoorDatabase> internal constructor(
             postgresChangeTracker.setupTriggers()
         }
 
+        (doorDb as DoorDatabaseJdbc).invalidationTracker.active = true
+
         return if(doorDb::class.doorDatabaseMetadata().hasReadOnlyWrapper) {
             doorDb.wrap(dbClass)
         }else {

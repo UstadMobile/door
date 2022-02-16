@@ -11,7 +11,8 @@ actual fun <R> DoorDatabaseJdbc.useConnection(
     transactionMode: TransactionMode,
     block: (Connection) -> R
 ): R {
-    val useSqliteChangeTracker = (this as DoorDatabase).dbType() == DoorDbType.SQLITE && !isInTransaction
+    val useSqliteChangeTracker = (this as DoorDatabase).dbType() == DoorDbType.SQLITE && invalidationTracker.active
+            && !isInTransaction
 
     val changedTables = mutableSetOf<String>()
     return dataSource.connection.useConnection { connection ->
@@ -39,7 +40,8 @@ actual suspend fun <R> DoorDatabaseJdbc.useConnectionAsync(
     transactionMode: TransactionMode,
     block: suspend (Connection) -> R
 ): R {
-    val useSqliteChangeTracker = (this as DoorDatabase).dbType() == DoorDbType.SQLITE && !isInTransaction
+    val useSqliteChangeTracker = (this as DoorDatabase).dbType() == DoorDbType.SQLITE && invalidationTracker.active
+            && !isInTransaction
 
     val changedTables = mutableSetOf<String>()
     return dataSource.connection.useConnectionAsync { connection ->

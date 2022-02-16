@@ -4,6 +4,7 @@ import com.ustadmobile.door.ChangeListenerRequest
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.concurrentSafeListOf
 import io.github.aakira.napier.Napier
+import kotlin.jvm.Volatile
 
 /**
  * The DoorInvalidationTracker is used by Jdbc database implementations. onTablesInvalidated is called by a
@@ -15,9 +16,14 @@ class DoorInvalidationTracker(
     private val logName: String
 ) {
 
-    //private val tablesChanged = concurrentSafeListOf<String>()
-
     private val listeners = concurrentSafeListOf<ChangeListenerRequest>()
+
+    /**
+     * Change tracking is deliberately left inactive during the migration and creation process
+     */
+    @Volatile
+    var active: Boolean = false
+        internal set
 
     fun onTablesInvalidated(tableNames: Set<String>) {
         fireChanges(tableNames)

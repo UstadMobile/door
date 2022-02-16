@@ -109,7 +109,7 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(
         //Put the temp tables and triggers in place.
         SqliteChangeTracker(builderOptions.dbImplClasses.metadata).setupTriggersOnDbAsync(
             dbImpl, temporary = false)
-        dataSource.changeTrackingEnabled = true
+        (dbImpl as DoorDatabaseJdbc).invalidationTracker.active = true
 
         val dbMetaData = lookupImplementations(builderOptions.dbClass).metadata
         SaveToIndexedDbChangeListener(dbImpl, dataSource, dbMetaData.replicateTableNames,
