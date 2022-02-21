@@ -525,8 +525,8 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
             }
         }
 
-        val preparedStatementSqlPostgres = querySqlPostgres ?: querySql?.replaceQueryNamedParamsWithQuestionMarks()
-            ?.sqlToPostgresSql()
+        val preparedStatementSqlPostgres = querySqlPostgres?.replaceQueryNamedParamsWithQuestionMarks()
+            ?: querySql?.replaceQueryNamedParamsWithQuestionMarks()?.sqlToPostgresSql()
 
 
         if(resultType != UNIT)
