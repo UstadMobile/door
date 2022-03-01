@@ -158,4 +158,12 @@ abstract class RepDao {
     @SqliteOnly
     abstract suspend fun sqliteOnlyFun(num1: Int, num2: Int): Long
 
+    @Query("""
+        SELECT RepEntityTracker.*
+          FROM RepEntityTracker
+         WHERE trkrForeignKey = :pk
+           AND trkrDestination = :destination
+    """)
+    abstract fun findTrackerByDestinationAndPk(pk: Long, destination: Long): RepEntityTracker?
+
 }

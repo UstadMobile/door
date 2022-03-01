@@ -8,9 +8,7 @@ import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
 import com.ustadmobile.door.replication.ReplicationEntityMetaData.Companion.KEY_PRIMARY_KEY
 import com.ustadmobile.door.replication.ReplicationEntityMetaData.Companion.KEY_VERSION_ID
 import io.github.aakira.napier.Napier
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.*
 import kotlin.reflect.KClass
 
 /**
@@ -142,19 +140,32 @@ suspend fun DoorDatabase.insertReplicationsIntoReceiveView(
     val receivedObjects = receivedEntities.map { it as JsonObject }
 
     return withDoorTransactionAsync(dbKClass) { transactionDb ->
-        transactionDb.prepareAndUseStatementAsync(repEntityMetaData.insertIntoReceiveViewSql) { stmt ->
-            receivedObjects.forEach { receivedObject ->
-                for(i in 0 until repEntityMetaData.insertIntoReceiveViewTypesList.size) {
-                    val objFieldVal = (receivedObject.get(repEntityMetaData.insertIntoReceiveViewTypeColNames[i]) as? JsonPrimitive)
-                        .toDefaultValIfNull(repEntityMetaData.insertIntoReceiveViewTypesList[i])
-                    stmt.setJsonPrimitive(i + 1, repEntityMetaData.insertIntoReceiveViewTypesList[i],
-                        objFieldVal)
+        transactionDb.prepareAndUseStatementAsync(repEntityMetaData.insertIntoReceiveViewSql) { insertStmt ->
+            transactionDb.prepareAndUseStatementAsync(repEntityMetaData.insertOrUpdateTrackerSql(dbType())) { updateTrackerStmt ->
+                receivedObjects.forEach { receivedObject ->
+                    for(i in 0 until repEntityMetaData.insertIntoReceiveViewTypesList.size) {
+                        val objFieldVal = (receivedObject.get(repEntityMetaData.insertIntoReceiveViewTypeColNames[i]) as? JsonPrimitive)
+                            .toDefaultValIfNull(repEntityMetaData.insertIntoReceiveViewTypesList[i])
+                        insertStmt.setJsonPrimitive(i + 1, repEntityMetaData.insertIntoReceiveViewTypesList[i],
+                            objFieldVal)
+                    }
+
+                    insertStmt.executeUpdateAsyncKmp()
+
+                    val primaryKeyVal = receivedObject.get(repEntityMetaData.entityPrimaryKeyFieldName)?.jsonPrimitive
+                        ?: throw IllegalArgumentException("No primary key field value")
+                    val entityVersionVal = receivedObject.get(repEntityMetaData.entityVersionIdFieldName)?.jsonPrimitive
+                        ?: throw IllegalArgumentException("No entity version field value")
+
+                    updateTrackerStmt.setJsonPrimitive(1, repEntityMetaData.entityPrimaryKeyFieldType, primaryKeyVal)
+                    updateTrackerStmt.setJsonPrimitive(2, repEntityMetaData.versionIdFieldType, entityVersionVal)
+                    updateTrackerStmt.setLong(3, remoteNodeId)
+                    updateTrackerStmt.setJsonPrimitive(4, repEntityMetaData.entityPrimaryKeyFieldType, primaryKeyVal)
+                    updateTrackerStmt.setJsonPrimitive(5, repEntityMetaData.versionIdFieldType, entityVersionVal)
+                    updateTrackerStmt.executeUpdateAsyncKmp()
                 }
 
-                stmt.executeUpdateAsyncKmp()
             }
-
-            Napier.d("$transactionDb - notifying of changes to ${repEntityMetaData.entityTableName}")
         }
     }
 

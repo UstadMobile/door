@@ -136,6 +136,55 @@ class ReplicationEntityMetaData(
         """
     }
 
+
+    private val insertOrUpdateTrackerSqlite: String by lazy(LazyThreadSafetyMode.NONE) {
+        """
+           REPLACE INTO $trackerTableName($trackerForeignKeyFieldName, $trackerVersionFieldName, $trackerDestNodeIdFieldName, 
+                        $trackerPendingFieldName)
+                   SELECT ? AS $trackerForeignKeyFieldName, ? AS $trackerVersionFieldName, ? AS $trackerDestNodeIdFieldName,
+                         (SELECT CASE
+                               WHEN ((SELECT $entityVersionIdFieldName
+                                        FROM $entityTableName
+                                       WHERE $entityPrimaryKeyFieldName = ?) = ?) THEN 0
+                               ELSE 1
+                               END) AS $trackerPendingFieldName
+        """
+    }
+
+    private val insertOrUpdateTrackerPostgres: String by lazy(LazyThreadSafetyMode.NONE) {
+        """
+        INSERT INTO $trackerTableName($trackerForeignKeyFieldName, $trackerVersionFieldName, $trackerDestNodeIdFieldName,
+                    $trackerPendingFieldName)
+               SELECT ? AS $trackerForeignKeyFieldName, ? AS $trackerVersionFieldName, ? AS $trackerDestNodeIdFieldName,
+                         (SELECT CASE
+                               WHEN ((SELECT $entityVersionIdFieldName
+                                        FROM $entityTableName
+                                       WHERE $entityPrimaryKeyFieldName = ?) = ?) THEN false
+                               ELSE true
+                               END) AS $trackerPendingFieldName
+               ON CONFLICT($trackerForeignKeyFieldName, $trackerDestNodeIdFieldName) DO UPDATE
+                  SET $trackerVersionFieldName = EXCLUDED.$trackerVersionFieldName, 
+                      $trackerPendingFieldName = EXCLUDED.$trackerPendingFieldName             
+        """
+    }
+
+    /**
+     * When inserting an entity into the receive view, immediately update the tracker(in the same transaction).
+     * The tracker exchange process would normally avoid sending entities again... but this takes time over the network
+     * and might not work if updates are going on in the meantime.
+     *
+     * Query params:
+     * 1 - entity primary key
+     * 2 - entity version
+     * 3 - destination node
+     * 4 - entity primary key
+     * 5 - entity version
+     */
+    fun insertOrUpdateTrackerSql(dbType: Int) = when(dbType){
+        DoorDbType.SQLITE -> insertOrUpdateTrackerSqlite
+        else -> insertOrUpdateTrackerPostgres
+    }
+
     /**
      * Converts a JsonObject representing the actual entity itself to a Replication Tracker Summary, which has only the
      * primary key and version id. The field names of the Replication Tracker Summary are fixed as per KEY_PRIMARY_KEY

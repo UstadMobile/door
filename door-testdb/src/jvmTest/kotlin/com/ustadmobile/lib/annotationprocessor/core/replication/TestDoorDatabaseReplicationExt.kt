@@ -197,8 +197,6 @@ class TestDoorDatabaseReplicationExt {
 
     @Test
     fun givenRepEntityJsonData_whenInsertReplicationsIntoReceiveViewCalled_thenShouldInsert() {
-        //IMPORTANT NOTE: We should update the logic so that missing column names fall back to default values.
-
         val time = systemTimeInMillis()
         val repEntity = RepEntity().apply {
             rePrimaryKey = 1212
@@ -233,6 +231,12 @@ class TestDoorDatabaseReplicationExt {
 
         val numEntities = db.repDao.countEntities()
         Assert.assertEquals("One entity inserted", 1, numEntities)
+
+        val remoteTracker = db.repDao.findTrackerByDestinationAndPk(1212, 100)
+        Assert.assertEquals("Tracker for remote node is updated to set on entity received", time,
+            remoteTracker?.trkrVersionId)
+        Assert.assertFalse("Tracker for remote node is set as not pending",
+            remoteTracker?.trkrPending ?: true)
 
     }
 }
