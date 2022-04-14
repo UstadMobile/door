@@ -61,7 +61,7 @@ fun FunSpec.Builder.addParametersForHttpDb(dbTypeElement: TypeElement, isPrimary
 fun CodeBlock.Builder.addRequestDi(diVarName: String = "_di", dbVarName: String = "_db",
     typeTokenVarName: String = "_typeToken", serverType: Int = SERVER_TYPE_KTOR) : CodeBlock.Builder {
     if(serverType == SERVER_TYPE_KTOR) {
-        add("val ${diVarName} = %M()\n", MemberName("org.kodein.di.ktor", "di"))
+        add("val ${diVarName} = %M()\n", MemberName("org.kodein.di.ktor", "closestDI"))
                 .add("val $dbVarName : %T = %M($typeTokenVarName)\n",
                     TypeVariableName.invoke("T"),
                     MemberName("com.ustadmobile.door.ext", "unwrappedDbOnCall"))

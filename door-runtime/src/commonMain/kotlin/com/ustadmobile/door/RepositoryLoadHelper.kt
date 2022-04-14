@@ -1,5 +1,6 @@
 package com.ustadmobile.door
 
+import com.ustadmobile.door.ext.DoorTag
 import io.github.aakira.napier.Napier
 import com.ustadmobile.door.util.systemTimeInMillis
 import kotlinx.atomicfu.atomic
@@ -170,7 +171,8 @@ class RepositoryLoadHelper<T>(
                         statusLiveData.sendValue(RepoLoadStatus(status))
                     }
 
-                    Napier.d({"$logPrefix doRequest: calling loadFn using endpoint ${repository.config.endpoint} ."})
+                    Napier.d(tag = DoorTag.LOG_TAG,
+                        message = {"$logPrefix doRequest: calling loadFn using endpoint ${repository.config.endpoint} ."})
                     val t = loadFn(repository.config.endpoint)
 
                     val isNullOrEmpty = if(t is List<*>) {
@@ -189,7 +191,11 @@ class RepositoryLoadHelper<T>(
                     loadedVal.complete(t)
                     statusLiveData.sendValue(RepoLoadStatus(status))
 
-                    Napier.d({"$logPrefix doRequest: completed successfully from $endpointToUse in ${systemTimeInMillis() - doRequestStart}ms"})
+                    Napier.d(
+                        tag = DoorTag.LOG_TAG,
+                        message = {
+                            "$logPrefix doRequest: completed successfully from $endpointToUse in ${systemTimeInMillis() - doRequestStart}ms"
+                        })
                     return@withContext t
                 }catch(e: Exception) {
                     //something went wrong with the load

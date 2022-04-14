@@ -54,8 +54,8 @@ dependencies {
     implementation "org.xerial:sqlite-jdbc:$version_sqlite_jdbc"
     implementation "org.postgresql:postgresql:$version_postgres_jdbc"
 
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.0'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.0'
+    testImplementation "org.junit.jupiter:junit-jupiter-api:$version_junit_jupiter"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:$version_junit_jupiter"
 }
 
 test {
