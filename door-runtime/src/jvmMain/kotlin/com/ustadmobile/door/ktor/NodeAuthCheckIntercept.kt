@@ -28,6 +28,8 @@ fun Route.addNodeIdAndAuthCheckInterceptor(){
             val remoteNodeIdAndAuth = requireRemoteNodeIdAndAuth()
 
             if(!nodeIdAuthCache.verify(remoteNodeIdAndAuth.first, remoteNodeIdAndAuth.second)) {
+                Napier.w("Invalid node id / node auth combo: ${remoteNodeIdAndAuth.first}",
+                    tag = DoorTag.LOG_TAG)
                 context.request.call.respond(HttpStatusCode.Unauthorized, "Invalid nodeId / nodeauth combo")
                 return@intercept finish()
             }

@@ -93,7 +93,7 @@ class SQLiteDatasourceJs(
             return withContext(ReentrantMutexContextElement(key)) {
                 withLock {
                     val transactionId = ++transactionIdCounter
-                    Napier.i("Transaction: Start Transaction $transactionId", tag = DoorTag.LOG_TAG)
+                    Napier.d("Transaction: Start Transaction $transactionId", tag = DoorTag.LOG_TAG)
                     var transactionSuccessful = false
                     try {
                         if(transactionMode == TransactionMode.READ_WRITE)
@@ -110,7 +110,7 @@ class SQLiteDatasourceJs(
                         Napier.e("withTransactionLock: Exception! ", e, tag = DoorTag.LOG_TAG)
                         throw e
                     }finally {
-                        Napier.i("Transaction: End transaction $transactionId", tag = DoorTag.LOG_TAG)
+                        Napier.d("Transaction: End transaction $transactionId", tag = DoorTag.LOG_TAG)
                         if(!transactionSuccessful && transactionMode == TransactionMode.READ_WRITE)
                             sendUpdate("ROLLBACK", emptyArray())
                     }
