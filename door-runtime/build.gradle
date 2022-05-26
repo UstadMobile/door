@@ -165,6 +165,7 @@ kotlin {
             dependsOn commonJvmJs
             dependencies {
                 implementation "org.jetbrains.kotlin-wrappers:kotlin-extensions:$version_kotlin_extensions"
+                implementation npm("spark-md5","$version_npm_sparkmd5")
             }
         }
         jsTest {

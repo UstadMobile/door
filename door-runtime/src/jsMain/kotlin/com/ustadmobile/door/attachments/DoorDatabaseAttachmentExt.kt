@@ -4,7 +4,12 @@ import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.DoorUri
+import com.ustadmobile.door.ext.md5
 import com.ustadmobile.door.ext.rootDatabase
+import com.ustadmobile.door.sqljsjdbc.IndexedDb
+import com.ustadmobile.door.sqljsjdbc.IndexedDb.ATTACHMENT_STORE_NAME
+import kotlinx.browser.window
+import kotlinx.coroutines.await
 
 /**
  * Store an attachment locally. This will be called by the generated update and insert implementation.
@@ -22,7 +27,15 @@ import com.ustadmobile.door.ext.rootDatabase
  *
  */
 actual suspend fun DoorDatabase.storeAttachment(entityWithAttachment: EntityWithAttachment) {
-    TODO("NOT IMPLEMENTEd")
+    val blob = window.fetch(entityWithAttachment.attachmentUri).await().blob().await()
+    val blobMd5 = blob.md5()
+    entityWithAttachment.attachmentMd5 = blobMd5
+    entityWithAttachment.attachmentSize = blob.size.toInt()
+
+    val dbName = transactionRootJdbcDb.dbName
+    val attachmentPath = entityWithAttachment.makeAttachmentUriFromTableNameAndMd5()
+    IndexedDb.storeBlob(dbName, ATTACHMENT_STORE_NAME, attachmentPath, blob)
+    entityWithAttachment.attachmentUri = attachmentPath
 }
 
 /**
@@ -32,7 +45,7 @@ actual suspend fun DoorDatabase.storeAttachment(entityWithAttachment: EntityWith
  *
  */
 actual suspend fun DoorDatabase.retrieveAttachment(attachmentUri: String): DoorUri {
-    TODO("Not yet implemented")
+    return DoorUri.parse("http://dummyserver.com/")
 }
 
 /**

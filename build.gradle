@@ -92,6 +92,8 @@ ext {
     version_kotlin_extensions = "1.0.1-pre.279-kotlin-1.6.0"
     version_kotlin_react_redux = "7.2.6-pre.279-kotlin-1.6.0"
 
+    version_npm_sparkmd5 = "^3.0.2"
+
 }
 
 allprojects {
