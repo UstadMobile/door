@@ -89,15 +89,34 @@ actual suspend fun DoorDatabaseRepository.uploadAttachment(entityWithAttachment:
         window.fetch("${config.endpoint}attachments/upload?$params",
             RequestInit(method = "POST", body = blob, headers = headers)).await()
     }catch(e: Exception) {
-        Napier.e(tag = DoorTag.LOG_TAG) { "Exception uploading attachment $attachmentUri" }
+        Napier.e(tag = DoorTag.LOG_TAG, throwable = e) { "Exception uploading attachment $attachmentUri" }
         throw e
     }
 }
 
 actual suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<EntityWithAttachment>) {
+    var currentAttachmentUri: String? = null
+    try {
+        val headers = json(HEADER_DBVERSION to db.dbSchemaVersion().toString(),
+            HEADER_NODE to "${config.nodeId}/${config.auth}")
+        val dbName = (this as DoorDatabase).transactionRootJdbcDb.dbName
 
+        val entitiesWithAttachmentData = entityList.mapNotNull { it.attachmentUri }
+        if(entitiesWithAttachmentData.isEmpty())
+            return
 
+        entitiesWithAttachmentData.forEach { attachmentUri ->
+            currentAttachmentUri = attachmentUri
+            val downloadUrl = "${config.endpoint}attachments/download?uri=${encodeURIComponent(attachmentUri)}"
+            val response = window.fetch(downloadUrl, RequestInit(method = "GET", headers = headers)).await()
+            val attachmentBlob = response.blob().await()
+            val storeKey = attachmentUri.substringAfter(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX)
+            IndexedDb.storeBlob(dbName, ATTACHMENT_STORE_NAME, storeKey, attachmentBlob)
+        }
 
+    }catch(e: Exception) {
+        Napier.e(tag = DoorTag.LOG_TAG, throwable = e) { "Exception downloading attachment $currentAttachmentUri" }
+    }
 }
 
 actual val DoorDatabase.attachmentsStorageUri: DoorUri?

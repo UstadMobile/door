@@ -103,7 +103,8 @@ fun main() {
 
             console.log("IndexTest: Got it back! $entityReceived")
 
-            val attachmentBlob = Blob(arrayOf("Hello World"), BlobPropertyBag(type = "text/string"))
+            val attachmentBlob = Blob(arrayOf("Hello World ${systemTimeInMillis()}"),
+                BlobPropertyBag(type = "text/string"))
             console.log("IndexTest: Stored attachment")
             val entityWithAttachment = RepEntityWithAttachment().apply {
                 waAttachmentUri = URL.createObjectURL(attachmentBlob)
