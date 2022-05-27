@@ -11,6 +11,19 @@ import org.w3c.files.Blob
  */
 object IndexedDb{
 
+    private fun onUpgradeNeededThenCreateStores(request: dynamic) {
+        request.onupgradeneeded = { event: dynamic ->
+            val db = event.target.result
+            if(!db.objectStoreNames.contains(DB_STORE_NAME)) {
+                db.createObjectStore(DB_STORE_NAME)
+            }
+
+            if(!db.objectStoreNames.contains(ATTACHMENT_STORE_NAME)) {
+                db.createObjectStore(ATTACHMENT_STORE_NAME)
+            }
+        }
+    }
+
     /**
      * Check if IndexedDb database exists with data store key of the SQL database
      * @param dbName Name of the database to be checked on
@@ -18,13 +31,9 @@ object IndexedDb{
     suspend fun checkIfExists(dbName: String): Boolean {
         val checkCompletable = CompletableDeferred<Boolean>()
         val request = indexedDb.open(dbName, DATABASE_VERSION)
-        request.onupgradeneeded = { event: dynamic ->
-            val db = event.target.result
-            if (!db.objectStoreNames.contains(DB_STORE_NAME)){
-                db.createObjectStore(DB_STORE_NAME)
-            }
-            //Do we need to close this?
-        }
+
+        onUpgradeNeededThenCreateStores(request)
+
         request.onerror = {
             checkCompletable.completeExceptionally(
                 Throwable("Error when opening database"))
@@ -52,12 +61,7 @@ object IndexedDb{
         val request = indexedDb.open(dbName, DATABASE_VERSION)
         val completeable = CompletableDeferred<Boolean>()
 
-        request.onupgradeneeded = { event: dynamic ->
-            val db = event.target.result
-            if (!db.objectStoreNames.contains(storeName)){
-                db.createObjectStore(storeName)
-            }
-        }
+        onUpgradeNeededThenCreateStores(request)
 
         request.onsuccess = { event: dynamic ->
             val db = event.target.result
@@ -87,12 +91,7 @@ object IndexedDb{
         val completableDeferred = CompletableDeferred<Blob?>()
         val request = indexedDb.open(dbName, DATABASE_VERSION)
 
-        request.onupgradeneeded = { event: dynamic ->
-            val db = event.target.result
-            if (!db.objectStoreNames.contains(storeName)){
-                db.createObjectStore(storeName)
-            }
-        }
+        onUpgradeNeededThenCreateStores(request)
 
         request.onsuccess = { event: dynamic ->
             val db = event.target.result
@@ -122,5 +121,5 @@ object IndexedDb{
 
     const val DB_STORE_KEY = "um_db_key"
 
-    const val DATABASE_VERSION = 1
+    const val DATABASE_VERSION = 2
 }

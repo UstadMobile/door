@@ -56,6 +56,9 @@ abstract class RepWithAttachmentDao {
     @Insert
     abstract fun insert(entityWithAttachment: RepEntityWithAttachment): Long
 
+    @Insert
+    abstract suspend fun insertAsync(entityWithAttachment: RepEntityWithAttachment): Long
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract fun replace(entityWithAttachment: RepEntityWithAttachment)
 

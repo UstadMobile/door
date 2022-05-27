@@ -12,13 +12,18 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
 import org.w3c.dom.url.URL
 import org.w3c.files.Blob
+import org.w3c.files.BlobPropertyBag
 import repdb.RepDb
 import repdb.RepDbJsImplementations
 import repdb.RepEntity
+import repdb.RepEntityWithAttachment
 import kotlin.js.Date
 import kotlin.js.Promise
 import kotlin.random.Random
 
+/**
+ * Run this using door-testdb-server
+ */
 
 private lateinit var repDb: RepDb
 
@@ -97,6 +102,15 @@ fun main() {
             }
 
             console.log("IndexTest: Got it back! $entityReceived")
+
+            val attachmentBlob = Blob(arrayOf("Hello World"), BlobPropertyBag(type = "text/string"))
+            console.log("IndexTest: Stored attachment")
+            val entityWithAttachment = RepEntityWithAttachment().apply {
+                waAttachmentUri = URL.createObjectURL(attachmentBlob)
+            }
+            repDb.repWithAttachmentDao.insertAsync(entityWithAttachment)
+            console.log("IndexTest: Stored attachment")
+
             //repDb.exportDatabase()
         }
 

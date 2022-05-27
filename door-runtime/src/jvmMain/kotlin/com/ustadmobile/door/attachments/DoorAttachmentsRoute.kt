@@ -64,7 +64,7 @@ fun <T: DoorDatabase> Route.doorAttachmentsRoute(path: String, typeToken: TypeTo
                 }
             }else {
                 Napier.e("Attachment upload: body md5 / md5 parameter mismatch! " +
-                        "Expected: $md5Param . Data MD5 = $dataMd5")
+                        "MD5 Param: $md5Param . Actual MD5 = ${dataMd5.toHexString()}. See tmp file: ${tmpOut.absolutePath}")
                 call.respond(HttpStatusCode.BadRequest, "Body md5 does not match md5 parameter")
             }
         }
