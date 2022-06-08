@@ -77,8 +77,7 @@ class SQLitePreparedStatementJs(
 
     /**
      * JS doesn't support 64 bit, so inserting a long to a web worker won't pass it,
-     * instead we convert it to a String and pass it to a worker and SQLite will convert
-     * it by default to INTEGER/REAL respectively
+     * Instead we use eval to turn it into a bigint.
      *
      * @see <a href="https://www.sqlite.org/datatype3.html">Datatypes</a>
      */
