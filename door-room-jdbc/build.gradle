@@ -9,12 +9,11 @@ group rootProject.group
 version rootProject.version
 
 android {
-    compileSdkVersion 31
-    buildToolsVersion "30.0.3"
+    compileSdkVersion 32
 
     defaultConfig {
         minSdkVersion 21
-        targetSdkVersion 31
+        targetSdkVersion 32
         versionCode 1
         versionName "1.0"
 
@@ -43,7 +42,7 @@ dependencies {
     implementation "androidx.room:room-runtime:$version_android_room"
     implementation "androidx.room:room-ktx:$version_android_room"
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
-    implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.4.0'
+    implementation "androidx.lifecycle:lifecycle-livedata-ktx:$version_androidx_lifecycle"
     androidTestImplementation project(":door-runtime")
     androidTestImplementation "androidx.test:core:$version_android_junit_runner"
     androidTestImplementation "androidx.test:core-ktx:$version_android_junit_runner"

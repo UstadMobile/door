@@ -14,7 +14,7 @@ import com.squareup.kotlinpoet.BOOLEAN
 import com.squareup.kotlinpoet.LONG
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asTypeName
-import com.squareup.kotlinpoet.metadata.toImmutableKmClass
+import com.squareup.kotlinpoet.metadata.toKmClass
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.DoorDbType.Companion.PRODUCT_INT_TO_NAME_MAP
 import com.ustadmobile.door.PreparedStatementConfig
@@ -148,7 +148,7 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
 
         //Check entities with the ReplicateEntity annotation have all the required fields
         allReplicateEntities.forEach { entity ->
-            val entityKmClass = entity.getAnnotation(Metadata::class.java).toImmutableKmClass()
+            val entityKmClass = entity.getAnnotation(Metadata::class.java).toKmClass()
 
             try {
                 val entityRepTrkr = entity.getReplicationTracker(processingEnv)
@@ -170,8 +170,8 @@ class AnnotationProcessorWrapper: AbstractProcessor() {
 
 
                 if(trkrForeignKey.size != 1 ||
-                    entity.kmPropertiesWithAnnotation(PrimaryKey::class.java).first().returnType !=
-                    entityRepTrkr.kmPropertiesWithAnnotation(ReplicationEntityForeignKey::class.java).first().returnType)
+                    entity.kmPropertiesWithAnnotation(PrimaryKey::class.java).first().returnType.classifier !=
+                    entityRepTrkr.kmPropertiesWithAnnotation(ReplicationEntityForeignKey::class.java).first().returnType.classifier)
 
                     messager.printMessage(Diagnostic.Kind.ERROR,
                         "Replication tracker ${entityRepTrkr.qualifiedName} must have exactly one field annotated " +

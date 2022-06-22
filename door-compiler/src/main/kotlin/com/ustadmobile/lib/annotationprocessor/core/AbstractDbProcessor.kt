@@ -110,6 +110,10 @@ internal val CLIENT_GET_MEMBER_NAME = MemberName("io.ktor.client.request", "get"
 
 internal val CLIENT_POST_MEMBER_NAME = MemberName("io.ktor.client.request", "post")
 
+internal val BODY_MEMBER_NAME = MemberName("io.ktor.client.call", "body")
+
+internal val BODY_OR_NULL_MEMBER_NAME = MemberName("com.ustadmobile.door.ext", "bodyOrNull")
+
 internal val CLIENT_GET_NULLABLE_MEMBER_NAME = MemberName("com.ustadmobile.door.ext", "getOrNull")
 
 internal val CLIENT_POST_NULLABLE_MEMBER_NAME = MemberName("com.ustadmobile.door.ext", "postOrNull")
@@ -226,7 +230,7 @@ internal fun generateKtorRequestCodeBlockForMethod(httpEndpointVarName: String =
                     MemberName("com.ustadmobile.door.ext", "withUtf8Charset"))
         }else {
             CodeBlock.of("body = %M().write(${requestBodyParam.name}, %T.Application.Json.%M())\n",
-                    MemberName("io.ktor.client.features.json", "defaultSerializer"),
+                    MemberName("io.ktor.client.plugins.json", "defaultSerializer"),
                     ContentType::class, MemberName("com.ustadmobile.door.ext", "withUtf8Charset"))
         }
 
@@ -902,6 +906,10 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
         const val NOTPGSECTION_END_COMMENT_PREFIX = "--endnotpsql"
 
         val MEMBERNAME_EXEC_UPDATE_ASYNC = MemberName("com.ustadmobile.door.jdbc.ext", "executeUpdateAsyncKmp")
+
+        val MEMBERNAME_ENCODED_PATH = MemberName("io.ktor.http", "encodedPath")
+
+        val MEMBERNAME_CLIENT_SET_BODY = MemberName("io.ktor.client.request", "setBody")
     }
 
 }

@@ -4,10 +4,11 @@ import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.requireRemoteNodeIdAndAuth
 import com.ustadmobile.door.util.NodeIdAuthCache
 import io.github.aakira.napier.Napier
-import io.ktor.application.*
+import io.ktor.server.application.*
 import io.ktor.http.*
-import io.ktor.response.*
-import io.ktor.routing.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
+import io.ktor.util.pipeline.*
 import org.kodein.di.DI
 import org.kodein.di.direct
 import org.kodein.di.instance
@@ -21,7 +22,7 @@ import org.kodein.di.on
  */
 fun Route.addNodeIdAndAuthCheckInterceptor(){
 
-    intercept(ApplicationCallPipeline.Features) {
+    intercept(ApplicationCallPipeline.Plugins) {
         try {
             val di: DI = call.closestDI()
             val nodeIdAuthCache: NodeIdAuthCache = di.direct.on(call).instance()

@@ -57,6 +57,7 @@ kotlin {
                 compileOnly project(":room-annotations")
 
                 implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
+                implementation "io.ktor:ktor-client-content-negotiation:$version_ktor"
                 implementation "io.ktor:ktor-client-core:$version_ktor"
                 implementation "io.ktor:ktor-client-json:$version_ktor"
                 implementation "io.github.aakira:napier:$version_napier"
@@ -72,9 +73,10 @@ kotlin {
 
         jvmMain {
             dependencies {
-                implementation "io.ktor:ktor-gson:$version_ktor"
+                implementation "io.ktor:ktor-serialization-gson:$version_ktor"
                 implementation "org.kodein.di:kodein-di-framework-ktor-server-jvm:$version_kodein_di"
                 implementation "org.xerial:sqlite-jdbc:$version_sqlite_jdbc"
+                implementation "io.ktor:ktor-server-content-negotiation:$version_ktor"
                 implementation "io.ktor:ktor-server-core:$version_ktor"
                 implementation "org.jetbrains.kotlin:kotlin-reflect:$version_kotlin"
             }

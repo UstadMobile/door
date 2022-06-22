@@ -10,14 +10,15 @@ import com.ustadmobile.door.ext.sanitizeDbName
 import com.ustadmobile.door.util.NodeIdAuthCache
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
-import io.ktor.application.*
-import io.ktor.features.*
+import io.ktor.server.application.*
 import io.ktor.http.*
-import io.ktor.response.*
-import io.ktor.routing.*
+import io.ktor.server.plugins.callloging.*
+import io.ktor.server.plugins.cors.routing.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import org.kodein.di.*
-import org.kodein.di.ktor.DIFeature
 import org.kodein.di.ktor.closestDI
+import org.kodein.di.ktor.di
 import java.nio.file.Files
 import javax.naming.InitialContext
 
@@ -29,18 +30,18 @@ fun Application.doorTestDbApplication() {
     val attachmentDir = Files.createTempDirectory("door-testdb-server-attachments").toFile()
 
     install(CORS) {
-        method(HttpMethod.Get)
-        method(HttpMethod.Post)
-        method(HttpMethod.Put)
-        method(HttpMethod.Options)
-        header("door-dbversion")
-        header("door-node")
-        header(HttpHeaders.ContentType)
+        allowMethod(HttpMethod.Get)
+        allowMethod(HttpMethod.Post)
+        allowMethod(HttpMethod.Put)
+        allowMethod(HttpMethod.Options)
+        allowHeader("door-dbversion")
+        allowHeader("door-node")
+        allowHeader(HttpHeaders.ContentType)
         anyHost()
     }
 
 
-    install(DIFeature) {
+    di {
         bind<RepDb>(tag = DoorTag.TAG_DB) with scoped(VirtualHostScope.Default).singleton {
             val dbHostName = context.sanitizeDbName()
             InitialContext().bindNewSqliteDataSourceIfNotExisting(dbHostName)

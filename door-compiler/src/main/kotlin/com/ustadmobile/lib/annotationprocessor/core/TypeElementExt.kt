@@ -7,13 +7,13 @@ import javax.lang.model.element.*
 import javax.lang.model.type.DeclaredType
 import javax.lang.model.type.ExecutableType
 import androidx.room.*
-import com.squareup.kotlinpoet.metadata.ImmutableKmProperty
-import com.squareup.kotlinpoet.metadata.toImmutableKmClass
+import com.squareup.kotlinpoet.metadata.toKmClass
 import com.ustadmobile.door.annotation.*
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.SUFFIX_DEFAULT_RECEIVEVIEW
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SUFFIX_KTOR_HELPER
 import com.ustadmobile.lib.annotationprocessor.core.ext.findByClass
 import com.ustadmobile.lib.annotationprocessor.core.ext.getClassArrayValue
+import kotlinx.metadata.KmProperty
 import javax.lang.model.type.TypeMirror
 
 val ALL_QUERY_ANNOTATIONS = listOf(Query::class.java, Update::class.java, Delete::class.java,
@@ -342,8 +342,8 @@ fun <A: Annotation> TypeElement.firstFieldWithAnnotationNameOrNull(annotationCla
     }
 }
 
-fun  <A: Annotation> TypeElement.kmPropertiesWithAnnotation(annotationClass: Class<A>): List<ImmutableKmProperty> {
-    val kmClass = getAnnotation(Metadata::class.java).toImmutableKmClass()
+fun  <A: Annotation> TypeElement.kmPropertiesWithAnnotation(annotationClass: Class<A>): List<KmProperty> {
+    val kmClass = getAnnotation(Metadata::class.java).toKmClass()
     val elementsWithAnnotationNames = enclosedElementsWithAnnotation(annotationClass).map { it.simpleName.toString() }
     return kmClass.properties.filter { it.name in elementsWithAnnotationNames }
 }

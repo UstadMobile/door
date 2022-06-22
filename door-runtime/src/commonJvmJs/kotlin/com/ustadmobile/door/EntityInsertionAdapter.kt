@@ -1,5 +1,6 @@
 package com.ustadmobile.door
 
+import com.ustadmobile.door.ext.asCommon
 import com.ustadmobile.door.jdbc.*
 import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
 import com.ustadmobile.door.ext.prepareAndUseStatement
@@ -7,13 +8,13 @@ import com.ustadmobile.door.ext.prepareAndUseStatementAsync
 
 /**
  * This is similar to the EntityInsertionAdapter on Room. It is used by generated code.
- * @param dbType The DbType constant as per DoorDbType
+ * @param db DoorDatabase being used
  */
 @Suppress("unused", "VARIABLE_WITH_REDUNDANT_INITIALIZER") //What appears unused to the IDE is actually used by generated code
 abstract class EntityInsertionAdapter<T>(protected val db: DoorDatabase) {
 
     //used by generated code
-    protected val dbType: Int = db.jdbcDbType
+    protected val dbType: Int = db.asCommon().jdbcDbType
 
     /**
      * Set values on the PreparedStatement (which is created using makeSql) for the given entity. This is implemented

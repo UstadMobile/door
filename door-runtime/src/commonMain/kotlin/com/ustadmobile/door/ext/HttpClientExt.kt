@@ -6,7 +6,6 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.client.features.json.defaultSerializer
 
 /**
  * Used to implement support for returning null from a 204 response
@@ -16,8 +15,16 @@ suspend inline fun <reified T> HttpStatement.receiveOrNull() : T?{
         if (it.status == HttpStatusCode.NoContent) {
             null
         } else {
-            it.receive<T>()
+            it.body()
         }
+    }
+}
+
+suspend inline fun <reified T> HttpResponse.bodyOrNull() : T? {
+    return if(status == HttpStatusCode.NoContent){
+        null
+    }else {
+        body()
     }
 }
 
@@ -25,21 +32,17 @@ suspend inline fun <reified T> HttpStatement.receiveOrNull() : T?{
  * Supports returning null when the server provides a 204 response.
  */
 suspend inline fun <reified T> HttpClient.getOrNull(block: HttpRequestBuilder.() -> Unit = {}) : T?{
-    val httpStatement = get<HttpStatement> {
-        apply(block)
-    }
-
-    return httpStatement.receiveOrNull<T>()
+    return get {
+        block()
+    }.bodyOrNull()
 }
 
 /**
  * Supports returning null when the server provides a 204 response.
  */
 suspend inline fun <reified T> HttpClient.postOrNull(block: HttpRequestBuilder.() -> Unit = {}) : T? {
-    val httpStatement = post<HttpStatement> {
-        apply(block)
-    }
-
-    return httpStatement.receiveOrNull<T>()
+    return post {
+        block()
+    }.bodyOrNull()
 }
 

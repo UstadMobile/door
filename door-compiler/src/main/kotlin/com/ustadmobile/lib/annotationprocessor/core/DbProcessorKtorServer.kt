@@ -5,7 +5,7 @@ import androidx.room.Database
 import com.google.gson.Gson
 import com.squareup.kotlinpoet.*
 import io.ktor.http.HttpStatusCode
-import io.ktor.routing.Route
+import io.ktor.server.routing.Route
 import javax.lang.model.element.TypeElement
 import com.google.gson.reflect.TypeToken
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
@@ -45,7 +45,7 @@ fun CodeBlock.Builder.addNanoHttpdResponse(varName: String, addNonNullOperator: 
             ?.add(applyToResponseCodeBlock!!)
             ?.endControlFlow()
 
-fun CodeBlock.Builder.addKtorResponse(varName: String, addNonNullOperator: Boolean = false)
+fun CodeBlock.Builder.addKtorResponse(varName: String)
         = add("%M.%M($varName)\n", DbProcessorKtorServer.CALL_MEMBER,
             DbProcessorKtorServer.RESPOND_MEMBER)
 
@@ -93,7 +93,7 @@ fun FileSpec.Builder.addDaoKtorRouteFun(
                             returnType = daoClassName))
             .addCode(CodeBlock.builder()
                     .beginControlFlow("%M(%S)",
-                        MemberName("io.ktor.routing", "route"),
+                        MemberName("io.ktor.server.routing", "route"),
                         daoClassName.simpleName)
                     .apply {
                         daoTypeSpec.funSpecs.specsWithHttpEndpoint().forEach {daoFunSpec ->
@@ -448,7 +448,7 @@ fun CodeBlock.Builder.addGetParamFromHttpRequest(typeName: TypeName, paramName: 
             CodeBlock.of("$multipartHelperVarName.receiveJsonStr()")
         }else if(serverType == SERVER_TYPE_KTOR){
             CodeBlock.of("%M.%M<String>()", DbProcessorKtorServer.CALL_MEMBER,
-                    MemberName("io.ktor.request", "receiveOrNull"))
+                    MemberName("io.ktor.server.request", "receiveOrNull"))
         }else {
             CodeBlock.of("mutableMapOf<String,String>().also{_session.parseBody(it)}.get(%S)",
                     "postData")
@@ -489,8 +489,8 @@ fun CodeBlock.Builder.addRespondCall(returnType: TypeName, varName: String, serv
 
         else -> beginControlFlow("if($varName != null)")
                 .apply {
-                    takeIf { serverType == SERVER_TYPE_KTOR }?.addKtorResponse(varName,
-                            addNonNullOperator = true)
+                    takeIf { serverType == SERVER_TYPE_KTOR }?.addKtorResponse(varName
+                    )
                     takeIf { serverType == SERVER_TYPE_NANOHTTPD }?.addNanoHttpdResponse(varName,
                             addNonNullOperator = true, applyToResponseCodeBlock = nanoHttpdApplyCodeBlock)
                 }
@@ -689,15 +689,15 @@ class DbProcessorKtorServer: AbstractDbProcessor() {
 
         const val SUFFIX_NANOHTTPD_ADDURIMAPPING = "_AddUriMapping"
 
-        val GET_MEMBER = MemberName("io.ktor.routing", "get")
+        val GET_MEMBER = MemberName("io.ktor.server.routing", "get")
 
-        val POST_MEMBER = MemberName("io.ktor.routing", "post")
+        val POST_MEMBER = MemberName("io.ktor.server.routing", "post")
 
-        val CALL_MEMBER = MemberName("io.ktor.application", "call")
+        val CALL_MEMBER = MemberName("io.ktor.server.application", "call")
 
-        val RESPOND_MEMBER = MemberName("io.ktor.response", "respond")
+        val RESPOND_MEMBER = MemberName("io.ktor.server.response", "respond")
 
-        val RESPONSE_HEADER = MemberName("io.ktor.response", "header")
+        val RESPONSE_HEADER = MemberName("io.ktor.server.response", "header")
 
         val DI_ON_MEMBER = MemberName("org.kodein.di", "on")
 

@@ -44,6 +44,9 @@ class DoorAttachmentsMultipartHelper {
                         attachmentTmpFiles[part.originalFileName!!] = tmpOutFile
                     }
                 }
+                else -> {
+                    //do nothing
+                }
             }
 
             part.dispose()

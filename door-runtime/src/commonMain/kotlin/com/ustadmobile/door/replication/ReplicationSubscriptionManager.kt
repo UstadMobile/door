@@ -77,7 +77,8 @@ class ReplicationSubscriptionManager(
         }
     }
 
-    private val eventSource: AtomicRef<DoorEventSource?> = atomic(null)
+    @Volatile
+    private var eventSource: DoorEventSource? = null
 
     private val queueProcessor: AtomicRef<ReceiveChannel<ReplicationStatus>?> = atomic(null)
 
@@ -93,7 +94,7 @@ class ReplicationSubscriptionManager(
     private var replicationSupervisor: ReplicationSubscriptionSupervisor? = null
 
     var enabled: Boolean
-        get() = eventSource.value != null
+        get() = eventSource != null
         set(value) {
             if(value) {
                 //start the subscription to the endpoint. When the endpoint replies, it can provide the node id as a header or
@@ -103,8 +104,8 @@ class ReplicationSubscriptionManager(
                     DoorConstants.HEADER_DBVERSION to dbSchemaVersion.toString(),
                     DoorConstants.HEADER_NODE to "${repository.config.nodeId}/${repository.config.auth}")
 
-                if(eventSource.value == null) {
-                    eventSource.value = eventSourceFactory.makeNewDoorEventSource(repository.config,
+                if(eventSource == null) {
+                    eventSource = eventSourceFactory.makeNewDoorEventSource(repository.config,
                         "${repository.config.endpoint}$PATH_REPLICATION/$ENDPOINT_SUBSCRIBE_SSE?${queryParams.toUrlQueryString()}",
                         this)
                 }
@@ -112,8 +113,8 @@ class ReplicationSubscriptionManager(
                 checkQueueSignal.trySend(true)
             }else {
                 Napier.i("$logPrefix : disabling")
-                val oldEventSource = eventSource.getAndSet(null)
-                oldEventSource?.close()
+                eventSource?.close()
+                eventSource = null
             }
         }
 
@@ -370,7 +371,7 @@ class ReplicationSubscriptionManager(
     }
 
     fun close() {
-        eventSource.value?.close()
+        eventSource?.close()
     }
 
     companion object {

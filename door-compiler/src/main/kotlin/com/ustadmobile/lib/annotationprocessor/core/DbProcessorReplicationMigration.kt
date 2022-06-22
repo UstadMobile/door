@@ -83,7 +83,7 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
             val entityVersionField = repEntity.enclosedElementsWithAnnotation(ReplicationVersionId::class.java).firstOrNull()
 
             FileSpec.builder(repEntity.packageName, "${repEntity.simpleName}Replicate")
-                .addComment("""
+                .addFileComment("""
                     @Triggers(arrayOf(
                         Trigger(
                             name = "${repEntity.simpleName.toString().lowercase()}_remote_insert",
@@ -100,7 +100,7 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
                         )
                     ))            
                 """.trimIndent())
-                .addComment("""
+                .addFileComment("""
                     @Query(""${'"'}
                     REPLACE INTO ${repEntity.simpleName}Replicate(${entityPrefix}Pk, ${entityPrefix}Destination)
                      SELECT ${repEntity.entityTableName}.${repEntity.entityPrimaryKey?.simpleName} AS ${entityPrefix}Pk,
@@ -124,7 +124,7 @@ class DbProcessorReplicationMigration: AbstractDbProcessor()  {
                 @ReplicationCheckPendingNotificationsFor([${repEntity.simpleName}::class])
                 abstract suspend fun replicateOnNewNode(@NewNodeIdParam newNodeId: Long)
                 """.trimIndent())
-                .addComment("""
+                .addFileComment("""
                     
                     @Query(""${'"'}
                     REPLACE INTO ${repEntity.simpleName}Replicate(${entityPrefix}Pk, ${entityPrefix}Destination)

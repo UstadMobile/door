@@ -3,10 +3,11 @@ package com.ustadmobile.door.ktor
 import com.ustadmobile.door.DoorConstants.HEADER_DBVERSION
 import com.ustadmobile.door.ext.DoorTag
 import io.github.aakira.napier.Napier
-import io.ktor.application.ApplicationCallPipeline
+import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.http.HttpStatusCode
-import io.ktor.response.respond
-import io.ktor.routing.Route
+import io.ktor.server.response.respond
+import io.ktor.server.routing.Route
+import io.ktor.util.pipeline.*
 
 
 /**
@@ -14,7 +15,7 @@ import io.ktor.routing.Route
  * generated ktor server application when @MinSyncVersion annotation is added.
  */
 fun Route.addDbVersionCheckIntercept(minVersion: Int) {
-    intercept(ApplicationCallPipeline.Features) {
+    intercept(ApplicationCallPipeline.Plugins) {
         val clientVersion: Int = this.context.request.headers[HEADER_DBVERSION]?.toInt() ?:
             this.context.request.queryParameters[HEADER_DBVERSION]?.toInt() ?: 0
         if(clientVersion < minVersion) {

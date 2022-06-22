@@ -2,7 +2,7 @@ package com.ustadmobile.door.jdbc
 
 actual interface Statement {
 
-    fun executeUpdate(sql: String): Int
+    actual fun executeUpdate(sql: String): Int
 
     suspend fun executeUpdateAsyncJs(sql: String): Int
 

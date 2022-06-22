@@ -68,7 +68,6 @@ fun FileSpec.Builder.addDbRepoType(
                 .addParameter("dbUnwrapped", dbTypeElement.asClassName())
                 .addParameter("config", RepositoryConfig::class)
                 .addParameter(ParameterSpec.builder("isRootRepository", BOOLEAN)
-                    .addModifiers(KModifier.OVERRIDE)
                     .defaultValue("false")
                     .build())
                 .build())

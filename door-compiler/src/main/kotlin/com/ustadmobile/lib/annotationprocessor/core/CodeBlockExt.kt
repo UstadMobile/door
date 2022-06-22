@@ -9,6 +9,8 @@ import javax.annotation.processing.ProcessingEnvironment
 import javax.lang.model.element.TypeElement
 import androidx.room.PrimaryKey
 import com.ustadmobile.door.annotation.ReplicateEntity
+import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.MEMBERNAME_CLIENT_SET_BODY
+import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.MEMBERNAME_ENCODED_PATH
 
 /**
  * Generate a delegation style function call, e.g.
@@ -186,24 +188,16 @@ internal fun CodeBlock.Builder.addKtorRequestForFunction(
     val httpResultType = funSpec.returnType?.unwrapLiveDataOrDataSourceFactory() ?: UNIT
 
     val httpMemberFn = if(nonQueryParams.isEmpty()) {
-        if(httpResultType.isNullable) {
-            CLIENT_GET_NULLABLE_MEMBER_NAME
-        }else {
-            CLIENT_GET_MEMBER_NAME
-        }
+        CLIENT_GET_MEMBER_NAME
     }else {
-        if(httpResultType.isNullable) {
-            CLIENT_POST_NULLABLE_MEMBER_NAME
-        }else {
-            CLIENT_POST_MEMBER_NAME
-        }
+        CLIENT_POST_MEMBER_NAME
     }
 
-    beginControlFlow("$httpClientVarName.%M<%T>",
-            httpMemberFn, httpResultType)
+    beginControlFlow("$httpClientVarName.%M",
+            httpMemberFn)
     beginControlFlow("url")
     add("%M($httpEndpointVarName)\n", MemberName("io.ktor.http", "takeFrom"))
-    add("encodedPath = \"\${encodedPath}%L/%L\"\n", daoName, funSpec.name)
+    add("%M = \"\${encodedPath}%L/%L\"\n", MEMBERNAME_ENCODED_PATH, daoName, funSpec.name)
     endControlFlow()
 
     if(addNodeIdAndVersionRepoVarName != null) {
@@ -256,23 +250,32 @@ internal fun CodeBlock.Builder.addKtorRequestForFunction(
             }else {
                 CodeBlock.of("serializer()")
             }
-            CodeBlock.of("body = %T(_json.stringify(%T.%L.%M, ${requestBodyParam.name}), %T.Application.Json.%M())\n",
+            CodeBlock.of("%M(%T(_json.stringify(%T.%L.%M, ${requestBodyParam.name}), %T.Application.Json.%M()))\n",
+                    MEMBERNAME_CLIENT_SET_BODY,
                     TextContent::class, entityComponentType,
                     serializerFnCodeBlock,
                     MemberName("kotlinx.serialization.builtins", "list"),
                     ContentType::class,
-                    MemberName("com.ustadmobile.door.ext", "withUtf8Charset"))
+                    MemberName("com.ustadmobile.door.ext", "withUtf8Charset")
+            )
         }else {
-            CodeBlock.of("body = %M().write(${requestBodyParam.name}, %T.Application.Json.%M())\n",
-                    MemberName("io.ktor.client.features.json", "defaultSerializer"),
-                    ContentType::class, MemberName("com.ustadmobile.door.ext", "withUtf8Charset"))
+            CodeBlock.of("%M(%M().write(${requestBodyParam.name}, %T.Application.Json.%M()))\n",
+                    MEMBERNAME_CLIENT_SET_BODY,
+                    MemberName("io.ktor.client.plugins.json", "defaultSerializer"),
+                    ContentType::class, MemberName("com.ustadmobile.door.ext", "withUtf8Charset")
+            )
         }
 
         addWithNullCheckIfNeeded(requestBodyParam.name, requestBodyParam.type,
                 writeBodyCodeBlock)
     }
 
-    endControlFlow()
+    unindent().add("}.")
+    if(httpResultType.isNullable)
+        add("%M()", BODY_OR_NULL_MEMBER_NAME)
+    else
+        add("%M()", BODY_MEMBER_NAME)
+    add("\n")
 
     return this
 }

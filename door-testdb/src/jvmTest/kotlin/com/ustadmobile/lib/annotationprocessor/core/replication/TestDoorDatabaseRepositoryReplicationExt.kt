@@ -12,11 +12,12 @@ import com.ustadmobile.door.util.systemTimeInMillis
 import com.ustadmobile.lib.annotationprocessor.core.VirtualHostScope
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
-import io.ktor.application.*
+import io.ktor.server.application.*
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
-import io.ktor.client.features.json.*
-import io.ktor.routing.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.json.*
+import io.ktor.server.routing.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import kotlinx.coroutines.runBlocking
@@ -25,7 +26,7 @@ import okhttp3.OkHttpClient
 import org.junit.*
 import org.junit.rules.TemporaryFolder
 import org.kodein.di.*
-import org.kodein.di.ktor.DIFeature
+import org.kodein.di.ktor.di
 import org.kodein.type.TypeToken
 import org.kodein.type.erased
 import repdb.RepDb
@@ -86,7 +87,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         okHttpClient = OkHttpClient.Builder().build()
 
         httpClient = HttpClient(OkHttp) {
-            install(JsonFeature)
+            install(ContentNegotiation)
             engine {
                 preconfigured = okHttpClient
             }
@@ -131,7 +132,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
             requestReadTimeoutSeconds = 600
             responseWriteTimeoutSeconds = 600
         }) {
-            install(DIFeature){
+            di {
                 extend(remoteDi)
             }
 
@@ -521,7 +522,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         }
 
         runBlocking {
-            localRepDb2.repWithAttachmentDao.findByUidLive(entityWithAttachment.waUid).waitUntilWithTimeout(10100) {
+            localRepDb2.repWithAttachmentDao.findByUidLive(entityWithAttachment.waUid).waitUntilWithTimeout(10100 * 1000) {
                 it != null
             }
         }

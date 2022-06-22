@@ -49,7 +49,7 @@ tasks.whenTaskAdded { task ->
 dependencies {
     implementation project(":door-runtime")
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
-    implementation "androidx.core:core-ktx:$version_android_core_ktx"
+    implementation "androidx.core:core-ktx:$version_androidx_core"
     implementation "androidx.appcompat:appcompat:$version_android_appcompat"
     implementation "com.google.android.material:material:$version_android_material"
     implementation "androidx.constraintlayout:constraintlayout:$version_android_constraint_layout"
@@ -63,7 +63,7 @@ dependencies {
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
     implementation "org.jetbrains.kotlinx:atomicfu:$version_atomicfu"
 
-    implementation "io.ktor:ktor-gson:$version_ktor"
+    implementation "io.ktor:ktor-serialization-gson:$version_ktor"
     implementation "io.ktor:ktor-client-okhttp:$version_ktor"
     implementation "io.ktor:ktor-client-gson:$version_ktor"
 
@@ -72,9 +72,9 @@ dependencies {
     implementation "androidx.room:room-ktx:$version_android_room"
     implementation "androidx.paging:paging-runtime:$version_androidx_paging"
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
-    implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.4.0'
+    implementation "androidx.lifecycle:lifecycle-livedata-ktx:$version_androidx_lifecycle"
 
-    kapt "androidx.room:room-compiler:$version_android_room"
+    annotationProcessor "androidx.room:room-compiler:$version_android_room"
 
 
     testImplementation 'junit:junit:4.+'

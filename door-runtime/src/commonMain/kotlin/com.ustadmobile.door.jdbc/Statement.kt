@@ -12,4 +12,6 @@ expect interface Statement {
 
     fun setQueryTimeout(seconds: Int)
 
+    fun executeUpdate(sql: String): Int
+
 }

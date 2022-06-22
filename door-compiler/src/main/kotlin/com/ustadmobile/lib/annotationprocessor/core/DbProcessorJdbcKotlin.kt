@@ -1253,9 +1253,9 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .addMember("%S, %S, %S, %S", "LocalVariableName", "RedundantVisibilityModifier", "unused", "ClassName")
                 .build())
             .primaryConstructor(FunSpec.constructorBuilder()
-                .addParameter("_db", dbTypeElement.asClassName(), KModifier.PRIVATE)
+                .addParameter("_db", dbTypeElement.asClassName())
                 .build())
-            .addProperty(PropertySpec.builder("_db", dbTypeElement.asClassName())
+            .addProperty(PropertySpec.builder("_db", dbTypeElement.asClassName(), KModifier.PRIVATE)
                 .initializer("_db")
                 .build())
             .apply {
@@ -1370,21 +1370,18 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             .superclass(dbTypeElement.asClassName())
             .addSuperinterface(DoorDatabaseJdbc::class)
             .primaryConstructor(FunSpec.constructorBuilder()
-                .addParameter("doorJdbcSourceDatabase", DoorDatabase::class.asTypeName().copy(nullable = true),
-                    KModifier.OVERRIDE)
-                .addParameter(ParameterSpec("dataSource",  CLASSNAME_DATASOURCE,
-                    KModifier.OVERRIDE))
-                .addParameter("dbName", String::class, KModifier.OVERRIDE)
+                .addParameter("doorJdbcSourceDatabase", DoorDatabase::class.asTypeName().copy(nullable = true))
+                .addParameter(ParameterSpec("dataSource",  CLASSNAME_DATASOURCE))
+                .addParameter("dbName", String::class)
                 .applyIf(target == DoorTarget.JVM) {
                     addParameter("attachmentDir", File::class.asTypeName().copy(nullable = true))
                 }
-                .addParameter("realAttachmentFilters", List::class.parameterizedBy(AttachmentFilter::class),
-                    KModifier.OVERRIDE)
-                .addParameter("jdbcQueryTimeout", Int::class, KModifier.OVERRIDE)
+                .addParameter("realAttachmentFilters", List::class.parameterizedBy(AttachmentFilter::class))
+                .addParameter("jdbcQueryTimeout", Int::class)
                 .addCode("setupFromDataSource()\n")
                 .build())
             .addDbVersionProperty(dbTypeElement)
-            .addProperty(PropertySpec.builder("dataSource", CLASSNAME_DATASOURCE)
+            .addProperty(PropertySpec.builder("dataSource", CLASSNAME_DATASOURCE, KModifier.OVERRIDE)
                 .initializer("dataSource")
                 .build())
             .applyIf(target == DoorTarget.JVM) {
@@ -1408,13 +1405,13 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .initializer("realAttachmentFilters")
                 .build())
             .addProperty(PropertySpec.builder("doorJdbcSourceDatabase",
-                    DoorDatabase::class.asTypeName().copy(nullable = true))
+                    DoorDatabase::class.asTypeName().copy(nullable = true), KModifier.OVERRIDE)
                 .initializer("doorJdbcSourceDatabase")
                 .build())
-            .addProperty(PropertySpec.builder("dbName", String::class)
+            .addProperty(PropertySpec.builder("dbName", String::class, KModifier.OVERRIDE)
                 .initializer("dbName")
                 .build())
-            .addProperty(PropertySpec.builder("jdbcQueryTimeout", Int::class)
+            .addProperty(PropertySpec.builder("jdbcQueryTimeout", Int::class, KModifier.OVERRIDE)
                 .initializer("jdbcQueryTimeout")
                 .build())
             .addProperty(PropertySpec.builder("transactionDepthCounter", TransactionDepthCounter::class)

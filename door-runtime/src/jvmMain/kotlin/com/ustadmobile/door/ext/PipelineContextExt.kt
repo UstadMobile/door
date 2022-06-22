@@ -3,8 +3,8 @@ package com.ustadmobile.door.ext
 import com.ustadmobile.door.DoorConstants
 import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.DoorDatabaseReplicateWrapper
-import io.ktor.application.*
-import io.ktor.request.*
+import io.ktor.server.application.*
+import io.ktor.server.request.*
 import io.ktor.util.pipeline.*
 import org.kodein.di.direct
 import org.kodein.di.ktor.closestDI

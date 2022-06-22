@@ -17,7 +17,7 @@ abstract class DoorDatabaseCommon {
 
     private val transactionRootDatabase: DoorDatabase
         get() {
-            @Suppress("CAST_NEVER_SUCCEEDS") //In reality it will succeed
+            @Suppress("CAST_NEVER_SUCCEEDS") //In reality it will always succeed
             var db = (this as DoorDatabase)
             while(db is DoorDatabaseRepository || db is DoorDatabaseReplicateWrapper) {
                 db = db.sourceDatabase ?: throw IllegalStateException("sourceDatabase cannot be null on repo or wrapper")
@@ -26,6 +26,7 @@ abstract class DoorDatabaseCommon {
             return db
         }
 
+    @Suppress("CAST_NEVER_SUCCEEDS") //IntelliJ doesn't understand: but this will always succeed
     val transactionRootJdbcDb : DoorDatabaseJdbc
         get() = ((this as? DoorDatabase)?.rootTransactionDatabase as? DoorDatabaseJdbc)
             ?: throw IllegalStateException("Database does not have jdbc transaction root")
@@ -41,7 +42,7 @@ abstract class DoorDatabaseCommon {
 
     @Suppress("CAST_NEVER_SUCCEEDS")
     var arraySupported: Boolean = false
-        get() = (this as DoorDatabase).sourceDatabase?.arraySupported ?: field
+        get() = (this as DoorDatabase).sourceDatabase?.asCommon()?.arraySupported ?: field
         private set
 
     abstract val jdbcArraySupported: Boolean
@@ -50,6 +51,7 @@ abstract class DoorDatabaseCommon {
 
     val changeListeners = concurrentSafeListOf<ChangeListenerRequest>()
 
+    @Suppress("CAST_NEVER_SUCCEEDS") //IntelliJ doesn't understand: but this will always succeed
     protected val rootDatabaseJdbc: DoorDatabaseJdbc
         get() = (this as DoorDatabase).rootDatabase as DoorDatabaseJdbc
 
@@ -95,16 +97,11 @@ abstract class DoorDatabaseCommon {
         rootDatabaseJdbc.invalidationTracker.removeInvalidationListener(doorInvalidationObserver)
     }
 
-
-    fun handleTableChangedInternal(changeTableNames: List<String>) {
-//        Napier.d("$this : handleTableChanged: ${changeTableNames.joinToString()}")
-//        transactionRootJdbcDb.invalidationTracker.onTablesInvalidated(changeTableNames.toSet())
-    }
-
     /**
      * Execute a batch of SQL Statements in a transaction. This is generally much faster
      * than executing statements individually.
      */
+    @Suppress("CAST_NEVER_SUCCEEDS") //IntelliJ doesn't understand: but this will always succeed
     open fun execSQLBatch(vararg sqlStatements: String) {
         val rootDb = (this as DoorDatabase).rootDatabase
         val jdbcDb = (rootDb as DoorDatabaseJdbc)
@@ -130,7 +127,7 @@ abstract class DoorDatabaseCommon {
      * use builtin support for arrays if required and available, or fallback to using
      * PreparedStatementArrayProxy otherwise.
      */
-    internal fun Connection.prepareStatement(stmtConfig: PreparedStatementConfig) : PreparedStatement {
+    internal fun prepareStatement(connection: Connection, stmtConfig: PreparedStatementConfig) : PreparedStatement {
         val pgSql = stmtConfig.postgreSql
         val sqlToUse = if(pgSql != null && jdbcDbType == DoorDbType.POSTGRES ) {
             pgSql
@@ -139,9 +136,9 @@ abstract class DoorDatabaseCommon {
         }
 
         return when {
-            !stmtConfig.hasListParams -> prepareStatement(sqlToUse, stmtConfig.generatedKeys)
-            jdbcArraySupported -> prepareStatement(adjustQueryWithSelectInParam(sqlToUse))
-            else -> PreparedStatementArrayProxy(sqlToUse, this)
+            !stmtConfig.hasListParams -> connection.prepareStatement(sqlToUse, stmtConfig.generatedKeys)
+            jdbcArraySupported -> connection.prepareStatement(adjustQueryWithSelectInParam(sqlToUse))
+            else -> PreparedStatementArrayProxy(sqlToUse, connection)
         }
     }
 

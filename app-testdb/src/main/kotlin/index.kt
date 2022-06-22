@@ -5,6 +5,7 @@ import com.ustadmobile.door.util.systemTimeInMillis
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
 import io.ktor.client.*
+import io.ktor.client.call.*
 import io.ktor.client.engine.js.*
 import io.ktor.client.request.*
 import kotlinx.browser.window
@@ -83,11 +84,12 @@ fun main() {
 
             console.log("IndexTest: Asking server to make something")
             val serverInsertUid = systemTimeInMillis()
-            val response = httpClient.get<String>(
-                "http://localhost:8098/insertRepEntity") {
+            val response: String = httpClient.get(
+                "http://localhost:8098/insertRepEntity"
+            ) {
                 parameter("rePrimaryKey", serverInsertUid)
                 parameter("reString", "From server at ${Date().toUTCString()}")
-            }
+            }.body()
 
             console.log("IndexTest: Server says: $response ... Waiting...")
 

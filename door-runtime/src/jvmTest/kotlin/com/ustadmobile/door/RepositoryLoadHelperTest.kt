@@ -9,8 +9,10 @@ import com.ustadmobile.door.RepositoryLoadHelper.Companion.STATUS_LOADED_WITHDAT
 import com.ustadmobile.door.RepositoryLoadHelper.Companion.STATUS_LOADING_CLOUD
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
-import io.ktor.client.features.*
-import io.ktor.client.features.json.*
+import io.ktor.client.plugins.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.json.*
+import io.ktor.serialization.gson.*
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import org.junit.After
@@ -36,12 +38,11 @@ class RepositoryLoadHelperTest  {
     @Before
     fun setup() {
         Napier.base(DebugAntilog())
-        httpClient = HttpClient {
-            install(JsonFeature)
-        }
         okHttpClient = OkHttpClient.Builder().build()
         httpClient = HttpClient(OkHttp) {
-            install(JsonFeature)
+            install(ContentNegotiation) {
+                gson()
+            }
             install(HttpTimeout)
 
             engine {

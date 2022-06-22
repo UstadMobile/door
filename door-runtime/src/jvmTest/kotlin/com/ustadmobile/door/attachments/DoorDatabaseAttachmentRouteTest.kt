@@ -5,20 +5,22 @@ import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.VirtualHostScope
 import com.ustadmobile.door.ext.*
-import io.ktor.application.*
+import io.ktor.client.call.*
+import io.ktor.client.content.*
+import io.ktor.client.request.*
+import io.ktor.server.application.*
 import io.ktor.server.testing.*
 import org.junit.Test
-import io.ktor.features.*
-import io.ktor.gson.*
 import io.ktor.http.*
-import io.ktor.routing.*
+import io.ktor.server.routing.*
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert
 import org.junit.Before
 import org.junit.Rule
 import org.junit.rules.TemporaryFolder
-import org.kodein.di.ktor.DIFeature
 import org.mockito.kotlin.mock
 import org.kodein.di.bind
+import org.kodein.di.ktor.di
 import org.kodein.di.registerContextTranslator
 import org.kodein.di.scoped
 import org.kodein.di.singleton
@@ -39,28 +41,23 @@ class DoorDatabaseAttachmentRouteTest {
     @Rule
     var temporaryFolder = TemporaryFolder()
 
-    private fun <R> withTestAttachmentRoute(testFn: TestApplicationEngine.() -> R) {
-        withTestApplication({
-            install(ContentNegotiation) {
-                gson {
-                    register(ContentType.Application.Json, GsonConverter())
-                    register(ContentType.Any, GsonConverter())
+    private fun <R> testAttachmentRouteApplication(testFn: ApplicationTestBuilder.() -> R) {
+        testApplication {
+            application {
+                di {
+                    bind<DoorDatabase>(tag = DoorTag.TAG_DB) with scoped(scope).singleton {
+                        mockDb
+                    }
+
+                    registerContextTranslator { _: ApplicationCall -> "localhost" }
+                }
+
+                routing {
+                    val typeToken : TypeToken<DoorDatabase> = erased()
+                    doorAttachmentsRoute("attachments", typeToken)
                 }
             }
 
-            install(DIFeature) {
-                bind<DoorDatabase>(tag = DoorTag.TAG_DB) with scoped(scope).singleton {
-                    mockDb
-                }
-
-                registerContextTranslator { _: ApplicationCall -> "localhost" }
-            }
-
-            routing {
-                val typeToken : TypeToken<DoorDatabase> = erased()
-                doorAttachmentsRoute("attachments", typeToken)
-            }
-        }) {
             testFn()
         }
     }
@@ -75,28 +72,30 @@ class DoorDatabaseAttachmentRouteTest {
         scope = VirtualHostScope()
 
         catPicFile = temporaryFolder.newFile()
-        this::class.java.getResourceAsStream("/test-resources/cat-pic0.jpg").writeToFile(catPicFile)
+        this::class.java.getResourceAsStream("/test-resources/cat-pic0.jpg")!!.writeToFile(catPicFile)
 
     }
 
     @Test
-    fun givenAttachmentUploaded_whenDownloadCalled_thenDataShouldMatch() = withTestAttachmentRoute {
+    fun givenAttachmentUploaded_whenDownloadCalled_thenDataShouldMatch() = testAttachmentRouteApplication {
         val picMd5 = catPicFile.md5Sum.toHexString()
         val attachmentUri = "${DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX}Dummmy/$picMd5"
         val uploadUri = "/attachments/upload?md5=$picMd5&uri=${URLEncoder.encode(attachmentUri, "UTF-8")}"
-        handleRequest(HttpMethod.Post,uploadUri) {
-            setBody(catPicFile.readBytes())
-        }.apply {
-            Assert.assertEquals(HttpStatusCode.NoContent, this.response.status())
+
+        val uploadResponse = runBlocking {
+            client.post(uploadUri) {
+                setBody(LocalFileContent(file = catPicFile, contentType = ContentType.Application.OctetStream))
+            }
         }
+        Assert.assertEquals("Upload Status returns NoContent", HttpStatusCode.NoContent,
+            uploadResponse.status)
 
-
-        handleRequest(HttpMethod.Get, "/attachments/download?uri=${URLEncoder.encode(attachmentUri, "UTF-8")}") {
-
-        }.apply {
-            Assert.assertArrayEquals("Data retrieved equals data uploaded", catPicFile.readBytes(),
-                response.byteContent!!)
+        val downloadResponse = runBlocking {
+            client.get("/attachments/download?uri=${URLEncoder.encode(attachmentUri, "UTF-8")}")
         }
+        val downloadResponseBytes : ByteArray = runBlocking { downloadResponse.body() }
+        Assert.assertArrayEquals("Data retrieved equals data uploaded", catPicFile.readBytes(),
+            downloadResponseBytes)
     }
 
 }

@@ -11,7 +11,8 @@ import com.ustadmobile.door.sse.DoorEventSourceFactory
 import com.ustadmobile.door.sse.DoorServerSentEvent
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
-import io.ktor.client.features.json.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.json.*
 import kotlinx.coroutines.GlobalScope
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
@@ -60,14 +61,15 @@ class TestReplicationSubscriptionManager {
         okHttpClient = OkHttpClient.Builder().build()
 
         httpClient = HttpClient(OkHttp) {
-            install(JsonFeature)
+            install(ContentNegotiation)
             engine {
                 preconfigured = okHttpClient
             }
         }
 
         repo = db.asRepository(RepositoryConfig.repositoryConfig(Any(), "http://localhost/dummy",
-            1234, "", httpClient, okHttpClient, Json { encodeDefaults = true }) {
+            1234, "", httpClient, okHttpClient, Json { encodeDefaults = true }
+        ) {
             this.useReplicationSubscription =  false
             this.replicationSubscriptionMode = ReplicationSubscriptionMode.MANUAL
         })

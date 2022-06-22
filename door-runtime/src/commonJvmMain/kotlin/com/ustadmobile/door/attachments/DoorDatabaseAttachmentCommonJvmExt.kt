@@ -31,18 +31,17 @@ actual suspend fun DoorDatabaseRepository.uploadAttachment(entityWithAttachment:
         attachmentUri.substringAfter(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX))
     val endpointUrl = URL(URL(config.endpoint), "attachments/upload")
 
-    Napier.d("Uploading attachment: $attachmentUri", tag = DoorTag.LOG_TAG)
-    //val inputFile = Paths.get(systemUri).toFile()
+    Napier.d("UploadAttachment: Uploading attachment: $attachmentUri", tag = DoorTag.LOG_TAG)
     try {
-        config.httpClient.post<Unit>(endpointUrl.toString()) {
+        config.httpClient.post(endpointUrl) {
             doorNodeAndVersionHeaders(this@uploadAttachment)
             parameter("md5", attachmentMd5)
             parameter("uri", attachmentUri)
-
-            body = LocalFileContent(file = attachmentFile, contentType = ContentType.Application.OctetStream)
+            setBody(LocalFileContent(file = attachmentFile, contentType = ContentType.Application.OctetStream))
         }
+        Napier.d("UploadAttachment: Posted $attachmentUri OK.", tag = DoorTag.LOG_TAG)
     }catch(e: Exception) {
-        Napier.e("Error uploading attachment: $attachmentUri", e)
+        Napier.e("UploadAttachment: Error uploading attachment: $attachmentUri", e, tag = DoorTag.LOG_TAG)
         throw e
     }
 

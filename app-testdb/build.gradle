@@ -22,11 +22,12 @@ kotlin {
 }
 
 dependencies {
-    testImplementation 'org.jetbrains.kotlin:kotlin-test:1.6.0'
-    implementation "org.jetbrains.kotlin-wrappers:kotlin-react:$version_kotlin_react"
-    implementation "org.jetbrains.kotlin-wrappers:kotlin-react-dom:$version_kotlin_react"
-    implementation "org.jetbrains.kotlin-wrappers:kotlin-styled:$version_kotlin_styled"
-    implementation "org.jetbrains.kotlin-wrappers:kotlin-react-router-dom:$version_kotlin_react_router_dom"
+    testImplementation "org.jetbrains.kotlin:kotlin-test:$version_kotlin"
+    implementation enforcedPlatform("org.jetbrains.kotlin-wrappers:kotlin-wrappers-bom:$version_kotlin_wrappers_bom")
+    implementation "org.jetbrains.kotlin-wrappers:kotlin-react"
+    implementation "org.jetbrains.kotlin-wrappers:kotlin-react-dom"
+    implementation "org.jetbrains.kotlin-wrappers:kotlin-styled"
+    implementation "org.jetbrains.kotlin-wrappers:kotlin-react-router-dom"
     implementation "io.github.aakira:napier:$version_napier"
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
 

@@ -9,11 +9,11 @@ import org.mockito.kotlin.verify
 import com.ustadmobile.door.sse.DoorEventListener
 import com.ustadmobile.door.sse.DoorEventSource
 import com.ustadmobile.door.sse.DoorServerSentEvent
-import io.ktor.application.call
-import io.ktor.client.features.*
-import io.ktor.response.respondTextWriter
-import io.ktor.routing.get
-import io.ktor.routing.routing
+import io.ktor.server.application.call
+import io.ktor.client.plugins.*
+import io.ktor.server.response.respondTextWriter
+import io.ktor.server.routing.get
+import io.ktor.server.routing.routing
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import kotlinx.coroutines.channels.Channel

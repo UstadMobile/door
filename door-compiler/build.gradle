@@ -33,11 +33,10 @@ dependencies {
     implementation project(":door-runtime")
     implementation project(":room-annotations")
     implementation "org.jetbrains.kotlin:kotlin-stdlib"
-    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.1.0'
+    implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
     implementation "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
     implementation "com.squareup:kotlinpoet:$version_kotlinpoet"
     implementation"com.squareup:kotlinpoet-metadata:$version_kotlinpoet"
-    implementation"com.squareup:kotlinpoet-metadata-specs:$version_kotlinpoet"
     implementation "com.github.jsqlparser:jsqlparser:$version_jsqlparser"
     implementation "org.apache.commons:commons-text:$version_apache_commons_text"
     implementation "com.google.code.gson:gson:$version_gson"
@@ -47,8 +46,7 @@ dependencies {
     implementation "org.postgresql:postgresql:$version_postgres_jdbc"
     implementation "org.apache.commons:commons-dbcp2:$version_apache_commons_dbcp2"
     implementation "io.ktor:ktor-server-netty:$version_ktor"
-    implementation "io.ktor:ktor-jackson:$version_ktor"
-    implementation "io.ktor:ktor-gson:$version_ktor"
+    implementation "io.ktor:ktor-serialization-gson:$version_ktor"
     implementation "io.ktor:ktor-client-okhttp:$version_ktor"
     implementation "io.ktor:ktor-client-gson:$version_ktor"
     implementation "org.nanohttpd:nanohttpd:$version_nanohttpd"

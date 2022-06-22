@@ -1,5 +1,6 @@
 package com.ustadmobile.door
 
+import com.ustadmobile.door.ext.asCommon
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 
@@ -15,13 +16,13 @@ class DoorLiveDataImpl<T>(
 
     override fun onActive() {
         super.onActive()
-        db.addChangeListener(dbChangeListenerRequest)
+        db.asCommon().addChangeListener(dbChangeListenerRequest)
         update()
     }
 
     override fun onInactive() {
         super.onInactive()
-        db.removeChangeListener(dbChangeListenerRequest)
+        db.asCommon().removeChangeListener(dbChangeListenerRequest)
     }
 
     internal fun update() {

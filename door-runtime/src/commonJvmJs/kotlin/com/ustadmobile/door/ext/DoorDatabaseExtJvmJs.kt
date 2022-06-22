@@ -12,8 +12,8 @@ actual suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
     block: suspend (PreparedStatement) -> R
 ) : R {
     try {
-        return transactionRootJdbcDb.useConnectionAsync { connection: Connection ->
-            connection.prepareStatement(stmtConfig).useStatementAsync { stmt: PreparedStatement ->
+        return asCommon().transactionRootJdbcDb.useConnectionAsync { connection: Connection ->
+            asCommon().prepareStatement(connection, stmtConfig).useStatementAsync { stmt: PreparedStatement ->
                 stmt.setQueryTimeout((rootDatabase as DoorDatabaseJdbc).jdbcQueryTimeout)
                 val blockStartTime = systemTimeInMillis()
                 return@useConnectionAsync block(stmt).also {
@@ -34,8 +34,8 @@ actual fun <R> DoorDatabase.prepareAndUseStatement(
     block: (PreparedStatement) -> R
 ) : R {
     try {
-        return transactionRootJdbcDb.useConnection { connection: Connection ->
-            connection.prepareStatement(stmtConfig).useStatement { stmt: PreparedStatement ->
+        return asCommon().transactionRootJdbcDb.useConnection { connection: Connection ->
+            asCommon().prepareStatement(connection, stmtConfig).useStatement { stmt: PreparedStatement ->
                 stmt.setQueryTimeout((rootDatabase as DoorDatabaseJdbc).jdbcQueryTimeout)
                 val blockStartTime = systemTimeInMillis()
                 return@useConnection block(stmt).also {
@@ -73,11 +73,11 @@ actual val DoorDatabase.replicationNotificationDispatcher: ReplicationNotificati
     }
 
 actual fun DoorDatabase.addInvalidationListener(changeListenerRequest: ChangeListenerRequest) {
-    addChangeListener(changeListenerRequest)
+    asCommon().addChangeListener(changeListenerRequest)
 }
 
 actual fun DoorDatabase.removeInvalidationListener(changeListenerRequest: ChangeListenerRequest) {
-    removeChangeListener(changeListenerRequest)
+    asCommon().removeChangeListener(changeListenerRequest)
 }
 
 actual val DoorDatabase.nodeIdAuthCache: NodeIdAuthCache

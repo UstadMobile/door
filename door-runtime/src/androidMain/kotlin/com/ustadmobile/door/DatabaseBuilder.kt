@@ -65,7 +65,7 @@ actual class DatabaseBuilder<T: DoorDatabase>(
                 when(callback) {
                     is DoorDatabaseCallbackSync -> callback.onCreate(db)
                     is DoorDatabaseCallbackStatementList ->
-                        db.execSqlBatch(*callback.onCreate(db).toTypedArray())
+                        db.execSqlBatch(callback.onCreate(db).toTypedArray())
                 }
             }
 
@@ -73,7 +73,7 @@ actual class DatabaseBuilder<T: DoorDatabase>(
                 when(callback){
                     is DoorDatabaseCallbackSync -> callback.onOpen(db)
                     is DoorDatabaseCallbackStatementList ->
-                        db.execSqlBatch(*callback.onOpen(db).toTypedArray())
+                        db.execSqlBatch(callback.onOpen(db).toTypedArray())
                 }
             }
         })
