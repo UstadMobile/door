@@ -1,5 +1,7 @@
 package com.ustadmobile.door
 
+import androidx.lifecycle.LifecycleOwner
+
 /**
  * This expect/actual is used by RepositoryLoadHelper to monitor the lifecycle of anything which is
  * observing it's related LiveData.  This allows the RepositoryLoadHelper to load automatically when
@@ -9,7 +11,7 @@ package com.ustadmobile.door
  * The RepositoryLoadHelper must call addObserver to start observing the lifecycleOwner and
  * removeObserver to stop observing the given lifecycleOwner.
  */
-expect class RepositoryLoadHelperLifecycleHelper(lifecycleOwner: DoorLifecycleOwner) {
+expect class RepositoryLoadHelperLifecycleHelper(lifecycleOwner: LifecycleOwner) {
 
     /**
      * Returns the current state as an Int as per DoorLifecycleObserver constants

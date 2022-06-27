@@ -1,8 +1,6 @@
 package com.ustadmobile.door.ext
 
-import com.ustadmobile.door.DoorLifecycleObserver
-import com.ustadmobile.door.DoorObserver
+import androidx.lifecycle.Lifecycle
 import com.ustadmobile.door.RepositoryLoadHelperLifecycleHelper
 
-fun RepositoryLoadHelperLifecycleHelper.isActive() = this.currentState == DoorLifecycleObserver.STARTED
-        || this.currentState == DoorLifecycleObserver.RESUMED
+fun RepositoryLoadHelperLifecycleHelper.isActive() = this.currentState >= Lifecycle.State.STARTED.ordinal

@@ -54,7 +54,7 @@ kotlin {
             dependencies {
                 implementation kotlin('stdlib-common')
                 implementation project(":door-runtime")
-                compileOnly project(":room-annotations")
+                compileOnly project(":door-room-kmp")
 
                 implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
                 implementation "io.ktor:ktor-client-content-negotiation:$version_ktor"
@@ -73,6 +73,7 @@ kotlin {
 
         jvmMain {
             dependencies {
+                implementation project(":door-room-kmp")
                 implementation "io.ktor:ktor-serialization-gson:$version_ktor"
                 implementation "org.kodein.di:kodein-di-framework-ktor-server-jvm:$version_kodein_di"
                 implementation "org.xerial:sqlite-jdbc:$version_sqlite_jdbc"
@@ -100,6 +101,9 @@ kotlin {
 
         jsMain {
             kotlin.srcDir("$buildDir/generated/source/door-js")
+            dependencies {
+                implementation project(":door-room-kmp")
+            }
         }
 
         jsTest {

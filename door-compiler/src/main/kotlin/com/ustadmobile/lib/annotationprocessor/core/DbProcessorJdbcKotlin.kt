@@ -1,5 +1,7 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
+import androidx.lifecycle.LiveData
+import androidx.paging.DataSource
 import androidx.room.*
 import com.squareup.kotlinpoet.*
 import javax.annotation.processing.*
@@ -204,10 +206,10 @@ fun removeTypeProjection(typeName: TypeName) =
  */
 fun resolveQueryResultType(returnTypeName: TypeName)  =
         if(returnTypeName is ParameterizedTypeName
-                && returnTypeName.rawType == DoorLiveData::class.asClassName()) {
+                && returnTypeName.rawType == LiveData::class.asClassName()) {
             returnTypeName.typeArguments[0]
         }else if(returnTypeName is ParameterizedTypeName
-            && returnTypeName.rawType == DoorDataSourceFactory::class.asClassName())
+            && returnTypeName.rawType == DataSource.Factory::class.asClassName())
             List::class.asClassName().parameterizedBy(returnTypeName.typeArguments[1])
         else {
             returnTypeName
@@ -576,7 +578,7 @@ fun isListOrArray(typeName: TypeName) = (typeName is ClassName && typeName.canon
         || (typeName is ParameterizedTypeName && typeName.rawType == List::class.asClassName())
 
 fun isLiveData(typeName: TypeName) = (typeName is ParameterizedTypeName
-        && typeName.rawType == DoorLiveData::class.asClassName())
+        && typeName.rawType == LiveData::class.asClassName())
 
 val SQL_COMPONENT_TYPE_MAP = mapOf(LONG to "BIGINT",
         INT to "INTEGER",
@@ -795,7 +797,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             }
 
             beginControlFlow("%T<%T>(_db, listOf(%L)) ",
-                DoorLiveDataImpl::class.asClassName(),
+                LiveDataImpl::class.asClassName(),
                 liveResultType.copy(nullable = isNullableResultType(liveResultType)),
                 tablesToWatch.map {"\"$it\""}.joinToString())
             .addJdbcQueryCode(liveResultType, liveQueryVarsMap, liveSql,
@@ -823,11 +825,11 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                     ?: throw IllegalStateException("TODO: datasource not typed - ${daoTypeElement.qualifiedName}#${funSpec.name}")
                 addCode("val _result = %L\n",
                 TypeSpec.anonymousClassBuilder()
-                    .superclass(DoorDataSourceFactory::class.asTypeName().parameterizedBy(INT,
+                    .superclass(DataSource.Factory::class.asTypeName().parameterizedBy(INT,
                         returnTypeUnwrapped))
                     .addFunction(FunSpec.builder("getData")
                         .addModifiers(KModifier.OVERRIDE)
-                        .returns(DoorLiveData::class.asTypeName()
+                        .returns(LiveData::class.asTypeName()
                             .parameterizedBy(List::class.asTypeName().parameterizedBy(returnTypeUnwrapped)))
                         .addParameter("_offset", INT)
                         .addParameter("_limit", INT)
@@ -850,7 +852,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                         .build())
                     .addFunction(FunSpec.builder("getLength")
                         .addModifiers(KModifier.OVERRIDE)
-                        .returns(DoorLiveData::class.asTypeName().parameterizedBy(INT))
+                        .returns(LiveData::class.asTypeName().parameterizedBy(INT))
                         .addCode(CodeBlock.builder()
                             .applyIf(rawQueryParamName != null) {
                                 add("val _rawQuery = $rawQueryParamName.%M(\n",

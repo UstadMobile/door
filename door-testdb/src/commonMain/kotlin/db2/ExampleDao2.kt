@@ -1,5 +1,7 @@
 package db2
 
+import androidx.lifecycle.LiveData
+import androidx.paging.DataSource
 import androidx.room.*
 import com.ustadmobile.door.*
 import com.ustadmobile.door.annotation.QueryLiveTables
@@ -82,7 +84,7 @@ abstract class ExampleDao2 {
     abstract fun updateList(updateEntityList: List<ExampleEntity2>)
 
     @Query("SELECT * FROM ExampleEntity2")
-    abstract fun findByMinUidLive(): DoorLiveData<List<ExampleEntity2>>
+    abstract fun findByMinUidLive(): LiveData<List<ExampleEntity2>>
 
     @Query("UPDATE ExampleEntity2 SET name = :newName WHERE someNumber >= :num")
     abstract fun updateByParam(newName: String, num: Long) : Int
@@ -125,17 +127,17 @@ abstract class ExampleDao2 {
 
     @RawQuery(observedEntities = [ExampleEntity2::class])
     @QueryLiveTables(["ExampleEntity2"])
-    abstract fun rawQueryForLiveData(query: DoorQuery): DoorLiveData<List<ExampleEntity2>>
+    abstract fun rawQueryForLiveData(query: DoorQuery): LiveData<List<ExampleEntity2>>
 
     @RawQuery(observedEntities = [ExampleEntity2::class])
     @QueryLiveTables(["ExampleEntity2"])
-    abstract fun rawQueryForDataSource(query: DoorQuery): DoorDataSourceFactory<Int, ExampleEntity2>
+    abstract fun rawQueryForDataSource(query: DoorQuery): DataSource.Factory<Int, ExampleEntity2>
 
     @Query("SELECT * FROM ExampleEntity2")
-    abstract fun queryAllLive(): DoorDataSourceFactory<Int, ExampleEntity2>
+    abstract fun queryAllLive(): DataSource.Factory<Int, ExampleEntity2>
 
     @Query("SELECT * FROM ExampleEntity2")
-    abstract fun queryAllLiveAsync(): DoorDataSourceFactory<Int, ExampleEntity2>
+    abstract fun queryAllLiveAsync(): DataSource.Factory<Int, ExampleEntity2>
 
     @RawQuery
     abstract fun rawQueryWithArrParam(query: DoorQuery): List<ExampleEntity2>

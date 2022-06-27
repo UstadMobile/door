@@ -1,11 +1,10 @@
 package com.ustadmobile.door
 
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleObserver
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.OnLifecycleEvent
+import androidx.lifecycle.*
 
-actual class RepositoryLoadHelperLifecycleHelper actual constructor(lifecycleOwner: DoorLifecycleOwner) : LifecycleObserver {
+actual class RepositoryLoadHelperLifecycleHelper actual constructor(
+    lifecycleOwner: LifecycleOwner
+) : DefaultLifecycleObserver {
 
     var actLifecycleOwner: LifecycleOwner? = lifecycleOwner
 
@@ -15,12 +14,7 @@ actual class RepositoryLoadHelperLifecycleHelper actual constructor(lifecycleOwn
      */
     actual val currentState: Int
         get() {
-            val actLifecycleVal = actLifecycleOwner
-            return if(actLifecycleVal != null) {
-                STATE_MAP[actLifecycleVal.lifecycle.currentState] ?: DoorLifecycleObserver.DESTROYED
-            }else {
-                DoorLifecycleObserver.DESTROYED
-            }
+            return actLifecycleOwner?.lifecycle?.currentState?.ordinal ?: Lifecycle.State.DESTROYED.ordinal
         }
 
     actual var onActive: (() -> Unit)? = null
@@ -37,35 +31,21 @@ actual class RepositoryLoadHelperLifecycleHelper actual constructor(lifecycleOwn
         actLifecycleOwner?.lifecycle?.removeObserver(this)
     }
 
-    @OnLifecycleEvent(Lifecycle.Event.ON_START)
-    fun onStart() {
+    override fun onStart(owner: LifecycleOwner) {
         onActive?.invoke()
     }
 
-    @OnLifecycleEvent(Lifecycle.Event.ON_STOP)
-    fun onStop() {
+    override fun onStop(owner: LifecycleOwner) {
         onInactive?.invoke()
     }
 
-    @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
-    fun onDestroy() {
+    override fun onDestroy(owner: LifecycleOwner) {
         dispose()
         onDestroyed?.invoke()
     }
 
-
     actual fun dispose() {
         actLifecycleOwner = null
-    }
-
-    companion object {
-
-        val STATE_MAP = mapOf(Lifecycle.State.CREATED to DoorLifecycleObserver.CREATED,
-                Lifecycle.State.STARTED to DoorLifecycleObserver.STARTED,
-                Lifecycle.State.DESTROYED to DoorLifecycleObserver.DESTROYED,
-                Lifecycle.State.INITIALIZED to DoorLifecycleObserver.NOT_CREATED,
-                Lifecycle.State.RESUMED to DoorLifecycleObserver.RESUMED)
-
     }
 
 

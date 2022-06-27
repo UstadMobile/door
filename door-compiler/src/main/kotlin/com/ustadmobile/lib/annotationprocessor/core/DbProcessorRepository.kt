@@ -7,6 +7,7 @@ import com.ustadmobile.door.*
 import com.ustadmobile.door.annotation.RepoHttpAccessible
 import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.attachments.EntityWithAttachment
+import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.replication.ReplicationSubscriptionManager
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_ANDROID_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JS_OUTPUT
@@ -372,7 +373,7 @@ fun TypeSpec.Builder.addDaoRepoFun(
 
     if(pagingBoundaryCallbackEnabled
             && returnTypeVal is ParameterizedTypeName
-            && returnTypeVal.rawType == DoorDataSourceFactory::class.asClassName()) {
+            && returnTypeVal.rawType == androidx.paging.DataSource.Factory::class.asClassName()) {
         generateBoundaryCallback = true
         repoMethodType = Repository.METHOD_DELEGATE_TO_DAO
     }
@@ -601,7 +602,7 @@ class DbProcessorRepository: AbstractDbProcessor() {
                 "RepositoryBoundaryCallback")
 
         val BOUNDARY_CALLBACK_MAP_CLASSNAME = WeakHashMap::class.asClassName().parameterizedBy(
-                DoorDataSourceFactory::class.asClassName().parameterizedBy(INT, STAR),
+                androidx.paging.DataSource.Factory::class.asClassName().parameterizedBy(INT, STAR),
                 BOUNDARY_CALLBACK_CLASSNAME.parameterizedBy(STAR))
 
     }

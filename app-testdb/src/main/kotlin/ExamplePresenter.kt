@@ -1,3 +1,5 @@
+import androidx.lifecycle.LifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import com.ustadmobile.door.*
 import com.ustadmobile.door.jdbc.types.Date
 import db2.ExampleDatabase2
@@ -7,7 +9,7 @@ import db2.ExampleEntity2
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 
-class ExamplePresenter<V :  ExampleView> (private val view: V, private val lifecycleOwner: DoorLifecycleOwner): DoorLifecycleObserver() {
+class ExamplePresenter<V :  ExampleView> (private val view: V, private val lifecycleOwner: LifecycleOwner): LifecycleObserver {
 
     private var database: ExampleDatabase2? = null;
 

@@ -1,5 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
+import androidx.lifecycle.Observer
 import com.ustadmobile.door.*
 import db2.ExampleDatabase2
 import db2.ExampleEntity2
@@ -31,7 +32,7 @@ class TestDbBuilderKtKt {
         runBlocking {
             val liveData = exampleDb2.exampleDao2().findByMinUidLive()
             val channel = Channel<List<ExampleEntity2>?>(1)
-            val observerFn = object : DoorObserver<List<ExampleEntity2>?> {
+            val observerFn = object : Observer<List<ExampleEntity2>?> {
                 override fun onChanged(t: List<ExampleEntity2>?) {
                     if(t?.size == 1) {
                         channel.trySend(t)

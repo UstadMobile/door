@@ -1,5 +1,9 @@
 package com.ustadmobile.door
 
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.Observer
 import com.ustadmobile.door.ext.DoorTag
 import io.github.aakira.napier.Napier
 import com.ustadmobile.door.util.systemTimeInMillis
@@ -10,7 +14,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.coroutineContext
 import kotlin.jvm.Volatile
 
-typealias LifeCycleHelperFactory = (DoorLifecycleOwner) -> RepositoryLoadHelperLifecycleHelper
+typealias LifeCycleHelperFactory = (LifecycleOwner) -> RepositoryLoadHelperLifecycleHelper
 
 //Empty / null retry:
 // On DataSourceFactory / boundary callback: alwasy - because it was called by onZeroItemsLoaded
@@ -22,7 +26,7 @@ class RepositoryLoadHelper<T>(
     val repository: DoorDatabaseRepository,
     val maxAttempts: Int = 3,
     val retryDelay: Int = 5000,
-    val autoRetryOnEmptyLiveData: DoorLiveData<T>? = null,
+    val autoRetryOnEmptyLiveData: LiveData<T>? = null,
     val lifecycleHelperFactory: LifeCycleHelperFactory =
           {RepositoryLoadHelperLifecycleHelper(it)},
     val uri: String = "",
@@ -41,7 +45,7 @@ class RepositoryLoadHelper<T>(
 
     //val repoHelperId = ID_ATOMICINT.getAndIncrement()
 
-    val statusLiveData = DoorMutableLiveData<RepoLoadStatus>(RepoLoadStatus(STATUS_NOT_STARTED))
+    val statusLiveData = MutableLiveData<RepoLoadStatus>(RepoLoadStatus(STATUS_NOT_STARTED))
 
     data class RepoLoadStatus(var loadStatus: Int = 0, var remoteNode: String? = null)
 
@@ -52,9 +56,9 @@ class RepositoryLoadHelper<T>(
      * It also provides access to the loadingStatus LiveData
      *
      */
-    inner class LiveDataWrapper2<L>(private val src: DoorLiveData<L>): DoorMutableLiveData<L>(), DoorObserver<L> {
+    inner class LiveDataWrapper2<L>(private val src: LiveData<L>): MutableLiveData<L>(), Observer<L> {
 
-        val loadingStatus: DoorMutableLiveData<RepoLoadStatus>
+        val loadingStatus: MutableLiveData<RepoLoadStatus>
             get() = statusLiveData
 
 
@@ -62,14 +66,14 @@ class RepositoryLoadHelper<T>(
             setVal(t)
         }
 
-        override fun onActive2() {
-            super.onActive2()
+        override fun onActive() {
+            super.onActive()
             src.observeForever(this)
             onLifecycleActive()
         }
 
-        override fun onInactive2() {
-            super.onInactive2()
+        override fun onInactive() {
+            super.onInactive()
             src.removeObserver(this)
         }
 
@@ -87,9 +91,9 @@ class RepositoryLoadHelper<T>(
     private val logPrefix
         get() = "ID [$uri]  "
 
-    private var wrappedLiveData: DoorLiveData<*>? = null
+    private var wrappedLiveData: LiveData<*>? = null
 
-    fun <L> wrapLiveData(src: DoorLiveData<L>): DoorLiveData<L> {
+    fun <L> wrapLiveData(src: LiveData<L>): LiveData<L> {
         return LiveDataWrapper2(src).also {
             wrappedLiveData = it
         }
@@ -168,7 +172,7 @@ class RepositoryLoadHelper<T>(
 
                     if(newStatus != status) {
                         status = newStatus
-                        statusLiveData.sendValue(RepoLoadStatus(status))
+                        statusLiveData.postValue(RepoLoadStatus(status))
                     }
 
                     Napier.d(tag = DoorTag.LOG_TAG,
@@ -189,7 +193,7 @@ class RepositoryLoadHelper<T>(
 
                     completed.value = true
                     loadedVal.complete(t)
-                    statusLiveData.sendValue(RepoLoadStatus(status))
+                    statusLiveData.postValue(RepoLoadStatus(status))
 
                     Napier.d(
                         tag = DoorTag.LOG_TAG,
@@ -218,7 +222,7 @@ class RepositoryLoadHelper<T>(
 
                 if(newStatus != status) {
                     status = newStatus
-                    statusLiveData.sendValue(RepoLoadStatus(status))
+                    statusLiveData.postValue(RepoLoadStatus(status))
                 }
 
 

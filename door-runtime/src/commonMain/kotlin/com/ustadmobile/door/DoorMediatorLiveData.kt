@@ -1,17 +1,20 @@
 package com.ustadmobile.door
 
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.Observer
 import com.ustadmobile.door.ext.concurrentSafeMapOf
 
 /**
  * Implementation similar to Android's MediatorLiveData
  */
 @Suppress("unused")
-open class DoorMediatorLiveData<T> : DoorMutableLiveData<T>() {
+open class DoorMediatorLiveData<T> : MutableLiveData<T>() {
 
     private class Source<T>(
-        private val liveData: DoorLiveData<T>,
-        private val mObserver: DoorObserver<T>
-    ) : DoorObserver<T> {
+        private val liveData: LiveData<T>,
+        private val mObserver: Observer<T>
+    ) : Observer<T> {
 
         override fun onChanged(t: T) {
             mObserver.onChanged(t)
@@ -26,9 +29,9 @@ open class DoorMediatorLiveData<T> : DoorMutableLiveData<T>() {
         }
     }
 
-    private val sources = concurrentSafeMapOf<DoorLiveData<*>, Source<*>>()
+    private val sources = concurrentSafeMapOf<LiveData<*>, Source<*>>()
 
-    fun <S> addSource(source: DoorLiveData<S>, doorObserver: DoorObserver<S>) {
+    fun <S> addSource(source: LiveData<S>, doorObserver: Observer<S>) {
         sources[source]?.unplug()
 
         val newSource = Source(source, doorObserver)
@@ -38,19 +41,19 @@ open class DoorMediatorLiveData<T> : DoorMutableLiveData<T>() {
         }
     }
 
-    fun removeSource(source: DoorLiveData<*>) {
+    fun removeSource(source: LiveData<*>) {
         sources.remove(source)?.unplug()
     }
 
-    override fun onActive2() {
-        super.onActive2()
+    override fun onActive() {
+        super.onActive()
         sources.forEach {
             it.value.plug()
         }
     }
 
-    override fun onInactive2() {
-        super.onInactive2()
+    override fun onInactive() {
+        super.onInactive()
         sources.forEach {
             it.value.unplug()
         }

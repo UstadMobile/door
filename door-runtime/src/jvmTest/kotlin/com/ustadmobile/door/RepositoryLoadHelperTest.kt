@@ -76,7 +76,7 @@ class RepositoryLoadHelperTest  {
             entity
         }
 
-        val loadObserver = mock<DoorObserver<RepositoryLoadHelper.RepoLoadStatus>>{}
+        val loadObserver = mock<Observer<RepositoryLoadHelper.RepoLoadStatus>>{}
         repoLoadHelper.statusLiveData.observeForever(loadObserver)
 
 
@@ -122,10 +122,10 @@ class RepositoryLoadHelperTest  {
             entity
         }
 
-        val mockLiveData = repoLoadHelper.wrapLiveData(mock<DoorLiveData<DummyEntity>> {  })
+        val mockLiveData = repoLoadHelper.wrapLiveData(mock<LiveData<DummyEntity>> {  })
 
         runBlocking {
-            val mockLiveDataObserver = mock<DoorObserver<DummyEntity>>{}
+            val mockLiveDataObserver = mock<Observer<DummyEntity>>{}
             mockLiveData.observeForever(mockLiveDataObserver)
 
             //make sure that the first load happened before the second request
@@ -160,11 +160,11 @@ class RepositoryLoadHelperTest  {
             }
         }
 
-        val loadObserver = mock<DoorObserver<RepositoryLoadHelper.RepoLoadStatus>> { }
+        val loadObserver = mock<Observer<RepositoryLoadHelper.RepoLoadStatus>> { }
         repoLoadHelper.statusLiveData.observeForever(loadObserver)
 
 
-        repoLoadHelper.wrapLiveData(mock<DoorLiveData<DummyEntity>> {  })
+        repoLoadHelper.wrapLiveData(mock<LiveData<DummyEntity>> {  })
 
         runBlocking {
             try {
@@ -220,12 +220,12 @@ class RepositoryLoadHelperTest  {
             }
         }
 
-        val loadObserver = mock<DoorObserver<RepositoryLoadHelper.RepoLoadStatus>>{}
+        val loadObserver = mock<Observer<RepositoryLoadHelper.RepoLoadStatus>>{}
         repoLoadHelper.statusLiveData.observeForever(loadObserver)
 
-        var liveData = mock<DoorLiveData<DummyEntity>> {  }
+        var liveData = mock<LiveData<DummyEntity>> {  }
 
-        val observer = mock<DoorObserver<DummyEntity>> {}
+        val observer = mock<Observer<DummyEntity>> {}
         runBlocking {
             try {
                 //mark that there is an active observer - this will fail because it's still disconnected
@@ -290,12 +290,12 @@ class RepositoryLoadHelperTest  {
             }
         }
 
-        val loadObserver = mock<DoorObserver<RepositoryLoadHelper.RepoLoadStatus>>{}
+        val loadObserver = mock<Observer<RepositoryLoadHelper.RepoLoadStatus>>{}
         repoLoadHelper.statusLiveData.observeForever(loadObserver)
 
-        val mockLiveData = mock<DoorLiveData<DummyEntity>> {  }
+        val mockLiveData = mock<LiveData<DummyEntity>> {  }
         val wrappedLiveData = repoLoadHelper.wrapLiveData(mockLiveData)
-        val mockObserver = mock<DoorObserver<DummyEntity>> {}
+        val mockObserver = mock<Observer<DummyEntity>> {}
 
         runBlocking {
             try {
@@ -360,7 +360,7 @@ class RepositoryLoadHelperTest  {
             }
         }
 
-        val loadObserver = mock<DoorObserver<RepositoryLoadHelper.RepoLoadStatus>>{}
+        val loadObserver = mock<Observer<RepositoryLoadHelper.RepoLoadStatus>>{}
         repoLoadHelper.statusLiveData.observeForever(loadObserver)
 
         runBlocking {

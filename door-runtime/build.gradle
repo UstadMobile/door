@@ -71,7 +71,7 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
-                compileOnly project(":room-annotations")
+                compileOnly project(":door-room-kmp")
                 implementation kotlin("stdlib-common")
                 implementation "io.ktor:ktor-client-core:$version_ktor"
                 implementation "io.ktor:ktor-client-json:$version_ktor"
@@ -132,7 +132,7 @@ kotlin {
             dependsOn commonJvmJs
 
             dependencies {
-                implementation project(":room-annotations")
+                implementation project(":door-room-kmp")
                 implementation "org.kodein.di:kodein-di-framework-ktor-server-jvm:$version_kodein_di"
                 implementation "org.xerial:sqlite-jdbc:$version_sqlite_jdbc"
                 implementation "org.postgresql:postgresql:$version_postgres_jdbc"

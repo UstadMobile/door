@@ -1,9 +1,8 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
+import androidx.lifecycle.LiveData
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
-import com.ustadmobile.door.DoorDataSourceFactory
-import com.ustadmobile.door.DoorLiveData
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.jdbc.TypesKmp
 import javax.annotation.processing.ProcessingEnvironment
@@ -63,13 +62,13 @@ internal fun String.sqlTypeDefaultValue(dbType: Int) = this.trim().uppercase().l
 
 internal fun TypeName.isDataSourceFactory(paramTypeFilter: (List<TypeName>) -> Boolean = {true}): Boolean {
     return this is ParameterizedTypeName
-            && this.rawType == DoorDataSourceFactory::class.asClassName()
+            && this.rawType == androidx.paging.DataSource.Factory::class.asClassName()
             && paramTypeFilter(this.typeArguments)
 }
 
 
 internal fun TypeName.isDataSourceFactoryOrLiveData() = this is ParameterizedTypeName
-        && (this.isDataSourceFactory() ||  this.rawType == DoorLiveData::class.asClassName())
+        && (this.isDataSourceFactory() ||  this.rawType == LiveData::class.asClassName())
 
 fun TypeName.isListOrArray() = (this is ClassName && this.canonicalName =="kotlin.Array")
         || (this is ParameterizedTypeName && this.rawType == List::class.asClassName())
@@ -129,8 +128,8 @@ internal fun TypeName.asComponentClassNameIfList() : ClassName {
  */
 fun TypeName.unwrapLiveDataOrDataSourceFactory()  =
     when {
-        this is ParameterizedTypeName && rawType == DoorLiveData::class.asClassName() -> typeArguments[0]
-        this is ParameterizedTypeName && rawType == DoorDataSourceFactory::class.asClassName() ->
+        this is ParameterizedTypeName && rawType == LiveData::class.asClassName() -> typeArguments[0]
+        this is ParameterizedTypeName && rawType == androidx.paging.DataSource.Factory::class.asClassName() ->
             List::class.asClassName().parameterizedBy(typeArguments[1])
         else -> this
     }
@@ -161,7 +160,7 @@ fun TypeName.unwrapQueryResultComponentType() = unwrapLiveDataOrDataSourceFactor
 /**
  * Determine if this typename represents LiveData
  */
-fun TypeName.isLiveData() = this is ParameterizedTypeName && rawType == DoorLiveData::class.asClassName()
+fun TypeName.isLiveData() = this is ParameterizedTypeName && rawType == LiveData::class.asClassName()
 
 fun TypeName.hasAttachments(processingEnv: ProcessingEnvironment): Boolean {
     if(this is ClassName){

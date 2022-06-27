@@ -1,6 +1,7 @@
 package com.ustadmobile.door.ext
 
-import com.ustadmobile.door.DoorLiveData
+
+import androidx.lifecycle.LiveData
 import com.ustadmobile.door.RepositoryLoadHelper
 
-fun DoorLiveData<*>.isRepositoryLiveData() = (this is RepositoryLoadHelper<*>.LiveDataWrapper2<*>)
+fun LiveData<*>.isRepositoryLiveData() = (this is RepositoryLoadHelper<*>.LiveDataWrapper2<*>)

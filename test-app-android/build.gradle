@@ -1,9 +1,10 @@
 plugins {
     id 'com.android.application'
     id 'kotlin-android'
-    id 'kotlin-kapt'
+    //id 'kotlin-kapt'
     id 'org.jetbrains.kotlin.plugin.serialization'
     id 'kotlinx-atomicfu'
+    id "com.google.devtools.ksp"
 }
 
 android {
@@ -74,7 +75,7 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
     implementation "androidx.lifecycle:lifecycle-livedata-ktx:$version_androidx_lifecycle"
 
-    annotationProcessor "androidx.room:room-compiler:$version_android_room"
+    ksp "androidx.room:room-compiler:$version_android_room"
 
 
     testImplementation 'junit:junit:4.+'

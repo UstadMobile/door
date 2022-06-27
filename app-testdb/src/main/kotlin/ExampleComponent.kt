@@ -1,8 +1,9 @@
-import com.ustadmobile.door.DoorLifecycleObserver
-import com.ustadmobile.door.DoorLifecycleOwner
+import androidx.lifecycle.FullLifecycleObserver
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import db2.ExampleEntity2
 import kotlinx.css.*
-import kotlinx.css.properties.Transforms
 import kotlinx.css.properties.border
 import kotlinx.css.properties.scale
 import kotlinx.css.properties.transform
@@ -14,13 +15,16 @@ import react.*
 import styled.*
 
 class ExampleComponent(mProps: PropsWithChildren): RComponent<PropsWithChildren, State>(mProps),
-    ExampleView, DoorLifecycleOwner {
+    ExampleView, LifecycleOwner {
 
     private var mPresenter: ExamplePresenter<*>? = null
 
-    private var observerStatus: Int = -1
+    private var lifecycleState = Lifecycle.State.DESTROYED
 
-    private val observerList: MutableList<DoorLifecycleObserver> = mutableListOf()
+    private val observerList: MutableList<LifecycleObserver> = mutableListOf()
+
+    override val lifecycle: Lifecycle
+        get() = TODO("Not yet implemented")
 
     override var list: List<ExampleEntity2>? = null
         get() = field
@@ -41,10 +45,10 @@ class ExampleComponent(mProps: PropsWithChildren): RComponent<PropsWithChildren,
     override fun componentDidMount() {
         mPresenter = ExamplePresenter(this, this)
         mPresenter?.onCreate()
-        observerStatus = DoorLifecycleObserver.STARTED
+        lifecycleState = Lifecycle.State.STARTED
 
         for (doorLifecycleObserver in observerList) {
-            doorLifecycleObserver.onCreate(this)
+            (doorLifecycleObserver as FullLifecycleObserver).onCreate(this)
         }
     }
 
@@ -160,22 +164,19 @@ class ExampleComponent(mProps: PropsWithChildren): RComponent<PropsWithChildren,
     }
 
 
-    override val currentState: Int
-        get() = observerStatus
-
-    override fun addObserver(observer: DoorLifecycleObserver) {
+    override fun addObserver(observer: LifecycleObserver) {
         observerList.add(observer)
     }
 
-    override fun removeObserver(observer: DoorLifecycleObserver) {
+    override fun removeObserver(observer: LifecycleObserver) {
         observerList.remove(observer)
     }
 
     override fun componentWillUnmount() {
-        observerStatus = DoorLifecycleObserver.STOPPED
+        lifecycleState = Lifecycle.State.DESTROYED
 
         for (doorLifecycleObserver in observerList) {
-            doorLifecycleObserver.onStop(this)
+            (doorLifecycleObserver as FullLifecycleObserver).onStop(this)
         }
 
         mPresenter?.onDestroy()

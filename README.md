@@ -33,3 +33,10 @@ Door provides a few workarounds:
 
 * android.permission.ACCESS_NETWORK_STATE - Used to automatically turn replication on and off when a device is 
   connected and disconnected.
+
+## Modules
+
+* [door-compiler](door-compiler/) Contains the actual annotation processor based on Kotlin Poet
+* [door-room-jdbc](door-room-jdbc/) Provides an adapter that implements a subset of JDBC on a Room database
+* [door-room-kmp](door-room-kmp/) Provides the needed androidx classes (e.g. LiveData, annotations, etc) for 
+use on JVM and JS. This is also used as a compileOnly dependency for common code

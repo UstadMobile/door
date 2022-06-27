@@ -1,5 +1,6 @@
 package com.ustadmobile.door
 
+import androidx.lifecycle.Observer
 import org.junit.Assert
 import org.junit.Test
 import org.mockito.kotlin.argThat
@@ -10,14 +11,14 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
-class DoorLiveDataImplTest {
+class LiveDataImplTest {
 
     @Test
     fun givenEmptyLiveData_whenActive_shouldCallFetchFnAndAddChangeListener() {
         val mockDb = mock<DoorDatabase>()
         val fetchFnCount = AtomicInteger()
         val fetchCountdownLatch = CountDownLatch(1)
-        val liveDataJdbc = DoorLiveDataImpl<Int>(mockDb, listOf("magic")) {
+        val liveDataJdbc = LiveDataImpl<Int>(mockDb, listOf("magic")) {
             fetchFnCount.incrementAndGet()
             fetchCountdownLatch.countDown()
             42
@@ -33,12 +34,12 @@ class DoorLiveDataImplTest {
     fun givenEmptyLiveData_whenInactive_shouldRemoveChangeListener() {
         val mockDb = mock<DoorDatabase>()
         val fetchFnCount = AtomicInteger()
-        val liveDataJdbc = DoorLiveDataImpl<Int>(mockDb, listOf("magic")) {
+        val liveDataJdbc = LiveDataImpl<Int>(mockDb, listOf("magic")) {
             fetchFnCount.incrementAndGet()
             42
         }
 
-        val mockObserver = mock<DoorObserver<Int>> {
+        val mockObserver = mock<Observer<Int>> {
 
         }
         liveDataJdbc.observeForever(mockObserver)

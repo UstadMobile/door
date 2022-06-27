@@ -1,14 +1,15 @@
 package com.ustadmobile.door
 
+import androidx.lifecycle.LiveData
 import com.ustadmobile.door.ext.asCommon
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 
-class DoorLiveDataImpl<T>(
+class LiveDataImpl<T>(
     val db: DoorDatabase,
     val tableNames: List<String>,
     val fetchFn: suspend () -> T
-): DoorLiveData<T>() {
+): LiveData<T>() {
 
     private val dbChangeListenerRequest = ChangeListenerRequest(tableNames) {
         update()

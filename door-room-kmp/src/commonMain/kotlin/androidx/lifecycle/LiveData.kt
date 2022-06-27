@@ -1,39 +1,40 @@
-package com.ustadmobile.door
+package androidx.lifecycle
 
-import com.ustadmobile.door.ext.concurrentSafeListOf
 import kotlinx.atomicfu.atomic
 
-actual abstract class DoorLiveData<T> {
+abstract class LiveData<T> {
 
     private val value = atomic<T?>(null)
 
-    private val activeObservers = concurrentSafeListOf<DoorObserver<in T>>()
+    //TODO: go back to use concurrentSafeListOf
+    //private val activeObservers = concurrentSafeListOf<Observer<in T>>()
+    private val activeObservers = mutableListOf<Observer<in T>>()
 
     private var active: Boolean = false
 
     private var initialValueLoaded: Boolean = false
 
-    private val lifecycleObservers = mutableMapOf<DoorObserver<in T>, Pair<DoorLifecycleOwner, LifecycleObserver>>()
+    private val lifecycleObservers = mutableMapOf<Observer<in T>, Pair<LifecycleOwner, LifecycleObserver>>()
 
-    actual constructor()
+    constructor()
 
     constructor(value: T) {
         this.value.value = value
         initialValueLoaded = true
     }
 
-    inner class LifecycleObserver(val observer: DoorObserver<in T>): DoorLifecycleObserver() {
+    inner class InnerLifecycleObserver(val observer: Observer<in T>): DefaultLifecycleObserver {
 
-        override fun onStart(owner: DoorLifecycleOwner) {
+        override fun onStart(owner: LifecycleOwner) {
             addActiveObserver(observer)
         }
 
-        override fun onStop(owner: DoorLifecycleOwner) {
+        override fun onStop(owner: LifecycleOwner) {
             removeActiveObserver(observer)
         }
     }
 
-    private fun addActiveObserver(observer: DoorObserver<in T>) {
+    private fun addActiveObserver(observer: Observer<in T>) {
         activeObservers.add(observer)
 
         //call onactive... that should then post the value out...
@@ -47,7 +48,7 @@ actual abstract class DoorLiveData<T> {
                 //If initial value has been set as loaded, but it is null, the type arg must be nullable. The only
                 //option here is to use an unchecked cast.
                 @Suppress("UNCHECKED_CAST")
-                val nullableObserver = observer as DoorObserver<T?>
+                val nullableObserver = observer as Observer<T?>
                 nullableObserver.onChanged(null)
             }else {
                 value.value?.let { observer.onChanged(it) }
@@ -55,27 +56,27 @@ actual abstract class DoorLiveData<T> {
         }
     }
 
-    private fun removeActiveObserver(observer: DoorObserver<in T>) {
+    private fun removeActiveObserver(observer: Observer<in T>) {
         if(activeObservers.remove(observer) && activeObservers.isEmpty()) {
             onInactive()
         }
     }
 
-    actual open fun observe(lifecycleOwner: DoorLifecycleOwner, observer: DoorObserver<in T>) {
-        if(lifecycleOwner.currentState >= DoorLifecycleObserver.STARTED) {
+    open fun observe(lifecycleOwner: LifecycleOwner, observer: Observer<in T>) {
+        if(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
             addActiveObserver(observer)
         }
 
-        val lifecycleObserver = LifecycleObserver(observer)
+        val lifecycleObserver = InnerLifecycleObserver(observer)
         lifecycleObservers[observer] = Pair(lifecycleOwner, lifecycleObserver)
-        lifecycleOwner.addObserver(lifecycleObserver)
+        lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
     }
 
-    actual open fun observeForever(observer: DoorObserver<in T>) {
+    open fun observeForever(observer: Observer<in T>) {
         addActiveObserver(observer)
     }
 
-    actual open fun removeObserver(observer: DoorObserver<in T>) {
+    open fun removeObserver(observer: Observer<in T>) {
         removeActiveObserver(observer)
         val observedLifecycle = lifecycleObservers[observer]
         if(observedLifecycle!= null) {
@@ -85,7 +86,7 @@ actual abstract class DoorLiveData<T> {
 
 
 
-    actual open fun getValue(): T?  = value.value
+    open fun getValue(): T?  = value.value
 
     protected open fun onActive() {
 
@@ -95,11 +96,12 @@ actual abstract class DoorLiveData<T> {
 
     }
 
-    protected fun postValue(value: T) {
+    protected open fun postValue(value: T) {
         this.value.value = value
         initialValueLoaded = true
         activeObservers.forEach { it.onChanged(value) }
     }
 
-    actual open fun hasActiveObservers(): Boolean = activeObservers.isNotEmpty()
+    open fun hasActiveObservers(): Boolean = activeObservers.isNotEmpty()
+
 }

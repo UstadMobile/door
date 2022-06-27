@@ -1,10 +1,10 @@
 package repdb
 
+import androidx.lifecycle.LiveData
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
-import com.ustadmobile.door.DoorLiveData
 import com.ustadmobile.door.annotation.*
 import com.ustadmobile.door.entities.DoorNode
 
@@ -74,7 +74,7 @@ abstract class RepDao {
         SELECT RepEntityTracker.*
           FROM RepEntityTracker
     """)
-    abstract fun findAllTrackers(): DoorLiveData<List<RepEntityTracker>>
+    abstract fun findAllTrackers(): LiveData<List<RepEntityTracker>>
 
     @Insert
     abstract fun insert(repEntity: RepEntity): Long
@@ -100,7 +100,7 @@ abstract class RepDao {
     SELECT COUNT(*)
       FROM RepEntity
     """)
-    abstract fun countEntitiesLive(): DoorLiveData<Int>
+    abstract fun countEntitiesLive(): LiveData<Int>
 
 
     @Query("""
@@ -130,7 +130,7 @@ abstract class RepDao {
       FROM RepEntity
      WHERE RepEntity.rePrimaryKey = :uid 
     """)
-    abstract fun findByUidLive(uid: Long): DoorLiveData<RepEntity?>
+    abstract fun findByUidLive(uid: Long): LiveData<RepEntity?>
 
     @RepoHttpAccessible
     @Repository(Repository.METHOD_DELEGATE_TO_WEB)

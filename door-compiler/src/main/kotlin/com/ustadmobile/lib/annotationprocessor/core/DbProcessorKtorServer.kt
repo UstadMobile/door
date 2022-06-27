@@ -1,5 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
+import androidx.lifecycle.LiveData
 import androidx.room.Dao
 import androidx.room.Database
 import com.google.gson.Gson
@@ -349,7 +350,7 @@ fun CodeBlock.Builder.addHttpServerPassToDaoCodeBlock(
     }
 
     val isLiveData = returnType is ParameterizedTypeName
-            && returnType.rawType == DoorLiveData::class.asClassName()
+            && returnType.rawType == LiveData::class.asClassName()
     val useRunBlocking = serverType == SERVER_TYPE_NANOHTTPD
             && (KModifier.SUSPEND in daoMethod.modifiers || isLiveData)
 

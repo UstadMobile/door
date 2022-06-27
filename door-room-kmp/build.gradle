@@ -1,6 +1,7 @@
 plugins {
     id 'org.jetbrains.kotlin.multiplatform'
     id 'maven-publish'
+    id 'kotlinx-atomicfu'
 }
 
 group rootProject.group
@@ -43,14 +44,13 @@ kotlin {
             }
         }
 
-        commonJvmMain{}
 
         androidMain {
-            dependsOn commonJvmMain
+            
         }
 
         jvmMain {
-            dependsOn commonJvmMain
+
         }
 
         jsMain {}

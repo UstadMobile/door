@@ -4,8 +4,8 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
-import com.ustadmobile.door.DoorDataSourceFactory
-import com.ustadmobile.door.DoorLiveData
+import androidx.paging.DataSource
+import androidx.lifecycle.LiveData
 import com.ustadmobile.door.SyncNode
 import com.ustadmobile.door.annotation.ParamName
 import com.ustadmobile.door.annotation.RepoHttpAccessible
@@ -46,10 +46,10 @@ abstract class ExampleSyncableDao {
     abstract fun findAllWithOtherByUid(): List<ExampleSyncableEntityWithOtherSyncableEntity>
 
     @Query("SELECT * FROM ExampleSyncableEntity")
-    abstract fun findAllLive(): DoorLiveData<List<ExampleSyncableEntity>>
+    abstract fun findAllLive(): LiveData<List<ExampleSyncableEntity>>
 
     @Query("SELECT * FROM ExampleSyncableEntity")
-    abstract fun findAllDataSource(): DoorDataSourceFactory<Int, ExampleSyncableEntity>
+    abstract fun findAllDataSource(): DataSource.Factory<Int, ExampleSyncableEntity>
 
     @Query("UPDATE ExampleSyncableEntity SET esNumber = :newNumber," +
             "esLcb = (SELECT nodeClientId FROM SyncNode LIMIT 1) " +

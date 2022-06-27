@@ -1,7 +1,7 @@
 package repdb
 
 import androidx.room.*
-import com.ustadmobile.door.DoorLiveData
+import androidx.lifecycle.LiveData
 import com.ustadmobile.door.annotation.*
 
 @Dao
@@ -67,7 +67,7 @@ abstract class RepWithAttachmentDao {
           FROM RepEntityWithAttachment
          WHERE waUid = :uid
     """)
-    abstract fun findByUidLive(uid: Long): DoorLiveData<RepEntityWithAttachment?>
+    abstract fun findByUidLive(uid: Long): LiveData<RepEntityWithAttachment?>
 
     @Query("""
         SELECT RepEntityWithAttachment.*

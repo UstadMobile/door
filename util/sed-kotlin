@@ -1,0 +1,11 @@
+s/import com.ustadmobile.door.DoorLiveData/import androidx.lifecycle.LiveData/g
+s/DoorLiveData/LiveData/g
+s/import com.ustadmobile.door.DoorObserver/import androidx.lifecycle.Observer/g
+s/DoorObserver/Observer/g
+s/import com.ustadmobile.door.LifecycleOwner/import androidx.lifecycle.LifecycleOwner/g
+s/DoorLifecycleOwner/LifecycleOwner/g
+s/import com.ustadmobile.door.DoorDataSourceFactory/import androidx.paging.DataSource/g
+s/DoorDataSourceFactory/DataSource.Factory/g
+
+
+
