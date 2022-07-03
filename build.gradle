@@ -51,6 +51,7 @@ buildscript {
 
 ext {
     version_kotlin = "1.7.0"
+    version_coroutines = "1.6.3"
     version_ktor = "2.0.2"
     version_nanohttpd = "2.3.1"
     version_napier = "2.6.1"

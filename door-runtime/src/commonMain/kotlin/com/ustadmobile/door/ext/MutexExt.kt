@@ -6,6 +6,8 @@ import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
 
+
+// This will be obsolete when we change to tracking transactions using coroutinecontext and threads
 // As per https://gist.github.com/elizarov/9a48b9709ffd508909d34fab6786acfe
 // see https://github.com/Kotlin/kotlinx.coroutines/issues/1686
 suspend fun <T> Mutex.withReentrantLock(

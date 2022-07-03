@@ -58,6 +58,7 @@ kotlin {
                 implementation kotlin('stdlib-common')
                 implementation project(":door-runtime")
                 compileOnly project(":door-room-kmp")
+                implementation project(":door-jdbc")
 
                 implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
                 implementation "io.ktor:ktor-client-content-negotiation:$version_ktor"

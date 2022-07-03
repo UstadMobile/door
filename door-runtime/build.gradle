@@ -72,6 +72,7 @@ kotlin {
         commonMain {
             dependencies {
                 compileOnly project(":door-room-kmp")
+                implementation project(":door-jdbc")
                 implementation kotlin("stdlib-common")
                 implementation "io.ktor:ktor-client-core:$version_ktor"
                 implementation "io.ktor:ktor-client-json:$version_ktor"

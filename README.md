@@ -40,3 +40,8 @@ Door provides a few workarounds:
 * [door-room-jdbc](door-room-jdbc/) Provides an adapter that implements a subset of JDBC on a Room database
 * [door-room-kmp](door-room-kmp/) Provides the needed androidx classes (e.g. LiveData, annotations, etc) for 
 use on JVM and JS. This is also used as a compileOnly dependency for common code
+
+## Known issues
+
+* door-testdb:jsBrowserTest on a limited Internet connection may fail. The test has to download SQLite.js
+from the Internet due to issues with asset loading. It can be skipped if building locally.
