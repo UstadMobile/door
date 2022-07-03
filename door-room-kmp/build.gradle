@@ -44,16 +44,21 @@ kotlin {
             }
         }
 
+        commonJvmJs {
+
+        }
 
         androidMain {
-            
+
         }
 
         jvmMain {
-
+            dependsOn commonJvmJs
         }
 
-        jsMain {}
+        jsMain {
+            dependsOn commonJvmJs
+        }
     }
 }
 

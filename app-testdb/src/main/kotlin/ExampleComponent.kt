@@ -163,14 +163,14 @@ class ExampleComponent(mProps: PropsWithChildren): RComponent<PropsWithChildren,
         }
     }
 
-
-    override fun addObserver(observer: LifecycleObserver) {
-        observerList.add(observer)
-    }
-
-    override fun removeObserver(observer: LifecycleObserver) {
-        observerList.remove(observer)
-    }
+//   This will be obsolete: moving to FC
+//    override fun addObserver(observer: LifecycleObserver) {
+//        observerList.add(observer)
+//    }
+//
+//    override fun removeObserver(observer: LifecycleObserver) {
+//        observerList.remove(observer)
+//    }
 
     override fun componentWillUnmount() {
         lifecycleState = Lifecycle.State.DESTROYED

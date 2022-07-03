@@ -23,6 +23,10 @@ abstract class LiveData<T> {
         initialValueLoaded = true
     }
 
+    /**
+     * When observe is called, this internal class is used to observe a given LifecycleOwner so that we can track if it
+     * is active or not
+     */
     inner class InnerLifecycleObserver(val observer: Observer<in T>): DefaultLifecycleObserver {
 
         override fun onStart(owner: LifecycleOwner) {
@@ -79,9 +83,7 @@ abstract class LiveData<T> {
     open fun removeObserver(observer: Observer<in T>) {
         removeActiveObserver(observer)
         val observedLifecycle = lifecycleObservers[observer]
-        if(observedLifecycle!= null) {
-            observedLifecycle.first.removeObserver(observedLifecycle.second)
-        }
+        observedLifecycle?.first?.lifecycle?.removeObserver(observedLifecycle.second)
     }
 
 

@@ -18,7 +18,8 @@ class ExamplePresenter<V :  ExampleView> (private val view: V, private val lifec
     }
 
     init {
-        lifecycleOwner.addObserver(this)
+        //This will be obsolete - moving to FC
+        //lifecycleOwner.addObserver(this)
     }
 
     fun onCreate(){
@@ -55,7 +56,7 @@ class ExamplePresenter<V :  ExampleView> (private val view: V, private val lifec
     }
 
     fun onDestroy(){
-        lifecycleOwner.removeObserver(this)
+        //lifecycleOwner.removeObserver(this)
     }
 
     fun handleDownloadDbClicked() {

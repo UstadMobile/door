@@ -1,7 +1,6 @@
 package com.ustadmobile.door
 
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.LiveData
+import androidx.lifecycle.*
 import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.timeout
@@ -13,8 +12,8 @@ import org.junit.Assert
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 class LiveDataTest {
 
@@ -35,8 +34,11 @@ class LiveDataTest {
 
     @Test
     fun givenEmptyLiveData_whenObserveCalledAndLifeCycleHasStarted_thenShouldCallOnActive() {
+        val mockActiveLifecycle = mock<Lifecycle> {
+            on { currentState }.thenReturn(Lifecycle.State.STARTED)
+        }
         val mockLifecycleOwner = mock<LifecycleOwner> {
-            on {  }.thenReturn(DoorLifecycleObserver.STARTED)
+            on { lifecycle }.thenReturn(mockActiveLifecycle)
         }
 
         val countdownLatch = CountDownLatch(1)
@@ -57,11 +59,13 @@ class LiveDataTest {
 
     @Test
     fun givenEmptyLiveData_whenObserveCalledAndLifeCycleStarts_thenShouldCallOnActive() {
-        val lifecycleState = AtomicInteger(DoorLifecycleObserver.STARTED)
-        val mockLifecycleOwner = mock<LifecycleOwner> {
-            on { currentState }.thenAnswer { invocation -> lifecycleState.get() }
-            on { addObserver(any()) }.thenAnswer {invocation ->
-                val listener = invocation.arguments[0] as DoorLifecycleObserver
+        val lifecycleState = AtomicReference(Lifecycle.State.STARTED)// AtomicInteger(DoorLifecycleObserver.STARTED)
+        val mockLifecycle = mock<Lifecycle> {
+            on { currentState }.thenAnswer {
+                lifecycleState.get()
+            }
+            on { addObserver(any())}.thenAnswer { invocation ->
+                val listener = invocation.arguments[0] as FullLifecycleObserver
                 GlobalScope.launch {
                     delay(100)
                     listener.onStart(invocation.mock as LifecycleOwner)
@@ -69,6 +73,21 @@ class LiveDataTest {
                 Unit
             }
         }
+        val mockLifecycleOwner = mock<LifecycleOwner> {
+            on { lifecycle }.thenReturn(mockLifecycle)
+        }
+
+//        val mockLifecycleOwner = mock<LifecycleOwner> {
+//            on { currentState }.thenAnswer { invocation -> lifecycleState.get() }
+//            on { addObserver(any()) }.thenAnswer {invocation ->
+//                val listener = invocation.arguments[0] as DoorLifecycleObserver
+//                GlobalScope.launch {
+//                    delay(100)
+//                    listener.onStart(invocation.mock as LifecycleOwner)
+//                }
+//                Unit
+//            }
+//        }
 
         val countdownLatch = CountDownLatch(1)
         val livedataTest = object : LiveData<Int>() {
@@ -87,13 +106,13 @@ class LiveDataTest {
 
     @Test
     fun givenEmptyLiveData_whenObsevedAndNewValuePosted_thenShouldCallOnChanged() {
-        val livedataTest = DoorMutableLiveData<Int>()
+        val livedataTest = MutableLiveData<Int>()
         val mockObserver = mock<Observer<Int>> {
 
         }
 
         livedataTest.observeForever(mockObserver)
-        livedataTest.sendValue(42)
+        livedataTest.postValue(42)
         verify(mockObserver, timeout(5000)).onChanged(42)
     }
 

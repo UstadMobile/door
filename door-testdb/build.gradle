@@ -1,3 +1,5 @@
+import java.time.Duration
+
 plugins {
     id 'org.jetbrains.kotlin.multiplatform'
     id 'org.jetbrains.kotlin.plugin.serialization'
@@ -43,6 +45,7 @@ kotlin {
         browser {
             testTask {
                 useKarma {
+                    timeout = Duration.ofSeconds(30)
                     useChromeHeadless() //change to useChrome to run the actual browser
                 }
             }
