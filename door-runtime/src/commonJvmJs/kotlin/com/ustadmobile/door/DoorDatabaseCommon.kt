@@ -2,11 +2,8 @@ package com.ustadmobile.door
 import com.ustadmobile.door.ext.*
 import io.github.aakira.napier.Napier
 import com.ustadmobile.door.jdbc.*
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.Runnable
 import com.ustadmobile.door.ext.concurrentSafeListOf
-import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.rootTransactionDatabase
 
 abstract class DoorDatabaseCommon {
@@ -65,8 +62,9 @@ abstract class DoorDatabaseCommon {
             this@DoorDatabaseCommon.execSQLBatch(*statements)
         }
 
+        @Suppress("CAST_NEVER_SUCCEEDS")
         override fun useConnection(block: (Connection) -> Unit) {
-            rootDatabaseJdbc.useConnection(block)
+            ((this as DoorDatabase).rootDatabase as RoomJdbcImpl).jdbcImplHelper.useConnection(block = block)
         }
 
         val jdbcDbType: Int
@@ -104,9 +102,9 @@ abstract class DoorDatabaseCommon {
     @Suppress("CAST_NEVER_SUCCEEDS") //IntelliJ doesn't understand: but this will always succeed
     open fun execSQLBatch(vararg sqlStatements: String) {
         val rootDb = (this as DoorDatabase).rootDatabase
-        val jdbcDb = (rootDb as DoorDatabaseJdbc)
+        val doorRoomImpl = (rootDb as RoomJdbcImpl)
 
-        jdbcDb.useConnection { connection ->
+        doorRoomImpl.jdbcImplHelper.useConnection { connection ->
             connection.setAutoCommit(false)
             connection.createStatement().useStatement { statement ->
                 sqlStatements.forEach { sql ->
@@ -119,26 +117,6 @@ abstract class DoorDatabaseCommon {
                 }
             }
             connection.commit()
-        }
-    }
-
-    /**
-     * Convenience extension function that will create a prepared statement. It will
-     * use builtin support for arrays if required and available, or fallback to using
-     * PreparedStatementArrayProxy otherwise.
-     */
-    internal fun prepareStatement(connection: Connection, stmtConfig: PreparedStatementConfig) : PreparedStatement {
-        val pgSql = stmtConfig.postgreSql
-        val sqlToUse = if(pgSql != null && jdbcDbType == DoorDbType.POSTGRES ) {
-            pgSql
-        }else {
-            stmtConfig.sql
-        }
-
-        return when {
-            !stmtConfig.hasListParams -> connection.prepareStatement(sqlToUse, stmtConfig.generatedKeys)
-            jdbcArraySupported -> connection.prepareStatement(adjustQueryWithSelectInParam(sqlToUse))
-            else -> PreparedStatementArrayProxy(sqlToUse, connection)
         }
     }
 

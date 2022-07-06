@@ -31,6 +31,10 @@ class SQLiteConnectionJs(val datasource: SQLiteDatasourceJs):Connection {
 
     override fun commit() {}
 
+    override fun rollback() {
+
+    }
+
     override fun close() {
         closed = true
     }

@@ -5,6 +5,7 @@ import com.ustadmobile.door.DoorDatabase
 import db2.ExampleDatabase2
 import db2.ExampleEntity2
 import db2.ExampleLinkEntity
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert
 import org.junit.Before
 import org.junit.BeforeClass
@@ -149,5 +150,20 @@ class TestDbBuilderKt {
                 exampleDb2.exampleDao2().findNameByUid(it.uid)) }
     }
 
+
+    @Test
+    fun givenEntryInsertedAsync_whenQueriedAsync_shouldBeEqual() {
+        runBlocking {
+            val entityToInsert = ExampleEntity2(0, "Bob", 50)
+            entityToInsert.uid = exampleDb2.exampleDao2().insertAsyncAndGiveId(entityToInsert)
+
+            val entityFromQuery = exampleDb2.exampleDao2().findByUidAsync(entityToInsert.uid)
+
+            Assert.assertNotEquals(0, entityToInsert.uid)
+            Assert.assertEquals("Entity retrieved from database is the same as entity inserted",
+                entityToInsert, entityFromQuery)
+        }
+
+    }
 
 }

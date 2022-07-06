@@ -1371,6 +1371,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         addType(TypeSpec.classBuilder(dbTypeElement.asClassNameWithSuffix(SUFFIX_JDBC_KT2))
             .superclass(dbTypeElement.asClassName())
             .addSuperinterface(DoorDatabaseJdbc::class)
+            .addSuperinterface(RoomJdbcImpl::class)
             .primaryConstructor(FunSpec.constructorBuilder()
                 .addParameter("doorJdbcSourceDatabase", DoorDatabase::class.asTypeName().copy(nullable = true))
                 .addParameter(ParameterSpec("dataSource",  CLASSNAME_DATASOURCE))
@@ -1385,6 +1386,9 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             .addDbVersionProperty(dbTypeElement)
             .addProperty(PropertySpec.builder("dataSource", CLASSNAME_DATASOURCE, KModifier.OVERRIDE)
                 .initializer("dataSource")
+                .build())
+            .addProperty(PropertySpec.builder("jdbcImplHelper", RoomDatabaseJdbcImplHelper::class, KModifier.OVERRIDE)
+                .initializer("%T(dataSource)\n", RoomDatabaseJdbcImplHelper::class)
                 .build())
             .applyIf(target == DoorTarget.JVM) {
                 addProperty(PropertySpec.builder("realAttachmentStorageUri",

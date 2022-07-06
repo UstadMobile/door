@@ -68,7 +68,7 @@ afterEvaluate {
 
                 // You can then customize attributes of the publication as shown below.
                 groupId = rootProject.group
-                artifactId = "door-room-jdbc"
+                artifactId = "door-jdbc-room-impl"
                 version = rootProject.version
             }
             // Creates a Maven publication called “debug”.
@@ -77,7 +77,7 @@ afterEvaluate {
                 from components.debug
 
                 groupId = rootProject.group
-                artifactId = "door-room-jdbc"
+                artifactId = "door-jdbc-room-impl"
                 version = rootProject.version
             }
         }

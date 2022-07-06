@@ -1,7 +1,19 @@
 package com.ustadmobile.door.ext
 
+import com.ustadmobile.door.DoorDatabase
+import com.ustadmobile.door.PreparedStatementConfig
 import com.ustadmobile.door.jdbc.Connection
+import com.ustadmobile.door.jdbc.PreparedStatement
 
-expect fun <R> Connection.useConnection(block: (Connection) -> R) : R
+/**
+ * Extension function that will produce a PreparedStatement given a database
+ * object and PreparedStatementConfig. It will choose the correct SQL to use
+ * (e.g. normal SQLite or Postgres if that is specified separately) and it will
+ * use the PreparedStatementArrayProxy if needed.
+ */
+expect fun Connection.prepareStatement(
+    db: DoorDatabase,
+    stmtConfig: PreparedStatementConfig
+): PreparedStatement
 
-expect suspend fun <R> Connection.useConnectionAsync(block: suspend (Connection) -> R): R
+

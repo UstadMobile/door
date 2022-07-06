@@ -1,31 +1,26 @@
 package com.ustadmobile.door.ext
 
+import com.ustadmobile.door.DoorDatabase
+import com.ustadmobile.door.DoorDbType
+import com.ustadmobile.door.PreparedStatementArrayProxy
+import com.ustadmobile.door.PreparedStatementConfig
 import com.ustadmobile.door.jdbc.Connection
+import com.ustadmobile.door.jdbc.PreparedStatement
 
-actual fun <R> Connection.useConnection(block: (Connection) -> R) : R {
-    try {
-        return block(this)
-    }catch(e: Exception) {
-        if(!autoCommit)
-            rollback()
-
-        throw e
-    }finally {
-        close()
+actual fun Connection.prepareStatement(
+    db: DoorDatabase,
+    stmtConfig: PreparedStatementConfig
+): PreparedStatement {
+    val pgSql = stmtConfig.postgreSql
+    val sqlToUse = if(pgSql != null && db.dbType() == DoorDbType.POSTGRES ) {
+        pgSql
+    }else {
+        stmtConfig.sql
     }
-}
 
-actual suspend fun <R> Connection.useConnectionAsync(
-    block: suspend (Connection) -> R
-) : R {
-    try {
-        return block(this)
-    }catch(e: Exception) {
-        if(!autoCommit)
-            rollback()
-
-        throw e
-    }finally {
-        close()
+    return when {
+        !stmtConfig.hasListParams -> prepareStatement(sqlToUse, stmtConfig.generatedKeys)
+        db.jdbcArraySupported -> prepareStatement(sqlToUse.adjustQueryWithSelectInParam(db.dbType()))
+        else -> PreparedStatementArrayProxy(sqlToUse, this)
     }
 }

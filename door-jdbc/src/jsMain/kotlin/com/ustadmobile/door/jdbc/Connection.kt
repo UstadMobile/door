@@ -12,6 +12,8 @@ actual interface Connection {
 
     actual fun commit()
 
+    actual fun rollback()
+
     actual fun close()
 
     actual fun isClosed(): Boolean

@@ -9,8 +9,6 @@ import kotlin.jvm.Volatile
 /**
  * The DoorInvalidationTracker is used by Jdbc database implementations. onTablesInvalidated is called by a
  * change tracker (e.g. SQLiteChangeTracker) when changes are committed.
- *
- * TODO: Maybe rename this to DoorInvalidationEventDispatcher ?
  */
 class DoorInvalidationTracker(
     private val logName: String

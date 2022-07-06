@@ -35,6 +35,9 @@ kotlin {
         commonMain {
             dependencies {
                 implementation kotlin('stdlib-common')
+                implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$version_coroutines"
+                implementation project(":door-jdbc")
+                implementation project(":door-common")
             }
         }
         commonTest {
@@ -54,6 +57,13 @@ kotlin {
 
         jvmMain {
             dependsOn commonJvmJs
+        }
+
+        jvmTest {
+            dependencies {
+                implementation kotlin("test-junit")
+                implementation "org.mockito.kotlin:mockito-kotlin:$version_kotlin_mockito"
+            }
         }
 
         jsMain {

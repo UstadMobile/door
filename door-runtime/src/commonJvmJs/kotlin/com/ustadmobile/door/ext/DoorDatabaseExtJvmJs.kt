@@ -12,8 +12,8 @@ actual suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
     block: suspend (PreparedStatement) -> R
 ) : R {
     try {
-        return asCommon().transactionRootJdbcDb.useConnectionAsync { connection: Connection ->
-            asCommon().prepareStatement(connection, stmtConfig).useStatementAsync { stmt: PreparedStatement ->
+        return (this.rootDatabase as RoomJdbcImpl).jdbcImplHelper.useConnectionAsync { connection ->
+            connection.prepareStatement(this, stmtConfig).useStatementAsync { stmt: PreparedStatement ->
                 stmt.setQueryTimeout((rootDatabase as DoorDatabaseJdbc).jdbcQueryTimeout)
                 val blockStartTime = systemTimeInMillis()
                 return@useConnectionAsync block(stmt).also {
@@ -34,8 +34,8 @@ actual fun <R> DoorDatabase.prepareAndUseStatement(
     block: (PreparedStatement) -> R
 ) : R {
     try {
-        return asCommon().transactionRootJdbcDb.useConnection { connection: Connection ->
-            asCommon().prepareStatement(connection, stmtConfig).useStatement { stmt: PreparedStatement ->
+        return (this.rootDatabase as RoomJdbcImpl).jdbcImplHelper.useConnection { connection ->
+            connection.prepareStatement(this, stmtConfig).useStatement { stmt: PreparedStatement ->
                 stmt.setQueryTimeout((rootDatabase as DoorDatabaseJdbc).jdbcQueryTimeout)
                 val blockStartTime = systemTimeInMillis()
                 return@useConnection block(stmt).also {

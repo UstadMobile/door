@@ -31,6 +31,7 @@ compileTestKotlin {
 
 dependencies {
     implementation project(":door-runtime")
+    implementation project(":door-common")
     implementation project(':door-room-kmp')
     implementation project(":door-jdbc")
     implementation "org.jetbrains.kotlin:kotlin-stdlib"

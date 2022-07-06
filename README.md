@@ -36,10 +36,21 @@ Door provides a few workarounds:
 
 ## Modules
 
+* [app-testdb](app-testdb/) Contains a test React/JS app. Used to run manual tests that don't seem to work in automated
+JS tests.
+* [door-jdbc](door-jdbc/) Contains multiplatform expect-actuals representing the core of JDBC (e.g. required functions on Statement, 
+PreparedStatement, Connection, DataSource, etc) On Android and JVM these are just typealiases to the real JDBC interfaces. 
+On JS these are actual interfaces. The class names are the same as found in JDBC, only the package name has been changed 
+from java.sql.* to com.ustadmobile.door.jdbc*. This allows multiplatform code to use JDBC.
+* [door-room-jdbc](door-room-jdbc/) Contains an Android module that provides an implementation of door-jdbc for Room 
+databases. 
 * [door-compiler](door-compiler/) Contains the actual annotation processor based on Kotlin Poet
-* [door-room-jdbc](door-room-jdbc/) Provides an adapter that implements a subset of JDBC on a Room database
 * [door-room-kmp](door-room-kmp/) Provides the needed androidx classes (e.g. LiveData, annotations, etc) for 
-use on JVM and JS. This is also used as a compileOnly dependency for common code
+use on JVM and JS. This is a compileOnly dependency for common code and an implementation dependency on JVM and JS. 
+Android will use room itself as an implementation dependency.
+* [door-testdb](door-testdb/) Contains a few test databases that are used for unit and integration testing. These 
+databases are compiled by the annotation processor, so tests can verify functionality (e.g. insert then retrieve, 
+sync, etc)
 
 ## Known issues
 

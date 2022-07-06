@@ -18,6 +18,8 @@ expect interface Connection {
 
     fun commit()
 
+    fun rollback()
+
     fun close()
 
     fun isClosed(): Boolean

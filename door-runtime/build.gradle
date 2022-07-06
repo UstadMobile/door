@@ -73,6 +73,7 @@ kotlin {
             dependencies {
                 compileOnly project(":door-room-kmp")
                 implementation project(":door-jdbc")
+                implementation project(":door-common")
                 implementation kotlin("stdlib-common")
                 implementation "io.ktor:ktor-client-core:$version_ktor"
                 implementation "io.ktor:ktor-client-json:$version_ktor"
@@ -103,7 +104,7 @@ kotlin {
         androidMain {
             dependsOn commonJvmMain
             dependencies {
-                implementation project(":door-room-jdbc")
+                implementation project(":door-jdbc-room-impl")
                 implementation "androidx.room:room-runtime:$version_android_room"
                 implementation "androidx.room:room-ktx:$version_android_room"
                 implementation "androidx.lifecycle:lifecycle-livedata-ktx:$version_androidx_lifecycle"
