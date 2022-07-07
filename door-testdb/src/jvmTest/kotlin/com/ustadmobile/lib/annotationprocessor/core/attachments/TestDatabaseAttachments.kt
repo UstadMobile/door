@@ -1,7 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core.attachments
 
 import com.ustadmobile.door.DatabaseBuilder
-import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.DOOR_ATTACHMENT_URI_PREFIX
 import com.ustadmobile.door.attachments.findZombieAttachments
 import com.ustadmobile.door.attachments.retrieveAttachment

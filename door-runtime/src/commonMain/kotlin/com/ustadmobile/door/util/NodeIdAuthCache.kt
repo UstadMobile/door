@@ -1,6 +1,7 @@
 package com.ustadmobile.door.util
 
-import com.ustadmobile.door.DoorDatabase
+
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.entities.DoorNode
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.concurrentSafeListOf
@@ -16,7 +17,7 @@ import kotlinx.coroutines.sync.withLock
  * acting as a server for other (remote) nodes to receive replication updates from the local node.
  */
 class NodeIdAuthCache(
-    private val db: DoorDatabase
+    private val db: RoomDatabase
 ) {
 
     fun interface OnNewDoorNode {

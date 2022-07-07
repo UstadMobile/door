@@ -2,18 +2,11 @@ package com.ustadmobile.door.ext
 
 import com.ustadmobile.door.jdbc.ResultSet
 import com.ustadmobile.door.jdbc.TypesKmp
+import com.ustadmobile.door.jdbc.ext.mapRows
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-fun <R> ResultSet.mapRows(block: (ResultSet) -> R): List<R> {
-    val mappedResults = mutableLinkedListOf<R>()
-    while(next()) {
-        mappedResults += block(this)
-    }
-
-    return mappedResults
-}
 
 /**
  * Get a column value from the ResultSet as a JsonPrimitive

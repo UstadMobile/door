@@ -1,6 +1,6 @@
 package com.ustadmobile.door.replication
 
-import com.ustadmobile.door.DoorDatabase
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_CHECK_FOR_ENTITIES_ALREADY_RECEIVED
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_FIND_PENDING_REPLICATIONS
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_FIND_PENDING_REPLICATION_TRACKERS
@@ -33,7 +33,7 @@ import com.ustadmobile.door.ktor.addNodeIdAndAuthCheckInterceptor
 import com.ustadmobile.door.util.systemTimeInMillis
 
 @Suppress("BlockingMethodInNonBlockingContext") //Has to be done in Server Sent Events
-fun <T: DoorDatabase> Route.doorReplicationRoute(
+fun <T: RoomDatabase> Route.doorReplicationRoute(
     typeToken: TypeToken<out T>,
     dbKClass: KClass<out T>,
     jsonSerializer: Json
@@ -48,7 +48,7 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
                 val tableId = call.request.queryParameters["tableId"]?.toInt() ?: 0
                 Napier.d("Replication: $ENDPOINT_CHECK_FOR_ENTITIES_ALREADY_RECEIVED table $tableId : starting")
                 val di: DI by closestDI()
-                val db: DoorDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
+                val db: RoomDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
                 val dbMetaData = dbKClass.doorDatabaseMetadata()
 
                 val pendingEntitiesStr = call.receive<String>()
@@ -73,7 +73,7 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
                 val di: DI by closestDI()
                 val tableId = call.request.queryParameters["tableId"]?.toInt() ?: 0
                 Napier.d("Replication: $ENDPOINT_RECEIVE_ENTITIES table $tableId : starting")
-                val db: DoorDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
+                val db: RoomDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
                 val dbMetaData = dbKClass.doorDatabaseMetadata()
                 val remoteNodeId = requireRemoteNodeIdAndAuth()
 
@@ -102,7 +102,7 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
                 call.response.cacheControl(CacheControl.NoCache(null))
                 val di: DI by closestDI()
 
-                val db: DoorDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
+                val db: RoomDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
                 val dbMetaData = dbKClass.doorDatabaseMetadata()
 
                 val trackersStr = call.receive<String>()
@@ -129,7 +129,7 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
                 call.response.cacheControl(CacheControl.NoCache(null))
                 val di: DI by closestDI()
 
-                val db: DoorDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
+                val db: RoomDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
                 val dbMetaData = dbKClass.doorDatabaseMetadata()
                 val offset = call.request.queryParameters["offset"]?.toInt()  ?: 0
 
@@ -155,7 +155,7 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
                 call.response.cacheControl(CacheControl.NoCache(null))
                 val di: DI by closestDI()
 
-                val db: DoorDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
+                val db: RoomDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
                 val dbMetaData = dbKClass.doorDatabaseMetadata()
 
 
@@ -173,7 +173,7 @@ fun <T: DoorDatabase> Route.doorReplicationRoute(
         get(ENDPOINT_SUBSCRIBE_SSE) {
             call.response.cacheControl(CacheControl.NoCache(null))
             val di: DI by closestDI()
-            val db: DoorDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
+            val db: RoomDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
 
             val channel = Channel<DoorServerSentEvent>(capacity = Channel.UNLIMITED)
             val remoteNodeIdAndAuth = requireRemoteNodeIdAndAuth()

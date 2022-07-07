@@ -1,5 +1,6 @@
 package com.ustadmobile.door
 
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.util.TransactionMode
@@ -11,7 +12,9 @@ import com.ustadmobile.door.util.TransactionMode
  * instance e.g. one set of invalidation listeners, one map of thread ids to transaction connections, etc.
  */
 expect class RoomDatabaseJdbcImplHelper(
-    dataSource: DataSource
+    dataSource: DataSource,
+    db: RoomDatabase,
+    tableNames: List<String>,
 ) : RoomDatabaseJdbcImplHelperCommon {
 
     fun <R> useConnection(

@@ -1,12 +1,12 @@
 package com.ustadmobile.door.ext
 
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.DoorConstants
-import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.DoorDatabaseRepository
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.header
 
-fun HttpRequestBuilder.dbVersionHeader(db: DoorDatabase) {
+fun HttpRequestBuilder.dbVersionHeader(db: RoomDatabase) {
     this.header(DoorConstants.HEADER_DBVERSION, db.dbSchemaVersion())
 }
 

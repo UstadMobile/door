@@ -1,6 +1,6 @@
 package com.ustadmobile.door.replication
 
-import com.ustadmobile.door.DoorDatabase
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_CHECK_FOR_ENTITIES_ALREADY_RECEIVED
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_FIND_PENDING_REPLICATIONS
@@ -33,7 +33,7 @@ suspend fun DoorDatabaseRepository.sendPendingReplications(
 ) {
     //should return a result object of some kind
     Napier.d("$this : tableId $tableId : sendPendingReplications - start", tag = DoorTag.LOG_TAG)
-    val dbMetaData = (this as DoorDatabase)::class.doorDatabaseMetadata()
+    val dbMetaData = (this as RoomDatabase)::class.doorDatabaseMetadata()
     val dbKClass = dbMetaData.dbClass
 
     val repEntityMetaData = dbMetaData.requireReplicateEntityMetaData(tableId)
@@ -131,7 +131,7 @@ suspend fun DoorDatabaseRepository.fetchPendingReplications(
     remoteNodeId: Long
 ) {
     Napier.d("$this : tableId $tableId : fetchPendingReplications - start", tag = DoorTag.LOG_TAG)
-    val dbMetaData = (this as DoorDatabase)::class.doorDatabaseMetadata()
+    val dbMetaData = (this as RoomDatabase)::class.doorDatabaseMetadata()
     val dbKClass = dbMetaData.dbClass
 
     val repEntityMetaData = dbMetaData.requireReplicateEntityMetaData(tableId)

@@ -728,8 +728,8 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         addImport("com.ustadmobile.door", "DoorDbType")
         addType(TypeSpec.classBuilder("${daoTypeElement.simpleName}$SUFFIX_JDBC_KT2")
             .primaryConstructor(FunSpec.constructorBuilder().addParameter("_db",
-                DoorDatabase::class).build())
-            .addProperty(PropertySpec.builder("_db", DoorDatabase::class).initializer("_db").build())
+                RoomDatabase::class).build())
+            .addProperty(PropertySpec.builder("_db", RoomDatabase::class).initializer("_db").build())
             .superclass(daoTypeElement.asClassName())
             .apply {
                 daoTypeElement.allOverridableMethods(processingEnv).forEach { executableEl ->
@@ -1373,7 +1373,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             .addSuperinterface(DoorDatabaseJdbc::class)
             .addSuperinterface(RoomJdbcImpl::class)
             .primaryConstructor(FunSpec.constructorBuilder()
-                .addParameter("doorJdbcSourceDatabase", DoorDatabase::class.asTypeName().copy(nullable = true))
+                .addParameter("doorJdbcSourceDatabase", RoomDatabase::class.asTypeName().copy(nullable = true))
                 .addParameter(ParameterSpec("dataSource",  CLASSNAME_DATASOURCE))
                 .addParameter("dbName", String::class)
                 .applyIf(target == DoorTarget.JVM) {
@@ -1381,14 +1381,14 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 }
                 .addParameter("realAttachmentFilters", List::class.parameterizedBy(AttachmentFilter::class))
                 .addParameter("jdbcQueryTimeout", Int::class)
-                .addCode("setupFromDataSource()\n")
                 .build())
             .addDbVersionProperty(dbTypeElement)
             .addProperty(PropertySpec.builder("dataSource", CLASSNAME_DATASOURCE, KModifier.OVERRIDE)
                 .initializer("dataSource")
                 .build())
             .addProperty(PropertySpec.builder("jdbcImplHelper", RoomDatabaseJdbcImplHelper::class, KModifier.OVERRIDE)
-                .initializer("%T(dataSource)\n", RoomDatabaseJdbcImplHelper::class)
+                .initializer("%T(dataSource, this, this::class.%M().allTables)\n", RoomDatabaseJdbcImplHelper::class,
+                    MemberName("com.ustadmobile.door.ext", "doorDatabaseMetadata"))
                 .build())
             .applyIf(target == DoorTarget.JVM) {
                 addProperty(PropertySpec.builder("realAttachmentStorageUri",
@@ -1411,7 +1411,7 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .initializer("realAttachmentFilters")
                 .build())
             .addProperty(PropertySpec.builder("doorJdbcSourceDatabase",
-                    DoorDatabase::class.asTypeName().copy(nullable = true), KModifier.OVERRIDE)
+                    RoomDatabase::class.asTypeName().copy(nullable = true), KModifier.OVERRIDE)
                 .initializer("doorJdbcSourceDatabase")
                 .build())
             .addProperty(PropertySpec.builder("dbName", String::class, KModifier.OVERRIDE)
@@ -1424,9 +1424,11 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
                 .addModifiers(KModifier.OVERRIDE)
                 .initializer("%T()\n", TransactionDepthCounter::class)
                 .build())
-            .addProperty(PropertySpec.builder("invalidationTracker", DoorInvalidationTracker::class)
+            .addProperty(PropertySpec.builder("invalidationTracker", InvalidationTracker::class)
                 .addModifiers(KModifier.OVERRIDE)
-                .initializer("%T(this.toString())\n", DoorInvalidationTracker::class)
+                .getter(FunSpec.getterBuilder()
+                    .addCode("return jdbcImplHelper.invalidationTracker\n")
+                    .build())
                 .build())
             .applyIf(target == DoorTarget.JS) {
                 addProperty(PropertySpec.builder("isInTransaction", Boolean::class,
@@ -1524,15 +1526,15 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             .returns(List::class.parameterizedBy(String::class))
             .addCode(CodeBlock.builder()
                 .add("val _stmtList = %M<String>()\n", MEMBERNAME_MUTABLE_LINKEDLISTOF)
-                .beginControlFlow("when(jdbcDbType)")
+                .beginControlFlow("when(jdbcImplHelper.dbType)")
                 .apply {
                     for(dbProductType in DoorDbType.SUPPORTED_TYPES) {
                         val dbTypeName = DoorDbType.PRODUCT_INT_TO_NAME_MAP[dbProductType] as String
                         beginControlFlow("$dbProductType -> ")
                         add("// - create for this $dbTypeName \n")
-                        add("_stmtList += \"CREATE·TABLE·IF·NOT·EXISTS·${DoorDatabaseCommon.DBINFO_TABLENAME}" +
+                        add("_stmtList += \"CREATE·TABLE·IF·NOT·EXISTS·${DoorConstants.DBINFO_TABLENAME}" +
                                 "·(dbVersion·int·primary·key,·dbHash·varchar(255))\"\n")
-                        add(" _stmtList += \"INSERT·INTO·${DoorDatabaseCommon.DBINFO_TABLENAME}·" +
+                        add(" _stmtList += \"INSERT·INTO·${DoorConstants.DBINFO_TABLENAME}·" +
                                 "VALUES·($initDbVersion,·'')\"\n")
 
                         //All entities MUST be created first, triggers etc. can only be created after all entities exist

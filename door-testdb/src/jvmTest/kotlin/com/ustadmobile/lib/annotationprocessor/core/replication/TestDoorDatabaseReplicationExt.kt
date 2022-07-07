@@ -3,6 +3,8 @@ package com.ustadmobile.lib.annotationprocessor.core.replication
 import com.ustadmobile.door.DatabaseBuilder
 import com.ustadmobile.door.entities.DoorNode
 import com.ustadmobile.door.ext.*
+import com.ustadmobile.door.jdbc.ext.useResults
+import com.ustadmobile.door.jdbc.ext.mapRows
 import com.ustadmobile.door.replication.*
 import com.ustadmobile.door.replication.ReplicationEntityMetaData.Companion.KEY_PRIMARY_KEY
 import com.ustadmobile.door.replication.ReplicationEntityMetaData.Companion.KEY_VERSION_ID

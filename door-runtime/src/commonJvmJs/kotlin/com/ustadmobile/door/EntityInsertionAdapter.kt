@@ -1,6 +1,7 @@
 package com.ustadmobile.door
 
-import com.ustadmobile.door.ext.asCommon
+import androidx.room.RoomDatabase
+import com.ustadmobile.door.ext.dbType
 import com.ustadmobile.door.jdbc.*
 import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
 import com.ustadmobile.door.ext.prepareAndUseStatement
@@ -11,10 +12,10 @@ import com.ustadmobile.door.ext.prepareAndUseStatementAsync
  * @param db DoorDatabase being used
  */
 @Suppress("unused", "VARIABLE_WITH_REDUNDANT_INITIALIZER") //What appears unused to the IDE is actually used by generated code
-abstract class EntityInsertionAdapter<T>(protected val db: DoorDatabase) {
+abstract class EntityInsertionAdapter<T>(protected val db: RoomDatabase) {
 
     //used by generated code
-    protected val dbType: Int = db.asCommon().jdbcDbType
+    protected val dbType: Int = db.dbType()
 
     /**
      * Set values on the PreparedStatement (which is created using makeSql) for the given entity. This is implemented
@@ -41,7 +42,7 @@ abstract class EntityInsertionAdapter<T>(protected val db: DoorDatabase) {
     }
 
     suspend fun insertAsync(entity: T) {
-        db.prepareAndUseStatementAsync(makeSql(false)) { stmt ->
+        db.prepareAndUseStatementAsync<Unit>(makeSql(false)) { stmt ->
             bindPreparedStmtToEntity(stmt, entity)
             stmt.executeUpdateAsyncKmp()
         }
@@ -133,7 +134,7 @@ abstract class EntityInsertionAdapter<T>(protected val db: DoorDatabase) {
 
 
     suspend fun insertListAsync(entities: List<T>) {
-        db.prepareAndUseStatementAsync(makeSql(false)) { stmt ->
+        db.prepareAndUseStatementAsync<Unit>(makeSql(false)) { stmt ->
             stmt.getConnection().setAutoCommit(false)
             entities.forEach {
                 bindPreparedStmtToEntity(stmt, it)

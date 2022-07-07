@@ -70,5 +70,17 @@ kotlin {
             }
         }
 
+        commonJvmMain {
+
+        }
+
+        jvmMain {
+            dependsOn commonJvmMain
+        }
+
+        androidMain {
+            dependsOn commonJvmMain
+        }
+
     }
 }

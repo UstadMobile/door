@@ -1,6 +1,8 @@
 package com.ustadmobile.door
 
 import androidx.lifecycle.Observer
+import androidx.room.InvalidationTracker
+import androidx.room.RoomDatabase
 import org.junit.Assert
 import org.junit.Test
 import org.mockito.kotlin.argThat
@@ -15,7 +17,13 @@ class LiveDataImplTest {
 
     @Test
     fun givenEmptyLiveData_whenActive_shouldCallFetchFnAndAddChangeListener() {
-        val mockDb = mock<DoorDatabase>()
+        val mockInvalidationTracker = mock<InvalidationTracker>()
+        val mockDb = mock<RoomDatabase> {
+            on {
+                invalidationTracker
+            }.thenReturn(mockInvalidationTracker)
+        }
+
         val fetchFnCount = AtomicInteger()
         val fetchCountdownLatch = CountDownLatch(1)
         val liveDataJdbc = LiveDataImpl<Int>(mockDb, listOf("magic")) {
@@ -25,14 +33,19 @@ class LiveDataImplTest {
         }
 
         liveDataJdbc.observeForever(mock())
-        verify(mockDb, timeout(5000)).addChangeListener(argThat { tableNames.contains("magic") })
+        verify(mockInvalidationTracker, timeout(5000)).addObserver(argThat {
+            tables.contains("magic")
+        })
         fetchCountdownLatch.await(5, TimeUnit.SECONDS)
         Assert.assertEquals("FetchFn called once", 1, fetchFnCount.get())
     }
 
     @Test
     fun givenEmptyLiveData_whenInactive_shouldRemoveChangeListener() {
-        val mockDb = mock<DoorDatabase>()
+        val mockInvalidationTracker = mock<InvalidationTracker>()
+        val mockDb = mock<RoomDatabase>() {
+            on { invalidationTracker }.thenReturn(mockInvalidationTracker)
+        }
         val fetchFnCount = AtomicInteger()
         val liveDataJdbc = LiveDataImpl<Int>(mockDb, listOf("magic")) {
             fetchFnCount.incrementAndGet()
@@ -45,8 +58,8 @@ class LiveDataImplTest {
         liveDataJdbc.observeForever(mockObserver)
         liveDataJdbc.removeObserver(mockObserver)
 
-        verify(mockDb, timeout(5000)).addChangeListener(argThat { tableNames.contains("magic") })
-        verify(mockDb, timeout(5000)).removeChangeListener(argThat { tableNames.contains("magic") })
+        verify(mockInvalidationTracker, timeout(5000)).addObserver(argThat { "magic" in tables })
+        verify(mockInvalidationTracker, timeout(5000)).removeObserver(argThat { "magic" in tables })
     }
 
 }

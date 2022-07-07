@@ -1,5 +1,6 @@
 package com.ustadmobile.door.ext
 
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.*
 import com.ustadmobile.door.jdbc.SQLException
 import com.ustadmobile.door.sqljsjdbc.SQLiteDatasourceJs
@@ -11,16 +12,16 @@ import kotlin.reflect.KClass
 /**
  * Get the database type that is running on the given database (DoorDbType.SQLITE Or DoorDbType.POSTGRES)
  */
-actual fun DoorDatabase.dbType(): Int {
+actual fun RoomDatabase.dbType(): Int {
     return DoorDbType.SQLITE
 }
 
-actual fun DoorDatabase.dbSchemaVersion(): Int = this.dbVersion
+actual fun RoomDatabase.dbSchemaVersion(): Int = this.dbVersion
 
 /**
  * Run a transaction within a suspend coroutine context. Not really implemented at the moment.
  */
-actual suspend fun <T: DoorDatabase, R> T.withDoorTransactionAsync(
+actual suspend fun <T: RoomDatabase, R> T.withDoorTransactionAsync(
     dbKClass: KClass<out T>,
     block: suspend (T) -> R
 ) : R {
@@ -43,7 +44,7 @@ actual suspend fun <T: DoorDatabase, R> T.withDoorTransactionAsync(
     }
 }
 
-actual fun <T: DoorDatabase, R> T.withDoorTransaction(dbKClass: KClass<T>, block: (T) -> R) : R {
+actual fun <T: RoomDatabase, R> T.withDoorTransaction(dbKClass: KClass<T>, block: (T) -> R) : R {
     throw SQLException("withDoorTransaction non-async not support on Javascript!")
 }
 
@@ -61,19 +62,19 @@ actual fun DoorSqlDatabase.dbType(): Int {
  *
  * The name deliberately lower cases sql to avoid name clashes
  */
-actual fun DoorDatabase.execSqlBatch(vararg sqlStatements: String) {
+actual fun RoomDatabase.execSqlBatch(vararg sqlStatements: String) {
     throw IllegalStateException("Non-async execSqlBatch not supported on Javascript!")
 }
 
-actual suspend fun DoorDatabase.execSqlBatchAsync(vararg sqlStatements: String) {
+actual suspend fun RoomDatabase.execSqlBatchAsync(vararg sqlStatements: String) {
     execSQLBatchAsyncJs(*sqlStatements)
 }
 
-actual fun <T : DoorDatabase> KClass<T>.doorDatabaseMetadata(): DoorDatabaseMetadata<T> {
+actual fun <T : RoomDatabase> KClass<T>.doorDatabaseMetadata(): DoorDatabaseMetadata<T> {
     return DatabaseBuilder.lookupImplementations(this).metadata
 }
 
-actual fun <T : DoorDatabase> T.wrap(dbClass: KClass<T>): T {
+actual fun <T : RoomDatabase> T.wrap(dbClass: KClass<T>): T {
     val jsImplClasses = DatabaseBuilder.lookupImplementations(dbClass)
     val rootDb = rootDatabase
     val wrapperKClass = jsImplClasses.replicateWrapperImplClass
@@ -83,12 +84,12 @@ actual fun <T : DoorDatabase> T.wrap(dbClass: KClass<T>): T {
 }
 
 @Suppress("UNCHECKED_CAST")
-actual fun <T : DoorDatabase> T.unwrap(dbClass: KClass<T>): T {
+actual fun <T : RoomDatabase> T.unwrap(dbClass: KClass<T>): T {
     return (this as? DoorDatabaseReplicateWrapper)?.realDatabase as? T
         ?: throw IllegalArgumentException("$this is not a replicate wrapper!")
 }
 
-actual inline fun <reified T : DoorDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T {
+actual inline fun <reified T : RoomDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T {
     val dbClass = T::class
     val repoClass = DatabaseBuilder.lookupImplementations(dbClass).repositoryImplClass
         ?: throw IllegalArgumentException("Database ${dbClass.simpleName} does not have a repository!")

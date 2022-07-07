@@ -1,5 +1,6 @@
 package com.ustadmobile.door.ext
 
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.*
 import com.ustadmobile.door.jdbc.*
 import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
@@ -7,7 +8,7 @@ import com.ustadmobile.door.util.NodeIdAuthCache
 import com.ustadmobile.door.util.systemTimeInMillis
 import io.github.aakira.napier.Napier
 
-actual suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
+actual suspend fun <R> RoomDatabase.prepareAndUseStatementAsync(
     stmtConfig: PreparedStatementConfig,
     block: suspend (PreparedStatement) -> R
 ) : R {
@@ -29,7 +30,7 @@ actual suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
     }
 }
 
-actual fun <R> DoorDatabase.prepareAndUseStatement(
+actual fun <R> RoomDatabase.prepareAndUseStatement(
     stmtConfig: PreparedStatementConfig,
     block: (PreparedStatement) -> R
 ) : R {
@@ -51,10 +52,9 @@ actual fun <R> DoorDatabase.prepareAndUseStatement(
     }
 }
 
-actual val DoorDatabase.sourceDatabase: DoorDatabase?
+actual val RoomDatabase.sourceDatabase: RoomDatabase?
     get() {
         return when {
-            (this is DoorDatabaseJdbc && isInTransaction) -> this.doorJdbcSourceDatabase
             (this is DoorDatabaseJdbc && !isInTransaction) -> null
             (this is DoorDatabaseRepository) -> this.db
             (this is DoorDatabaseReplicateWrapper) -> this.realDatabase
@@ -62,45 +62,37 @@ actual val DoorDatabase.sourceDatabase: DoorDatabase?
         }
     }
 
-actual val DoorDatabase.doorPrimaryKeyManager: DoorPrimaryKeyManager
+actual val RoomDatabase.doorPrimaryKeyManager: DoorPrimaryKeyManager
     get() = (rootDatabase as DoorDatabaseJdbc).realPrimaryKeyManager
 
-actual val DoorDatabase.replicationNotificationDispatcher: ReplicationNotificationDispatcher
+actual val RoomDatabase.replicationNotificationDispatcher: ReplicationNotificationDispatcher
     get() = if(this is DoorDatabaseJdbc) {
         this.realReplicationNotificationDispatcher
     }else {
         this.rootDatabase.replicationNotificationDispatcher
     }
 
-actual fun DoorDatabase.addInvalidationListener(changeListenerRequest: ChangeListenerRequest) {
-    asCommon().addChangeListener(changeListenerRequest)
-}
-
-actual fun DoorDatabase.removeInvalidationListener(changeListenerRequest: ChangeListenerRequest) {
-    asCommon().removeChangeListener(changeListenerRequest)
-}
-
-actual val DoorDatabase.nodeIdAuthCache: NodeIdAuthCache
+actual val RoomDatabase.nodeIdAuthCache: NodeIdAuthCache
     get() = if(this is DoorDatabaseJdbc) {
         this.realNodeIdAuthCache
     }else {
         this.rootDatabase.nodeIdAuthCache
     }
 
-actual fun DoorDatabase.addIncomingReplicationListener(incomingReplicationListener: IncomingReplicationListener) {
+actual fun RoomDatabase.addIncomingReplicationListener(incomingReplicationListener: IncomingReplicationListener) {
     val rootDb = this.rootDatabase as DoorDatabaseJdbc
     rootDb.realIncomingReplicationListenerHelper.addIncomingReplicationListener(incomingReplicationListener)
 }
 
-actual fun DoorDatabase.removeIncomingReplicationListener(incomingReplicationListener: IncomingReplicationListener) {
+actual fun RoomDatabase.removeIncomingReplicationListener(incomingReplicationListener: IncomingReplicationListener) {
     val rootDb = this.rootDatabase as DoorDatabaseJdbc
     rootDb.realIncomingReplicationListenerHelper.removeIncomingReplicationListener(incomingReplicationListener)
 }
 
-actual val DoorDatabase.incomingReplicationListenerHelper: IncomingReplicationListenerHelper
+actual val RoomDatabase.incomingReplicationListenerHelper: IncomingReplicationListenerHelper
     get() = (this.rootDatabase as DoorDatabaseJdbc).realIncomingReplicationListenerHelper
 
-actual val DoorDatabase.rootTransactionDatabase: DoorDatabase
+actual val RoomDatabase.rootTransactionDatabase: RoomDatabase
     get() {
         var db = this
         while(db !is DoorDatabaseJdbc) {

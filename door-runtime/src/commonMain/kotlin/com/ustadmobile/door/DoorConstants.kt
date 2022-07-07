@@ -13,4 +13,6 @@ object DoorConstants {
      */
     val HEADER_NODE = "door-node"
 
+    const val DBINFO_TABLENAME = "_doorwayinfo"
+
 }

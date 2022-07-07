@@ -29,20 +29,22 @@ fun Connection.prepareStatement(
 }
 
 /**
+ * Shorthand to get the dbType using the metadata product name
+ */
+fun Connection.dbType() = DoorDbType.typeIntFromProductName(getMetaData().getDatabaseProductName())
+
+
+/**
  * Create an JDBC array. If the dbType supports arrays natively, the native support will be used. Otherwise this will
  * fallback to using the JdbcArrayProxy (e.g. for use on SQLite)
  */
-@Suppress("RemoveRedundantQualifierName") // Qualifier here for the name "Array" should be clear.
-fun Connection.createArrayOf(
-    dbType: Int,
+fun Connection.createArrayOrProxyArrayOf(
     arrayType: String,
     objects: kotlin.Array<out Any?>
 ): com.ustadmobile.door.jdbc.Array  {
-    return if(dbType == DoorDbType.POSTGRES) {
+    return if(dbType() == DoorDbType.POSTGRES) {
         createArrayOf(arrayType, objects)
     }else {
         JdbcArrayProxy(arrayType, objects)
     }
 }
-
-

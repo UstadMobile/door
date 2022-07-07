@@ -1,5 +1,6 @@
 package com.ustadmobile.door.attachments
 
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.*
 import com.ustadmobile.door.ext.*
 import org.mockito.kotlin.mock
@@ -22,7 +23,7 @@ class DoorDatabaseAttachmentExtTest {
 
     lateinit var attachmentPath: String
 
-    lateinit var db: DoorDatabase
+    lateinit var db: RoomDatabase
 
     @Before
     fun setup() {

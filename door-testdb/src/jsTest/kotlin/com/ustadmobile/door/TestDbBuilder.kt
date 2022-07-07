@@ -1,6 +1,6 @@
 package com.ustadmobile.door
 
-import com.ustadmobile.door.ext.addInvalidationListener
+import androidx.room.InvalidationTracker
 import com.ustadmobile.door.ext.withDoorTransactionAsync
 import com.ustadmobile.door.util.systemTimeInMillis
 import db2.ExampleDatabase2
@@ -126,9 +126,12 @@ class TestDbBuilder {
         }
 
         val completableDeferred = CompletableDeferred<Boolean>()
-        repDb.addInvalidationListener(ChangeListenerRequest(listOf("RepEntity")) {
-            if("RepEntity" in it)
-                completableDeferred.complete(true)
+
+        repDb.invalidationTracker.addObserver(object: InvalidationTracker.Observer(arrayOf("RepEntity")) {
+            override fun onInvalidated(tables: Set<String>) {
+                if("RepEntity" in tables)
+                    completableDeferred.complete(true)
+            }
         })
 
         repEntity.rePrimaryKey = repDb.repDao.insertAsync(repEntity)

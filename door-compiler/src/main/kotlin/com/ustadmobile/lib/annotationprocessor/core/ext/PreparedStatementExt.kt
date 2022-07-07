@@ -1,6 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core.ext
 
-import com.ustadmobile.door.ext.createArrayOf
+import com.ustadmobile.door.ext.createArrayOrProxyArrayOf
 import com.ustadmobile.lib.annotationprocessor.core.toSqlType
 import com.ustadmobile.lib.annotationprocessor.core.unwrapListOrArrayComponentType
 import java.sql.PreparedStatement
@@ -30,7 +30,7 @@ fun PreparedStatement.setDefaultParamValue(
                 setString(index, null)
             }else if(declaredType.asElement() == processingEnv.elementUtils.getTypeElement("java.util.List")) {
                 val componentType = declaredType.unwrapListOrArrayComponentType(processingEnv)
-                setArray(index, connection.createArrayOf(dbType, componentType.toSqlType(dbType, processingEnv),
+                setArray(index, connection.createArrayOrProxyArrayOf(componentType.toSqlType(dbType, processingEnv),
                     arrayOf()))
             }
 

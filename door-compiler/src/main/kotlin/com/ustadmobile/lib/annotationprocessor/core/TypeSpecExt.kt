@@ -1,8 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import androidx.room.ColumnInfo
-import androidx.room.Database
-import androidx.room.PrimaryKey
+import androidx.room.*
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.ustadmobile.door.DoorDbType
@@ -12,7 +10,6 @@ import com.ustadmobile.door.RepositoryConnectivityListener
 import com.ustadmobile.door.TableChangeListener
 import javax.annotation.processing.ProcessingEnvironment
 import javax.lang.model.element.TypeElement
-import androidx.room.Query
 import kotlin.reflect.KClass
 import com.ustadmobile.door.SyncListener
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_ILLEGALSTATEEXCEPTION
@@ -149,6 +146,16 @@ fun TypeSpec.Builder.addOverrideGetRoomInvalidationTracker(realDbVarName: String
         .returns(ClassName("androidx.room", "InvalidationTracker"))
         .addModifiers(KModifier.OVERRIDE)
         .addCode("return $realDbVarName.getInvalidationTracker()\n")
+        .build())
+    return this
+}
+
+fun TypeSpec.Builder.addOverrideGetInvalidationTrackerVal(realDbVarName: String) : TypeSpec.Builder {
+    addProperty(PropertySpec.builder("invalidationTracker", InvalidationTracker::class,
+            KModifier.OVERRIDE)
+        .getter(FunSpec.getterBuilder()
+            .addCode("return $realDbVarName.invalidationTracker")
+            .build())
         .build())
     return this
 }

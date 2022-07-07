@@ -1,6 +1,6 @@
 package com.ustadmobile.door.ext
 
-import com.ustadmobile.door.DoorDatabase
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.replication.ReplicationEntityMetaData
 import kotlin.reflect.KClass
 
@@ -10,7 +10,7 @@ import kotlin.reflect.KClass
  *
  * The metadata can be retrieved via extension functions dbInstance.doorDatabaseMetadata() or dbClass.doorDatabaseMetadata()
  */
-abstract class DoorDatabaseMetadata<T: DoorDatabase> {
+abstract class DoorDatabaseMetadata<T: RoomDatabase> {
 
     /**
      * Map of Table Name -> TableId for all syncable tables.

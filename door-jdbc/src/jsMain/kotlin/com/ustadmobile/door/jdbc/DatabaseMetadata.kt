@@ -10,4 +10,6 @@ actual interface DatabaseMetadata {
         tableNamePattern: String?,
         types: Array<out String>
     ): ResultSet
+
+    actual fun getDatabaseProductName(): String
 }

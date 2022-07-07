@@ -1,7 +1,7 @@
 package com.ustadmobile.door.replication
 
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.DoorConstants
-import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_SUBSCRIBE_SSE
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.PATH_REPLICATION
@@ -25,6 +25,8 @@ import kotlin.jvm.Volatile
 import kotlin.math.min
 import kotlin.reflect.KClass
 import com.ustadmobile.door.ext.toUrlQueryString
+import com.ustadmobile.door.jdbc.ext.mapRows
+import com.ustadmobile.door.jdbc.ext.useResults
 
 //Class that is responsible to listen for local and remote changes, then send/receive replication accordingly.
 // There will be one repository instance per endpoint (e.g. for the cloud and any local mirrors).
@@ -41,7 +43,7 @@ class ReplicationSubscriptionManager(
     private val repository: DoorDatabaseRepository,
     private val coroutineScope: CoroutineScope,
     private val dbMetadata: DoorDatabaseMetadata<*>,
-    private val dbKClass: KClass<out DoorDatabase>,
+    private val dbKClass: KClass<out RoomDatabase>,
     private val numProcessors: Int = 5,
     private val eventSourceFactory: DoorEventSourceFactory = DefaultDoorEventSourceFactoryImpl(),
     private val sendReplicationRunner: ReplicateRunner = DefaultReplicationSender(json),

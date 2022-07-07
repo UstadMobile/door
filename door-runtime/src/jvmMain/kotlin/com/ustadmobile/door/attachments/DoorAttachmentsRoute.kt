@@ -1,6 +1,6 @@
 package com.ustadmobile.door.attachments
 
-import com.ustadmobile.door.DoorDatabase
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.toFile
@@ -26,7 +26,7 @@ import java.io.IOException
 /**
  * Route that handles receiving attachment uploads and serving attachment downloads
  */
-fun <T: DoorDatabase> Route.doorAttachmentsRoute(path: String, typeToken: TypeToken<T>) {
+fun <T: RoomDatabase> Route.doorAttachmentsRoute(path: String, typeToken: TypeToken<T>) {
     route(path) {
         post("upload") {
             val md5Param = call.parameters["md5"]

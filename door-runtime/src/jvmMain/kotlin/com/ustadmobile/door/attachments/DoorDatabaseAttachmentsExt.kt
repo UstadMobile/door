@@ -1,6 +1,6 @@
 package com.ustadmobile.door.attachments
 
-import com.ustadmobile.door.DoorDatabase
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.DOOR_ATTACHMENT_URI_PREFIX
@@ -14,7 +14,7 @@ import java.io.IOException
 import java.net.URI
 import java.nio.file.Paths
 
-actual suspend fun DoorDatabase.storeAttachment(entityWithAttachment: EntityWithAttachment) {
+actual suspend fun RoomDatabase.storeAttachment(entityWithAttachment: EntityWithAttachment) {
     val attachmentUri = entityWithAttachment.attachmentUri
     val attachmentDirVal = requireAttachmentStorageUri().toFile()
 
@@ -50,16 +50,16 @@ actual suspend fun DoorDatabase.storeAttachment(entityWithAttachment: EntityWith
     }
 }
 
-actual suspend fun DoorDatabase.retrieveAttachment(attachmentUri: String): DoorUri {
+actual suspend fun RoomDatabase.retrieveAttachment(attachmentUri: String): DoorUri {
     val attachmentDirVal = requireAttachmentStorageUri().toFile()
     val file = File(attachmentDirVal, attachmentUri.substringAfter(DOOR_ATTACHMENT_URI_PREFIX))
     return DoorUri(file.toURI())
 }
 
-actual val DoorDatabase.attachmentsStorageUri: DoorUri?
+actual val RoomDatabase.attachmentsStorageUri: DoorUri?
     get() = (rootDatabase as DoorDatabaseJdbc).realAttachmentStorageUri
 
-actual val DoorDatabase.attachmentFilters: List<AttachmentFilter>
+actual val RoomDatabase.attachmentFilters: List<AttachmentFilter>
     get() = (rootDatabase as DoorDatabaseJdbc).realAttachmentFilters
 
 

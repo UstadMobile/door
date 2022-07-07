@@ -1,5 +1,7 @@
 package com.ustadmobile.door
 
+import androidx.room.InvalidationTracker
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
@@ -25,7 +27,7 @@ interface DoorDatabaseJdbc {
      * to the underlying (original) database instance.
      * When this instance is the actual original database instance, this will be null.
      */
-    val doorJdbcSourceDatabase: DoorDatabase?
+    val doorJdbcSourceDatabase: RoomDatabase?
 
     /**
      * If the database instance is being used as a transaction wrapper, and a transaction is ongoing, this will
@@ -57,7 +59,7 @@ interface DoorDatabaseJdbc {
 
     val transactionDepthCounter: TransactionDepthCounter
 
-    val invalidationTracker: DoorInvalidationTracker
+    val invalidationTracker: InvalidationTracker
 
     val realAttachmentStorageUri: DoorUri?
 

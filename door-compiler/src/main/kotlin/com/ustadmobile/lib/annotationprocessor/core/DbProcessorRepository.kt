@@ -157,16 +157,11 @@ fun FileSpec.Builder.addDbRepoType(
                 addOverrideGetRoomInvalidationTracker("_db")
                 addRoomDatabaseCreateOpenHelperFunction()
             }
+            .applyIf(!overrideOpenHelper) {
+                addOverrideGetInvalidationTrackerVal("_db")
+            }
             .applyIf(addDbVersionProp) {
                 addDbVersionProperty(dbTypeElement)
-            }
-            .applyIf(overrideWrapDbForTransaction) {
-                addFunction(FunSpec.builder("wrapForNewTransaction")
-                    .addOverrideWrapNewTransactionFun()
-                    .addCode("return transactionDb.%M(this as T, dbKClass as KClass<T>, this::class as KClass<T>) as T\n",
-                        MemberName("com.ustadmobile.door.ext", "wrapDbAsRepositoryForTransaction"),
-                        )
-                    .build())
             }
             .apply {
                 dbTypeElement.allDbClassDaoGetters(processingEnv).forEach { daoGetter ->
@@ -303,7 +298,7 @@ fun FileSpec.Builder.addDaoRepoType(
 ): FileSpec.Builder {
 
     addType(TypeSpec.classBuilder("${daoTypeSpec.name}$SUFFIX_REPOSITORY2")
-            .addProperty(PropertySpec.builder("_db", DoorDatabase::class)
+            .addProperty(PropertySpec.builder("_db", RoomDatabase::class)
                     .initializer("_db").build())
             .addProperty(PropertySpec.builder("_repo", DoorDatabaseRepository::class)
                     .initializer("_repo").build())
@@ -321,7 +316,7 @@ fun FileSpec.Builder.addDaoRepoType(
                         "ClassName")
                     .build())
             .primaryConstructor(FunSpec.constructorBuilder()
-                    .addParameter("_db", DoorDatabase::class)
+                    .addParameter("_db", RoomDatabase::class)
                     .addParameter("_repo", DoorDatabaseRepository::class)
                     .addParameter("_dao", daoClassName)
                     .addParameter("_httpClient", HttpClient::class)

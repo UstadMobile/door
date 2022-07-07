@@ -1,6 +1,6 @@
 package com.ustadmobile.door.util
 
-import com.ustadmobile.door.DoorDatabase
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.doorDatabaseMetadata
@@ -57,7 +57,7 @@ class PostgresChangeTracker(
      * Create a trigger and function for each table on the database.
      */
     fun setupTriggers() {
-        (jdbcDatabase as DoorDatabase)::class.doorDatabaseMetadata().allTables.forEach { tableName ->
+        (jdbcDatabase as RoomDatabase)::class.doorDatabaseMetadata().allTables.forEach { tableName ->
             jdbcDatabase.dataSource.connection.use { connection ->
                 connection.createStatement().use { stmt ->
                     stmt.execute("""

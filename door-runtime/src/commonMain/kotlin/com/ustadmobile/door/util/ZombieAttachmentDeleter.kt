@@ -1,7 +1,8 @@
 package com.ustadmobile.door.util
 
+import androidx.room.InvalidationTracker
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.ChangeListenerRequest
-import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.attachments.deleteZombieAttachments
 import com.ustadmobile.door.ext.*
 import kotlinx.coroutines.CoroutineScope
@@ -13,24 +14,27 @@ import kotlinx.coroutines.launch
  * deleteZombieAttachments function so unused files get deleted.
  */
 class DeleteZombieAttachmentsListener(
-    private val db: DoorDatabase,
+    private val db: RoomDatabase,
     coroutineScope: CoroutineScope = GlobalScope,
 ) {
 
-    val invalidationListener = ChangeListenerRequest(listOf("ZombieAttachmentData")) {
-        coroutineScope.launch {
-            db.deleteZombieAttachments()
+    val invalidationObserver = object: InvalidationTracker.Observer(arrayOf("ZombieAttachmentData")) {
+        override fun onInvalidated(tables: Set<String>) {
+            coroutineScope.launch {
+                db.deleteZombieAttachments()
+            }
         }
     }
 
+
     init {
         if(db::class.doorDatabaseMetadata().hasAttachments) {
-            db.addInvalidationListener(invalidationListener)
+            db.invalidationTracker.addObserver(invalidationObserver)
         }
     }
 
     fun close() {
-        db.removeInvalidationListener(invalidationListener)
+        db.invalidationTracker.removeObserver(invalidationObserver)
     }
 
 

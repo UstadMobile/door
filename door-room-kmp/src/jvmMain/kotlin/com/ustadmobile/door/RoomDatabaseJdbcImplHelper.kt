@@ -1,13 +1,17 @@
 package com.ustadmobile.door
 
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
+import com.ustadmobile.door.jdbc.ext.mutableLinkedListOf
 import com.ustadmobile.door.util.TransactionMode
 import kotlinx.atomicfu.atomic
 
 actual class RoomDatabaseJdbcImplHelper actual constructor(
-    dataSource: DataSource
-) : RoomDatabaseJdbcImplHelperCommon(dataSource) {
+    dataSource: DataSource,
+    db: RoomDatabase,
+    tableNames: List<String>,
+) : RoomDatabaseJdbcImplHelperCommon(dataSource, db, tableNames) {
 
     inner class PendingTransaction(
         val connection: Connection
@@ -19,28 +23,52 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
     //Synchronous mode pending transactions
     private val pendingTransactionThreadMap = mutableMapOf<Long, PendingTransaction>()
 
+    override val dbType: Int by lazy {
+        dataSource.connection.use { connection ->
+            DoorDbType.typeIntFromProductName(connection.metaData?.databaseProductName ?: "")
+        }
+    }
+
     actual fun <R> useConnection(
         transactionMode: TransactionMode,
         block: (Connection) -> R,
     ): R {
         val threadId = Thread.currentThread().id
         val transaction: PendingTransaction = pendingTransactionThreadMap.computeIfAbsent(threadId) {
-            PendingTransaction(dataSource.connection)
+            val pendingTx = PendingTransaction(dataSource.connection)
+            pendingTx.connection.autoCommit = false
+
+            if(dbType == DoorDbType.SQLITE) {
+                invalidationTracker.setupSqliteTriggers(pendingTx.connection)
+            }
+
+            pendingTx
         }
 
-        //TODO: check if we need to setup SQLite change tracking
         transaction.depth.incrementAndGet()
+        var err: Throwable? = null
         try {
             return block(transaction.connection)
         }catch(t: Throwable) {
-            if(!transaction.connection.autoCommit)
+            err = t
+            if(!transaction.connection.autoCommit) {
                 transaction.connection.rollback()
+            }
 
             throw t
         } finally {
             if(transaction.depth.decrementAndGet() == 0) {
                 pendingTransactionThreadMap.remove(threadId)
+
+                val changedTables = mutableLinkedListOf<String>()
+                if(dbType == DoorDbType.SQLITE && err == null) {
+                    changedTables.addAll(invalidationTracker.findChangedTablesOnConnection(transaction.connection))
+                }
+
+                transaction.connection.commit()
                 transaction.connection.close()
+
+                invalidationTracker.takeIf { changedTables.isNotEmpty() }?.onTablesInvalidated(changedTables.toSet())
             }
         }
     }

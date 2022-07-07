@@ -3,7 +3,6 @@ package com.ustadmobile.lib.annotationprocessor.core
 import androidx.room.*
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
-import com.ustadmobile.door.DoorDatabase
 import javax.annotation.processing.ProcessingEnvironment
 import javax.annotation.processing.RoundEnvironment
 import javax.lang.model.element.ExecutableElement
@@ -257,13 +256,6 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
                                 .addCode("return _db.createAllTables()\n")
                                 .build())
                     }
-                    .applyIf(target == DoorTarget.JVM) {
-                        addFunction(FunSpec.builder("wrapForNewTransaction")
-                            .addOverrideWrapNewTransactionFun()
-                            .addCode("return transactionDb.%M(dbKClass) as T\n",
-                                MemberName("com.ustadmobile.door.ext", "wrap"))
-                            .build())
-                    }
                     .addProperty(PropertySpec.builder("dbName", String::class, KModifier.OVERRIDE)
                         .getter(FunSpec.getterBuilder()
                             .addCode("return \"DoorWrapper for [\${_db.toString()}]\"\n")
@@ -274,7 +266,7 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
                             addWrapperAccessorFunction(daoGetter, processingEnv)
                         }
                     }
-                    .addProperty(PropertySpec.builder("realDatabase", DoorDatabase::class)
+                    .addProperty(PropertySpec.builder("realDatabase", RoomDatabase::class)
                             .addModifiers(KModifier.OVERRIDE)
                             .getter(FunSpec.getterBuilder().addCode("return _db\n")
                                     .build())
@@ -300,6 +292,9 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
                         addRoomCreateInvalidationTrackerFunction()
                         addOverrideGetRoomInvalidationTracker("_db")
                     }
+                    .applyIf(target != DoorTarget.ANDROID) {
+                        addOverrideGetInvalidationTrackerVal("_db")
+                    }
                     .build())
             .build()
 
@@ -317,10 +312,10 @@ fun FileSpec.Builder.addDaoWrapperTypeSpec(
     addType(TypeSpec.classBuilder(daoTypeElement.asClassNameWithSuffix(DoorDatabaseReplicateWrapper.SUFFIX))
             .superclass(daoTypeElement.asClassName())
             .primaryConstructor(FunSpec.constructorBuilder()
-                    .addParameter("_db", DoorDatabase::class)
+                    .addParameter("_db", RoomDatabase::class)
                     .addParameter("_dao", daoTypeElement.asClassName())
                     .build())
-            .addProperty(PropertySpec.builder("_db", DoorDatabase::class,
+            .addProperty(PropertySpec.builder("_db", RoomDatabase::class,
                 KModifier.PRIVATE)
                 .initializer("_db")
                 .build())

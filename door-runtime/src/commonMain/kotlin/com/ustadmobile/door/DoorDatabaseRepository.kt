@@ -1,5 +1,6 @@
 package com.ustadmobile.door
 
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.replication.ReplicationSubscriptionManager
 import kotlin.reflect.KClass
 
@@ -15,7 +16,7 @@ interface DoorDatabaseRepository {
      * This provides access to the underlying database for this repository. It must be wrapped with
      * The SyncableReadOnlyWrapper if this is a syncable database.
      */
-    val db: DoorDatabase
+    val db: RoomDatabase
 
     val dbName: String
 

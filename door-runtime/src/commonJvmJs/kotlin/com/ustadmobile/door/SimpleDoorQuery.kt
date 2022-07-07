@@ -1,6 +1,7 @@
 package com.ustadmobile.door
 
-import com.ustadmobile.door.ext.asCommon
+import androidx.room.RoomDatabase
+import com.ustadmobile.door.ext.arraySupported
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.PreparedStatement
 import com.ustadmobile.door.ext.isArray
@@ -16,7 +17,7 @@ actual class SimpleDoorQuery actual constructor(private val sql: String, overrid
     }
 
 
-    override fun bindToPreparedStmt(stmt: PreparedStatement, db: DoorDatabase, con: Connection) {
+    override fun bindToPreparedStmt(stmt: PreparedStatement, db: RoomDatabase, con: Connection) {
         val paramsToBind = values
         if(paramsToBind != null) {
             var paramIndex = 1
@@ -37,7 +38,7 @@ actual class SimpleDoorQuery actual constructor(private val sql: String, overrid
                     }
 
 
-                    val arrayParam = if(db.asCommon().arraySupported) {
+                    val arrayParam = if(db.arraySupported) {
                         con.createArrayOf(paramType, valuesArr)
                     }else {
                         JdbcArrayProxy(paramType, valuesArr)

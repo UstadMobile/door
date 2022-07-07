@@ -15,7 +15,7 @@ import com.ustadmobile.door.util.DoorAndroidRoomHelper
 import java.io.File
 
 @Suppress("UNCHECKED_CAST", "unused") //This is used as an API
-actual class DatabaseBuilder<T: DoorDatabase>(
+actual class DatabaseBuilder<T: RoomDatabase>(
     private val roomBuilder: RoomDatabase.Builder<T>,
     private val dbClass: KClass<T>,
     private val appContext: Context,
@@ -24,7 +24,7 @@ actual class DatabaseBuilder<T: DoorDatabase>(
 ) {
 
     companion object {
-        fun <T : DoorDatabase> databaseBuilder(
+        fun <T : RoomDatabase> databaseBuilder(
             context: Any,
             dbClass: KClass<T>,
             dbName: String,

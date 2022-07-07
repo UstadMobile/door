@@ -1,7 +1,7 @@
 package com.ustadmobile.door.ext
 
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.DoorConstants
-import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.DoorDatabaseReplicateWrapper
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -18,7 +18,7 @@ import org.kodein.type.TypeToken
  * This is used by generated code in Ktor routes.
  */
 @Suppress("UNCHECKED_CAST")
-fun <T: DoorDatabase> PipelineContext<Unit, ApplicationCall>.unwrappedDbOnCall(typeToken: TypeToken<T>, tag: Int = DoorTag.TAG_DB): T{
+fun <T: RoomDatabase> PipelineContext<Unit, ApplicationCall>.unwrappedDbOnCall(typeToken: TypeToken<T>, tag: Int = DoorTag.TAG_DB): T{
     val db = closestDI().on(call).direct.Instance(typeToken, tag = tag)
     return if(db is DoorDatabaseReplicateWrapper) {
         db.realDatabase as T

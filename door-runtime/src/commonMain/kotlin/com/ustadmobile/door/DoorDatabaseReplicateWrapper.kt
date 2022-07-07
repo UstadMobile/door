@@ -1,5 +1,7 @@
 package com.ustadmobile.door
 
+import androidx.room.RoomDatabase
+
 /**
  * When running an insert or update query on an entity with @ReplicateEntity, the primary key and versionId fields
  * need to be managed. The generated implementation wrapper takes care of assigning a unique primary key using the
@@ -7,7 +9,7 @@ package com.ustadmobile.door
  */
 interface DoorDatabaseReplicateWrapper {
 
-    val realDatabase: DoorDatabase
+    val realDatabase: RoomDatabase
 
     val dbName: String
 

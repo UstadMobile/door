@@ -1,9 +1,12 @@
 package com.ustadmobile.door.ext
 
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.*
 import com.ustadmobile.door.jdbc.PreparedStatement
 import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
 import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
+import com.ustadmobile.door.jdbc.ext.mapRows
+import com.ustadmobile.door.jdbc.ext.useResults
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 
@@ -26,7 +29,7 @@ import kotlinx.coroutines.withTimeout
  * used as the database for the fallback to running from the
  */
 @Suppress("UNCHECKED_CAST")
-suspend fun <T : DoorDatabase, R> T.onRepoWithFallbackToDb(timeMillis: Long, block: suspend (T) -> R) : R {
+suspend fun <T : RoomDatabase, R> T.onRepoWithFallbackToDb(timeMillis: Long, block: suspend (T) -> R) : R {
     if(this is DoorDatabaseRepository) {
         try {
             return withTimeout(timeMillis) {
@@ -51,7 +54,7 @@ suspend fun <T : DoorDatabase, R> T.onRepoWithFallbackToDb(timeMillis: Long, blo
  * If a timeout occurs then the return value will be the value from invocation on the database
  */
 @Suppress("UNCHECKED_CAST")
-suspend fun <T: DoorDatabase, R> T.onDbThenRepoWithTimeout(timeMillis: Long, block: suspend (doorDb: T, lastResult: R?) -> R) : R{
+suspend fun <T: RoomDatabase, R> T.onDbThenRepoWithTimeout(timeMillis: Long, block: suspend (doorDb: T, lastResult: R?) -> R) : R{
     if(this is DoorDatabaseRepository) {
         val dbResult = block(this.db as T, null)
         try {
@@ -76,7 +79,7 @@ suspend fun <T: DoorDatabase, R> T.onDbThenRepoWithTimeout(timeMillis: Long, blo
  * @throws IllegalArgumentException if the receiver is not actually the repository
  */
 @Suppress("UNCHECKED_CAST")
-fun <T: DoorDatabase> T.requireDbAndRepo(): Pair<T, T> {
+fun <T: RoomDatabase> T.requireDbAndRepo(): Pair<T, T> {
     val repo = this as? DoorDatabaseRepository
         ?: throw IllegalStateException("Must use repo for addFileToContainer")
     val db = repo.db as T
@@ -90,7 +93,7 @@ fun <T: DoorDatabase> T.requireDbAndRepo(): Pair<T, T> {
  * After clearing all the table data, the sync tables (e.g. TableSyncStatus,
  * The nodeId on SyncNode, etc) need to be setup again.
  */
-fun <T:DoorDatabase> T.clearAllTablesAndResetNodeId(nodeId: Long) : T {
+fun <T:RoomDatabase> T.clearAllTablesAndResetNodeId(nodeId: Long) : T {
     clearAllTables()
     execSqlBatch(*SyncNodeIdCallback(nodeId)
         .initSyncNodeSync(forceReset = true).toTypedArray())
@@ -100,15 +103,15 @@ fun <T:DoorDatabase> T.clearAllTablesAndResetNodeId(nodeId: Long) : T {
 /**
  * Suspended wrapper that will prepare a Statement, execute a code block, and return the code block result
  */
-suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
+suspend fun <R> RoomDatabase.prepareAndUseStatementAsync(
     sql: String,
-    block: suspend (PreparedStatement) -> R
+    block: suspend (PreparedStatement) -> R,
 ) = prepareAndUseStatementAsync(PreparedStatementConfig(sql), block)
 
 /**
  * Suspended wrapper that will prepare a Statement, execute a code block, and return the code block result
  */
-fun <R> DoorDatabase.prepareAndUseStatement(
+fun <R> RoomDatabase.prepareAndUseStatement(
     sql: String,
     block: (PreparedStatement) -> R
 ) = prepareAndUseStatement(PreparedStatementConfig(sql), block)
@@ -116,7 +119,7 @@ fun <R> DoorDatabase.prepareAndUseStatement(
 /**
  * This is used from generated code to delete ChangeLogs for the givne table id
  */
-suspend fun DoorDatabase.deleteFromChangeLog(tableId: Int) {
+suspend fun RoomDatabase.deleteFromChangeLog(tableId: Int) {
     prepareAndUseStatementAsync("DELETE FROM ChangeLog WHERE chTableId = ?") { stmt ->
         stmt.setInt(1, tableId)
         stmt.executeUpdateAsyncKmp()
@@ -126,7 +129,7 @@ suspend fun DoorDatabase.deleteFromChangeLog(tableId: Int) {
 /**
  * Find tables which have pending changelogs that have not yet been processed.
  */
-suspend fun DoorDatabase.findDistinctPendingChangeLogs(): List<Int> {
+suspend fun RoomDatabase.findDistinctPendingChangeLogs(): List<Int> {
     return prepareAndUseStatementAsync("SELECT DISTINCT chTableId FROM ChangeLog") { stmt ->
         stmt.executeQueryAsyncKmp().useResults { it.mapRows {
             it.getInt(1)
@@ -137,7 +140,7 @@ suspend fun DoorDatabase.findDistinctPendingChangeLogs(): List<Int> {
 /**
  * Get the real, one and only, root database. This will get out of any wrappers, transactions, etc.
  */
-val DoorDatabase.rootDatabase: DoorDatabase
+val RoomDatabase.rootDatabase: RoomDatabase
     get() {
         var db = this
         while (true) {
@@ -146,3 +149,6 @@ val DoorDatabase.rootDatabase: DoorDatabase
 
         return db
     }
+
+val RoomDatabase.arraySupported: Boolean
+    get() = dbType() == DoorDbType.POSTGRES

@@ -1,9 +1,11 @@
 package com.ustadmobile.door.util
 
-import com.ustadmobile.door.DoorDatabase
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.Connection
+import com.ustadmobile.door.jdbc.ext.mapRows
+import com.ustadmobile.door.jdbc.ext.useResults
 
 /**
  * The SQLite Change Tracker is based on using a temporary table and temporary triggers. Temporary tables and triggers
@@ -51,7 +53,7 @@ class SqliteChangeTracker(
     }
 
     suspend fun setupTriggersOnDbAsync(
-        db: DoorDatabase,
+        db: RoomDatabase,
         temporary: Boolean = true,
     ) {
         db.execSqlBatchAsync(*generateCreateTriggersSql(temporary).toTypedArray())

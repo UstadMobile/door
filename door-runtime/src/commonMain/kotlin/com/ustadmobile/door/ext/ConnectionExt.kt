@@ -1,6 +1,6 @@
 package com.ustadmobile.door.ext
 
-import com.ustadmobile.door.DoorDatabase
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.PreparedStatementConfig
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.PreparedStatement
@@ -12,7 +12,7 @@ import com.ustadmobile.door.jdbc.PreparedStatement
  * use the PreparedStatementArrayProxy if needed.
  */
 expect fun Connection.prepareStatement(
-    db: DoorDatabase,
+    db: RoomDatabase,
     stmtConfig: PreparedStatementConfig
 ): PreparedStatement
 

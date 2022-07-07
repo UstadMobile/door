@@ -1,5 +1,7 @@
 package com.ustadmobile.door
 
+import androidx.room.RoomDatabase
+import com.ustadmobile.door.DoorConstants.DBINFO_TABLENAME
 import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.dbType
 import com.ustadmobile.door.ext.doorDatabaseMetadata
@@ -19,10 +21,12 @@ import java.sql.Statement
 import javax.naming.InitialContext
 import javax.sql.DataSource
 import kotlin.reflect.KClass
+import com.ustadmobile.door.jdbc.ext.useResults
+import com.ustadmobile.door.jdbc.ext.mapRows
 
 
 @Suppress("unused") //This is used as an API
-actual class DatabaseBuilder<T: DoorDatabase> internal constructor(
+actual class DatabaseBuilder<T: RoomDatabase> internal constructor(
     private var context: Any,
     private var dbClass: KClass<T>,
     private var dbName: String,
@@ -36,7 +40,7 @@ actual class DatabaseBuilder<T: DoorDatabase> internal constructor(
     private val migrationList = mutableListOf<DoorMigration>()
 
     companion object {
-        fun <T : DoorDatabase> databaseBuilder(
+        fun <T : RoomDatabase> databaseBuilder(
             context: Any, dbClass:
             KClass<T>,
             dbName: String,
@@ -53,12 +57,18 @@ actual class DatabaseBuilder<T: DoorDatabase> internal constructor(
         val dataSource = iContext.lookup("java:/comp/env/jdbc/${dbName}") as DataSource
         val dbImplClass = Class.forName("${dbClass.java.canonicalName}_JdbcKt") as Class<T>
 
-        val doorDb = dbImplClass.getConstructor(DoorDatabase::class.java, DataSource::class.java,
+        val doorDb = dbImplClass.getConstructor(RoomDatabase::class.java, DataSource::class.java,
                 String::class.java, File::class.java, List::class.java, Int::class.javaPrimitiveType)
             .newInstance(null, dataSource, dbName, attachmentDir, attachmentFilters, queryTimeout)
 
+        val connection = dataSource.connection
+        val sqlDatabase = DoorSqlDatabaseConnectionImpl(connection)
 
-        if(!doorDb.tableNames.any {it.lowercase() == DoorDatabaseCommon.DBINFO_TABLENAME}) {
+        val tableNames: List<String> = connection.metaData.getTables(null, null, "%", arrayOf("TABLE")).useResults { tableResult ->
+            tableResult.mapRows { it.getString("TABLE_NAME") ?: "" }
+        }
+
+        if(!tableNames.any {it.lowercase() == DBINFO_TABLENAME}) {
             //Do this directly to avoid conflicts with the change tracking systems before tables have been created
             dataSource.connection.use { con ->
                 con.createStatement().use { stmt ->
@@ -70,9 +80,9 @@ actual class DatabaseBuilder<T: DoorDatabase> internal constructor(
 
             callbacks.forEach {
                 when(it) {
-                    is DoorDatabaseCallbackSync -> it.onCreate(doorDb.sqlDatabaseImpl)
+                    is DoorDatabaseCallbackSync -> it.onCreate(sqlDatabase)
                     is DoorDatabaseCallbackStatementList -> {
-                        doorDb.execSQLBatch(*it.onCreate(doorDb.sqlDatabaseImpl).toTypedArray())
+                        doorDb.execSQLBatch(*it.onCreate(sqlDatabase).toTypedArray())
                     }
                 }
             }
@@ -101,14 +111,14 @@ actual class DatabaseBuilder<T: DoorDatabase> internal constructor(
                         .maxByOrNull { it.endVersion }
                 if(nextMigration != null) {
                     when(nextMigration) {
-                        is DoorMigrationSync -> nextMigration.migrateFn(doorDb.sqlDatabaseImpl)
-                        is DoorMigrationAsync -> runBlocking { nextMigration.migrateFn(doorDb.sqlDatabaseImpl) }
+                        is DoorMigrationSync -> nextMigration.migrateFn(sqlDatabase)
+                        is DoorMigrationAsync -> runBlocking { nextMigration.migrateFn(sqlDatabase) }
                         is DoorMigrationStatementList -> doorDb.execSQLBatch(
-                            *nextMigration.migrateStmts(doorDb.sqlDatabaseImpl).toTypedArray())
+                            *nextMigration.migrateStmts(sqlDatabase).toTypedArray())
                     }
 
                     currentDbVersion = nextMigration.endVersion
-                    doorDb.sqlDatabaseImpl.execSQL("UPDATE _doorwayinfo SET dbVersion = $currentDbVersion")
+                    sqlDatabase.execSQL("UPDATE _doorwayinfo SET dbVersion = $currentDbVersion")
                 }else {
                     throw IllegalStateException("Need to migrate to version " +
                             "${doorDb.dbVersion} from $currentDbVersion - could not find next migration")
@@ -118,19 +128,19 @@ actual class DatabaseBuilder<T: DoorDatabase> internal constructor(
 
         callbacks.forEach {
             when(it) {
-                is DoorDatabaseCallbackSync -> it.onOpen(doorDb.sqlDatabaseImpl)
+                is DoorDatabaseCallbackSync -> it.onOpen(sqlDatabase)
                 is DoorDatabaseCallbackStatementList -> {
-                    doorDb.execSQLBatch(*it.onOpen(doorDb.sqlDatabaseImpl).toTypedArray())
+                    doorDb.execSQLBatch(*it.onOpen(sqlDatabase).toTypedArray())
                 }
             }
         }
+
+        connection.close()
 
         if(doorDb.dbType() == DoorDbType.POSTGRES) {
             val postgresChangeTracker = PostgresChangeTracker(doorDb as DoorDatabaseJdbc)
             postgresChangeTracker.setupTriggers()
         }
-
-        (doorDb as DoorDatabaseJdbc).invalidationTracker.active = true
 
         return if(doorDb::class.doorDatabaseMetadata().hasReadOnlyWrapper) {
             doorDb.wrap(dbClass)

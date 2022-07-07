@@ -3,7 +3,6 @@ package com.ustadmobile.door.roomjdbc
 import android.content.Context
 import androidx.room.InvalidationTracker
 import androidx.room.Room
-import androidx.room.RoomDatabase
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.ustadmobile.door.ext.*

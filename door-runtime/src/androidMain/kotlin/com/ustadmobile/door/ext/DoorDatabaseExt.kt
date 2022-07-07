@@ -21,19 +21,19 @@ import kotlin.reflect.KClass
 import com.ustadmobile.door.attachments.requireAttachmentStorageUri
 import com.ustadmobile.door.ext.toFile
 
-actual fun DoorDatabase.dbType(): Int = DoorDbType.SQLITE
+actual fun RoomDatabase.dbType(): Int = DoorDbType.SQLITE
 
-actual fun DoorDatabase.dbSchemaVersion(): Int {
+actual fun RoomDatabase.dbSchemaVersion(): Int {
     return this::class.doorDatabaseMetadata().version
 }
 
-actual suspend fun <T: DoorDatabase, R> T.withDoorTransactionAsync(dbKClass: KClass<out T>, block: suspend (T) -> R) : R{
+actual suspend fun <T: RoomDatabase, R> T.withDoorTransactionAsync(dbKClass: KClass<out T>, block: suspend (T) -> R) : R{
     return rootDatabase.withTransaction {
         block(this)
     }
 }
 
-actual fun <T: DoorDatabase, R> T.withDoorTransaction(dbKClass: KClass<T>, block: (T) -> R) : R {
+actual fun <T: RoomDatabase, R> T.withDoorTransaction(dbKClass: KClass<T>, block: (T) -> R) : R {
     return rootDatabase.runInTransaction(Callable {
         block(this)
     })
@@ -42,7 +42,7 @@ actual fun <T: DoorDatabase, R> T.withDoorTransaction(dbKClass: KClass<T>, block
 /**
  * The DoorDatabase
  */
-fun DoorDatabase.resolveAttachmentAndroidUri(attachmentUri: String): Uri {
+fun RoomDatabase.resolveAttachmentAndroidUri(attachmentUri: String): Uri {
     val attachmentsDir = requireAttachmentStorageUri().toFile()
 
     if(attachmentUri.startsWith(DOOR_ATTACHMENT_URI_PREFIX)) {
@@ -59,14 +59,14 @@ fun DoorDatabase.resolveAttachmentAndroidUri(attachmentUri: String): Uri {
 private val metadataCache = mutableMapOf<KClass<*>, DoorDatabaseMetadata<*>>()
 
 @Suppress("UNCHECKED_CAST", "RECEIVER_NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
-actual fun <T: DoorDatabase> KClass<T>.doorDatabaseMetadata(): DoorDatabaseMetadata<T> {
+actual fun <T: RoomDatabase> KClass<T>.doorDatabaseMetadata(): DoorDatabaseMetadata<T> {
     return metadataCache.getOrPut(this) {
         Class.forName(this.java.canonicalName.substringBefore('_') + DoorDatabaseMetadata.SUFFIX_DOOR_METADATA).newInstance()
                 as DoorDatabaseMetadata<*>
     } as DoorDatabaseMetadata<T>
 }
 
-actual fun DoorDatabase.execSqlBatch(vararg sqlStatements: String) {
+actual fun RoomDatabase.execSqlBatch(vararg sqlStatements: String) {
     runInTransaction {
         sqlStatements.forEach {
             this.query(it, arrayOf())
@@ -74,7 +74,7 @@ actual fun DoorDatabase.execSqlBatch(vararg sqlStatements: String) {
     }
 }
 
-actual suspend fun DoorDatabase.execSqlBatchAsync(vararg sqlStatements: String) {
+actual suspend fun RoomDatabase.execSqlBatchAsync(vararg sqlStatements: String) {
     withTransaction {
         sqlStatements.forEach {
             this.query(it, arrayOf())
@@ -82,7 +82,7 @@ actual suspend fun DoorDatabase.execSqlBatchAsync(vararg sqlStatements: String) 
     }
 }
 
-actual suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
+actual suspend fun <R> RoomDatabase.prepareAndUseStatementAsync(
     stmtConfig: PreparedStatementConfig,
     block: suspend (PreparedStatement) -> R
 ) : R {
@@ -100,7 +100,7 @@ actual suspend fun <R> DoorDatabase.prepareAndUseStatementAsync(
     }
 }
 
-actual fun <R> DoorDatabase.prepareAndUseStatement(
+actual fun <R> RoomDatabase.prepareAndUseStatement(
     stmtConfig: PreparedStatementConfig,
     block: (PreparedStatement) -> R
 ) : R {
@@ -118,7 +118,7 @@ actual fun <R> DoorDatabase.prepareAndUseStatement(
     }
 }
 
-actual val DoorDatabase.sourceDatabase: DoorDatabase?
+actual val RoomDatabase.sourceDatabase: RoomDatabase?
     get() {
         return when {
             (this is DoorDatabaseRepository) -> this.db
@@ -130,7 +130,7 @@ actual val DoorDatabase.sourceDatabase: DoorDatabase?
 
 private val pkManagersMap = ConcurrentHashMap<RoomDatabase, DoorPrimaryKeyManager>()
 
-actual val DoorDatabase.doorPrimaryKeyManager : DoorPrimaryKeyManager
+actual val RoomDatabase.doorPrimaryKeyManager : DoorPrimaryKeyManager
     get() {
         if(pkManagersMap[this] == null) {
             synchronized(this){
@@ -147,7 +147,7 @@ actual val DoorDatabase.doorPrimaryKeyManager : DoorPrimaryKeyManager
 //There is no alternative to the unchecked cast here. The cast is operating on generated code, so it will always
 //succeed
 @Suppress("UNCHECKED_CAST")
-actual inline fun <reified  T: DoorDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T {
+actual inline fun <reified  T: RoomDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T {
     val dbUnwrapped = if(this is DoorDatabaseReplicateWrapper) {
         this.unwrap(T::class)
     }else {
@@ -163,7 +163,7 @@ actual inline fun <reified  T: DoorDatabase> T.asRepository(repositoryConfig: Re
 }
 
 @Suppress("unused")
-fun <T: DoorDatabase> DoorDatabase.isWrappable(dbClass: KClass<T>): Boolean {
+fun <T: RoomDatabase> RoomDatabase.isWrappable(dbClass: KClass<T>): Boolean {
     try {
         Class.forName("${dbClass.qualifiedName}${DoorDatabaseReplicateWrapper.SUFFIX}")
         return true
@@ -177,13 +177,13 @@ fun <T: DoorDatabase> DoorDatabase.isWrappable(dbClass: KClass<T>): Boolean {
  * annotated with @LastChangedTime) setting the last changed time as the version id, and storing attachment data.
  */
 @Suppress("UNCHECKED_CAST")
-actual fun <T: DoorDatabase> T.wrap(dbClass: KClass<T>) : T {
+actual fun <T: RoomDatabase> T.wrap(dbClass: KClass<T>) : T {
     val wrapperClass = Class.forName("${dbClass.qualifiedName}${DoorDatabaseReplicateWrapper.SUFFIX}") as Class<T>
     return wrapperClass.getConstructor(dbClass.java).newInstance(this)
 }
 
 @Suppress("UNCHECKED_CAST")
-actual fun <T: DoorDatabase> T.unwrap(dbClass: KClass<T>): T {
+actual fun <T: RoomDatabase> T.unwrap(dbClass: KClass<T>): T {
     if(this is DoorDatabaseReplicateWrapper) {
         return this.realDatabase as T
     }else {
@@ -191,39 +191,31 @@ actual fun <T: DoorDatabase> T.unwrap(dbClass: KClass<T>): T {
     }
 }
 
-actual fun DoorDatabase.addInvalidationListener(changeListenerRequest: ChangeListenerRequest) {
-    invalidationTracker.addObserver(ChangeListenerRequestInvalidationObserver(changeListenerRequest))
-}
-
-actual fun DoorDatabase.removeInvalidationListener(changeListenerRequest: ChangeListenerRequest) {
-    invalidationTracker.removeObserver(ChangeListenerRequestInvalidationObserver(changeListenerRequest))
-}
-
-internal val DoorDatabase.dbClassName: String
+internal val RoomDatabase.dbClassName: String
     get() = this::class.qualifiedName?.substringBefore("_")
         ?: throw IllegalArgumentException("No class name!")
 
 
-internal val DoorDatabase.doorAndroidRoomHelper: DoorAndroidRoomHelper
+internal val RoomDatabase.doorAndroidRoomHelper: DoorAndroidRoomHelper
     get()  = DoorAndroidRoomHelper.lookupHelper(this)
 
-actual val DoorDatabase.replicationNotificationDispatcher : ReplicationNotificationDispatcher
+actual val RoomDatabase.replicationNotificationDispatcher : ReplicationNotificationDispatcher
     get() = doorAndroidRoomHelper.replicationNotificationDispatcher
 
-actual val DoorDatabase.nodeIdAuthCache: NodeIdAuthCache
+actual val RoomDatabase.nodeIdAuthCache: NodeIdAuthCache
     get() = doorAndroidRoomHelper.nodeIdAndAuthCache
 
-actual fun DoorDatabase.addIncomingReplicationListener(incomingReplicationListener: IncomingReplicationListener) {
+actual fun RoomDatabase.addIncomingReplicationListener(incomingReplicationListener: IncomingReplicationListener) {
     doorAndroidRoomHelper.incomingReplicationListenerHelper.addIncomingReplicationListener(incomingReplicationListener)
 }
 
-actual fun DoorDatabase.removeIncomingReplicationListener(incomingReplicationListener: IncomingReplicationListener) {
+actual fun RoomDatabase.removeIncomingReplicationListener(incomingReplicationListener: IncomingReplicationListener) {
     doorAndroidRoomHelper.incomingReplicationListenerHelper.removeIncomingReplicationListener(incomingReplicationListener)
 }
 
-actual val DoorDatabase.incomingReplicationListenerHelper: IncomingReplicationListenerHelper
+actual val RoomDatabase.incomingReplicationListenerHelper: IncomingReplicationListenerHelper
     get() = doorAndroidRoomHelper.incomingReplicationListenerHelper
 
-actual val DoorDatabase.rootTransactionDatabase: DoorDatabase
+actual val RoomDatabase.rootTransactionDatabase: RoomDatabase
     get() = rootDatabase
 

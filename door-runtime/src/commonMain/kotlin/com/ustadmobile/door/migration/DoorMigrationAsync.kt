@@ -1,5 +1,6 @@
 package com.ustadmobile.door.migration
 
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.ustadmobile.door.DoorSqlDatabase
 
 class DoorMigrationAsync(

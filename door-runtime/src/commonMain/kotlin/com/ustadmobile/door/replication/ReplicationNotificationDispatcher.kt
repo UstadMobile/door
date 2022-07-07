@@ -1,10 +1,13 @@
 package com.ustadmobile.door.replication
 
+import androidx.room.InvalidationTracker
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.ChangeListenerRequest
-import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.TablesInvalidationListener
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
+import com.ustadmobile.door.jdbc.ext.mapRows
+import com.ustadmobile.door.jdbc.ext.useResults
 import com.ustadmobile.door.util.DoorEventCollator
 import com.ustadmobile.door.util.NodeIdAuthCache
 import io.github.aakira.napier.Napier
@@ -18,7 +21,7 @@ import kotlinx.coroutines.launch
  * 4) ReplicationNotificationDispatcher fires ReplicationPendingEvent. That is received by the SubscriptionManager and/or ServerSentEvents endpoint.
  */
 class ReplicationNotificationDispatcher(
-    private val db: DoorDatabase,
+    private val db: RoomDatabase,
 
     /**
      * The generated DbName_ReplicationRunOnChangeRunner
@@ -29,14 +32,16 @@ class ReplicationNotificationDispatcher(
 
     private val dbMetaData: DoorDatabaseMetadata<*> = db::class.doorDatabaseMetadata()
 
-) : TablesInvalidationListener, NodeIdAuthCache.OnNewDoorNode {
+) : InvalidationTracker.Observer(db::class.doorDatabaseMetadata().replicateTableNames.toTypedArray()),
+    NodeIdAuthCache.OnNewDoorNode
+{
 
     private data class ReplicationPendingRequest(val nodeId: Long, val listener: ReplicationPendingListener)
 
     private val eventCollator = DoorEventCollator(200, coroutineScope, this::onDispatch)
 
     init {
-        db.addInvalidationListener(ChangeListenerRequest(dbMetaData.replicateTableNames, this))
+        db.invalidationTracker.addObserver(this)
         coroutineScope.launch {
             val pendingChangeLogs = db.findDistinctPendingChangeLogs()
             Napier.d("ReplicationNotificationDispatcher for [$db] startup: found ${pendingChangeLogs.size} ChangeLogs to" +
@@ -60,8 +65,8 @@ class ReplicationNotificationDispatcher(
         }
     }
 
-    override fun onTablesInvalidated(tableNames: List<String>) {
-        eventCollator.receiveEvent(tableNames)
+    override fun onInvalidated(tables: Set<String>) {
+        eventCollator.receiveEvent(tables.toList())
     }
 
     override fun onNewDoorNode(newNodeId: Long, auth: String) {

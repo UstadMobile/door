@@ -1,7 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
 import com.ustadmobile.door.DatabaseBuilder
-import com.ustadmobile.door.DoorDatabase
 import db2.ExampleDatabase2
 import db2.ExampleEntity2
 import db2.ExampleLinkEntity

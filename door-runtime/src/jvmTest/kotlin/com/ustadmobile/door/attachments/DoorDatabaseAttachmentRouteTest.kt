@@ -1,6 +1,6 @@
 package com.ustadmobile.door.attachments
 
-import com.ustadmobile.door.DoorDatabase
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.VirtualHostScope
@@ -31,7 +31,7 @@ import java.net.URLEncoder
 
 class DoorDatabaseAttachmentRouteTest {
 
-    private lateinit var mockDb: DoorDatabase
+    private lateinit var mockDb: RoomDatabase
 
     private lateinit var scope: VirtualHostScope
 
@@ -45,7 +45,7 @@ class DoorDatabaseAttachmentRouteTest {
         testApplication {
             application {
                 di {
-                    bind<DoorDatabase>(tag = DoorTag.TAG_DB) with scoped(scope).singleton {
+                    bind<RoomDatabase>(tag = DoorTag.TAG_DB) with scoped(scope).singleton {
                         mockDb
                     }
 
@@ -53,7 +53,7 @@ class DoorDatabaseAttachmentRouteTest {
                 }
 
                 routing {
-                    val typeToken : TypeToken<DoorDatabase> = erased()
+                    val typeToken : TypeToken<RoomDatabase> = erased()
                     doorAttachmentsRoute("attachments", typeToken)
                 }
             }

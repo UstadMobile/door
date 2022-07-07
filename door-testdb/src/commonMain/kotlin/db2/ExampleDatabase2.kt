@@ -1,6 +1,7 @@
 package db2
 
 import androidx.room.Database
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.*
 import com.ustadmobile.door.annotation.DoorNodeIdAuthRequired
 import com.ustadmobile.door.annotation.MinReplicationVersion
@@ -23,7 +24,7 @@ import db2.ExampleDatabase2.Companion.DB_VERSION
 ])
 @MinReplicationVersion(1)
 @DoorNodeIdAuthRequired
-abstract class ExampleDatabase2 : DoorDatabase() {
+abstract class ExampleDatabase2 : RoomDatabase() {
 
     abstract fun exampleSyncableDao(): ExampleSyncableDao
 

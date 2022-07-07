@@ -1,5 +1,6 @@
 package com.ustadmobile.door
 
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.PreparedStatement
 
@@ -11,7 +12,7 @@ actual interface DoorQuery {
 
     val values: Array<out Any?>?
 
-    fun bindToPreparedStmt(stmt: PreparedStatement, db: DoorDatabase, con: Connection)
+    fun bindToPreparedStmt(stmt: PreparedStatement, db: RoomDatabase, con: Connection)
 
 
 }

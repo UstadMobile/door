@@ -1,13 +1,14 @@
 package com.ustadmobile.door.replication
 
-import com.ustadmobile.door.DoorDatabase
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.entities.DoorNode
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
 import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
+import com.ustadmobile.door.jdbc.ext.mapRows
+import com.ustadmobile.door.jdbc.ext.useResults
 import com.ustadmobile.door.replication.ReplicationEntityMetaData.Companion.KEY_PRIMARY_KEY
 import com.ustadmobile.door.replication.ReplicationEntityMetaData.Companion.KEY_VERSION_ID
-import io.github.aakira.napier.Napier
 import kotlinx.serialization.json.*
 import kotlin.reflect.KClass
 
@@ -15,7 +16,7 @@ import kotlin.reflect.KClass
  * Get a list of the replication trackers that are pending for the given remoteNode and given tableId and return as a
  * JSON array
  */
-suspend fun DoorDatabase.findPendingReplicationTrackers(
+suspend fun RoomDatabase.findPendingReplicationTrackers(
     dbMetaData: DoorDatabaseMetadata<*>,
     remoteNodeId: Long,
     tableId: Int,
@@ -37,7 +38,7 @@ suspend fun DoorDatabase.findPendingReplicationTrackers(
  *
  * @return list of pending replication tracker
  */
-suspend fun <T: DoorDatabase> DoorDatabase.checkPendingReplicationTrackers(
+suspend fun <T: RoomDatabase> RoomDatabase.checkPendingReplicationTrackers(
     dbKClass: KClass<out T>,
     dbMetaData: DoorDatabaseMetadata<*>,
     pendingReplications: JsonArray,
@@ -76,7 +77,7 @@ suspend fun <T: DoorDatabase> DoorDatabase.checkPendingReplicationTrackers(
  * @param processedReplicateTrackers a JSON array of trackers that should be marked as processed e.g.
  *  [ {primaryKey : 123, versionId: 456 }.. ]
  */
-suspend fun <T: DoorDatabase> DoorDatabase.markReplicateTrackersAsProcessed(
+suspend fun <T: RoomDatabase> RoomDatabase.markReplicateTrackersAsProcessed(
     dbKClass: KClass<out T>,
     dbMetaData: DoorDatabaseMetadata<*>,
     processedReplicateTrackers: JsonArray,
@@ -108,7 +109,7 @@ suspend fun <T: DoorDatabase> DoorDatabase.markReplicateTrackersAsProcessed(
 /**
  *
  */
-suspend fun DoorDatabase.findPendingReplications(
+suspend fun RoomDatabase.findPendingReplications(
     dbMetaData: DoorDatabaseMetadata<*>,
     remoteNodeId: Long,
     tableId: Int,
@@ -125,9 +126,9 @@ suspend fun DoorDatabase.findPendingReplications(
 }
 
 
-suspend fun DoorDatabase.insertReplicationsIntoReceiveView(
+suspend fun RoomDatabase.insertReplicationsIntoReceiveView(
     dbMetaData: DoorDatabaseMetadata<*>,
-    dbKClass: KClass<out DoorDatabase>,
+    dbKClass: KClass<out RoomDatabase>,
     @Suppress("UNUSED_PARAMETER") //This is reserved for future usage (e.g. to set when doing the insert to help with permission checking)
     remoteNodeId: Long,
     tableId: Int,
@@ -171,7 +172,7 @@ suspend fun DoorDatabase.insertReplicationsIntoReceiveView(
 
 }
 
-internal suspend fun DoorDatabase.getDoorNodeAuth(nodeId : Long): String? {
+internal suspend fun RoomDatabase.getDoorNodeAuth(nodeId : Long): String? {
     return prepareAndUseStatementAsync("""SELECT auth
           FROM DoorNode
          WHERE nodeId = ?""") { stmt ->
@@ -184,7 +185,7 @@ internal suspend fun DoorDatabase.getDoorNodeAuth(nodeId : Long): String? {
     }
 }
 
-internal suspend fun DoorDatabase.insertNewDoorNode(node: DoorNode) {
+internal suspend fun RoomDatabase.insertNewDoorNode(node: DoorNode) {
     prepareAndUseStatementAsync("INSERT INTO DoorNode(nodeId, auth, rel) VALUES(?, ?, ?)") { stmt ->
         stmt.setLong(1, node.nodeId)
         stmt.setString(2, node.auth)
@@ -193,7 +194,7 @@ internal suspend fun DoorDatabase.insertNewDoorNode(node: DoorNode) {
     }
 }
 
-internal suspend fun DoorDatabase.selectDoorNodeExists(nodeId: Long): Boolean {
+internal suspend fun RoomDatabase.selectDoorNodeExists(nodeId: Long): Boolean {
     return prepareAndUseStatementAsync("""
         SELECT EXISTS(
                SELECT nodeId 

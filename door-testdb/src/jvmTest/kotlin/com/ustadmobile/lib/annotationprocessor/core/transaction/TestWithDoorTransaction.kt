@@ -1,8 +1,7 @@
 package com.ustadmobile.lib.annotationprocessor.core.transaction
 
-import com.ustadmobile.door.ChangeListenerRequest
+import androidx.room.InvalidationTracker
 import com.ustadmobile.door.DatabaseBuilder
-import com.ustadmobile.door.TablesInvalidationListener
 import com.ustadmobile.door.entities.DoorNode
 import com.ustadmobile.door.ext.withDoorTransaction
 import com.ustadmobile.door.ext.withDoorTransactionAsync
@@ -37,7 +36,7 @@ class TestWithDoorTransaction {
 
     private var connectionCountBefore = 0
 
-    private lateinit var invalidationListener: TablesInvalidationListener
+    private lateinit var invalidationObserver: InvalidationTracker.Observer
 
     @Before
     fun setup() {
@@ -71,8 +70,12 @@ class TestWithDoorTransaction {
 
         connectionCountBefore = connectionCount.get()
 
-        invalidationListener = mock { }
-        db.addChangeListener(ChangeListenerRequest(listOf("RepEntity", "DoorNode"), invalidationListener))
+        invalidationObserver = spy { object: InvalidationTracker.Observer(arrayOf("RepEntity")) {
+            override fun onInvalidated(tables: Set<String>) {
+
+            }
+        } }
+        db.invalidationTracker.addObserver(invalidationObserver)
     }
 
     private fun assertInvocationCounts() {
@@ -85,7 +88,7 @@ class TestWithDoorTransaction {
 
 
         //Check that the onTablesInvalidated is only called once at the end of the transaction
-        verify(invalidationListener, timeout(5000).times(1)).onTablesInvalidated(argWhere {
+        verify(invalidationObserver, timeout(5000).times(1)).onInvalidated(argWhere {
             "RepEntity" in it && "DoorNode" in it
         })
     }

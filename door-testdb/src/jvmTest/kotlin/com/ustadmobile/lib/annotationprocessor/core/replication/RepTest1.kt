@@ -26,7 +26,8 @@ class RepTest1 {
 
         val dispatcher = ReplicationNotificationDispatcher(db,
             RepDb_ReplicationRunOnChangeRunner(db), GlobalScope)
-        db.addChangeListener(ChangeListenerRequest(listOf("RepEntity"), dispatcher))
+
+        db.invalidationTracker.addObserver(dispatcher)
 
         val repPendingListener = mock<ReplicationPendingListener> { }
 
@@ -58,7 +59,8 @@ class RepTest1 {
 
         val dispatcher = ReplicationNotificationDispatcher(db,
             RepDb_ReplicationRunOnChangeRunner(db), GlobalScope)
-        db.addChangeListener(ChangeListenerRequest(listOf("RepEntity"), dispatcher))
+        db.invalidationTracker.addObserver(dispatcher)
+
 
         val repPendingListener = mock<ReplicationPendingListener> { }
 

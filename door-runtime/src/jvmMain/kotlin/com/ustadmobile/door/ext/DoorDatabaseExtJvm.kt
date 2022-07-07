@@ -1,5 +1,6 @@
 package com.ustadmobile.door.ext
 
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.*
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
 import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
@@ -9,16 +10,20 @@ import kotlinx.coroutines.withContext
 
 import kotlin.reflect.KClass
 
-actual fun DoorDatabase.dbType(): Int = this.jdbcDbType
+actual fun RoomDatabase.dbType(): Int = (this.rootDatabase as RoomJdbcImpl).jdbcImplHelper.dbType
 
-actual fun DoorDatabase.dbSchemaVersion(): Int = this.dbVersion
+actual fun RoomDatabase.dbSchemaVersion(): Int = this.dbVersion
 
-actual suspend fun <T: DoorDatabase, R> T.withDoorTransactionAsync(dbKClass: KClass<out T>, block: suspend (T) -> R): R {
-    return withDoorTransactionInternalAsync(block)
+actual suspend fun <T: RoomDatabase, R> T.withDoorTransactionAsync(dbKClass: KClass<out T>, block: suspend (T) -> R): R {
+    return (this.rootDatabase as RoomJdbcImpl).jdbcImplHelper.useConnectionAsync {
+        block(this)
+    }
 }
 
-actual fun <T: DoorDatabase, R> T.withDoorTransaction(dbKClass: KClass<T>, block: (T) -> R): R {
-    return withDoorTransactionInternal(block)
+actual fun <T: RoomDatabase, R> T.withDoorTransaction(dbKClass: KClass<T>, block: (T) -> R): R {
+    return (this.rootDatabase as RoomJdbcImpl).jdbcImplHelper.useConnection {
+        block(this)
+    }
 }
 
 /**
@@ -35,7 +40,7 @@ actual fun <T: DoorDatabase, R> T.withDoorTransaction(dbKClass: KClass<T>, block
  * @param repoImplKClass the KClass representing the generated repository implementation
  */
 @Suppress("unused")
-fun <T: DoorDatabase> T.wrapDbAsRepositoryForTransaction(
+fun <T: RoomDatabase> T.wrapDbAsRepositoryForTransaction(
     originalRepo: T,
     dbKClass: KClass<T>,
     repoImplKClass: KClass<T>,
@@ -52,11 +57,11 @@ fun <T: DoorDatabase> T.wrapDbAsRepositoryForTransaction(
     ).newInstance(wrappedDb, this, repoConfig, false) as T
 }
 
-actual fun DoorDatabase.execSqlBatch(vararg sqlStatements: String) {
+actual fun RoomDatabase.execSqlBatch(vararg sqlStatements: String) {
     execSQLBatch(*sqlStatements)
 }
 
-actual suspend fun DoorDatabase.execSqlBatchAsync(vararg sqlStatements: String) {
+actual suspend fun RoomDatabase.execSqlBatchAsync(vararg sqlStatements: String) {
     withContext(Dispatchers.IO) {
         execSQLBatch(*sqlStatements)
     }
@@ -65,7 +70,7 @@ actual suspend fun DoorDatabase.execSqlBatchAsync(vararg sqlStatements: String) 
 private val metadataCache = mutableMapOf<KClass<*>, DoorDatabaseMetadata<*>>()
 
 @Suppress("UNCHECKED_CAST")
-actual fun <T: DoorDatabase> KClass<T>.doorDatabaseMetadata(): DoorDatabaseMetadata<T> {
+actual fun <T: RoomDatabase> KClass<T>.doorDatabaseMetadata(): DoorDatabaseMetadata<T> {
     return metadataCache.getOrPut(this) {
         Class.forName(this.java.canonicalName.substringBefore('_') + SUFFIX_DOOR_METADATA)
             .getConstructor().newInstance()
@@ -75,7 +80,7 @@ actual fun <T: DoorDatabase> KClass<T>.doorDatabaseMetadata(): DoorDatabaseMetad
 
 
 @Suppress("UNCHECKED_CAST")
-actual inline fun <reified  T: DoorDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T {
+actual inline fun <reified  T: RoomDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T {
     val dbClass = T::class
     val repoImplClass = Class.forName("${dbClass.qualifiedName}_Repo") as Class<T>
 
@@ -103,13 +108,13 @@ private val KClass<*>.qualifiedNameBeforeLastUnderscore: String?
  * the repo.
  */
 @Suppress("UNCHECKED_CAST")
-actual fun <T: DoorDatabase> T.wrap(dbClass: KClass<T>) : T {
+actual fun <T: RoomDatabase> T.wrap(dbClass: KClass<T>) : T {
     val wrapperClass = Class.forName("${dbClass.qualifiedNameBeforeLastUnderscore}${DoorDatabaseReplicateWrapper.SUFFIX}") as Class<T>
     return wrapperClass.getConstructor(dbClass.java).newInstance(this)
 }
 
 @Suppress("UNCHECKED_CAST")
-actual fun <T: DoorDatabase> T.unwrap(dbClass: KClass<T>): T {
+actual fun <T: RoomDatabase> T.unwrap(dbClass: KClass<T>): T {
     return (this as DoorDatabaseReplicateWrapper).realDatabase as T
 }
 

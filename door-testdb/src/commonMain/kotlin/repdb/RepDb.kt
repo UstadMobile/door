@@ -1,7 +1,7 @@
 package repdb
 
 import androidx.room.Database
-import com.ustadmobile.door.DoorDatabase
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.SyncNode
 import com.ustadmobile.door.entities.ChangeLog
 import com.ustadmobile.door.entities.DoorNode
@@ -13,7 +13,7 @@ import com.ustadmobile.door.entities.ZombieAttachmentData
     RepEntityWithAttachment::class, RepEntityWithAttachmentTracker::class, SyncNode::class,
     CompositePkEntity::class, ZombieAttachmentData::class
 ])
-abstract class RepDb: DoorDatabase() {
+abstract class RepDb: RoomDatabase() {
 
     abstract val repDao: RepDao
 

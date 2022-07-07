@@ -1,9 +1,9 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
 import androidx.room.Query
+import androidx.room.RoomDatabase
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
-import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.annotation.RepoHttpAccessible
 import javax.lang.model.element.TypeElement
 import kotlin.reflect.KClass
@@ -74,20 +74,6 @@ fun FunSpec.Builder.removeAbstractModifier(): FunSpec.Builder {
 
 fun FunSpec.Builder.removeAnnotations(): FunSpec.Builder {
     annotations.clear()
-    return this
-}
-
-/**
- * Turn this FunSpec into a function that will override wrapNewTransactionFor
- */
-fun FunSpec.Builder.addOverrideWrapNewTransactionFun() : FunSpec.Builder {
-    val typeVariableNameT = TypeVariableName.invoke("T", DoorDatabase::class)
-    addModifiers(KModifier.OVERRIDE, KModifier.PROTECTED, KModifier.OPEN)
-    addTypeVariable(typeVariableNameT)
-    addParameter("dbKClass", KClass::class.asClassName()
-            .parameterizedBy(typeVariableNameT))
-    addParameter("transactionDb", typeVariableNameT)
-    returns(typeVariableNameT)
     return this
 }
 

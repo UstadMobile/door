@@ -72,8 +72,8 @@ fun findEntitiesWithAnnotation(entityType: ClassName, annotationClass: Class<out
 
 fun jdbcDaoTypeSpecBuilder(simpleName: String, superTypeName: TypeName) = TypeSpec.classBuilder(simpleName)
         .primaryConstructor(FunSpec.constructorBuilder().addParameter("_db",
-                DoorDatabase::class).build())
-        .addProperty(PropertySpec.builder("_db", DoorDatabase::class).initializer("_db").build())
+                RoomDatabase::class).build())
+        .addProperty(PropertySpec.builder("_db", RoomDatabase::class).initializer("_db").build())
         .superclass(superTypeName)
 
 
@@ -565,7 +565,8 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
                 }else if(paramType.javaToKotlinType().isListOrArray()) {
                     //val con = null as Connection
                     val arrayTypeName = sqlArrayComponentTypeOf(paramType.javaToKotlinType())
-                    add("_stmt.setArray(${paramIndex++}, _db.createArrayOf(_stmt.getConnection(), %S, %L.toTypedArray()))\n",
+                    add("_stmt.setArray(${paramIndex++}, _stmt.getConnection().%M(%S, %L.toTypedArray()))\n",
+                        MemberName("com.ustadmobile.door.ext", "createArrayOrProxyArrayOf"),
                         arrayTypeName, it)
                 }else {
                     add("_stmt.set${paramType.javaToKotlinType().preparedStatementSetterGetterTypeName}(${paramIndex++}, " +
@@ -883,7 +884,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
 
         val MEMBERNAME_ASYNC_QUERY = MemberName("com.ustadmobile.door.jdbc.ext", "executeQueryAsyncKmp")
 
-        val MEMBERNAME_RESULTSET_USERESULTS = MemberName("com.ustadmobile.door.ext", "useResults")
+        val MEMBERNAME_RESULTSET_USERESULTS = MemberName("com.ustadmobile.door.jdbc.ext", "useResults")
 
         val MEMBERNAME_MUTABLE_LINKEDLISTOF = MemberName("com.ustadmobile.door.ext", "mutableLinkedListOf")
 

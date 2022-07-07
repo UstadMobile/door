@@ -3,6 +3,7 @@ package com.ustadmobile.lib.annotationprocessor.core
 import androidx.lifecycle.LiveData
 import androidx.room.Dao
 import androidx.room.Database
+import androidx.room.RoomDatabase
 import com.google.gson.Gson
 import com.squareup.kotlinpoet.*
 import io.ktor.http.HttpStatusCode
@@ -85,7 +86,7 @@ fun FileSpec.Builder.addDaoKtorRouteFun(
 ) : FileSpec.Builder {
 
     addFunction(FunSpec.builder("${daoTypeSpec.name}$SUFFIX_KTOR_ROUTE")
-            .addTypeVariable(TypeVariableName.invoke("T", DoorDatabase::class))
+            .addTypeVariable(TypeVariableName.invoke("T", RoomDatabase::class))
             .receiver(Route::class)
             .addParameter("_typeToken",
                     org.kodein.type.TypeToken::class.asClassName().parameterizedBy(TypeVariableName("T")))
@@ -196,14 +197,14 @@ fun TypeSpec.Builder.addNanoHttpdResponderFun(
                     .add("val _daoProvider = _uriResource.initParameter(1, %T::class.java) as %T\n",
                             DoorDaoProvider::class,
                             DoorDaoProvider::class.asClassName().parameterizedBy(
-                                    DoorDatabase::class.asClassName(), daoClassName))
+                                RoomDatabase::class.asClassName(), daoClassName))
                     .add("val _typeToken = _uriResource.initParameter(2, %T::class.java) as %T\n",
                         org.kodein.type.TypeToken::class.java,
-                            org.kodein.type.TypeToken::class.parameterizedBy(DoorDatabase::class))
+                            org.kodein.type.TypeToken::class.parameterizedBy(RoomDatabase::class))
                     .add("val _call = %T(_uriResource, _urlParams, _session)\n", NanoHttpdCall::class)
-                    .add("val _db: %T by _di.%M(_call).%M(_typeToken, tag = %T.TAG_DB)\n", DoorDatabase::class,
+                    .add("val _db: %T by _di.%M(_call).%M(_typeToken, tag = %T.TAG_DB)\n", RoomDatabase::class,
                             DI_ON_MEMBER, DI_INSTANCE_TYPETOKEN_MEMBER, DoorTag::class)
-                    .add("val _repo: %T by _di.%M(_call).%M(_typeToken, tag = %T.TAG_REPO)\n", DoorDatabase::class,
+                    .add("val _repo: %T by _di.%M(_call).%M(_typeToken, tag = %T.TAG_REPO)\n", RoomDatabase::class,
                             DI_ON_MEMBER, DI_INSTANCE_TYPETOKEN_MEMBER, DoorTag::class)
                     .add("val _dao = _daoProvider.getDao(_db)\n")
                     .add("val _gson : %T by _di.%M()\n", Gson::class, DI_INSTANCE_MEMBER)
