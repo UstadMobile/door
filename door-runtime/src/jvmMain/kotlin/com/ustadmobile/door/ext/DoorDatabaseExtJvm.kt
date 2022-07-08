@@ -58,12 +58,12 @@ fun <T: RoomDatabase> T.wrapDbAsRepositoryForTransaction(
 }
 
 actual fun RoomDatabase.execSqlBatch(vararg sqlStatements: String) {
-    execSQLBatch(*sqlStatements)
+    rootDatabase.execSQLBatch(*sqlStatements)
 }
 
 actual suspend fun RoomDatabase.execSqlBatchAsync(vararg sqlStatements: String) {
     withContext(Dispatchers.IO) {
-        execSQLBatch(*sqlStatements)
+        rootDatabase.execSQLBatch(*sqlStatements)
     }
 }
 

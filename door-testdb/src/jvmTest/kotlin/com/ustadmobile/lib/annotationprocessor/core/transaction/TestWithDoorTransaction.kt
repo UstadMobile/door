@@ -70,11 +70,13 @@ class TestWithDoorTransaction {
 
         connectionCountBefore = connectionCount.get()
 
-        invalidationObserver = spy { object: InvalidationTracker.Observer(arrayOf("RepEntity")) {
+        val realInvalidationObserver : InvalidationTracker.Observer = object: InvalidationTracker.Observer(arrayOf("RepEntity")) {
             override fun onInvalidated(tables: Set<String>) {
 
             }
-        } }
+        }
+
+        invalidationObserver = spy(realInvalidationObserver)
         db.invalidationTracker.addObserver(invalidationObserver)
     }
 
