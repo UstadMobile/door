@@ -1,23 +1,17 @@
 package com.ustadmobile.door.ext
 
+import androidx.room.RoomDatabase
+import com.ustadmobile.door.PreparedStatementConfig
 import com.ustadmobile.door.jdbc.Connection
+import com.ustadmobile.door.jdbc.PreparedStatement
 
-actual inline fun <R> Connection.useConnection(block: (Connection) -> R) : R {
-    try {
-        return block(this)
-    }catch(e: Exception) {
-        throw e
-    }finally {
-        close()
-    }
-}
+actual fun Connection.prepareStatement(
+    db: RoomDatabase,
+    stmtConfig: PreparedStatementConfig
+): PreparedStatement {
 
-actual suspend inline fun <R> Connection.useConnectionAsync(block: suspend (Connection) -> R) : R {
-    try {
-        return block(this)
-    }catch(e: Exception) {
-        throw e
-    }finally {
-        close()
+    return when {
+        !stmtConfig.hasListParams -> prepareStatement(stmtConfig.sql, stmtConfig.generatedKeys)
+        else -> TODO("prepareStatement(db, stmtConfig): list params on Android unsupported!")
     }
 }

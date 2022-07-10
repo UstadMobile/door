@@ -1,5 +1,5 @@
 group 'com.github.UstadMobile.door'
-version '0.0.60'
+version '0.0.60a'
 
 ext.localProperties = new Properties()
 
@@ -29,7 +29,7 @@ apply plugin: "com.github.ben-manes.versions"
 buildscript {
 
     ext.kotlin_version = "1.7.0"
-    ext.atomicfu_version = '0.18.0'
+    ext.atomicfu_version = '0.18.2'
     ext.version_shadow = "7.1.2"
     ext.gradle_versions_version = "0.42.0"
 
@@ -50,12 +50,12 @@ buildscript {
 }
 
 ext {
-    version_kotlin = "1.7.0"
+    version_kotlin = "1.7.10"
     version_coroutines = "1.6.3"
-    version_ktor = "2.0.2"
+    version_ktor = "2.0.3"
     version_nanohttpd = "2.3.1"
     version_napier = "2.6.1"
-    version_atomicfu = '0.18.0'
+    version_atomicfu = '0.18.2'
     version_sqlite_jdbc = "3.36.0.3"
     version_kodein_di = "7.12.0"
     version_kotlin_mockito = "4.0.0"
@@ -76,7 +76,7 @@ ext {
     version_logback = "1.2.11"
     version_okhttp = "4.9.3"
     version_kotlinx_serialization = "1.3.3"
-    version_kotlin_extensions = "1.0.1-pre.220-kotlin-$version_kotlin"
+
     version_kotlinx_metadata = "0.4.2"
     version_junit = "4.13"
     version_junit_jupiter = "5.8.2"
@@ -86,14 +86,14 @@ ext {
     version_android_material = "1.5.0"
     version_android_constraint_layout = "2.1.4"
 
-    version_kotlin_wrappers_bom = "1.0.0-pre.346"
+    version_kotlin_wrappers_bom = "1.0.0-pre.353"
 
-    version_kotlin_react = "18.2.0-pre.346-cmopat"
-    version_kotlin_react_router_dom = "6.3.0-pre.346-compat"
-    version_kotlin_styled = "5.3.5-pre.346-compat"
-    version_kotlin_redux = "4.1.2-pre.346-compat"
-    version_kotlin_extensions = "1.0.1-pre.346-compat"
-    version_kotlin_react_redux = "7.2.6-pre.346-compat"
+    version_kotlin_react = "18.2.0-pre.353"
+    version_kotlin_react_router_dom = "6.3.0-pre.353"
+    version_kotlin_styled = "5.3.5-pre.353"
+    version_kotlin_redux = "4.1.2-pre.353"
+    version_kotlin_extensions = "1.0.1-pre.353"
+    version_kotlin_react_redux = "7.2.6-pre.353"
 
     version_npm_sparkmd5 = "^3.0.2"
 

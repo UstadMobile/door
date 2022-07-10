@@ -15,7 +15,7 @@ import com.ustadmobile.door.util.DoorAndroidRoomHelper
 import java.io.File
 
 @Suppress("UNCHECKED_CAST", "unused") //This is used as an API
-actual class DatabaseBuilder<T: RoomDatabase>(
+class DatabaseBuilder<T: RoomDatabase>(
     private val roomBuilder: RoomDatabase.Builder<T>,
     private val dbClass: KClass<T>,
     private val appContext: Context,
@@ -59,7 +59,7 @@ actual class DatabaseBuilder<T: RoomDatabase>(
         }
     }
 
-    actual fun addCallback(callback: DoorDatabaseCallback) : DatabaseBuilder<T> {
+    fun addCallback(callback: DoorDatabaseCallback) : DatabaseBuilder<T> {
         roomBuilder.addCallback(object: RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 when(callback) {
@@ -81,7 +81,7 @@ actual class DatabaseBuilder<T: RoomDatabase>(
         return this
     }
 
-    actual fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
+    fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
         roomBuilder.addMigrations(*migrations.map { it.asRoomMigration() }.toTypedArray())
         return this
     }

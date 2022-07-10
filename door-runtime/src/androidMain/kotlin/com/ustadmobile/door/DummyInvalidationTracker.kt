@@ -1,6 +1,7 @@
 package com.ustadmobile.door
 
 import androidx.room.InvalidationTracker
+import androidx.room.RoomDatabase
 
 /**
  * Because a repository is a child class the database, which on Android is a child class of RoomDatabase
@@ -10,7 +11,7 @@ import androidx.room.InvalidationTracker
 class DummyInvalidationTracker {
 
     companion object {
-        fun createDummyInvalidationTracker(db: DoorDatabase)  = object: InvalidationTracker(db){
+        fun createDummyInvalidationTracker(db: RoomDatabase)  = object: InvalidationTracker(db, *arrayOf()){
             //do nothing
         }
     }

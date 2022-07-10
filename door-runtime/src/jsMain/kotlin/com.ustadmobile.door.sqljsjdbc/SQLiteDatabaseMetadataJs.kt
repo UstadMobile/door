@@ -21,8 +21,12 @@ class SQLiteDatabaseMetadataJs(val datasource: SQLiteDatasourceJs): DatabaseMeta
      * List all tables from the database, this implementation was adapter from SQLiteJDBC
      * @see https://github.com/xerial/sqlite-jdbc/blob/master/src/main/java/org/sqlite/jdbc3/JDBC3DatabaseMetaData.java
      */
-    suspend fun getTablesAsync(catalog: String?, schemaPattern: String?, tableNamePattern: String?,
-                               types: Array<out String>): ResultSet {
+    override suspend fun getTablesAsync(
+        catalog: String?,
+        schemaPattern: String?,
+        tableNamePattern: String?,
+        types: Array<out String>
+    ): ResultSet {
 
         val tblNamePattern = if (tableNamePattern == null || "" == tableNamePattern) "%" else escape(tableNamePattern)
 
@@ -54,7 +58,7 @@ class SQLiteDatabaseMetadataJs(val datasource: SQLiteDatasourceJs): DatabaseMeta
         """.trimIndent()
 
 
-        if (types.isNullOrEmpty()) {
+        if (types.isEmpty()) {
             sql += "'TABLE','VIEW'"
         } else {
             sql += "'${types[0].uppercase()}'"

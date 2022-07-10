@@ -63,6 +63,7 @@ kotlin {
             dependencies {
                 implementation kotlin("test-junit")
                 implementation "org.mockito.kotlin:mockito-kotlin:$version_kotlin_mockito"
+                implementation "org.mockito:mockito-inline:$version_kotlin_mockito"
             }
         }
 

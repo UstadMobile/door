@@ -25,22 +25,8 @@ actual suspend fun <T: RoomDatabase, R> T.withDoorTransactionAsync(
     dbKClass: KClass<out T>,
     block: suspend (T) -> R
 ) : R {
-    val rootJdbcDb = (rootDatabase as DoorDatabaseJdbc)
-    val wasInTransaction = rootJdbcDb.isInTransaction
-    rootJdbcDb.transactionDepthCounter.incrementTransactionDepth()
-    try {
-        val sqliteDataSource = rootJdbcDb.dataSource as SQLiteDatasourceJs
-
-        return sqliteDataSource.withTransactionLock {
-            val result = block(this)
-            if(!wasInTransaction) {
-                val changedTables = sqliteDataSource.findUpdatedTables(this::class.doorDatabaseMetadata())
-                rootJdbcDb.invalidationTracker.onTablesInvalidated(changedTables.toSet())
-            }
-            result
-        }
-    }finally {
-        rootJdbcDb.transactionDepthCounter.decrementTransactionDepth()
+    return (this.rootDatabase as RoomJdbcImpl).jdbcImplHelper.useConnectionAsync {
+        block(this)
     }
 }
 

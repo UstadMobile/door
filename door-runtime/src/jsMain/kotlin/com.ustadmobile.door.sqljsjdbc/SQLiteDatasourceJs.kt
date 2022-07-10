@@ -4,6 +4,8 @@ import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.jdbc.ResultSet
 import com.ustadmobile.door.jdbc.SQLException
+import com.ustadmobile.door.jdbc.ext.mapRows
+import com.ustadmobile.door.jdbc.ext.useResults
 import com.ustadmobile.door.sqljsjdbc.IndexedDb.DATABASE_VERSION
 import com.ustadmobile.door.sqljsjdbc.IndexedDb.DB_STORE_KEY
 import com.ustadmobile.door.sqljsjdbc.IndexedDb.DB_STORE_NAME
@@ -93,7 +95,7 @@ class SQLiteDatasourceJs(
             return withContext(ReentrantMutexContextElement(key)) {
                 withLock {
                     val transactionId = ++transactionIdCounter
-                    Napier.d("Transaction: Start Transaction $transactionId", tag = DoorTag.LOG_TAG)
+                    Napier.d("Transaction: Start Transaction $transactionId\n", tag = DoorTag.LOG_TAG)
                     var transactionSuccessful = false
                     try {
                         if(transactionMode == TransactionMode.READ_WRITE)
@@ -127,13 +129,13 @@ class SQLiteDatasourceJs(
         return transactionMutex.withReentrantLock {
             val completable = CompletableDeferred<WorkerResult>()
             val actionId = ++idCounter
-            Napier.d("$logPrefix sendMessage #$actionId - sending action=${message["action"]}", tag = DoorTag.LOG_TAG)
+            Napier.d("$logPrefix sendMessage #$actionId - sending action=${message["action"]} \n", tag = DoorTag.LOG_TAG)
             pendingMessages[actionId] = completable
             executedSqlQueries[actionId] = message["sql"].toString()
             message["id"] = actionId
             worker.postMessage(message)
             val result = completable.await()
-            Napier.d("$logPrefix sendMessage #$actionId - got result", tag = DoorTag.LOG_TAG)
+            Napier.d("$logPrefix sendMessage #$actionId - got result \n", tag = DoorTag.LOG_TAG)
             result
         }
     }
@@ -154,7 +156,7 @@ class SQLiteDatasourceJs(
         Napier.d("$logPrefix sending query: $sql params=${params?.joinToString()}", tag = DoorTag.LOG_TAG)
         val results = sendMessage(makeMessage(sql, params)).results
         val sqliteResultSet = results?.let { SQLiteResultSet(it) } ?: SQLiteResultSet(arrayOf())
-        Napier.d("$logPrefix Got result: Ran: '$sql' params=${params?.joinToString()} result = $sqliteResultSet", tag = DoorTag.LOG_TAG)
+        Napier.d("$logPrefix Got result: Ran: '$sql' params=${params?.joinToString()} result = $sqliteResultSet\n", tag = DoorTag.LOG_TAG)
         sqliteResultSet
     }
 
@@ -163,7 +165,7 @@ class SQLiteDatasourceJs(
         params: Array<Any?>?,
         returnGeneratedKey: Boolean = false
     ): UpdateResult = withTransactionLock{
-        Napier.d("$logPrefix sending update: '$sql', params=${params?.joinToString()}",
+        Napier.d("$logPrefix sending update: '$sql', params=${params?.joinToString()}\n",
             tag = DoorTag.LOG_TAG)
         sendMessage(makeMessage(sql, params))
         val generatedKey = if(returnGeneratedKey) {

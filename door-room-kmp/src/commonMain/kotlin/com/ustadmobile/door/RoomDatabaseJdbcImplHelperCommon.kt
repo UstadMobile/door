@@ -14,9 +14,8 @@ open class RoomDatabaseJdbcImplHelperCommon(
     protected val dataSource: DataSource,
     protected val db: RoomDatabase,
     private val tableNames: List<String>,
+    val invalidationTracker: InvalidationTracker,
 ) {
-
-    val invalidationTracker = InvalidationTracker(tableNames)
 
     open val dbType: Int = DoorDbType.SQLITE
 
@@ -50,8 +49,9 @@ open class RoomDatabaseJdbcImplHelperCommon(
 
             val changedTables = mutableLinkedListOf<String>()
             try {
+                //TODO: This needs updated to handle JS and JVM. JS might need this created only once at the start.
                 if(dbType == DoorDbType.SQLITE) {
-                    invalidationTracker.setupSqliteTriggers(connection)
+                    invalidationTracker.setupSqliteTriggersAsync(connection)
                 }
 
                 val result = blockRunner(TransactionElement(Key, connection))

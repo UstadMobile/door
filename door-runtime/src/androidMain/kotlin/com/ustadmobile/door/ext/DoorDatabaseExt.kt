@@ -9,17 +9,14 @@ import com.ustadmobile.door.jdbc.PreparedStatement
 import com.ustadmobile.door.PreparedStatementConfig
 import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
 import com.ustadmobile.door.roomjdbc.ConnectionRoomJdbc
-import com.ustadmobile.door.util.ChangeListenerRequestInvalidationObserver
 import com.ustadmobile.door.util.DoorAndroidRoomHelper
 import com.ustadmobile.door.util.NodeIdAuthCache
 import io.github.aakira.napier.Napier
 import java.io.File
-import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KClass
 import com.ustadmobile.door.attachments.requireAttachmentStorageUri
-import com.ustadmobile.door.ext.toFile
 
 actual fun RoomDatabase.dbType(): Int = DoorDbType.SQLITE
 
@@ -34,7 +31,7 @@ actual suspend fun <T: RoomDatabase, R> T.withDoorTransactionAsync(dbKClass: KCl
 }
 
 actual fun <T: RoomDatabase, R> T.withDoorTransaction(dbKClass: KClass<T>, block: (T) -> R) : R {
-    return rootDatabase.runInTransaction(Callable {
+    return runInTransaction(Callable {
         block(this)
     })
 }

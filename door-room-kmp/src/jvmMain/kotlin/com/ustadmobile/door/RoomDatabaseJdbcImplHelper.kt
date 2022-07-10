@@ -1,5 +1,6 @@
 package com.ustadmobile.door
 
+import androidx.room.InvalidationTracker
 import androidx.room.RoomDatabase
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
@@ -11,7 +12,8 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
     dataSource: DataSource,
     db: RoomDatabase,
     tableNames: List<String>,
-) : RoomDatabaseJdbcImplHelperCommon(dataSource, db, tableNames) {
+    invalidationTracker: InvalidationTracker,
+) : RoomDatabaseJdbcImplHelperCommon(dataSource, db, tableNames, invalidationTracker) {
 
     inner class PendingTransaction(
         val connection: Connection

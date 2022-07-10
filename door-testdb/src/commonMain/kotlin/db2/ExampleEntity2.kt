@@ -5,7 +5,7 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 
-@Entity
+@Entity(tableName = "ExampleEntity2")
 @Serializable
 open class ExampleEntity2(
         @PrimaryKey(autoGenerate = true)

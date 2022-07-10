@@ -1,6 +1,6 @@
 package com.ustadmobile.door.util
 
-import com.ustadmobile.door.DoorDatabase
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.ext.DoorDatabaseMetadata
 import kotlin.reflect.KClass
 
@@ -9,7 +9,7 @@ import kotlin.reflect.KClass
  * implementations. An object type will be generated for each database class. That object is then passed as a parameter
  * to the DatabaseBuilder.
  */
-abstract class DoorJsImplClasses<T: DoorDatabase> () {
+abstract class DoorJsImplClasses<T: RoomDatabase> () {
     //KClass for the original database itself (not the implementation)
     abstract val dbKClass: KClass<T>
 

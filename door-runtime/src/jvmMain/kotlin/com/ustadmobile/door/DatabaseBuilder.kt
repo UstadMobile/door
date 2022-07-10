@@ -26,7 +26,7 @@ import com.ustadmobile.door.jdbc.ext.mapRows
 
 
 @Suppress("unused") //This is used as an API
-actual class DatabaseBuilder<T: RoomDatabase> internal constructor(
+class DatabaseBuilder<T: RoomDatabase> internal constructor(
     private var context: Any,
     private var dbClass: KClass<T>,
     private var dbName: String,
@@ -41,8 +41,8 @@ actual class DatabaseBuilder<T: RoomDatabase> internal constructor(
 
     companion object {
         fun <T : RoomDatabase> databaseBuilder(
-            context: Any, dbClass:
-            KClass<T>,
+            context: Any,
+            dbClass: KClass<T>,
             dbName: String,
             attachmentDir: File? = null,
             attachmentFilters: List<AttachmentFilter> = listOf(),
@@ -149,13 +149,13 @@ actual class DatabaseBuilder<T: RoomDatabase> internal constructor(
         }
     }
 
-    actual fun addCallback(callback: DoorDatabaseCallback) : DatabaseBuilder<T>{
+    fun addCallback(callback: DoorDatabaseCallback) : DatabaseBuilder<T>{
         callbacks.add(callback)
 
         return this
     }
 
-    actual fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
+    fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
         migrationList.addAll(migrations)
         return this
     }

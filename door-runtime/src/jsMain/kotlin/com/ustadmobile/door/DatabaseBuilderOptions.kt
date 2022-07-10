@@ -1,9 +1,10 @@
 package com.ustadmobile.door
 
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.util.DoorJsImplClasses
 import kotlin.reflect.KClass
 
-data class DatabaseBuilderOptions<T : DoorDatabase>(
+data class DatabaseBuilderOptions<T : RoomDatabase>(
     var dbClass: KClass<T>,
     var dbImplClasses: DoorJsImplClasses<T>,
     var dbName: String = dbClass.simpleName!!,

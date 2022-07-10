@@ -61,7 +61,7 @@ class ExamplePresenter<V :  ExampleView> (private val view: V, private val lifec
 
     fun handleDownloadDbClicked() {
         GlobalScope.launch {
-            database?.exportDatabase()
+            //database?.exportDatabase()
         }
     }
 }

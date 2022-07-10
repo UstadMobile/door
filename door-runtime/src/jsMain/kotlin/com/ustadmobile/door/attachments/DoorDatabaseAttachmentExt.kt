@@ -1,8 +1,8 @@
 package com.ustadmobile.door.attachments
 
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.DoorConstants.HEADER_DBVERSION
 import com.ustadmobile.door.DoorConstants.HEADER_NODE
-import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.DoorUri
@@ -32,7 +32,7 @@ import kotlin.js.json
  * will be done
  *
  */
-actual suspend fun DoorDatabase.storeAttachment(entityWithAttachment: EntityWithAttachment) {
+actual suspend fun RoomDatabase.storeAttachment(entityWithAttachment: EntityWithAttachment) {
     val attachmentUri = entityWithAttachment.attachmentUri
     if(attachmentUri == null || attachmentUri.startsWith(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX))
         return
@@ -42,7 +42,7 @@ actual suspend fun DoorDatabase.storeAttachment(entityWithAttachment: EntityWith
     entityWithAttachment.attachmentMd5 = blobMd5
     entityWithAttachment.attachmentSize = blob.size.toInt()
 
-    val dbName = transactionRootJdbcDb.dbName
+    val dbName = (rootDatabase as DoorDatabaseJdbc).dbName
     IndexedDb.storeBlob(dbName, ATTACHMENT_STORE_NAME, entityWithAttachment.tableNameAndMd5Path, blob)
     entityWithAttachment.attachmentUri = entityWithAttachment.makeAttachmentUriFromTableNameAndMd5()
     URL.revokeObjectURL(attachmentUri)
@@ -54,9 +54,10 @@ actual suspend fun DoorDatabase.storeAttachment(entityWithAttachment: EntityWith
  * @param attachmentUri The attachmentUri: this can be a platform dependent URI string, or it could
  *
  */
-actual suspend fun DoorDatabase.retrieveAttachment(attachmentUri: String): DoorUri {
+actual suspend fun RoomDatabase.retrieveAttachment(attachmentUri: String): DoorUri {
     val indexedDbKey = attachmentUri.substringAfter(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX)
-    val blob = IndexedDb.retrieveBlob(transactionRootJdbcDb.dbName, ATTACHMENT_STORE_NAME, indexedDbKey)
+    val dbName = (rootDatabase as DoorDatabaseJdbc).dbName
+    val blob = IndexedDb.retrieveBlob(dbName, ATTACHMENT_STORE_NAME, indexedDbKey)
     val url = blob?.let { URL.createObjectURL(it) }
         ?: throw IllegalArgumentException("Attachment $attachmentUri not found in db!")
     return DoorUri(URL(url))
@@ -66,7 +67,7 @@ actual suspend fun DoorDatabase.retrieveAttachment(attachmentUri: String): DoorU
  * After an update has been performed on a table that has attachments, this function is called
  * to delete old/unused data by the generated repository code
  */
-actual suspend fun DoorDatabase.deleteZombieAttachments() {
+actual suspend fun RoomDatabase.deleteZombieAttachments() {
 }
 
 /**
@@ -79,7 +80,7 @@ actual suspend fun DoorDatabaseRepository.uploadAttachment(entityWithAttachment:
         ?: throw IllegalArgumentException("uploadAttachment: Entity attachment must not be null")
 
     val indexedDbKey = attachmentUri.substringAfter(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX)
-    val dbName = (this as DoorDatabase).transactionRootJdbcDb.dbName
+    val dbName = ((this as RoomDatabase).rootDatabase as DoorDatabaseJdbc).dbName
     val blob = IndexedDb.retrieveBlob(dbName, ATTACHMENT_STORE_NAME, indexedDbKey)
         ?: throw IllegalStateException("No blob found for $attachmentUri")
     val params = "md5=${encodeURIComponent(attachmentMd5)}&uri=${encodeURIComponent(attachmentUri)}"
@@ -99,7 +100,7 @@ actual suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<E
     try {
         val headers = json(HEADER_DBVERSION to db.dbSchemaVersion().toString(),
             HEADER_NODE to "${config.nodeId}/${config.auth}")
-        val dbName = (this as DoorDatabase).transactionRootJdbcDb.dbName
+        val dbName = ((this as RoomDatabase).rootDatabase as DoorDatabaseJdbc).dbName
 
         val entitiesWithAttachmentData = entityList.mapNotNull { it.attachmentUri }
         if(entitiesWithAttachmentData.isEmpty())
@@ -119,8 +120,8 @@ actual suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<E
     }
 }
 
-actual val DoorDatabase.attachmentsStorageUri: DoorUri?
+actual val RoomDatabase.attachmentsStorageUri: DoorUri?
     get() = (rootDatabase as DoorDatabaseJdbc).realAttachmentStorageUri
 
-actual val DoorDatabase.attachmentFilters: List<AttachmentFilter>
+actual val RoomDatabase.attachmentFilters: List<AttachmentFilter>
     get() = (rootDatabase as DoorDatabaseJdbc).realAttachmentFilters

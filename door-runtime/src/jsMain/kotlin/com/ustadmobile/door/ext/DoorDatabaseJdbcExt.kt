@@ -1,6 +1,5 @@
 package com.ustadmobile.door.ext
 
-import com.ustadmobile.door.DoorDatabase
 import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.SQLException

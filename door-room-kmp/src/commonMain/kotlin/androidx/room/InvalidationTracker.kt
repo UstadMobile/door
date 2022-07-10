@@ -10,9 +10,12 @@ import com.ustadmobile.door.jdbc.ext.mapRows
 import com.ustadmobile.door.jdbc.ext.useResults
 import kotlin.jvm.Volatile
 
-class InvalidationTracker(
-    private val tableNames: List<String>
+open class InvalidationTracker(
+    private val db: RoomDatabase,
+    vararg tables: String,
 ) {
+
+    private val tableNames: List<String> = tables.toList()
 
     private val observers = concurrentSafeListOf<Observer>()
 

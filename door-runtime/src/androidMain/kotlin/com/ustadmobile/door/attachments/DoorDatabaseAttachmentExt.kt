@@ -1,7 +1,7 @@
 package com.ustadmobile.door.attachments
 
 import android.net.Uri
-import com.ustadmobile.door.DoorDatabase
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.DoorUri
 import com.ustadmobile.door.util.systemTimeInMillis
@@ -14,7 +14,7 @@ import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.ext.doorAndroidRoomHelper
 import io.github.aakira.napier.Napier
 
-suspend fun DoorDatabase.filterAttachment(entityWithAttachment: EntityWithAttachment): EntityWithAttachment {
+suspend fun RoomDatabase.filterAttachment(entityWithAttachment: EntityWithAttachment): EntityWithAttachment {
 
     val tmpDir = File.createTempFile("attachmentfilter", systemTimeInMillis().toString()).also {
         it.delete()
@@ -26,7 +26,7 @@ suspend fun DoorDatabase.filterAttachment(entityWithAttachment: EntityWithAttach
     }
 }
 
-actual suspend fun DoorDatabase.storeAttachment(entityWithAttachment: EntityWithAttachment) {
+actual suspend fun RoomDatabase.storeAttachment(entityWithAttachment: EntityWithAttachment) {
     val androidContext = doorAndroidRoomHelper.context
     if(entityWithAttachment.attachmentUri?.startsWith(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX) == true)
         return //already stored
@@ -67,14 +67,14 @@ actual suspend fun DoorDatabase.storeAttachment(entityWithAttachment: EntityWith
     }
 }
 
-actual suspend fun DoorDatabase.retrieveAttachment(attachmentUri:  String): DoorUri {
+actual suspend fun RoomDatabase.retrieveAttachment(attachmentUri:  String): DoorUri {
     val file = File(requireAttachmentStorageUri().toFile(), attachmentUri
         .substringAfter(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX))
     return DoorUri(Uri.fromFile(file))
 }
 
-actual val DoorDatabase.attachmentsStorageUri: DoorUri?
+actual val RoomDatabase.attachmentsStorageUri: DoorUri?
     get() = doorAndroidRoomHelper.attachmentsDir?.toDoorUri()
 
-actual val DoorDatabase.attachmentFilters: List<AttachmentFilter>
+actual val RoomDatabase.attachmentFilters: List<AttachmentFilter>
     get() = doorAndroidRoomHelper.attachmentFilters

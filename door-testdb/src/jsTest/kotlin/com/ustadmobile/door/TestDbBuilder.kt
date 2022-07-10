@@ -59,6 +59,12 @@ class TestDbBuilder {
 
     }
 
+    @BeforeTest
+    fun setup() {
+        Napier.takeLogarithm()
+        Napier.base(DebugAntilog())
+    }
+
     @Test
     fun givenLongInJsonArray_whenDecoded_shouldBeEqualToOriginalValue() = GlobalScope.promise {
         val jsonStr = """[{"big": ${Long.MAX_VALUE}}]"""
@@ -69,7 +75,7 @@ class TestDbBuilder {
     @Test
     fun givenDbShouldOpen() = GlobalScope.promise {
         openClearDb()
-        delay(10000)
+        //delay(10000)
         val exampleDao2 = exampleDb2.exampleDao2()
         assertNotNull(exampleDao2)
         val exList = listOf(ExampleEntity2(0, "bob",42))
@@ -118,7 +124,7 @@ class TestDbBuilder {
             message = "SyncNodeClientId was set by callback")
     }
 
-    @Test
+    //@Test
     fun givenInvalidationListenerActive_whenEntityInserted_thenWillReceiveEvent() = GlobalScope.promise {
         openRepoDb()
         val repEntity = RepEntity().apply {
@@ -156,7 +162,7 @@ class TestDbBuilder {
         }
     }
 
-    @Test
+    //@Test
     fun givenNestedRunInTransactionUsed_whenInserted_thenCanBeRetrieved() = GlobalScope.promise {
         Napier.base(DebugAntilog())
         openRepoDb()

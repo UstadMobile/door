@@ -1,6 +1,7 @@
 package com.ustadmobile.door.sqljsjdbc
 
 import com.ustadmobile.door.jdbc.*
+import io.github.aakira.napier.Napier
 
 open class SQLiteStatementJs(
     protected val connection: SQLiteConnectionJs,
@@ -19,6 +20,7 @@ open class SQLiteStatementJs(
     }
 
     override suspend fun executeUpdateAsyncJs(sql: String): Int {
+        Napier.d("SqliteJs: updateAsyncJs: $sql\n")
         return connection.datasource.sendUpdate(sql, emptyArray()).numRowsChanged
     }
 

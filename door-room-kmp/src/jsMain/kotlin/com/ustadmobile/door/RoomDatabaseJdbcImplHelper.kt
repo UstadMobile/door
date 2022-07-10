@@ -6,27 +6,30 @@ import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.util.TransactionMode
 
-
 /**
  * Contains logic that is used by generated JDBC implementations on JVM and JS. The reason this is not in the parent
  * RoomDatabase class is because we want to be 100% sure that there is only one instance of this class per database
  * instance e.g. one set of invalidation listeners, one map of thread ids to transaction connections, etc.
  */
-expect class RoomDatabaseJdbcImplHelper(
+actual class RoomDatabaseJdbcImplHelper actual constructor(
     dataSource: DataSource,
     db: RoomDatabase,
     tableNames: List<String>,
-    invalidationTracker: InvalidationTracker = InvalidationTracker(db, *tableNames.toTypedArray())
-) : RoomDatabaseJdbcImplHelperCommon {
+    invalidationTracker: InvalidationTracker,
+) : RoomDatabaseJdbcImplHelperCommon(dataSource, db, tableNames, invalidationTracker) {
 
-    fun <R> useConnection(
+    actual fun <R> useConnection(
         transactionMode: TransactionMode,
         block: (Connection) -> R
-    ) : R
+    ): R {
+        throw IllegalStateException("useConnection synchronous not supported on JS")
+    }
 
     /**
      *
      */
-    fun <R> useConnection(block: (Connection) -> R) : R
+    actual fun <R> useConnection(block: (Connection) -> R): R {
+        throw IllegalStateException("useConnection synchronous not supported on JS")
+    }
 
 }

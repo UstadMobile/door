@@ -1,10 +1,13 @@
 package com.ustadmobile.door
 
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.createInstance
+import com.ustadmobile.door.ext.useStatementAsync
 import com.ustadmobile.door.ext.wrap
 import com.ustadmobile.door.jdbc.SQLException
+import com.ustadmobile.door.jdbc.ext.executeUpdateAsync
 import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.migration.DoorMigrationAsync
 import com.ustadmobile.door.migration.DoorMigrationStatementList
@@ -16,7 +19,7 @@ import io.github.aakira.napier.Napier
 import org.w3c.dom.Worker
 import kotlin.reflect.KClass
 
-actual class DatabaseBuilder<T: DoorDatabase> private constructor(
+class DatabaseBuilder<T: RoomDatabase> private constructor(
     private val builderOptions: DatabaseBuilderOptions<T>
 ) {
 
@@ -31,6 +34,8 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(
         val dbImpl = builderOptions.dbImplClasses.dbImplKClass.js.createInstance(null, dataSource,
             builderOptions.dbName, listOf<AttachmentFilter>(), builderOptions.jdbcQueryTimeout) as T
         val exists = IndexedDb.checkIfExists(builderOptions.dbName)
+        val connection = dataSource.getConnection()
+        val sqlDatabase = DoorSqlDatabaseConnectionImpl(connection)
 
         if(exists){
             Napier.d("DatabaseBuilderJs: database exists... loading", tag = DoorTag.LOG_TAG)
@@ -64,9 +69,9 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(
                     Napier.d("DatabaseBuilderJs: Attempting to upgrade from ${nextMigration.startVersion} to " +
                             "${nextMigration.endVersion}", tag = DoorTag.LOG_TAG)
                     when(nextMigration) {
-                        is DoorMigrationAsync -> nextMigration.migrateFn(dbImpl.sqlDatabaseImpl)
+                        is DoorMigrationAsync -> nextMigration.migrateFn(sqlDatabase)
                         is DoorMigrationStatementList -> dbImpl.execSQLBatchAsyncJs(
-                            *nextMigration.migrateStmts(dbImpl.sqlDatabaseImpl).toTypedArray())
+                            *nextMigration.migrateStmts(sqlDatabase).toTypedArray())
                         else -> throw IllegalArgumentException("Cannot use DataMigrationSync on JS")
                     }
 
@@ -79,17 +84,17 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(
                 }
             }
         }else{
-            if(!dbImpl.getTableNamesAsync().any {it.lowercase() == DoorDatabaseCommon.DBINFO_TABLENAME}) {
-                Napier.i("DatabaseBuilderJs: Creating database ${builderOptions.dbName}")
-                dbImpl.execSQLBatchAsyncJs(*dbImpl.createAllTables().toTypedArray())
-                Napier.d("DatabaseBuilderJs: Running onCreate callbacks...")
-                callbacks.forEach {
-                    when(it) {
-                        is DoorDatabaseCallbackSync -> throw NotSupportedException("Cannot use sync callback on JS")
-                        is DoorDatabaseCallbackStatementList -> {
-                            Napier.d("DatabaseBuilderJs: Running onCreate callback: ${it::class.simpleName}")
-                            dbImpl.execSQLBatchAsyncJs(*it.onCreate(dbImpl.sqlDatabaseImpl).toTypedArray())
-                        }
+            Napier.i("DatabaseBuilderJs: Creating database ${builderOptions.dbName}\n")
+            connection.createStatement().useStatementAsync {
+                it.executeUpdateAsync(dbImpl.createAllTables().joinToString(separator = ";"))
+            }
+            Napier.d("DatabaseBuilderJs: Running onCreate callbacks...")
+            callbacks.forEach {
+                when(it) {
+                    is DoorDatabaseCallbackSync -> throw NotSupportedException("Cannot use sync callback on JS")
+                    is DoorDatabaseCallbackStatementList -> {
+                        Napier.d("DatabaseBuilderJs: Running onCreate callback: ${it::class.simpleName}")
+                        dbImpl.execSQLBatchAsyncJs(*it.onCreate(sqlDatabase).toTypedArray())
                     }
                 }
             }
@@ -100,20 +105,23 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(
         callbacks.forEach {
             when(it) {
                 is DoorDatabaseCallbackStatementList -> {
-                    dbImpl.execSQLBatchAsyncJs(*it.onOpen(dbImpl.sqlDatabaseImpl).toTypedArray())
+                    dbImpl.execSQLBatchAsyncJs(*it.onOpen(sqlDatabase).toTypedArray())
                 }
                 else -> throw IllegalArgumentException("Cannot use sync callback on JS")
             }
         }
 
-        //Put the temp tables and triggers in place.
-        SqliteChangeTracker(builderOptions.dbImplClasses.metadata).setupTriggersOnDbAsync(
-            dbImpl, temporary = false)
-        (dbImpl as DoorDatabaseJdbc).invalidationTracker.active = true
+        //This should now be done by the invalidationtracker
+//        //Put the temp tables and triggers in place.
+//        SqliteChangeTracker(builderOptions.dbImplClasses.metadata).setupTriggersOnDbAsync(
+//            dbImpl, temporary = false)
+//        (dbImpl as DoorDatabaseJdbc).invalidationTracker.active = true
 
         val dbMetaData = lookupImplementations(builderOptions.dbClass).metadata
         SaveToIndexedDbChangeListener(dbImpl, dataSource, dbMetaData.replicateTableNames,
             builderOptions.saveToIndexedDbDelayTime)
+
+        connection.close()
         return if(dbMetaData.hasReadOnlyWrapper) {
             dbImpl.wrap(builderOptions.dbClass)
         }else {
@@ -121,12 +129,12 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(
         }
     }
 
-    actual fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
+    fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
         migrationList.addAll(migrations)
         return this
     }
 
-    actual fun addCallback(callback: DoorDatabaseCallback): DatabaseBuilder<T> {
+    fun addCallback(callback: DoorDatabaseCallback): DatabaseBuilder<T> {
         Napier.d("DatabaseBuilderJs: Add Callback: ${callback::class.simpleName}", tag = DoorTag.LOG_TAG)
         callbacks.add(callback)
         return this
@@ -140,12 +148,12 @@ actual class DatabaseBuilder<T: DoorDatabase> private constructor(
 
         private val implementationMap = mutableMapOf<KClass<*>, DoorJsImplClasses<*>>()
 
-        fun <T : DoorDatabase> databaseBuilder(
+        fun <T : RoomDatabase> databaseBuilder(
             builderOptions: DatabaseBuilderOptions<T>
         ): DatabaseBuilder<T> = DatabaseBuilder(builderOptions)
 
         @Suppress("UNCHECKED_CAST")
-        fun <T: DoorDatabase> lookupImplementations(dbKClass: KClass<T>): DoorJsImplClasses<T> {
+        fun <T: RoomDatabase> lookupImplementations(dbKClass: KClass<T>): DoorJsImplClasses<T> {
             return implementationMap[dbKClass] as? DoorJsImplClasses<T>
                 ?: throw IllegalArgumentException("${dbKClass.simpleName} is not registered through DatabaseBuilder.register")
         }

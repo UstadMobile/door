@@ -1,7 +1,8 @@
 package com.ustadmobile.door.util
 
 import android.content.Context
-import com.ustadmobile.door.DoorDatabase
+import androidx.room.Room
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.IncomingReplicationListenerHelper
 import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.dbClassName
@@ -19,7 +20,7 @@ import java.io.File
  * e.g. the attachmentsDir, ReplicationNotificationDispatcher, etc.
  */
 class DoorAndroidRoomHelper(
-    val db: DoorDatabase,
+    val db: RoomDatabase,
     val context: Context,
     val attachmentsDir: File?,
     val attachmentFilters: List<AttachmentFilter>,
@@ -50,13 +51,13 @@ class DoorAndroidRoomHelper(
         /**
          * The Door Android room helper is mapped 1:1 with each database to provide some Door-specific functions
          */
-        private val doorAndroidRoomHelperMap = WeakHashMap<DoorDatabase, DoorAndroidRoomHelper>()
+        private val doorAndroidRoomHelperMap = WeakHashMap<RoomDatabase, DoorAndroidRoomHelper>()
 
 
         @JvmStatic
         @Synchronized
         internal fun createAndRegisterHelper(
-            db: DoorDatabase,
+            db: RoomDatabase,
             context: Context,
             attachmentsDir: File?,
             attachmentFilters: List<AttachmentFilter>,
@@ -69,7 +70,7 @@ class DoorAndroidRoomHelper(
 
         @JvmStatic
         @Synchronized
-        internal fun lookupHelper(db: DoorDatabase): DoorAndroidRoomHelper {
+        internal fun lookupHelper(db: RoomDatabase): DoorAndroidRoomHelper {
             return doorAndroidRoomHelperMap[db.rootDatabase] ?: throw IllegalStateException("No helper registered for $db ! " +
                     "Are you sure you used the Door's DatabaseBuilder to build it?")
         }
