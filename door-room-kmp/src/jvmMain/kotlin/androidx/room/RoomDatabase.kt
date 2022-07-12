@@ -19,7 +19,7 @@ import kotlin.reflect.KClass
 
 actual abstract class RoomDatabase actual constructor() {
 
-    actual class Builder<T: RoomDatabase>(
+    actual open class Builder<T: RoomDatabase>(
         private val dbClass: KClass<T>,
         private val dbName: String,
         private val queryTimeoutSecs: Int = 10,
@@ -29,12 +29,19 @@ actual abstract class RoomDatabase actual constructor() {
 
         private val migrationList = mutableListOf<Migration>()
 
-        fun addCallback(callback: Callback) {
+        fun addCallback(callback: Callback) : RoomDatabase.Builder<T>{
             callbacks += callback
+            return this
         }
 
-        fun addMigration(migration: Migration) {
+        fun addMigration(migration: Migration) : RoomDatabase.Builder<T> {
             migrationList += migration
+            return this
+        }
+
+        fun addMigrations(vararg migrations: Migration) : RoomDatabase.Builder<T> {
+            migrationList += migrations
+            return this
         }
 
         @Suppress("UNCHECKED_CAST")

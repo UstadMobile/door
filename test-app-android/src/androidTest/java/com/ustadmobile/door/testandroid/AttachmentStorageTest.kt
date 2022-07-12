@@ -1,14 +1,12 @@
 package com.ustadmobile.door.testandroid
 
 import android.content.Context
+import androidx.room.InvalidationTracker
 import androidx.test.core.app.ApplicationProvider
 import com.ustadmobile.door.DatabaseBuilder
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.attachments.retrieveAttachment
-import com.ustadmobile.door.ext.openInputStream
-import com.ustadmobile.door.ext.toDoorUri
-import com.ustadmobile.door.ext.toFile
-import com.ustadmobile.door.ext.writeToFile
+import com.ustadmobile.door.ext.*
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert
 import org.junit.Before
@@ -18,6 +16,10 @@ import org.junit.rules.TemporaryFolder
 import repdb.RepDb
 import repdb.RepEntityWithAttachment
 import java.io.File
+import com.ustadmobile.door.jdbc.ext.mapRows
+import com.ustadmobile.door.jdbc.ext.useResults
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 class AttachmentStorageTest {
 
@@ -74,7 +76,27 @@ class AttachmentStorageTest {
         repEntityWithAttachment.waAttachmentUri = null
         repDb.repWithAttachmentDao.update(repEntityWithAttachment)
 
-        Thread.sleep(100)
+
+        val latch = CountDownLatch(1)
+        val invalidationObserver = object: InvalidationTracker.Observer(arrayOf("ZombieAttachmentData")) {
+            override fun onInvalidated(tables: MutableSet<String>) {
+                val zombieAttachmentsCount = repDb.prepareAndUseStatement("SELECT COUNT(*) FROM ZombieAttachmentData") { stmt ->
+                    stmt.executeQuery().useResults { results ->
+                        results.mapRows { result ->
+                            result.getInt(1)
+                        }
+                    }
+                }.first()
+
+                if(zombieAttachmentsCount == 0)
+                    latch.countDown()
+            }
+        }
+        repDb.invalidationTracker.addObserver(invalidationObserver)
+
+        latch.await(2000, TimeUnit.MILLISECONDS)
+
+        repDb.invalidationTracker.removeObserver(invalidationObserver)
 
         Assert.assertFalse("Old file attachment was deleted", firstFileUri.toFile().exists())
     }

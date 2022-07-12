@@ -1,7 +1,6 @@
 plugins {
     id 'com.android.application'
     id 'kotlin-android'
-    //id 'kotlin-kapt'
     id 'org.jetbrains.kotlin.plugin.serialization'
     id 'kotlinx-atomicfu'
     id "com.google.devtools.ksp"
@@ -18,6 +17,11 @@ android {
         versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunnerArguments clearPackageData: 'true'
+    }
+
+    testOptions {
+        execution 'ANDROIDX_TEST_ORCHESTRATOR'
     }
 
     sourceSets {
@@ -49,6 +53,7 @@ tasks.whenTaskAdded { task ->
 
 dependencies {
     implementation project(":door-runtime")
+    implementation project(":door-jdbc")
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
     implementation "androidx.core:core-ktx:$version_androidx_core"
     implementation "androidx.appcompat:appcompat:$version_android_appcompat"
@@ -80,5 +85,9 @@ dependencies {
 
     testImplementation 'junit:junit:4.+'
     androidTestImplementation 'androidx.test.ext:junit:1.1.3'
+    androidTestImplementation "androidx.test:runner:$version_androidx_test"
+    androidTestUtil "androidx.test:orchestrator:$version_androidx_test"
+    androidTestImplementation "androidx.test:rules:$version_androidx_test"
+
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
 }

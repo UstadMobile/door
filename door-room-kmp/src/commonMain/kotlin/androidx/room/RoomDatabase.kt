@@ -2,7 +2,7 @@ package androidx.room
 
 expect abstract class RoomDatabase() {
 
-    class Builder<T: RoomDatabase> {
+    open class Builder<T: RoomDatabase> {
 
     }
 

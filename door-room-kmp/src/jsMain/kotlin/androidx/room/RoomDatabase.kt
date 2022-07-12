@@ -8,7 +8,7 @@ import kotlinx.coroutines.Runnable
 
 actual abstract class RoomDatabase actual constructor() {
 
-    actual class Builder<T : RoomDatabase> {
+    actual open class Builder<T : RoomDatabase> {
 
     }
 
