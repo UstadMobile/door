@@ -10,7 +10,7 @@ import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
 
-open class RoomDatabaseJdbcImplHelperCommon(
+abstract class RoomDatabaseJdbcImplHelperCommon(
     protected val dataSource: DataSource,
     protected val db: RoomDatabase,
     private val tableNames: List<String>,
@@ -24,6 +24,11 @@ open class RoomDatabaseJdbcImplHelperCommon(
         val connection: Connection,
     ) : CoroutineContext.Element
 
+    /**
+     * Setup triggers (if needed) for SQLite change tracking. On JVM (where multiple connections can operate run at
+     * the same time
+     */
+    abstract suspend fun Connection.setupSqliteTriggersAsync()
 
     @Suppress("UNUSED_PARAMETER") //Reserved for future usage
     suspend fun <R> useConnectionAsync(
@@ -49,15 +54,14 @@ open class RoomDatabaseJdbcImplHelperCommon(
 
             val changedTables = mutableLinkedListOf<String>()
             try {
-                //TODO: This needs updated to handle JS and JVM. JS might need this created only once at the start.
                 if(dbType == DoorDbType.SQLITE) {
-                    invalidationTracker.setupSqliteTriggersAsync(connection)
+                    connection.setupSqliteTriggersAsync()
                 }
 
                 val result = blockRunner(TransactionElement(Key, connection))
 
                 if(dbType == DoorDbType.SQLITE) {
-                    changedTables.addAll(invalidationTracker.findChangedTablesOnConnection(connection))
+                    changedTables.addAll(invalidationTracker.findChangedTablesOnConnectionAsync(connection))
                 }
 
                 connection.commit()

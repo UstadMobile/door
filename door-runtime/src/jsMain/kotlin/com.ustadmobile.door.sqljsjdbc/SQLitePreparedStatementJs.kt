@@ -98,7 +98,7 @@ class SQLitePreparedStatementJs(
     }
 
     override fun executeUpdate(): Int {
-        throw Exception("This can not be used on JS, only for JVM")
+        throw Exception("executeUpdate: (not-async) This can not be used on JS, only for JVM")
     }
 
     override suspend fun executeUpdateAsync(): Int {
@@ -109,7 +109,7 @@ class SQLitePreparedStatementJs(
     }
 
     override fun executeQuery(): ResultSet {
-        throw Exception("This can not be used on JS, only for JVM")
+        throw Exception("executeQuery (non-async): This can not be used on JS, only for JVM")
     }
 
     override fun close() {}

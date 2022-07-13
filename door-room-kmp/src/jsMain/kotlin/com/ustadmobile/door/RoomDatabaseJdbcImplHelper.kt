@@ -18,6 +18,10 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
     invalidationTracker: InvalidationTracker,
 ) : RoomDatabaseJdbcImplHelperCommon(dataSource, db, tableNames, invalidationTracker) {
 
+    override suspend fun Connection.setupSqliteTriggersAsync() {
+        //do nothing - this should already be done by the database builder
+    }
+
     actual fun <R> useConnection(
         transactionMode: TransactionMode,
         block: (Connection) -> R

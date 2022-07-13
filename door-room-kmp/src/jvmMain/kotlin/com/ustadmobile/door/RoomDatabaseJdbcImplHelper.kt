@@ -21,6 +21,10 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
         val depth = atomic(0)
     }
 
+    override suspend fun Connection.setupSqliteTriggersAsync() {
+        invalidationTracker.setupSqliteTriggersAsync(this)
+    }
+
     //Switch this to using concurrentSafeMap
     //Synchronous mode pending transactions
     private val pendingTransactionThreadMap = mutableMapOf<Long, PendingTransaction>()

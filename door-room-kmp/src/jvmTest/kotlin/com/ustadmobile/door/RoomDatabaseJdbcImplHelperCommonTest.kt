@@ -1,6 +1,7 @@
 package com.ustadmobile.door
 
 import androidx.room.InvalidationTracker
+import androidx.room.RoomDatabase
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
 import kotlinx.coroutines.*
@@ -21,19 +22,33 @@ class RoomDatabaseJdbcImplHelperCommonTest {
 
     lateinit var mockInvalidationTracker: InvalidationTracker
 
+    private class RoomDatabaseJdbcImplHelperCommonImpl(
+        dataSource: DataSource,
+        db: RoomDatabase,
+        tableNames: List<String>,
+        invalidationTracker: InvalidationTracker,
+    ): RoomDatabaseJdbcImplHelperCommon(dataSource, db, tableNames, invalidationTracker) {
+        override suspend fun Connection.setupSqliteTriggersAsync() {
+
+        }
+    }
+
     @BeforeTest
     fun setup() {
-        mockInvalidationTracker = mock() {}
+        mockInvalidationTracker = mock {
+            onBlocking { findChangedTablesOnConnectionAsync(any()) }.thenReturn(listOf())
+        }
         mockConnection = mock { }
-        mockInvalidationTracker.setupSqliteTriggers(mockConnection)
         mockDataSource = mock {
             on { connection }.thenReturn(mockConnection)
         }
+
     }
 
     @Test
     fun givenUseConnectionAsyncCalled_whenUseConnectionAsyncCalledNested_thenShouldOpenOneConnection() {
-        val helper = RoomDatabaseJdbcImplHelperCommon(mockDataSource, mock { }, listOf("ExampleEntity"), mock { })
+        val helper = RoomDatabaseJdbcImplHelperCommonImpl(mockDataSource, mock { }, listOf("ExampleEntity"),
+            mockInvalidationTracker)
         runBlocking {
             helper.useConnectionAsync {
                 withContext(Dispatchers.IO) {
@@ -51,7 +66,8 @@ class RoomDatabaseJdbcImplHelperCommonTest {
 
     @Test
     fun givenUseConnectionAsyncCalled_whenUseConnectionAsyncCalledInNewContext_thenShouldOpenTwoConnections() {
-        val helper = RoomDatabaseJdbcImplHelperCommon(mockDataSource, mock { }, listOf("ExampleEntity"), mock { })
+        val helper = RoomDatabaseJdbcImplHelperCommonImpl(mockDataSource, mock { }, listOf("ExampleEntity"),
+            mockInvalidationTracker)
         runBlocking {
             repeat(2) {
                 launch {

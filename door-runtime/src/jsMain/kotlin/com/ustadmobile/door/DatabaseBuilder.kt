@@ -1,11 +1,9 @@
 package com.ustadmobile.door
 
+import androidx.room.InvalidationTracker
 import androidx.room.RoomDatabase
 import com.ustadmobile.door.attachments.AttachmentFilter
-import com.ustadmobile.door.ext.DoorTag
-import com.ustadmobile.door.ext.createInstance
-import com.ustadmobile.door.ext.useStatementAsync
-import com.ustadmobile.door.ext.wrap
+import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.SQLException
 import com.ustadmobile.door.jdbc.ext.executeUpdateAsync
 import com.ustadmobile.door.migration.DoorMigration
@@ -14,7 +12,6 @@ import com.ustadmobile.door.migration.DoorMigrationStatementList
 import com.ustadmobile.door.migration.DoorMigrationSync
 import com.ustadmobile.door.sqljsjdbc.*
 import com.ustadmobile.door.util.DoorJsImplClasses
-import com.ustadmobile.door.util.SqliteChangeTracker
 import io.github.aakira.napier.Napier
 import org.w3c.dom.Worker
 import kotlin.reflect.KClass
@@ -111,13 +108,11 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
             }
         }
 
-        //This should now be done by the invalidationtracker
-//        //Put the temp tables and triggers in place.
-//        SqliteChangeTracker(builderOptions.dbImplClasses.metadata).setupTriggersOnDbAsync(
-//            dbImpl, temporary = false)
-//        (dbImpl as DoorDatabaseJdbc).invalidationTracker.active = true
-
         val dbMetaData = lookupImplementations(builderOptions.dbClass).metadata
+        dbImpl.execSQLBatchAsyncJs(
+            *InvalidationTracker.generateCreateTriggersSql(dbMetaData.allTables, temporary = false).toTypedArray())
+
+
         SaveToIndexedDbChangeListener(dbImpl, dataSource, dbMetaData.replicateTableNames,
             builderOptions.saveToIndexedDbDelayTime)
 

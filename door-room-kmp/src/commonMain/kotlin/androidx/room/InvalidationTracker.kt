@@ -47,30 +47,9 @@ open class InvalidationTracker(
         }
     }
 
-    private fun generateCreateTriggersSql(temporary: Boolean = true) : List<String>{
-        val tempStr = if(temporary) "TEMP" else ""
-        val createTableSql = if(temporary) CREATE_TEMP_TABLE_SQL else CREATE_TABLE_SQL
-        return listOf(createTableSql) + tableNames.mapIndexed { tableId, tableName ->
-            listOf("INSERT OR IGNORE INTO $UPDATE_TABLE_NAME ($TABLE_ID_COLNAME, $TABLE_INVALIDATED_COLNAME) " +
-                    "VALUES ($tableId, 0)") +
-                    listOf("UPDATE", "INSERT", "DELETE").map { evtName ->
-                        """CREATE $tempStr TRIGGER IF NOT EXISTS door_mod_trigger_${tableName}_${evtName} 
-                   AFTER $evtName
-                   ON $tableName 
-                   BEGIN 
-                   UPDATE $UPDATE_TABLE_NAME
-                      SET $TABLE_INVALIDATED_COLNAME = 1 
-                    WHERE $TABLE_ID_COLNAME = $tableId
-                      AND $TABLE_INVALIDATED_COLNAME = 0;
-                    END 
-                    """
-                    }
-        }.flatten()
-    }
-
     fun setupSqliteTriggers(connection: Connection) {
         connection.createStatement().useStatement { stmt ->
-            generateCreateTriggersSql().forEach {  sql ->
+            generateCreateTriggersSql(tableNames).forEach {  sql ->
                 stmt.executeUpdate(sql)
             }
         }
@@ -78,7 +57,7 @@ open class InvalidationTracker(
 
     suspend fun setupSqliteTriggersAsync(connection: Connection) {
         connection.createStatement().useStatementAsync { stmt ->
-            generateCreateTriggersSql().forEach { sql ->
+            generateCreateTriggersSql(tableNames).forEach { sql ->
                 stmt.executeUpdateAsync(sql)
             }
         }
@@ -110,7 +89,7 @@ open class InvalidationTracker(
         }
 
         connection.prepareStatement(RESET_CHANGED_TABLES_SQL).useStatement { stmt ->
-            stmt.executeUpdate()
+            stmt.executeQueryAsyncKmp()
         }
 
         return changedTables
@@ -118,6 +97,28 @@ open class InvalidationTracker(
 
 
     companion object {
+
+        fun generateCreateTriggersSql(tableNames: List<String>, temporary: Boolean = true) : List<String>{
+            val tempStr = if(temporary) "TEMP" else ""
+            val createTableSql = if(temporary) CREATE_TEMP_TABLE_SQL else CREATE_TABLE_SQL
+            return listOf(createTableSql) + tableNames.mapIndexed { tableId, tableName ->
+                listOf("INSERT OR IGNORE INTO $UPDATE_TABLE_NAME ($TABLE_ID_COLNAME, $TABLE_INVALIDATED_COLNAME) " +
+                        "VALUES ($tableId, 0)") +
+                        listOf("UPDATE", "INSERT", "DELETE").map { evtName ->
+                            """CREATE $tempStr TRIGGER IF NOT EXISTS door_mod_trigger_${tableName}_${evtName} 
+                   AFTER $evtName
+                   ON $tableName 
+                   BEGIN 
+                   UPDATE $UPDATE_TABLE_NAME
+                      SET $TABLE_INVALIDATED_COLNAME = 1 
+                    WHERE $TABLE_ID_COLNAME = $tableId
+                      AND $TABLE_INVALIDATED_COLNAME = 0;
+                    END 
+                    """
+                        }
+            }.flatten()
+        }
+
         const val UPDATE_TABLE_NAME = "door_update_mods"
 
         const val TABLE_ID_COLNAME = "tableId"
