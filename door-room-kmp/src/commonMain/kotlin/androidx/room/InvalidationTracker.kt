@@ -4,11 +4,7 @@ import com.ustadmobile.door.ext.concurrentSafeListOf
 import com.ustadmobile.door.ext.useStatement
 import com.ustadmobile.door.ext.useStatementAsync
 import com.ustadmobile.door.jdbc.Connection
-import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
-import com.ustadmobile.door.jdbc.ext.executeUpdateAsync
-import com.ustadmobile.door.jdbc.ext.mapRows
-import com.ustadmobile.door.jdbc.ext.useResults
-import kotlin.jvm.Volatile
+import com.ustadmobile.door.jdbc.ext.*
 
 open class InvalidationTracker(
     private val db: RoomDatabase,
@@ -89,7 +85,7 @@ open class InvalidationTracker(
         }
 
         connection.prepareStatement(RESET_CHANGED_TABLES_SQL).useStatement { stmt ->
-            stmt.executeQueryAsyncKmp()
+            stmt.executeUpdateAsyncKmp()
         }
 
         return changedTables
