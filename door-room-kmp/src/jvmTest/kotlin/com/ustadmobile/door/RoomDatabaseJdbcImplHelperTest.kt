@@ -3,6 +3,7 @@ package com.ustadmobile.door
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.timeout
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import java.util.concurrent.atomic.AtomicInteger
@@ -37,8 +38,8 @@ class RoomDatabaseJdbcImplHelperTest {
             }
         }
 
-        verify(mockDataSource, times(2)).connection
-        verify(mockConnection, times(2)).close()
+        verify(mockDataSource, timeout(1000).times(2)).connection
+        verify(mockConnection, timeout(1000).times(2)).close()
     }
 
     @Test
@@ -62,8 +63,8 @@ class RoomDatabaseJdbcImplHelperTest {
             it.join()
         }
 
-        verify(mockDataSource, times(3)).connection
-        verify(mockConnection, times(3)).close()
+        verify(mockDataSource, timeout(1000).times(3)).connection
+        verify(mockConnection, timeout(1000).times(3)).close()
     }
 
 }

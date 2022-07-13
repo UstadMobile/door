@@ -2,6 +2,8 @@ package com.ustadmobile.door
 
 import androidx.room.InvalidationTracker
 import androidx.room.RoomDatabase
+import com.ustadmobile.door.ext.concurrentSafeListOf
+import com.ustadmobile.door.ext.concurrentSafeMapOf
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.jdbc.ext.mutableLinkedListOf
@@ -27,7 +29,7 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
 
     //Switch this to using concurrentSafeMap
     //Synchronous mode pending transactions
-    private val pendingTransactionThreadMap = mutableMapOf<Long, PendingTransaction>()
+    private val pendingTransactionThreadMap = concurrentSafeMapOf<Long, PendingTransaction>()
 
     override val dbType: Int by lazy {
         dataSource.connection.use { connection ->
