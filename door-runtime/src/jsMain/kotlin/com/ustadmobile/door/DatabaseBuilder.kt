@@ -4,6 +4,7 @@ import androidx.room.InvalidationTracker
 import androidx.room.RoomDatabase
 import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.*
+import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.SQLException
 import com.ustadmobile.door.jdbc.ext.executeUpdateAsync
 import com.ustadmobile.door.migration.DoorMigration
@@ -34,8 +35,15 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
         val connection = dataSource.getConnection()
         val sqlDatabase = DoorSqlDatabaseConnectionImpl(connection)
 
+        suspend fun Connection.execSqlAsync(vararg sqlStmts: String) {
+            createStatement().useStatementAsync { stmt ->
+                stmt.executeUpdateAsyncJs(sqlStmts.joinToString(separator = ";"))
+            }
+        }
+
+
         if(exists){
-            Napier.d("DatabaseBuilderJs: database exists... loading", tag = DoorTag.LOG_TAG)
+            Napier.d("DatabaseBuilderJs: database exists... loading\n", tag = DoorTag.LOG_TAG)
             dataSource.loadDbFromIndexedDb()
             var sqlCon = null as SQLiteConnectionJs?
             var stmt = null as SQLitePreparedStatementJs?
@@ -56,7 +64,7 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
                 sqlCon?.close()
             }
 
-            Napier.d("DatabaseBuilderJs: Found current db version = $currentDbVersion", tag = DoorTag.LOG_TAG)
+            Napier.d("DatabaseBuilderJs: Found current db version = $currentDbVersion\n", tag = DoorTag.LOG_TAG)
             while(currentDbVersion < dbImpl.dbVersion) {
                 val nextMigration = migrationList.filter {
                     it.startVersion == currentDbVersion && it !is DoorMigrationSync
@@ -64,16 +72,16 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
 
                 if(nextMigration != null) {
                     Napier.d("DatabaseBuilderJs: Attempting to upgrade from ${nextMigration.startVersion} to " +
-                            "${nextMigration.endVersion}", tag = DoorTag.LOG_TAG)
+                            "${nextMigration.endVersion}\n", tag = DoorTag.LOG_TAG)
                     when(nextMigration) {
                         is DoorMigrationAsync -> nextMigration.migrateFn(sqlDatabase)
-                        is DoorMigrationStatementList -> dbImpl.execSQLBatchAsyncJs(
+                        is DoorMigrationStatementList -> connection.execSqlAsync(
                             *nextMigration.migrateStmts(sqlDatabase).toTypedArray())
                         else -> throw IllegalArgumentException("Cannot use DataMigrationSync on JS")
                     }
 
                     currentDbVersion = nextMigration.endVersion
-                    dbImpl.execSQLBatchAsyncJs("UPDATE _doorwayinfo SET dbVersion = $currentDbVersion")
+                    connection.execSqlAsync("UPDATE _doorwayinfo SET dbVersion = $currentDbVersion")
                     Napier.d("DatabaseBuilderJs: migrated up to $currentDbVersion", tag = DoorTag.LOG_TAG)
                 }else {
                     throw IllegalStateException("Need to migrate to version " +
@@ -82,46 +90,51 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
             }
         }else{
             Napier.i("DatabaseBuilderJs: Creating database ${builderOptions.dbName}\n")
-            connection.createStatement().useStatementAsync {
-                it.executeUpdateAsync(dbImpl.createAllTables().joinToString(separator = ";"))
-            }
-            Napier.d("DatabaseBuilderJs: Running onCreate callbacks...")
+            connection.execSqlAsync(*dbImpl.createAllTables().toTypedArray())
+            Napier.d("DatabaseBuilderJs: Running onCreate callbacks...\n")
             callbacks.forEach {
                 when(it) {
                     is DoorDatabaseCallbackSync -> throw NotSupportedException("Cannot use sync callback on JS")
                     is DoorDatabaseCallbackStatementList -> {
                         Napier.d("DatabaseBuilderJs: Running onCreate callback: ${it::class.simpleName}")
-                        dbImpl.execSQLBatchAsyncJs(*it.onCreate(sqlDatabase).toTypedArray())
+                        connection.execSqlAsync(*it.onCreate(sqlDatabase).toTypedArray())
                     }
                 }
             }
         }
 
-        Napier.d("DatabaseBuilderJs: Running onOpen callbacks...")
+        Napier.d("DatabaseBuilderJs: Running onOpen callbacks...\n")
         //Run onOpen callbacks
         callbacks.forEach {
             when(it) {
                 is DoorDatabaseCallbackStatementList -> {
-                    dbImpl.execSQLBatchAsyncJs(*it.onOpen(sqlDatabase).toTypedArray())
+                    connection.execSqlAsync(*it.onOpen(sqlDatabase).toTypedArray())
                 }
                 else -> throw IllegalArgumentException("Cannot use sync callback on JS")
             }
         }
 
+        Napier.d("DatabaseBuilderJs: Setting up trigger SQL\n")
         val dbMetaData = lookupImplementations(builderOptions.dbClass).metadata
-        dbImpl.execSQLBatchAsyncJs(
+        connection.execSqlAsync(
             *InvalidationTracker.generateCreateTriggersSql(dbMetaData.allTables, temporary = false).toTypedArray())
 
+        Napier.d("DatabaseBuilderJs: Setting up change listener\n")
 
         SaveToIndexedDbChangeListener(dbImpl, dataSource, dbMetaData.replicateTableNames,
             builderOptions.saveToIndexedDbDelayTime)
 
         connection.close()
-        return if(dbMetaData.hasReadOnlyWrapper) {
+
+        val dbWrappedIfNeeded = if(dbMetaData.hasReadOnlyWrapper) {
             dbImpl.wrap(builderOptions.dbClass)
         }else {
             dbImpl
         }
+
+        Napier.d("Built ${builderOptions.dbName}\n")
+
+        return dbWrappedIfNeeded
     }
 
     fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {

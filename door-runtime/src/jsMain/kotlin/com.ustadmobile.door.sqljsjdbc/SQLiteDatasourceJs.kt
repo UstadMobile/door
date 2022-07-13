@@ -4,13 +4,10 @@ import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.jdbc.ResultSet
 import com.ustadmobile.door.jdbc.SQLException
-import com.ustadmobile.door.jdbc.ext.mapRows
-import com.ustadmobile.door.jdbc.ext.useResults
 import com.ustadmobile.door.sqljsjdbc.IndexedDb.DATABASE_VERSION
 import com.ustadmobile.door.sqljsjdbc.IndexedDb.DB_STORE_KEY
 import com.ustadmobile.door.sqljsjdbc.IndexedDb.DB_STORE_NAME
 import com.ustadmobile.door.sqljsjdbc.IndexedDb.indexedDb
-import com.ustadmobile.door.util.SqliteChangeTracker
 import com.ustadmobile.door.util.TransactionMode
 import io.github.aakira.napier.Napier
 import kotlinx.browser.document
@@ -249,21 +246,6 @@ class SQLiteDatasourceJs(
         }
     }
 
-
-    /**
-     * Find tables that have been changed using the SQLite triggers setup by SQLiteChangeTracker.
-     */
-    internal suspend fun findUpdatedTables(dbMetadata: DoorDatabaseMetadata<*>): List<String> {
-        val changedTables = sendQuery(SqliteChangeTracker.FIND_CHANGED_TABLES_SQL).useResults { results ->
-            results.mapRows {
-                dbMetadata.allTables[it.getInt(1)]
-            }
-        }
-
-        sendUpdate(SqliteChangeTracker.RESET_CHANGED_TABLES_SQL, emptyArray())
-
-        return changedTables
-    }
 
     override fun getConnection(): Connection {
         return SQLiteConnectionJs(this)

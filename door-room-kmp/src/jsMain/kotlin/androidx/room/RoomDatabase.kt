@@ -29,8 +29,7 @@ actual abstract class RoomDatabase actual constructor() {
     suspend fun execSQLBatchAsyncJs(vararg sqlStatements: String){
         (this as RoomJdbcImpl).jdbcImplHelper.useConnectionAsync { connection ->
             connection.createStatement().useStatementAsync {  statement ->
-                statement.executeUpdateAsync(sqlStatements.joinToString(";"))
-                //(statement as SQLiteStatementJs).executeUpdateAsyncJs(sqlStatements.joinToString(";"))
+                statement.executeUpdateAsyncJs(sqlStatements.joinToString(";"))
             }
         }
     }
