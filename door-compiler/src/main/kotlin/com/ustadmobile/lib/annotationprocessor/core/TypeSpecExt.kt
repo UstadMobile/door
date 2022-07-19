@@ -1,18 +1,23 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
 import androidx.room.*
+import com.google.devtools.ksp.getAnnotationsByType
+import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSDeclaration
+import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.squareup.kotlinpoet.*
-import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import com.squareup.kotlinpoet.ksp.toTypeName
 import com.ustadmobile.door.DoorDbType
-import java.util.*
 import javax.lang.model.element.ExecutableElement
 import com.ustadmobile.door.RepositoryConnectivityListener
-import com.ustadmobile.door.TableChangeListener
 import javax.annotation.processing.ProcessingEnvironment
 import javax.lang.model.element.TypeElement
-import kotlin.reflect.KClass
-import com.ustadmobile.door.SyncListener
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_ILLEGALSTATEEXCEPTION
+import com.ustadmobile.lib.annotationprocessor.core.ext.getAnnotation
+import com.ustadmobile.lib.annotationprocessor.core.ext.propertyOrReturnType
+import com.ustadmobile.lib.annotationprocessor.core.ext.toPropertyOrEmptyFunctionCaller
+import kotlin.IllegalArgumentException
 
 /**
  * Add a method or property that overrides the given accessor. The ExecutableElement could be a
@@ -36,6 +41,40 @@ fun TypeSpec.Builder.addAccessorOverride(methodName: String, returnType: TypeNam
 
 fun TypeSpec.Builder.addAccessorOverride(executableElement: ExecutableElement, codeBlock: CodeBlock)  =
         addAccessorOverride(executableElement.simpleName.toString(), executableElement.returnType.asTypeName(), codeBlock)
+
+fun TypeSpec.Builder.addDaoPropOrGetterOverride(
+    daoPropOrGetterDeclaration: KSDeclaration,
+    codeBlock: CodeBlock,
+): TypeSpec.Builder {
+    val daoType = daoPropOrGetterDeclaration.propertyOrReturnType()?.resolve()
+        ?: throw IllegalArgumentException("Dao getter given ${daoPropOrGetterDeclaration.simpleName.asString()} has no type!")
+
+    if(daoPropOrGetterDeclaration is KSFunctionDeclaration) {
+        addFunction(FunSpec.builder(daoPropOrGetterDeclaration.simpleName.asString())
+            .addModifiers(KModifier.OVERRIDE)
+            .returns(daoType.toTypeName())
+            .addCode(codeBlock)
+            .build())
+    }else if(daoPropOrGetterDeclaration is KSPropertyDeclaration) {
+        addProperty(PropertySpec.builder(daoPropOrGetterDeclaration.simpleName.asString(),
+                daoType.toTypeName())
+            .addModifiers(KModifier.OVERRIDE)
+            .getter(FunSpec.getterBuilder()
+                .addCode(codeBlock)
+                .build())
+            .build())
+    }else {
+        throw IllegalArgumentException("${daoPropOrGetterDeclaration.simpleName} is not property or function!")
+    }
+
+    return this
+}
+
+fun TypeSpec.Builder.addDaoPropOrGetterDelegate(
+    daoPropOrGetterDeclaration: KSDeclaration,
+    prefix: String
+): TypeSpec.Builder = addDaoPropOrGetterOverride(daoPropOrGetterDeclaration,
+    CodeBlock.of("return $prefix${daoPropOrGetterDeclaration.toPropertyOrEmptyFunctionCaller()}\n"))
 
 /**
  * Implement the DoorDatabaseRepository methods for add/remove mirror etc. by delegating to a
@@ -79,6 +118,15 @@ fun TypeSpec.Builder.addDbVersionProperty(dbTypeElement: TypeElement): TypeSpec.
             .build())
 
     return this
+}
+
+fun TypeSpec.Builder.addDbVersionProperty(dbClassDecl: KSClassDeclaration): TypeSpec.Builder {
+    return addProperty(PropertySpec.builder("dbVersion", INT)
+        .addModifiers(KModifier.OVERRIDE)
+        .getter(FunSpec.getterBuilder()
+            .addCode("return ${dbClassDecl.getAnnotation(Database::class).version}")
+            .build())
+        .build())
 }
 
 /**

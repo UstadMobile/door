@@ -28,10 +28,12 @@ apply plugin: "com.github.ben-manes.versions"
 
 buildscript {
 
-    ext.kotlin_version = "1.7.0"
+    ext.kotlin_version = "1.7.10"
+    ext.version_ksp = "1.0.6"
     ext.atomicfu_version = '0.18.2'
     ext.version_shadow = "7.1.2"
     ext.gradle_versions_version = "0.42.0"
+    ext.ksp_version = "1.0.6"
 
     repositories {
         google()
@@ -45,7 +47,7 @@ buildscript {
         classpath "org.jetbrains.kotlinx:atomicfu-gradle-plugin:$atomicfu_version"
         classpath "org.jetbrains.kotlin:kotlin-serialization:$kotlin_version"
         classpath "com.github.ben-manes:gradle-versions-plugin:$gradle_versions_version"
-        classpath "com.google.devtools.ksp:com.google.devtools.ksp.gradle.plugin:$kotlin_version-1.0.6"
+        classpath "com.google.devtools.ksp:com.google.devtools.ksp.gradle.plugin:$kotlin_version-$ksp_version"
     }
 }
 

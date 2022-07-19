@@ -1,8 +1,13 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
 import androidx.room.*
+import com.google.devtools.ksp.processing.*
+import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSDeclaration
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import com.squareup.kotlinpoet.ksp.toClassName
 import javax.annotation.processing.ProcessingEnvironment
 import javax.annotation.processing.RoundEnvironment
 import javax.lang.model.element.ExecutableElement
@@ -11,53 +16,39 @@ import javax.lang.model.type.DeclaredType
 import com.ustadmobile.door.DoorDatabaseReplicateWrapper
 import com.ustadmobile.door.annotation.LastChangedTime
 import com.ustadmobile.door.annotation.ReplicateEntity
+import com.ustadmobile.lib.annotationprocessor.core.ext.*
 import javax.lang.model.element.Element
 import javax.lang.model.element.ElementKind
 
 /**
- * Add a DAO accessor for a database wrapper (e.g. property or function). If the given DAO
- * has queries that modify a syncable entity, the return will be wrapped. If there are no such queries,
- * then the original DAO from the database will be returned by the generated code.
+ * Add a DAO accessor for a database replication wrapper (e.g. property or function). If the given DAO
+ * has queries that modify an entity with @ReplicateEntity annotation, the return will be wrapped. If there are no
+ * such queries, then the original DAO from the database will be returned by the generated code.
  */
-fun TypeSpec.Builder.addWrapperAccessorFunction(daoGetter: ExecutableElement,
-                                                processingEnv: ProcessingEnvironment) : TypeSpec.Builder {
-    val daoModifiesReplicateEntities = daoGetter.returnType.asTypeElement(processingEnv)
-            ?.daoHasRepositoryWriteFunctions(processingEnv) == true
-
-    if(!daoModifiesReplicateEntities) {
-        addAccessorOverride(daoGetter, CodeBlock.of("return _db.${daoGetter.accessAsPropertyOrFunctionInvocationCall()}\n"))
+fun TypeSpec.Builder.addDbDaoWrapperPropOrGetter(
+    daoPropOrGetterDecl: KSDeclaration,
+    resolver: Resolver,
+): TypeSpec.Builder {
+    val daoClassDeclaration = daoPropOrGetterDecl.propertyOrReturnType()
+        ?.resolve()?.declaration as? KSClassDeclaration
+    if(daoClassDeclaration?.daoHasReplicateEntityWriteFunctions(resolver) != true) {
+        addDaoPropOrGetterDelegate(daoPropOrGetterDecl, "_db.")
     }else {
-        val daoType = daoGetter.returnType.asTypeElement(processingEnv)
-                ?: throw IllegalStateException("Dao return type is not TypeElement")
-        val wrapperClassName = daoType.asClassNameWithSuffix(DoorDatabaseReplicateWrapper.SUFFIX)
-        addProperty(PropertySpec.builder("_${daoType.simpleName}",
-                daoType.asClassName()).delegate(
-                CodeBlock.builder().beginControlFlow("lazy ")
-                        .add("%T(_db, _db.${daoGetter.accessAsPropertyOrFunctionInvocationCall()})\n",
-                                wrapperClassName)
-                        .endControlFlow()
-                        .build())
+        val wrapperClassName = daoClassDeclaration.toClassNameWithSuffix(DoorDatabaseReplicateWrapper.SUFFIX)
+
+        addProperty(PropertySpec.builder("_${daoClassDeclaration.simpleName.asString()}",
+            daoClassDeclaration.toClassName()).delegate(
+            CodeBlock.builder().beginControlFlow("lazy ")
+                .add("%T(_db, _db.${daoPropOrGetterDecl.toPropertyOrEmptyFunctionCaller()})\n",
+                    wrapperClassName)
+                .endControlFlow()
                 .build())
-        addAccessorOverride(daoGetter, CodeBlock.of("return _${daoType.simpleName}\n"))
+            .build())
+        addDaoPropOrGetterOverride(daoPropOrGetterDecl,
+            CodeBlock.of("return _${daoClassDeclaration.simpleName.asString()}\n"))
     }
 
     return this
-}
-
-/**
- * Add access functions for the KTOR Helper DAOs. The KTOR helper DAOS contain
- * only select queries, so the KTOR Helper DAOs themselves never need a wrapper
- */
-fun TypeSpec.Builder.addKtorHelperWrapperAccessorFunction(
-    daoGetter: ExecutableElement,
-    processingEnv: ProcessingEnvironment
-) {
-    daoGetter.returnType.asTypeElement(processingEnv)?.daoKtorHelperDaoClassNames?.forEach {
-        addFunction(FunSpec.builder("_${it.value.simpleName}")
-                .addModifiers(KModifier.OVERRIDE)
-                .addCode("return _db._${it.value.simpleName}()\n")
-                .build())
-    }
 }
 
 
@@ -228,75 +219,77 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(
 }
 
 /**
- * Add a TypeSpec representing a database wrapper for the given database to the filespec
+ * Add a TypeSpec representing a database replication wrapper for the given database to the filespec
  */
 fun FileSpec.Builder.addDbWrapperTypeSpec(
-    dbTypeEl: TypeElement,
-    processingEnv: ProcessingEnvironment,
+    dbClassDecl: KSClassDeclaration,
+    resolver: Resolver,
     target: DoorTarget,
 ): FileSpec.Builder {
-    val dbClassName = dbTypeEl.asClassName()
+    val dbClassName = dbClassDecl.toClassName()
     addType(
-            TypeSpec.classBuilder("${dbTypeEl.simpleName}${DoorDatabaseReplicateWrapper.SUFFIX}")
-                    .addAnnotation(AnnotationSpec.builder(Suppress::class)
-                            .addMember("%S, %S", "REDUNDANT_PROJECTION", "ClassName")
-                            .build())
-                    .superclass(dbClassName)
-                    .addSuperinterface(DoorDatabaseReplicateWrapper::class.asClassName())
-                    .primaryConstructor(FunSpec.constructorBuilder()
-                            .addParameter("_db", dbClassName)
-                            .build())
-                    .addProperty(PropertySpec.builder("_db", dbClassName, KModifier.PRIVATE)
-                            .initializer("_db").build())
-                    .applyIf(target == DoorTarget.JS || target == DoorTarget.JVM) {
-                        addDbVersionProperty(dbTypeEl)
-                        addFunction(FunSpec.builder("createAllTables")
-                                .addModifiers(KModifier.OVERRIDE)
-                                .returns(List::class.parameterizedBy(String::class))
-                                .addCode("return _db.createAllTables()\n")
-                                .build())
-                    }
-                    .addProperty(PropertySpec.builder("dbName", String::class, KModifier.OVERRIDE)
-                        .getter(FunSpec.getterBuilder()
-                            .addCode("return \"DoorWrapper for [\${_db.toString()}]\"\n")
-                            .build())
-                        .build())
-                    .apply {
-                        dbTypeEl.allDbClassDaoGetters(processingEnv).forEach {daoGetter ->
-                            addWrapperAccessorFunction(daoGetter, processingEnv)
-                        }
-                    }
-                    .addProperty(PropertySpec.builder("realDatabase", RoomDatabase::class)
-                            .addModifiers(KModifier.OVERRIDE)
-                            .getter(FunSpec.getterBuilder().addCode("return _db\n")
-                                    .build())
-                            .build())
-                    .applyIf(target == DoorTarget.JS) {
-                        addFunction(FunSpec.builder("clearAllTablesAsync")
-                            .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-                            .addCode("_db.clearAllTablesAsync()\n")
-                            .build())
-                    }
-                    .addFunction(FunSpec.builder("clearAllTables")
-                            .addModifiers(KModifier.OVERRIDE)
-                            .addCode("_db.clearAllTables()\n")
-                            .build())
-                    .addFunction(FunSpec.builder("runInTransaction")
-                            .addModifiers(KModifier.OVERRIDE)
-                            .addParameter("body", ClassName("kotlinx.coroutines",
-                                    "Runnable"))
-                            .addCode("_db.runInTransaction(body)\n")
-                            .build())
-                    .applyIf(target == DoorTarget.ANDROID) {
-                        addRoomDatabaseCreateOpenHelperFunction()
-                        addRoomCreateInvalidationTrackerFunction()
-                        addOverrideGetRoomInvalidationTracker("_db")
-                    }
-                    .applyIf(target != DoorTarget.ANDROID) {
-                        addOverrideGetInvalidationTrackerVal("_db")
-                    }
+        TypeSpec.classBuilder("${dbClassDecl.simpleName.asString()}${DoorDatabaseReplicateWrapper.SUFFIX}")
+            .addOriginatingKsFileOrThrow(dbClassDecl.containingFile)
+            .addAnnotation(AnnotationSpec.builder(Suppress::class)
+                .addMember("%S, %S", "REDUNDANT_PROJECTION", "ClassName")
+                .build())
+            .superclass(dbClassName)
+            .addSuperinterface(DoorDatabaseReplicateWrapper::class.asClassName())
+            .primaryConstructor(FunSpec.constructorBuilder()
+                .addParameter("_db", dbClassName)
+                .build())
+            .addProperty(PropertySpec.builder("_db", dbClassName, KModifier.PRIVATE)
+                .initializer("_db").build())
+            .applyIf(target == DoorTarget.JS || target == DoorTarget.JVM) {
+                addDbVersionProperty(dbClassDecl)
+                addFunction(FunSpec.builder("createAllTables")
+                    .addModifiers(KModifier.OVERRIDE)
+                    .returns(List::class.parameterizedBy(String::class))
+                    .addCode("return _db.createAllTables()\n")
                     .build())
+            }
+            .addProperty(PropertySpec.builder("dbName", String::class, KModifier.OVERRIDE)
+                .getter(FunSpec.getterBuilder()
+                    .addCode("return \"DoorWrapper for [\${_db.toString()}]\"\n")
+                    .build())
+                .build())
+            .apply {
+                dbClassDecl.allDbClassDaoGetters().forEach {  daoPropOrGetter ->
+                    addDbDaoWrapperPropOrGetter(daoPropOrGetter, resolver)
+                }
+            }
+            .addProperty(PropertySpec.builder("realDatabase", RoomDatabase::class)
+                .addModifiers(KModifier.OVERRIDE)
+                .getter(FunSpec.getterBuilder().addCode("return _db\n")
+                    .build())
+                .build())
+            .applyIf(target == DoorTarget.JS) {
+                addFunction(FunSpec.builder("clearAllTablesAsync")
+                    .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
+                    .addCode("_db.clearAllTablesAsync()\n")
+                    .build())
+            }
+            .addFunction(FunSpec.builder("clearAllTables")
+                .addModifiers(KModifier.OVERRIDE)
+                .addCode("_db.clearAllTables()\n")
+                .build())
+            .addFunction(FunSpec.builder("runInTransaction")
+                .addModifiers(KModifier.OVERRIDE)
+                .addParameter("body", ClassName("kotlinx.coroutines",
+                    "Runnable"))
+                .addCode("_db.runInTransaction(body)\n")
+                .build())
+            .applyIf(target == DoorTarget.ANDROID) {
+                addRoomDatabaseCreateOpenHelperFunction()
+                addRoomCreateInvalidationTrackerFunction()
+                addOverrideGetRoomInvalidationTracker("_db")
+            }
+            .applyIf(target != DoorTarget.ANDROID) {
+                addOverrideGetInvalidationTrackerVal("_db")
+            }
+
             .build()
+    )
 
     return this
 }
@@ -349,6 +342,25 @@ private fun TypeElement.daoHasRepositoryWriteFunctions(
 }
 
 /**
+ * Determine if this KSClassDeclaration (or any of its ancestors) representing a DAO has any functions with the Insert,
+ * Delete, or Update annotation that are acting on a ReplicateEntity
+ */
+private fun KSClassDeclaration.daoHasReplicateEntityWriteFunctions(
+    resolver: Resolver,
+): Boolean {
+    val allInsertUpdateDeleteFuns = getAllFunctionsIncSuperTypes {
+        if(!it.hasAnyAnnotation(Update::class, Insert::class, Delete::class)) {
+            false
+        } else {
+            val fnResolved = it.asMemberOf(this.asType(emptyList()))
+            fnResolved.firstParamEntityType(resolver).declaration.hasAnnotation(ReplicateEntity::class)
+        }
+    }
+
+    return allInsertUpdateDeleteFuns.isNotEmpty()
+}
+
+/**
  * Generates an implementation of DoorDatabaseReplicateWrapper for databases and daos being processed.
  */
 class DbProcessorReplicateWrapper: AbstractDbProcessor()  {
@@ -357,20 +369,6 @@ class DbProcessorReplicateWrapper: AbstractDbProcessor()  {
         val targetMap = mapOf(DoorTarget.JVM to AnnotationProcessorWrapper.OPTION_JVM_DIRS,
             DoorTarget.JS to AnnotationProcessorWrapper.OPTION_JS_OUTPUT,
             DoorTarget.ANDROID to AnnotationProcessorWrapper.OPTION_ANDROID_OUTPUT)
-
-        roundEnv.getElementsAnnotatedWith(Database::class.java).map { it as TypeElement }.forEach {dbTypeEl ->
-            //jvm version
-            if(dbTypeEl.dbHasReplicateWrapper(processingEnv)) {
-                targetMap.forEach { target ->
-                    FileSpec.builder(dbTypeEl.qualifiedPackageName(processingEnv),
-                        "${dbTypeEl.simpleName}${DoorDatabaseReplicateWrapper.SUFFIX}")
-                        .addDbWrapperTypeSpec(dbTypeEl, processingEnv, target.key)
-                        .build()
-                        .writeToDirsFromArg(target.value)
-                }
-            }
-        }
-
 
 
         roundEnv.getElementsAnnotatedWith(Dao::class.java).map { it as TypeElement }.forEach {daoTypeEl ->
@@ -388,4 +386,27 @@ class DbProcessorReplicateWrapper: AbstractDbProcessor()  {
         return true
     }
 
+}
+
+class ReplicateWrapperProcessor(
+    private val environment: SymbolProcessorEnvironment,
+) : SymbolProcessor{
+
+    override fun process(resolver: Resolver): List<KSAnnotated> {
+        val dbSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Database")
+            .filterIsInstance<KSClassDeclaration>()
+        dbSymbols.forEach { dbClassDecl ->
+            if(dbClassDecl.dbHasReplicateWrapper()) {
+                DoorTarget.values().forEach { target ->
+                    FileSpec.builder(dbClassDecl.packageName.asString(),
+                        "${dbClassDecl.simpleName.asString()}${DoorDatabaseReplicateWrapper.SUFFIX}")
+                        .addDbWrapperTypeSpec(dbClassDecl, resolver, target)
+                        .build()
+                        .writeToPlatformDir(target, environment.codeGenerator, environment.options)
+                }
+            }
+        }
+
+        return emptyList()
+    }
 }
