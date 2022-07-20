@@ -1,12 +1,10 @@
 package com.ustadmobile.lib.annotationprocessor.core.ext
 
-import androidx.room.Dao
-import androidx.room.Database
-import com.google.devtools.ksp.KspExperimental
-import com.google.devtools.ksp.getAllSuperTypes
-import com.google.devtools.ksp.isAnnotationPresent
+import androidx.room.*
+import com.google.devtools.ksp.*
 import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.ClassName
+import com.ustadmobile.door.annotation.AttachmentUri
 import com.ustadmobile.door.annotation.ReplicateEntity
 import com.ustadmobile.door.annotation.Repository
 import kotlin.reflect.KClass
@@ -84,6 +82,8 @@ fun KSClassDeclaration.getAllSuperTypeClassDeclarations(): List<KSClassDeclarati
 
 /**
  * Get a list of all functions (recursive, including all supertypes).
+ *
+ * TODO: getAllFunctions might already do this... - which might cause duplicate results here
  */
 fun KSClassDeclaration.getAllFunctionsIncSuperTypes(
     incSuperTypes: Boolean = true,
@@ -104,18 +104,56 @@ fun KSClassDeclaration.getAllFunctionsIncSuperTypes(
  * Find all functions that have a given annotation class (by default including all supertypes).
  */
 fun <T: Annotation> KSClassDeclaration.getAllFunctionsIncSuperTypesWithAnnotation(
-    annotationKClass: KClass<T>,
     incSuperTypes: Boolean = true,
+    vararg annotationKClasses: KClass<out T>,
+
 ): List<KSFunctionDeclaration> = getAllFunctionsIncSuperTypes(incSuperTypes) {
-    it.hasAnnotation(annotationKClass)
+    it.hasAnyAnnotation(*annotationKClasses)
 }
+
+fun KSClassDeclaration.getAllFunctionsIncSuperTypesToGenerate(): List<KSFunctionDeclaration> {
+    return getAllFunctionsIncSuperTypesWithAnnotation(true, Query::class, Insert::class, Update::class,
+        Delete::class)
+}
+
 fun KSClassDeclaration.isListDeclaration(): Boolean {
-    return simpleName.asString() in listOf("List", "MutableList") &&
-        qualifiedName?.asString() == "kotlin"
+    return qualifiedName?.asString() in listOf("kotlin.collections.List", "kotlin.collections.MutableList")
 }
 
 
 fun KSClassDeclaration.toClassNameWithSuffix(
     suffix: String
 ) = ClassName(packageName.asString(), simpleName.asString() + suffix)
+
+/**
+ * Where this KSClassDeclaration represents an
+ */
+fun KSClassDeclaration.entityHasAttachments() =  getDeclaredProperties().any { it.hasAnnotation(AttachmentUri::class) }
+
+/**
+ * Where this KSClassDeclaration represents an entity, get a list of the primary keys for this entity.
+ * First look for a property annotated @PrimaryKey. If that is not present, look at the @Entity primaryKeys
+ * argument
+ */
+val KSClassDeclaration.entityPrimaryKeyProps: List<KSPropertyDeclaration>
+    get() {
+        val annotatedPrimaryKey = getDeclaredProperties().firstOrNull { it.hasAnnotation(PrimaryKey::class) }
+        if(annotatedPrimaryKey != null)
+            return listOf(annotatedPrimaryKey)
+
+        val entityAnnotation = getAnnotation(Entity::class)
+        val allDeclaredProps = getAllProperties()
+        return entityAnnotation.primaryKeys.map {
+            allDeclaredProps.first { prop -> prop.simpleName.asString() == it }
+        }
+    }
+
+val KSClassDeclaration.isReplicateEntityWithAutoIncPrimaryKey: Boolean
+    get() {
+        return hasAnnotation(ReplicateEntity::class) && getAllProperties().any {
+            it.getAnnotationOrNull(PrimaryKey::class)?.autoGenerate == true
+        }
+    }
+
+
 

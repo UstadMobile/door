@@ -35,3 +35,8 @@ fun <T: Annotation> KSAnnotated.getAnnotation(annotationKClazz: KClass<T>): T {
     return getAnnotationsByType(annotationKClazz).first()
 }
 
+@OptIn(KspExperimental::class)
+fun <T: Annotation> KSAnnotated.getAnnotationOrNull(annotationKClazz: KClass<T>): T? {
+    return getAnnotationsByType(annotationKClazz).firstOrNull()
+}
+

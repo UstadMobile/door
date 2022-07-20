@@ -1,9 +1,7 @@
 package com.ustadmobile.lib.annotationprocessor.core.ext
 
-import com.google.devtools.ksp.processing.KSBuiltIns
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.google.devtools.ksp.symbol.KSClassifierReference
 import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSTypeAlias
 
@@ -11,7 +9,8 @@ fun KSType.unwrapComponentTypeIfListOrArray(
     resolver: Resolver
 ): KSType {
     return if(isListOrArrayType(resolver)) {
-        this.arguments.first().type?.resolve() ?: throw IllegalArgumentException("")
+        this.arguments.first().type?.resolve()
+            ?: throw IllegalArgumentException("unwrapComponentTypeIfListOrArray: List or array type cannot be resolved!")
     }else {
         this
     }

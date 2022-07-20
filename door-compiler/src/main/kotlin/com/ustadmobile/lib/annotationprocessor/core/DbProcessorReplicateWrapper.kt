@@ -1,24 +1,22 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import androidx.room.*
-import com.google.devtools.ksp.processing.*
-import com.google.devtools.ksp.symbol.KSAnnotated
-import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.google.devtools.ksp.symbol.KSDeclaration
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.RoomDatabase
+import androidx.room.Update
+import com.google.devtools.ksp.processing.Resolver
+import com.google.devtools.ksp.processing.SymbolProcessor
+import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
+import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toClassName
-import javax.annotation.processing.ProcessingEnvironment
-import javax.annotation.processing.RoundEnvironment
-import javax.lang.model.element.ExecutableElement
-import javax.lang.model.element.TypeElement
-import javax.lang.model.type.DeclaredType
 import com.ustadmobile.door.DoorDatabaseReplicateWrapper
 import com.ustadmobile.door.annotation.LastChangedTime
 import com.ustadmobile.door.annotation.ReplicateEntity
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
-import javax.lang.model.element.Element
-import javax.lang.model.element.ElementKind
+import javax.annotation.processing.RoundEnvironment
+import javax.lang.model.element.TypeElement
 
 /**
  * Add a DAO accessor for a database replication wrapper (e.g. property or function). If the given DAO
@@ -80,124 +78,121 @@ fun CodeBlock.Builder.endAttachmentStorageFlow(daoFunSpec: FunSpec) {
  * modifying an entity annotated with SyncableEntity
  */
 fun TypeSpec.Builder.addDaoFunctionDelegate(
-    daoMethod: ExecutableElement,
-    daoTypeEl: TypeElement,
-    processingEnv: ProcessingEnvironment,
+    daoFunDeclaration: KSFunctionDeclaration,
+    daoClassDeclaration: KSClassDeclaration,
+    resolver: Resolver,
     doorTarget: DoorTarget,
 ) : TypeSpec.Builder {
+    val functionResolved = daoFunDeclaration.asMemberOf(daoClassDeclaration.asType(emptyList()))
 
-    val methodResolved = daoMethod.asMemberOf(daoTypeEl, processingEnv)
-
-    val returnTypeName = methodResolved.suspendedSafeReturnType
-
-    val overridingFunction = overrideAndConvertToKotlinTypes(daoMethod, daoTypeEl.asType() as DeclaredType,
-            processingEnv,
-            forceNullableReturn = returnTypeName.isNullableAsSelectReturnResult,
-            forceNullableParameterTypeArgs = returnTypeName.isNullableParameterTypeAsSelectReturnResult)
-            .build()
+    val overridingFunction = daoFunDeclaration.toOverridingFunSpecBuilder(resolver,
+        daoClassDeclaration.asType(emptyList()))
+        .removeAbstractModifier()
+        .build()
 
     var setPk = false
-    lateinit var entityTypeEl : TypeElement
-    var pkField : Element? = null
+    var pkProp : KSPropertyDeclaration? = null
 
     //If running on JS, non-suspended (sync) version is NOT allowed
     val isSyncFunctionOnJs = doorTarget == DoorTarget.JS && !overridingFunction.isSuspended
             && (overridingFunction.returnType?.isDataSourceFactoryOrLiveData() == false)
 
     val entityParam = overridingFunction.parameters.firstOrNull()
-    val entityComponentType = entityParam?.type?.unwrapListOrArrayComponentType()
+    val entityComponentClassDecl: KSClassDeclaration? =
+        if(daoFunDeclaration.isDaoReplicateEntityWriteFunction(resolver, daoClassDeclaration)) {
+            functionResolved.firstParamEntityType(resolver).declaration as KSClassDeclaration
+        }else {
+            null
+        }
 
     addFunction(overridingFunction.toBuilder()
         .addCode(CodeBlock.builder()
-                .applyIf(isSyncFunctionOnJs) {
-                    if(doorTarget == DoorTarget.JS && !overridingFunction.isSuspended) {
-                        add("throw %T(%S)\n", ClassName("kotlin", "IllegalStateException"),
-                            "Synchronous db access is NOT possible on Javascript!")
-                    }
+            .applyIf(isSyncFunctionOnJs) {
+                if(doorTarget == DoorTarget.JS && !overridingFunction.isSuspended) {
+                    add("throw %T(%S)\n", ClassName("kotlin", "IllegalStateException"),
+                        "Synchronous db access is NOT possible on Javascript!")
                 }
-                .applyIf(!isSyncFunctionOnJs) {
-                    if(daoMethod.hasAnyAnnotation(Insert::class.java, Update::class.java, Delete::class.java) &&
-                        (overridingFunction.entityParamComponentType as? ClassName)?.isReplicateEntity(processingEnv) == true) {
+            }
+            .applyIf(!isSyncFunctionOnJs) {
+                if(daoFunDeclaration.isDaoReplicateEntityWriteFunction(resolver, daoClassDeclaration)) {
+                    if(entityComponentClassDecl == null)
+                        throw IllegalArgumentException("${daoFunDeclaration.simpleName.asString()} has " +
+                                "insert/update/delete annotation, but no entity component type")
 
 
-                        if(daoMethod.hasAnyAnnotation(Update::class.java, Insert::class.java)
-                            && entityComponentType?.hasAttachments(processingEnv) == true) {
-                            val isList = entityParam.type.isListOrArray()
+                    if(daoFunDeclaration.hasAnyAnnotation(Update::class, Insert::class)
+                            && entityComponentClassDecl.entityHasAttachments()) {
+                        val isList = functionResolved.parameterTypes.first()?.isListOrArrayType(resolver) == true
 
-                            beginAttachmentStorageFlow(overridingFunction)
+                        beginAttachmentStorageFlow(overridingFunction)
 
-                            val entityClassName = entityComponentType as ClassName
+                        add("_db.%M(%L.%M())\n",
+                            MemberName("com.ustadmobile.door.attachments", "storeAttachment"),
+                            if(isList) "it" else entityParam?.name,
+                            MemberName(entityComponentClassDecl.packageName.asString(), "asEntityWithAttachment"))
 
-                            add("_db.%M(%L.%M())\n",
-                                MemberName("com.ustadmobile.door.attachments", "storeAttachment"),
-                                if(isList) "it" else entityParam.name,
-                                MemberName(entityClassName.packageName, "asEntityWithAttachment"))
+                        endAttachmentStorageFlow(overridingFunction)
+                    }
 
-                            endAttachmentStorageFlow(overridingFunction)
+                    pkProp = entityComponentClassDecl.entityPrimaryKeyProps.first()
+
+                    val tableId = entityComponentClassDecl.getAnnotation(ReplicateEntity::class).tableId
+
+                    setPk = daoFunDeclaration.hasAnnotation(Insert::class)
+                            && entityComponentClassDecl.isReplicateEntityWithAutoIncPrimaryKey
+
+                    val setLastChangedProp = entityComponentClassDecl.getAllProperties().firstOrNull {
+                        it.hasAnnotation(LastChangedTime::class)
+                    }
+
+                    if(setPk || setLastChangedProp != null) {
+                        if(setPk) {
+                            add("val _pkManager = _db.%M.%M\n",
+                                MemberName("com.ustadmobile.door.ext", "rootDatabase"),
+                                MemberName("com.ustadmobile.door.ext", "doorPrimaryKeyManager"))
                         }
 
+                        var varName = overridingFunction.parameters.first().name
 
+                        val isListParam = overridingFunction.parameters.first().type.isListOrArray()
 
-                        entityTypeEl =  overridingFunction.entityParamComponentType
-                            .asComponentClassNameIfList().asTypeElement(processingEnv)
-                            ?: throw IllegalStateException("addDaoFunctionDelegate cannot get entity type spec")
-                        pkField = entityTypeEl.entityPrimaryKey
-
-                        val tableId = entityTypeEl.getAnnotation(ReplicateEntity::class.java).tableId
-
-                        setPk = daoMethod.hasAnyAnnotation(Insert::class.java) && entityTypeEl.isReplicateEntityWithAutoIncPrimaryKey
-
-                        val setLastChangedField = entityTypeEl.enclosedElementsWithAnnotation(LastChangedTime::class.java,
-                            ElementKind.FIELD)
-
-                        if(setPk || setLastChangedField.isNotEmpty()) {
-                            if(setPk) {
-                                add("val _pkManager = _db.%M.%M\n",
-                                    MemberName("com.ustadmobile.door.ext", "rootDatabase"),
-                                    MemberName("com.ustadmobile.door.ext", "doorPrimaryKeyManager"))
-                            }
-
-                            var varName = overridingFunction.parameters.first().name
-
-                            val isListParam = overridingFunction.parameters.first().type.isListOrArray()
-
-                            if(isListParam) {
-                                varName = "it"
-                                add("val _generatedPks = mutableListOf<Long>()\n")
-                                beginControlFlow("${overridingFunction.parameters.first().name}.iterator().forEach ")
-                            }
-
-                            if(setPk) {
-                                beginControlFlow("if($varName.${pkField?.simpleName} == 0L)")
-                                add("val _newPk = _pkManager.nextId")
-                                if(overridingFunction.isSuspended)
-                                    add("Async")
-                                add("($tableId)\n")
-                                add("$varName.${pkField?.simpleName} = _newPk\n")
-                                if(isListParam)
-                                    add("_generatedPks += _newPk\n")
-                                endControlFlow()
-                            }
-
-                            if(setLastChangedField.isNotEmpty()) {
-                                add("$varName.${setLastChangedField.first().simpleName} = %M()\n",
-                                    MemberName("com.ustadmobile.door.util", "systemTimeInMillis"))
-                            }
-
-                            if(overridingFunction.parameters.first().type.isListOrArray()) {
-                                endControlFlow()
-                            }
+                        if(isListParam) {
+                            varName = "it"
+                            add("val _generatedPks = mutableListOf<Long>()\n")
+                            beginControlFlow("${overridingFunction.parameters.first().name}.iterator().forEach ")
                         }
 
-                        add("//must set versionid and/or primary key here\n")
+                        if(setPk) {
+                            beginControlFlow("if($varName.${pkProp?.simpleName?.asString()} == 0L)")
+                            add("val _newPk = _pkManager.nextId")
+                            if(overridingFunction.isSuspended)
+                                add("Async")
+                            add("($tableId)\n")
+                            add("$varName.${pkProp?.simpleName?.asString()} = _newPk\n")
+                            if(isListParam)
+                                add("_generatedPks += _newPk\n")
+                            endControlFlow()
+                        }
+
+                        if(setLastChangedProp != null) {
+                            add("$varName.${setLastChangedProp.simpleName.asString()} = %M()\n",
+                                MemberName("com.ustadmobile.door.util", "systemTimeInMillis"))
+                        }
+
+                        if(overridingFunction.parameters.first().type.isListOrArray()) {
+                            endControlFlow()
+                        }
                     }
 
-                    if(!setPk && overridingFunction.returnType != null && overridingFunction.returnType != UNIT) {
-                        add("return ")
-                    }
+                    add("//must set versionid and/or primary key here\n")
                 }
-                .applyIf(!isSyncFunctionOnJs) {
-                    addDelegateFunctionCall("_dao", overridingFunction)
+
+                if(!setPk && overridingFunction.returnType != null && overridingFunction.returnType != UNIT) {
+                    add("return ")
+                }
+            }
+            .applyIf(!isSyncFunctionOnJs) {
+                addDelegateFunctionCall("_dao", overridingFunction)
                     .add("\n")
                     .applyIf(setPk && overridingFunction.returnType != null && overridingFunction.returnType != UNIT) {
                         //We need to override this to return the PKs that were really generated
@@ -208,11 +203,11 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(
                                 add("toTypedArray()")
                             add("\n")
                         }else {
-                            add("return ${overridingFunction.parameters.first().name}.${pkField?.simpleName}\n")
+                            add("return ${overridingFunction.parameters.first().name}.${pkProp?.simpleName?.asString()}\n")
                         }
                     }
-                }
-                .build())
+            }
+            .build())
         .build())
 
     return this
@@ -294,52 +289,37 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
     return this
 }
 
-/**
- * Add a TypeSpec to the FileSpec that is a wrapper class for the given DAO
- */
 fun FileSpec.Builder.addDaoWrapperTypeSpec(
-    daoTypeElement: TypeElement,
-    processingEnv: ProcessingEnvironment,
-    target: DoorTarget
+    daoClassDeclaration: KSClassDeclaration,
+    resolver: Resolver,
+    target: DoorTarget,
 ): FileSpec.Builder {
-    addType(TypeSpec.classBuilder(daoTypeElement.asClassNameWithSuffix(DoorDatabaseReplicateWrapper.SUFFIX))
-            .superclass(daoTypeElement.asClassName())
-            .primaryConstructor(FunSpec.constructorBuilder()
-                    .addParameter("_db", RoomDatabase::class)
-                    .addParameter("_dao", daoTypeElement.asClassName())
-                    .build())
-            .addProperty(PropertySpec.builder("_db", RoomDatabase::class,
-                KModifier.PRIVATE)
-                .initializer("_db")
-                .build())
-            .addProperty(PropertySpec.builder("_dao", daoTypeElement.asClassName(),
-                    KModifier.PRIVATE)
-                    .initializer("_dao")
-                    .build())
-            .apply {
-                daoTypeElement.allOverridableMethods(processingEnv).forEach {daoMethodEl ->
-                    addDaoFunctionDelegate(daoMethodEl, daoTypeElement, processingEnv, target)
-                }
-            }
+    addType(TypeSpec.classBuilder(daoClassDeclaration.toClassNameWithSuffix(DoorDatabaseReplicateWrapper.SUFFIX))
+        .superclass(daoClassDeclaration.toClassName())
+        .primaryConstructor(FunSpec.constructorBuilder()
+            .addParameter("_db", RoomDatabase::class)
+            .addParameter("_dao", daoClassDeclaration.toClassName())
             .build())
+        .addProperty(PropertySpec.builder("_db", RoomDatabase::class,
+            KModifier.PRIVATE)
+            .initializer("_db")
+            .build())
+        .addProperty(PropertySpec.builder("_dao", daoClassDeclaration.toClassName(),
+            KModifier.PRIVATE)
+            .initializer("_dao")
+            .build())
+        .apply {
+            daoClassDeclaration.getAllFunctionsIncSuperTypesToGenerate().forEach { daoFunDeclaration ->
+                addDaoFunctionDelegate(daoFunDeclaration, daoClassDeclaration, resolver, target)
+            }
+        }
+        .build()
+    )
+
 
     return this
 }
 
-
-/**
- * Determine if this TypeElement (or any of its ancestors) representing a DAO has any functions with the Insert,
- * Delete, or Update annotation that are acting on a ReplicateEntity
- */
-private fun TypeElement.daoHasRepositoryWriteFunctions(
-    processingEnv: ProcessingEnvironment
-) : Boolean {
-    return allOverridableMethods(processingEnv).any { daoMethodEl ->
-        val fnResolved = daoMethodEl.asMemberOf(this, processingEnv)
-        val paramType = fnResolved.parameterTypes.firstOrNull()?.unwrapListOrArrayComponentType(processingEnv)
-        paramType?.asTypeElement(processingEnv)?.hasAnnotation(ReplicateEntity::class.java) == true
-    }
-}
 
 /**
  * Determine if this KSClassDeclaration (or any of its ancestors) representing a DAO has any functions with the Insert,
@@ -349,15 +329,22 @@ private fun KSClassDeclaration.daoHasReplicateEntityWriteFunctions(
     resolver: Resolver,
 ): Boolean {
     val allInsertUpdateDeleteFuns = getAllFunctionsIncSuperTypes {
-        if(!it.hasAnyAnnotation(Update::class, Insert::class, Delete::class)) {
-            false
-        } else {
-            val fnResolved = it.asMemberOf(this.asType(emptyList()))
-            fnResolved.firstParamEntityType(resolver).declaration.hasAnnotation(ReplicateEntity::class)
-        }
+        it.isDaoReplicateEntityWriteFunction(resolver, this)
     }
 
     return allInsertUpdateDeleteFuns.isNotEmpty()
+}
+
+private fun KSFunctionDeclaration.isDaoReplicateEntityWriteFunction(
+    resolver: Resolver,
+    daoClassDeclaration: KSClassDeclaration,
+): Boolean {
+    return if(!hasAnyAnnotation(Update::class, Insert::class, Delete::class)) {
+        false
+    } else {
+        val fnResolved = asMemberOf(daoClassDeclaration.asType(emptyList()))
+        fnResolved.firstParamEntityType(resolver).declaration.hasAnnotation(ReplicateEntity::class)
+    }
 }
 
 /**
@@ -366,23 +353,7 @@ private fun KSClassDeclaration.daoHasReplicateEntityWriteFunctions(
 class DbProcessorReplicateWrapper: AbstractDbProcessor()  {
 
     override fun process(annotations: MutableSet<out TypeElement>?, roundEnv: RoundEnvironment): Boolean {
-        val targetMap = mapOf(DoorTarget.JVM to AnnotationProcessorWrapper.OPTION_JVM_DIRS,
-            DoorTarget.JS to AnnotationProcessorWrapper.OPTION_JS_OUTPUT,
-            DoorTarget.ANDROID to AnnotationProcessorWrapper.OPTION_ANDROID_OUTPUT)
-
-
-        roundEnv.getElementsAnnotatedWith(Dao::class.java).map { it as TypeElement }.forEach {daoTypeEl ->
-            if(daoTypeEl.daoHasRepositoryWriteFunctions(processingEnv)) {
-                targetMap.forEach { target ->
-                    FileSpec.builder(daoTypeEl.packageName,
-                        "${daoTypeEl.simpleName}${DoorDatabaseReplicateWrapper.SUFFIX}")
-                        .addDaoWrapperTypeSpec(daoTypeEl, processingEnv, target.key)
-                        .build()
-                        .writeToDirsFromArg(target.value)
-                }
-            }
-        }
-
+        //Not used anymore - will be removed soon - now done using KSP
         return true
     }
 
@@ -405,6 +376,22 @@ class ReplicateWrapperProcessor(
                         .writeToPlatformDir(target, environment.codeGenerator, environment.options)
                 }
             }
+        }
+
+        val daoSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Dao")
+            .filterIsInstance<KSClassDeclaration>()
+        daoSymbols.forEach { daoClassDec ->
+            if(daoClassDec.daoHasReplicateEntityWriteFunctions(resolver)) {
+                DoorTarget.values().forEach { target ->
+                    FileSpec.builder(daoClassDec.packageName.asString(),
+                        "${daoClassDec.simpleName.asString()}${DoorDatabaseReplicateWrapper.SUFFIX}")
+                        .addDaoWrapperTypeSpec(daoClassDec, resolver, target)
+                        .build()
+                        .writeToPlatformDir(target, environment.codeGenerator, environment.options)
+
+                }
+            }
+
         }
 
         return emptyList()
