@@ -10,7 +10,7 @@ import com.ustadmobile.door.entities.DoorNode
 
 @Dao
 @Repository
-abstract class RepDao {
+abstract class RepDao: RepDaoInterface<RepEntity> {
 
     @Insert
     abstract suspend fun insertDoorNodeAsync(node: DoorNode)

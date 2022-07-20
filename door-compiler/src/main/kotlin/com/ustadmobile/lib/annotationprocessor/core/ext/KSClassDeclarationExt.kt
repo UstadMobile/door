@@ -66,54 +66,26 @@ fun KSClassDeclaration.allDbClassDaoGetters(): List<KSDeclaration> {
 }
 
 /**
- * Use this in place of getAllSuperTypes when looking for all supertypes...
- *
- * It will resolve typealiases
- */
-fun KSClassDeclaration.getAllSuperTypeClassDeclarations(): List<KSClassDeclaration> {
-    return getAllSuperTypes().map {
-        if(it is KSTypeAlias) {
-            it.findActualTypeClassDecl()
-        }else{
-            it.declaration as KSClassDeclaration
-        }
-    }.toList()
-}
-
-/**
  * Get a list of all functions (recursive, including all supertypes).
- *
- * TODO: getAllFunctions might already do this... - which might cause duplicate results here
- */
+ **/
 fun KSClassDeclaration.getAllFunctionsIncSuperTypes(
-    incSuperTypes: Boolean = true,
     filterFn: (KSFunctionDeclaration) -> Boolean = {true},
 ) : List<KSFunctionDeclaration> {
-    val allClassDecls = listOf(this) + if(incSuperTypes) {
-        getAllSuperTypeClassDeclarations()
-    }else {
-        emptyList()
-    }
-
-    return allClassDecls.flatMap { superType ->
-        superType.getAllFunctions().filter(filterFn)
-    }
+    return getAllFunctions().toList().filter(filterFn)
 }
 
 /**
  * Find all functions that have a given annotation class (by default including all supertypes).
  */
 fun <T: Annotation> KSClassDeclaration.getAllFunctionsIncSuperTypesWithAnnotation(
-    incSuperTypes: Boolean = true,
     vararg annotationKClasses: KClass<out T>,
-
-): List<KSFunctionDeclaration> = getAllFunctionsIncSuperTypes(incSuperTypes) {
+): List<KSFunctionDeclaration> = getAllFunctionsIncSuperTypes {
     it.hasAnyAnnotation(*annotationKClasses)
 }
 
 fun KSClassDeclaration.getAllFunctionsIncSuperTypesToGenerate(): List<KSFunctionDeclaration> {
-    return getAllFunctionsIncSuperTypesWithAnnotation(true, Query::class, Insert::class, Update::class,
-        Delete::class)
+    return getAllFunctionsIncSuperTypesWithAnnotation(Query::class, Insert::class, Update::class,
+        Delete::class, RawQuery::class)
 }
 
 fun KSClassDeclaration.isListDeclaration(): Boolean {
