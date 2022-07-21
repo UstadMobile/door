@@ -124,7 +124,7 @@ fun TypeSpec.Builder.addDbVersionProperty(dbClassDecl: KSClassDeclaration): Type
     return addProperty(PropertySpec.builder("dbVersion", INT)
         .addModifiers(KModifier.OVERRIDE)
         .getter(FunSpec.getterBuilder()
-            .addCode("return ${dbClassDecl.getAnnotation(Database::class).version}")
+            .addCode("return ${dbClassDecl.getAnnotation(Database::class)?.version}")
             .build())
         .build())
 }

@@ -85,9 +85,10 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(
 ) : TypeSpec.Builder {
     val functionResolved = daoFunDeclaration.asMemberOf(daoClassDeclaration.asType(emptyList()))
 
-    val overridingFunction = daoFunDeclaration.toOverridingFunSpecBuilder(resolver,
-        daoClassDeclaration.asType(emptyList()))
+    val overridingFunction = daoFunDeclaration.toFunSpecBuilder(resolver,
+            daoClassDeclaration.asType(emptyList()))
         .removeAbstractModifier()
+        .addModifiers(KModifier.OVERRIDE)
         .build()
 
     var setPk = false
@@ -136,7 +137,7 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(
 
                     pkProp = entityComponentClassDecl.entityPrimaryKeyProps.first()
 
-                    val tableId = entityComponentClassDecl.getAnnotation(ReplicateEntity::class).tableId
+                    val tableId = entityComponentClassDecl.getAnnotation(ReplicateEntity::class)?.tableId ?: 0
 
                     setPk = daoFunDeclaration.hasAnnotation(Insert::class)
                             && entityComponentClassDecl.isReplicateEntityWithAutoIncPrimaryKey

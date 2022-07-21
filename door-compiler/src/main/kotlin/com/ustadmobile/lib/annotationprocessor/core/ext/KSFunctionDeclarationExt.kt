@@ -10,7 +10,7 @@ import com.squareup.kotlinpoet.ksp.toKModifier
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.ustadmobile.lib.annotationprocessor.core.applyIf
 
-fun KSFunctionDeclaration.toOverridingFunSpecBuilder(
+fun KSFunctionDeclaration.toFunSpecBuilder(
     resolver: Resolver,
     containingType: KSType,
 ) : FunSpec.Builder {

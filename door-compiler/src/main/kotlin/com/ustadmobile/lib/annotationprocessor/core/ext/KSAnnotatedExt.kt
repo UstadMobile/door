@@ -31,8 +31,8 @@ fun <T: Annotation> KSAnnotated.hasAnyAnnotation(vararg annotationKClass: KClass
 
 
 @OptIn(KspExperimental::class)
-fun <T: Annotation> KSAnnotated.getAnnotation(annotationKClazz: KClass<T>): T {
-    return getAnnotationsByType(annotationKClazz).first()
+fun <T: Annotation> KSAnnotated.getAnnotation(annotationKClazz: KClass<T>): T? {
+    return getAnnotationsByType(annotationKClazz).firstOrNull()
 }
 
 @OptIn(KspExperimental::class)

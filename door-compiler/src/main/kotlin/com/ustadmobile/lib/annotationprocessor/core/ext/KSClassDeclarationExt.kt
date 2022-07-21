@@ -65,6 +65,16 @@ fun KSClassDeclaration.allDbClassDaoGetters(): List<KSDeclaration> {
     }.toList()
 }
 
+fun KSClassDeclaration.findDbGetterForDao(daoKSClassDeclaration: KSClassDeclaration): KSDeclaration? {
+    return getAllFunctions().firstOrNull {
+        it.returnType?.resolve()?.declaration?.qualifiedName?.asString() ==
+                daoKSClassDeclaration.qualifiedName?.asString()
+    } ?: getAllProperties().firstOrNull {
+        it.type.resolve().declaration.qualifiedName?.asString() ==
+                daoKSClassDeclaration.qualifiedName?.asString()
+    }
+}
+
 /**
  * Get a list of all functions (recursive, including all supertypes).
  **/
@@ -114,6 +124,7 @@ val KSClassDeclaration.entityPrimaryKeyProps: List<KSPropertyDeclaration>
             return listOf(annotatedPrimaryKey)
 
         val entityAnnotation = getAnnotation(Entity::class)
+            ?: throw IllegalArgumentException("entityPrimaryKeyProps ${qualifiedName?.asString()} has no entity annotation!")
         val allDeclaredProps = getAllProperties()
         return entityAnnotation.primaryKeys.map {
             allDeclaredProps.first { prop -> prop.simpleName.asString() == it }

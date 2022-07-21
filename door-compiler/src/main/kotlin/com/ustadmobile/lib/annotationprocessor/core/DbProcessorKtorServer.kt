@@ -4,6 +4,12 @@ import androidx.lifecycle.LiveData
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import com.google.devtools.ksp.processing.Resolver
+import com.google.devtools.ksp.processing.SymbolProcessor
+import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
+import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.gson.Gson
 import com.squareup.kotlinpoet.*
 import io.ktor.http.HttpStatusCode
@@ -11,6 +17,7 @@ import io.ktor.server.routing.Route
 import javax.lang.model.element.TypeElement
 import com.google.gson.reflect.TypeToken
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import com.squareup.kotlinpoet.ksp.toClassName
 import com.ustadmobile.door.*
 import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_KTOR_OUTPUT
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SERVER_TYPE_KTOR
@@ -35,6 +42,7 @@ import com.ustadmobile.door.AbstractDoorUriResponder
 import com.ustadmobile.door.annotation.*
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SUFFIX_KTOR_ROUTE
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SUFFIX_NANOHTTPD_ADDURIMAPPING
+import com.ustadmobile.lib.annotationprocessor.core.ext.*
 import kotlinx.serialization.json.Json
 import javax.annotation.processing.RoundEnvironment
 
@@ -52,7 +60,7 @@ fun CodeBlock.Builder.addKtorResponse(varName: String)
             DbProcessorKtorServer.RESPOND_MEMBER)
 
 
-fun FunSpec.Builder.addParametersForHttpDb(dbTypeElement: TypeElement, isPrimaryDefaultVal: Boolean): FunSpec.Builder {
+fun FunSpec.Builder.addParametersForHttpDb(isPrimaryDefaultVal: Boolean): FunSpec.Builder {
     addParameter(ParameterSpec.builder("_isPrimary", BOOLEAN)
                     .defaultValue(isPrimaryDefaultVal.toString())
                     .build())
@@ -133,6 +141,48 @@ fun FileSpec.Builder.addNanoHttpdResponder(daoTypeSpec: TypeSpec, daoClassName: 
     return this
 }
 
+fun FileSpec.Builder.addNanoHttpdResponder(
+    daoKSClassDeclaration: KSClassDeclaration,
+    resolver: Resolver,
+): FileSpec.Builder {
+
+    addType(TypeSpec.classBuilder(daoKSClassDeclaration.toClassNameWithSuffix(SUFFIX_NANOHTTPD_URIRESPONDER))
+        .superclass(AbstractDoorUriResponder::class)
+        .apply {
+            daoKSClassDeclaration.getAllFunctions()
+                .filter { it.hasAnnotation(RepoHttpAccessible::class) }
+                .forEach { daoFun ->
+                    addNanoHttpDaoFun(daoFun, daoKSClassDeclaration, resolver)
+                }
+        }
+        .build())
+    return this
+}
+
+/**
+ *
+ */
+fun TypeSpec.Builder.addNanoHttpDaoFun(
+    daoFunDecl: KSFunctionDeclaration,
+    daoClassDecl: KSClassDeclaration,
+    resolver: Resolver,
+): TypeSpec.Builder {
+    val daoFunSpec = daoFunDecl.toFunSpecBuilder(resolver, daoClassDecl.asType(emptyList())).build()
+
+    addFunction(FunSpec.builder(daoFunDecl.simpleName.asString())
+        .returns(NanoHTTPD.Response::class)
+        .addNanoHttpdUriResponderParams()
+        .addParameter("_dao", daoClassDecl.toClassName())
+        .addParameter("_gson", Gson::class)
+        .addCode(CodeBlock.builder()
+            .addHttpServerPassToDaoCodeBlock(daoFunSpec,
+                serverType = SERVER_TYPE_NANOHTTPD)
+            .build())
+        .build())
+
+    return this
+}
+
 /**
  * Add the parameters that are required for all nanohttpd uri responder functions
  */
@@ -153,7 +203,7 @@ fun TypeSpec.Builder.addNanoHttpdDaoFun(daoFunSpec: FunSpec, daoClassName: Class
             .addParameter("_gson", Gson::class)
 
             .addCode(CodeBlock.builder()
-                    .addHttpServerPassToDaoCodeBlock(daoFunSpec, processingEnv,
+                    .addHttpServerPassToDaoCodeBlock(daoFunSpec,
                         serverType = SERVER_TYPE_NANOHTTPD)
                 .build())
             .build())
@@ -249,7 +299,7 @@ fun CodeBlock.Builder.addKtorDaoMethodCode(daoFunSpec: FunSpec, processingEnv: P
             .add("val _dao = _daoFn(_db)\n")
             .add("val _gson: %T by _di.%M()\n", Gson::class, DI_INSTANCE_MEMBER)
 
-    addHttpServerPassToDaoCodeBlock(daoFunSpec, processingEnv, serverType = SERVER_TYPE_KTOR)
+    addHttpServerPassToDaoCodeBlock(daoFunSpec, serverType = SERVER_TYPE_KTOR)
 
 
     endControlFlow()
@@ -307,7 +357,7 @@ fun CodeBlock.Builder.addKtorRouteSelectCodeBlock(
             ?.addModifiers(KModifier.SUSPEND)
 
     addHttpServerPassToDaoCodeBlock(modifiedQueryFunSpec.build(),
-            processingEnv, daoVarName = "_ktorHelperDao",
+            daoVarName = "_ktorHelperDao",
             preexistingVarNames = listOf("clientId"), serverType = serverType, addRespondCall = false)
 
     addRespondCall(resultType, "_result", serverType)
@@ -333,7 +383,6 @@ fun CodeBlock.Builder.addKtorRouteSelectCodeBlock(
  */
 fun CodeBlock.Builder.addHttpServerPassToDaoCodeBlock(
     daoMethod: FunSpec,
-    processingEnv: ProcessingEnvironment,
     mutlipartHelperVarName: String? = null,
     beforeDaoCallCode: CodeBlock = CodeBlock.of(""),
     afterDaoCallCode: CodeBlock = CodeBlock.of(""),
@@ -514,62 +563,61 @@ fun CodeBlock.Builder.addRespondCall(returnType: TypeName, varName: String, serv
  * Adds a Ktor Route function that will subroute all the DAOs on the given database
  */
 fun FileSpec.Builder.addDbKtorRouteFunction(
-    dbTypeEl: TypeElement,
-    processingEnv: ProcessingEnvironment
+    dbClassDeclaration: KSClassDeclaration,
 ) : FileSpec.Builder {
 
     fun CodeBlock.Builder.addDbDaoRouteCall(
-        daoTypeEl: TypeElement
+        daoClassDecl: KSClassDeclaration
     ) : CodeBlock.Builder {
-        add("%M(\n_typeToken, \n", MemberName(daoTypeEl.packageName,
-                "${daoTypeEl.simpleName}$SUFFIX_KTOR_ROUTE"))
+        add("%M(\n_typeToken, \n", MemberName(daoClassDecl.packageName.asString(),
+            "${daoClassDecl.simpleName.asString()}$SUFFIX_KTOR_ROUTE"))
         beginControlFlow("")
-                .add("it.%L\n", dbTypeEl.findDaoGetter(daoTypeEl, processingEnv))
-                .endControlFlow()
+            .add("it.%L\n",
+                dbClassDeclaration.findDbGetterForDao(daoClassDecl)?.toPropertyOrEmptyFunctionCaller())
+            .endControlFlow()
 
         add(")\n\n")
         return this
     }
 
-
-
-    val dbClassName = dbTypeEl.asClassName()
+    val dbClassName = dbClassDeclaration.toClassName()
     addFunction(FunSpec.builder("${dbClassName.simpleName}$SUFFIX_KTOR_ROUTE")
-            .receiver(Route::class)
-            .addParameter(ParameterSpec.builder("json", Json::class)
-                .defaultValue(CodeBlock.of("%T { encodeDefaults = true } ", Json::class))
-                .build())
-            .addCode(CodeBlock.builder()
-                    .apply {
-                        dbTypeEl.getAnnotation(MinReplicationVersion::class.java)?.also {
-                            add("%M(${it.value})\n",
-                                    MemberName("com.ustadmobile.door.ktor",
-                                            "addDbVersionCheckIntercept"))
-                        }
-
-                        if(dbTypeEl.getAnnotation(DoorNodeIdAuthRequired::class.java) != null) {
-                            add("%M()\n", MemberName("com.ustadmobile.door.ktor", "addNodeIdAndAuthCheckInterceptor"))
-                        }
-
-                        add("val _typeToken: %T<%T> = %M()\n", org.kodein.type.TypeToken::class.java,
-                                dbTypeEl, DbProcessorKtorServer.DI_ERASED_MEMBER)
-                        if(dbTypeEl.dbHasReplicateWrapper(processingEnv)) {
-                            add("%M(_typeToken, %T::class, json)\n",
-                                MemberName("com.ustadmobile.door.replication", "doorReplicationRoute"),
-                                dbTypeEl)
-                        }
-                    }.apply {
-                        dbTypeEl.allDbClassDaoGettersWithRepo(processingEnv).forEach {daoGetter ->
-                            val daoTypeEl = daoGetter.returnType.asTypeElement(processingEnv)
-                                    ?: throw IllegalArgumentException("${daoGetter.simpleName} has no return type?")
-                            addDbDaoRouteCall(daoTypeEl)
-                        }
-                    }.applyIf(dbTypeEl.allDbEntities(processingEnv).any { it.entityHasAttachments }) {
-                        add("%M(%S, _typeToken)\n", MemberName("com.ustadmobile.door.attachments",
-                                "doorAttachmentsRoute"), "attachments")
-                    }
-                    .build())
+        .receiver(Route::class)
+        .addParameter(ParameterSpec.builder("json", Json::class)
+            .defaultValue(CodeBlock.of("%T { encodeDefaults = true } ", Json::class))
             .build())
+        .addCode(CodeBlock.builder()
+            .apply {
+                dbClassDeclaration.getAnnotation(MinReplicationVersion::class)?.also {
+                    add("%M(${it.value})\n",
+                        MemberName("com.ustadmobile.door.ktor",
+                            "addDbVersionCheckIntercept"))
+                }
+
+                if(dbClassDeclaration.hasAnnotation(DoorNodeIdAuthRequired::class)) {
+                    add("%M()\n", MemberName("com.ustadmobile.door.ktor", "addNodeIdAndAuthCheckInterceptor"))
+                }
+
+                add("val _typeToken: %T<%T> = %M()\n", org.kodein.type.TypeToken::class.java,
+                    dbClassDeclaration.toClassName(), DbProcessorKtorServer.DI_ERASED_MEMBER)
+                if(dbClassDeclaration.dbHasReplicateWrapper()) {
+                    add("%M(_typeToken, %T::class, json)\n",
+                        MemberName("com.ustadmobile.door.replication", "doorReplicationRoute"),
+                        dbClassDeclaration.toClassName())
+                }
+            }.apply {
+                dbClassDeclaration.dbEnclosedDaos().filter {
+                    it.hasAnnotation(Repository::class)
+                }.forEach {
+                    addDbDaoRouteCall(it)
+                }
+            }.applyIf(dbClassDeclaration.allDbEntities().any { it.entityHasAttachments() }) {
+                add("%M(%S, _typeToken)\n", MemberName("com.ustadmobile.door.attachments",
+                    "doorAttachmentsRoute"), "attachments")
+            }
+            .build())
+        .build())
+
     return this
 }
 
@@ -578,40 +626,38 @@ fun FileSpec.Builder.addDbKtorRouteFunction(
  * to this FileSpec.
  */
 fun FileSpec.Builder.addDbNanoHttpdMapperFunction(
-    dbTypeElement: TypeElement,
-    processingEnv: ProcessingEnvironment
+    dbClassDeclaration: KSClassDeclaration,
+    resolver: Resolver,
 ) : FileSpec.Builder {
-
-    val dbTypeClassName = dbTypeElement.asClassName()
+    val dbTypeClassName = dbClassDeclaration.toClassName()
     addFunction(FunSpec.builder("${dbTypeClassName.simpleName}$SUFFIX_NANOHTTPD_ADDURIMAPPING")
-            .addParametersForHttpDb(dbTypeElement, false)
-            .addParameter("_mappingPrefix", String::class)
-            .addParameter("_di", DI::class)
-            .receiver(RouterNanoHTTPD::class)
-            .addCode(CodeBlock.builder()
-                    .add("val _typeToken : %T = %M()\n",
-                            org.kodein.type.TypeToken::class.asClassName().parameterizedBy(dbTypeClassName),
-                            MemberName("org.kodein.type", "erased"))
-                    .apply {
-                        dbTypeElement.allDbClassDaoGettersWithRepo(processingEnv).forEach { daoGetter ->
-                            val daoTypeEl = daoGetter.returnType.asTypeElement(processingEnv)
-                                    ?: throw IllegalArgumentException("${daoGetter.simpleName} has no return type?")
-                            add("addRoute(\"\$_mappingPrefix/${daoTypeEl.simpleName}/.*\",\n " +
-                                    "%T::class.java, _di,\n %T(){ it.${daoGetter.accessAsPropertyOrFunctionInvocationCall()} }, _typeToken",
-                                    daoTypeEl.asClassNameWithSuffix(SUFFIX_NANOHTTPD_URIRESPONDER),
-                                    DoorDaoProvider::class.asTypeName().parameterizedBy(
-                                        dbTypeClassName, daoTypeEl.asClassName()))
-                            add(")\n")
-                        }
-                    }
-                    .build())
+        .addParametersForHttpDb(false)
+        .addParameter("_mappingPrefix", String::class)
+        .addParameter("_di", DI::class)
+        .receiver(RouterNanoHTTPD::class)
+        .addCode(CodeBlock.builder()
+            .add("val _typeToken : %T = %M()\n",
+                org.kodein.type.TypeToken::class.asClassName().parameterizedBy(dbTypeClassName),
+                MemberName("org.kodein.type", "erased"))
+            .apply {
+                dbClassDeclaration.dbEnclosedDaos().filter {
+                    it.hasAnnotation(Repository::class)
+                }.forEach { daoClassDecl ->
+                    val daoPropOrGetter = dbClassDeclaration.findDbGetterForDao(daoClassDecl)
+                    add("addRoute(\"\$_mappingPrefix/${daoClassDecl.simpleName.asString()}/.*\",\n " +
+                            "%T::class.java, _di,\n %T(){ it.${daoPropOrGetter?.toPropertyOrEmptyFunctionCaller()} }, _typeToken",
+                        daoClassDecl.toClassNameWithSuffix(SUFFIX_NANOHTTPD_URIRESPONDER),
+                        DoorDaoProvider::class.asTypeName().parameterizedBy(
+                            dbTypeClassName, daoClassDecl.toClassName()))
+                    add(")\n")
+                }
+            }
             .build())
+        .build())
 
 
     return this
 }
-
-
 
 
 
@@ -643,20 +689,6 @@ class DbProcessorKtorServer: AbstractDbProcessor() {
 
 
     override fun process(annotations: MutableSet<out TypeElement>?, roundEnv: RoundEnvironment): Boolean {
-        roundEnv.getElementsAnnotatedWith(Database::class.java).map { it as TypeElement}.forEach {dbTypeEl ->
-            if(dbTypeEl.dbEnclosedDaos(processingEnv).any { it.hasAnnotation(Repository::class.java) }) {
-                FileSpec.builder(dbTypeEl.packageName, "${dbTypeEl.simpleName}$SUFFIX_KTOR_ROUTE")
-                        .addDbKtorRouteFunction(dbTypeEl, processingEnv)
-                        .build()
-                        .writeToDirsFromArg(OPTION_KTOR_OUTPUT)
-                FileSpec.builder(dbTypeEl.packageName, "${dbTypeEl.simpleName}$SUFFIX_NANOHTTPD_ADDURIMAPPING")
-                        .addDbNanoHttpdMapperFunction(dbTypeEl, processingEnv)
-                        .build()
-                        .writeToDirsFromArg(OPTION_ANDROID_OUTPUT)
-            }
-        }
-
-
         val daos = roundEnv.getElementsAnnotatedWith(Dao::class.java)
         daos.filter { it is TypeElement && it.isDaoWithRepository }.map { it as TypeElement }.forEach {daoTypeEl ->
             val daoTypeSpec = daoTypeEl.asTypeSpecStub(processingEnv)
@@ -722,3 +754,38 @@ class DbProcessorKtorServer: AbstractDbProcessor() {
 
     }
 }
+
+class DbHttpServerProcessor(
+    private val environment: SymbolProcessorEnvironment,
+) : SymbolProcessor {
+
+
+    override fun process(resolver: Resolver): List<KSAnnotated> {
+
+        val dbSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Database")
+            .filterIsInstance<KSClassDeclaration>()
+        dbSymbols.forEach { dbClassDecl ->
+            if(dbClassDecl.dbEnclosedDaos().any { it.hasAnnotation(Repository::class) }) {
+                FileSpec.builder(dbClassDecl.packageName.asString(),
+                    "${dbClassDecl.simpleName.asString()}$SUFFIX_KTOR_ROUTE")
+                    .addDbKtorRouteFunction(dbClassDecl)
+                    .build()
+                    .writeToPlatformDir(DoorTarget.JVM, environment.codeGenerator, environment.options)
+                FileSpec.builder(dbClassDecl.packageName.asString(),
+                    "${dbClassDecl.simpleName.asString()}$SUFFIX_NANOHTTPD_ADDURIMAPPING")
+                    .addDbNanoHttpdMapperFunction(dbClassDecl, resolver)
+                    .build()
+                    .writeToPlatformDir(DoorTarget.ANDROID, environment.codeGenerator, environment.options)
+            }
+        }
+
+        val daoSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Dao")
+            .filterIsInstance<KSClassDeclaration>()
+        daoSymbols.forEach { daoClassDecl ->
+
+        }
+
+        return emptyList()
+    }
+}
+

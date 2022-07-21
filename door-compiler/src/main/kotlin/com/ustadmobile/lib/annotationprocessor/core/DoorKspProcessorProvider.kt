@@ -7,6 +7,6 @@ import com.google.devtools.ksp.processing.SymbolProcessorProvider
 class DoorKspProcessorProvider: SymbolProcessorProvider {
 
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor {
-        return ReplicateWrapperProcessor(environment)
+        return SymbolProcessorWrapper(environment)
     }
 }
