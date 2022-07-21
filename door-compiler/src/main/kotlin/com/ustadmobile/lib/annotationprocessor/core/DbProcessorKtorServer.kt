@@ -1,8 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
 import androidx.lifecycle.LiveData
-import androidx.room.Dao
-import androidx.room.Database
 import androidx.room.RoomDatabase
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
@@ -11,20 +9,19 @@ import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.gson.Gson
-import com.squareup.kotlinpoet.*
-import io.ktor.http.HttpStatusCode
-import io.ktor.server.routing.Route
-import javax.lang.model.element.TypeElement
 import com.google.gson.reflect.TypeToken
+import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toClassName
-import com.ustadmobile.door.*
-import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_KTOR_OUTPUT
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SERVER_TYPE_KTOR
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SERVER_TYPE_NANOHTTPD
-import fi.iki.elonen.NanoHTTPD
-import fi.iki.elonen.router.RouterNanoHTTPD
-import java.util.*
+import com.squareup.kotlinpoet.ksp.toTypeName
+import com.ustadmobile.door.AbstractDoorUriResponder
+import com.ustadmobile.door.DoorConstants
+import com.ustadmobile.door.DoorDaoProvider
+import com.ustadmobile.door.NanoHttpdCall
+import com.ustadmobile.door.annotation.DoorNodeIdAuthRequired
+import com.ustadmobile.door.annotation.MinReplicationVersion
+import com.ustadmobile.door.annotation.RepoHttpAccessible
+import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.CODEBLOCK_KTOR_NO_CONTENT_RESPOND
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.CODEBLOCK_NANOHTTPD_NO_CONTENT_RESPONSE
@@ -33,18 +30,21 @@ import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Compan
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.DI_ON_MEMBER
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.GET_MEMBER
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.POST_MEMBER
-import org.kodein.di.DI
-import java.lang.IllegalArgumentException
-import javax.annotation.processing.ProcessingEnvironment
-import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_ANDROID_OUTPUT
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SUFFIX_NANOHTTPD_URIRESPONDER
-import com.ustadmobile.door.AbstractDoorUriResponder
-import com.ustadmobile.door.annotation.*
+import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SERVER_TYPE_KTOR
+import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SERVER_TYPE_NANOHTTPD
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SUFFIX_KTOR_ROUTE
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SUFFIX_NANOHTTPD_ADDURIMAPPING
+import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SUFFIX_NANOHTTPD_URIRESPONDER
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
+import fi.iki.elonen.NanoHTTPD
+import fi.iki.elonen.router.RouterNanoHTTPD
+import io.ktor.http.*
+import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
+import org.kodein.di.DI
+import javax.annotation.processing.ProcessingEnvironment
 import javax.annotation.processing.RoundEnvironment
+import javax.lang.model.element.TypeElement
 
 fun CodeBlock.Builder.addNanoHttpdResponse(varName: String, addNonNullOperator: Boolean = false,
                                            applyToResponseCodeBlock: CodeBlock? = null)
@@ -88,55 +88,34 @@ fun CodeBlock.Builder.addRequestDi(diVarName: String = "_di", dbVarName: String 
  * }
  */
 fun FileSpec.Builder.addDaoKtorRouteFun(
-    daoTypeSpec: TypeSpec,
+    daoClassDecl: KSClassDeclaration,
     daoClassName: ClassName,
-    processingEnv: ProcessingEnvironment
+    resolver: Resolver,
 ) : FileSpec.Builder {
 
-    addFunction(FunSpec.builder("${daoTypeSpec.name}$SUFFIX_KTOR_ROUTE")
-            .addTypeVariable(TypeVariableName.invoke("T", RoomDatabase::class))
-            .receiver(Route::class)
-            .addParameter("_typeToken",
-                    org.kodein.type.TypeToken::class.asClassName().parameterizedBy(TypeVariableName("T")))
-            .addParameter("_daoFn",
-                    LambdaTypeName.get(parameters = arrayOf(TypeVariableName("T")),
-                            returnType = daoClassName))
-            .addCode(CodeBlock.builder()
-                    .beginControlFlow("%M(%S)",
-                        MemberName("io.ktor.server.routing", "route"),
-                        daoClassName.simpleName)
-                    .apply {
-                        daoTypeSpec.funSpecs.specsWithHttpEndpoint().forEach {daoFunSpec ->
-                            addKtorDaoMethodCode(daoFunSpec, processingEnv)
-                        }
-                    }
-                    .endControlFlow()
-                    .build())
-            .build())
-
-
-    return this
-}
-
-/**
- * Add a NanoHTTPD Responder class implementation for the DAO to this file
- */
-fun FileSpec.Builder.addNanoHttpdResponder(daoTypeSpec: TypeSpec, daoClassName: ClassName,
-    processingEnv: ProcessingEnvironment): FileSpec.Builder {
-
-    addType(TypeSpec.classBuilder(daoClassName.withSuffix(SUFFIX_NANOHTTPD_URIRESPONDER))
-            .superclass(AbstractDoorUriResponder::class)
+    addFunction(FunSpec.builder("${daoClassDecl.simpleName.asString()}$SUFFIX_KTOR_ROUTE")
+        .addTypeVariable(TypeVariableName.invoke("T", RoomDatabase::class))
+        .receiver(Route::class)
+        .addParameter("_typeToken",
+            org.kodein.type.TypeToken::class.asClassName().parameterizedBy(TypeVariableName("T")))
+        .addParameter("_daoFn",
+            LambdaTypeName.get(parameters = arrayOf(TypeVariableName("T")),
+                returnType = daoClassName))
+        .addCode(CodeBlock.builder()
+            .beginControlFlow("%M(%S)",
+                MemberName("io.ktor.server.routing", "route"),
+                daoClassName.simpleName)
             .apply {
-                //generate a function for each dao function
-                daoTypeSpec.funSpecs.specsWithHttpEndpoint().forEach { daoFunSpec ->
-                    addNanoHttpdDaoFun(daoFunSpec, daoClassName, daoTypeSpec,
-                        processingEnv)
+                daoClassDecl.getAllFunctions().filter {
+                    it.hasAnnotation(RepoHttpAccessible::class)
+                }.forEach {
+                    addKtorDaoMethodCode(it.toFunSpecBuilder(resolver, daoClassDecl.asType(emptyList())).build())
                 }
-
-                addNanoHttpdResponderFun("get", daoClassName, daoTypeSpec, processingEnv)
-                addNanoHttpdResponderFun("post", daoClassName, daoTypeSpec, processingEnv)
             }
+            .endControlFlow()
             .build())
+        .build())
+
 
     return this
 }
@@ -155,6 +134,8 @@ fun FileSpec.Builder.addNanoHttpdResponder(
                     addNanoHttpDaoFun(daoFun, daoKSClassDeclaration, resolver)
                 }
         }
+        .addNanoHttpdResponderFun("get", daoKSClassDeclaration.toClassName(), daoKSClassDeclaration)
+        .addNanoHttpdResponderFun("post", daoKSClassDeclaration.toClassName(), daoKSClassDeclaration)
         .build())
     return this
 }
@@ -192,23 +173,6 @@ private fun FunSpec.Builder.addNanoHttpdUriResponderParams() =
                 Map::class.parameterizedBy(String::class, String::class))
         .addParameter("_session", NanoHTTPD.IHTTPSession::class)
 
-fun TypeSpec.Builder.addNanoHttpdDaoFun(daoFunSpec: FunSpec, daoClassName: ClassName,
-                                        daoTypeSpec: TypeSpec,
-                                        processingEnv: ProcessingEnvironment) {
-
-    addFunction(FunSpec.builder(daoFunSpec.name)
-            .returns(NanoHTTPD.Response::class)
-            .addNanoHttpdUriResponderParams()
-            .addParameter("_dao", daoClassName)
-            .addParameter("_gson", Gson::class)
-
-            .addCode(CodeBlock.builder()
-                    .addHttpServerPassToDaoCodeBlock(daoFunSpec,
-                        serverType = SERVER_TYPE_NANOHTTPD)
-                .build())
-            .build())
-}
-
 
 /**
  * Add a function that overrides the get or post function of the NanoHTTPD
@@ -218,15 +182,17 @@ fun TypeSpec.Builder.addNanoHttpdDaoFun(daoFunSpec: FunSpec, daoClassName: Class
 fun TypeSpec.Builder.addNanoHttpdResponderFun(
     methodName: String,
     daoClassName: ClassName,
-    daoTypeSpec: TypeSpec,
-    @Suppress("UNUSED_PARAMETER")
-    processingEnv: ProcessingEnvironment
+    daoClassDecl: KSClassDeclaration,
 ) : TypeSpec.Builder {
 
     val isPostFn = methodName.lowercase() == "post"
-    val daoFunsToRespond =  daoTypeSpec.funSpecs.specsWithHttpEndpoint().filter {
-        it.httpBodyParams().isNotEmpty() == isPostFn
-    }
+
+    val daoFunsToRespond = daoClassDecl.getAllFunctions().filter { daoFun ->
+        daoFun.hasAnnotation(RepoHttpAccessible::class)
+    }.filter { daoFun ->
+        val funResolved = daoFun.asMemberOf(daoClassDecl.asType(emptyList()))
+        funResolved.parameterTypes.any { it?.toTypeName()?.isHttpQueryQueryParam() == false } == isPostFn
+    }.toList()
 
     fun CodeBlock.Builder.addNanoHttpdReturnNotFound() : CodeBlock.Builder {
         add("%T.newFixedLengthResponse(%T.Status.NOT_FOUND, " +
@@ -264,7 +230,7 @@ fun TypeSpec.Builder.addNanoHttpdResponderFun(
                         }else {
                             beginControlFlow("return when(_fnName)")
                             daoFunsToRespond.forEach {
-                                add("%S -> ${it.name}($daoParamNames)\n", it.name)
+                                add("%S -> ${it.simpleName.asString()}($daoParamNames)\n", it.simpleName.asString())
                             }
                             add("else -> ").addNanoHttpdReturnNotFound().add("\n")
                             endControlFlow()
@@ -286,7 +252,7 @@ private fun FunSpec.httpBodyParams(): List<ParameterSpec> {
     return parameters.filter { !it.type.isHttpQueryQueryParam() }
 }
 
-fun CodeBlock.Builder.addKtorDaoMethodCode(daoFunSpec: FunSpec, processingEnv: ProcessingEnvironment) : CodeBlock.Builder {
+fun CodeBlock.Builder.addKtorDaoMethodCode(daoFunSpec: FunSpec) : CodeBlock.Builder {
     val memberFn = if(daoFunSpec.httpBodyParams().isNotEmpty()) {
         POST_MEMBER
     }else {
@@ -303,64 +269,6 @@ fun CodeBlock.Builder.addKtorDaoMethodCode(daoFunSpec: FunSpec, processingEnv: P
 
 
     endControlFlow()
-
-    return this
-}
-
-/**
- * Generates a CodeBlock for running an SQL select statement on the KTOR serer and then returning
- * the result as JSON.
- *
- * e.g.
- * get("methodName") {
- *   val paramVal = request.queryParameters['uid']?.toLong()
- *   .. query execution code (as per JDBC)
- *   call.respond(_result)
- * }
- *
- * The method will automatically choose between using get or post, and will use post if there
- * are any parameters which cannot be sent as query parameters (e.g. JSON), or get otherwise.
- *
- * This will handle refactoring the query to remove syncable entities already delivered to the
- * client making the request
- *
- * @param daoMethod A FunSpec representing the DAO method that this CodeBlock is being generated for
- * @param daoTypeEl The DAO element that this is being generated for: optional for error logging purposes
- *
- */
-fun CodeBlock.Builder.addKtorRouteSelectCodeBlock(
-    daoMethod: FunSpec,
-    processingEnv: ProcessingEnvironment,
-    serverType: Int = SERVER_TYPE_KTOR
-) : CodeBlock.Builder {
-
-    val returnTypeName = daoMethod.returnType
-            ?: throw IllegalArgumentException("addKtorRouteSelectCodeBlock for ${daoMethod.name}: has null return type")
-
-    val resultType = returnTypeName.unwrapLiveDataOrDataSourceFactory()
-    val isDataSourceFactory = returnTypeName.isDataSourceFactory()
-
-    val queryVarsList = daoMethod.parameters.toMutableList()
-    if(isDataSourceFactory){
-        queryVarsList += ParameterSpec.builder(PARAM_NAME_OFFSET, INT).build()
-        queryVarsList += ParameterSpec.builder(PARAM_NAME_LIMIT, INT).build()
-    }
-
-    if(serverType != SERVER_TYPE_NANOHTTPD)
-        //This is already a parameter in the nanohttpd function
-        add("val _ktorHelperDao = _ktorHelperDaoFn(_db)\n")
-
-    val modifiedQueryFunSpec = FunSpec.builder(daoMethod.name)
-            .addParameters(queryVarsList)
-            .returns(resultType)
-    modifiedQueryFunSpec.takeIf { KModifier.SUSPEND in daoMethod.modifiers }
-            ?.addModifiers(KModifier.SUSPEND)
-
-    addHttpServerPassToDaoCodeBlock(modifiedQueryFunSpec.build(),
-            daoVarName = "_ktorHelperDao",
-            preexistingVarNames = listOf("clientId"), serverType = serverType, addRespondCall = false)
-
-    addRespondCall(resultType, "_result", serverType)
 
     return this
 }
@@ -689,21 +597,6 @@ class DbProcessorKtorServer: AbstractDbProcessor() {
 
 
     override fun process(annotations: MutableSet<out TypeElement>?, roundEnv: RoundEnvironment): Boolean {
-        val daos = roundEnv.getElementsAnnotatedWith(Dao::class.java)
-        daos.filter { it is TypeElement && it.isDaoWithRepository }.map { it as TypeElement }.forEach {daoTypeEl ->
-            val daoTypeSpec = daoTypeEl.asTypeSpecStub(processingEnv)
-
-            FileSpec.builder(daoTypeEl.packageName, "${daoTypeEl.simpleName}$SUFFIX_KTOR_ROUTE")
-                    .addDaoKtorRouteFun(daoTypeSpec, daoTypeEl.asClassName(), processingEnv)
-                    .build()
-                    .writeToDirsFromArg(OPTION_KTOR_OUTPUT)
-
-            FileSpec.builder(daoTypeEl.packageName, "${daoTypeEl.simpleName}$SUFFIX_NANOHTTPD_URIRESPONDER")
-                    .addNanoHttpdResponder(daoTypeSpec, daoTypeEl.asClassName(), processingEnv)
-                    .build()
-                    .writeToDirsFromArg(OPTION_ANDROID_OUTPUT)
-        }
-
 
         return true
     }
@@ -781,8 +674,17 @@ class DbHttpServerProcessor(
 
         val daoSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Dao")
             .filterIsInstance<KSClassDeclaration>()
+            .filter { it.hasAnnotation(Repository::class) }
         daoSymbols.forEach { daoClassDecl ->
+            FileSpec.builder(daoClassDecl.packageName.asString(), "${daoClassDecl.simpleName.asString()}$SUFFIX_KTOR_ROUTE")
+                .addDaoKtorRouteFun(daoClassDecl, daoClassDecl.toClassName(), resolver)
+                .build()
+                .writeToPlatformDir(DoorTarget.JVM, environment.codeGenerator, environment.options)
 
+            FileSpec.builder(daoClassDecl.packageName.asString(), "${daoClassDecl.simpleName.asString()}$SUFFIX_NANOHTTPD_URIRESPONDER")
+                .addNanoHttpdResponder(daoClassDecl, resolver)
+                .build()
+                .writeToPlatformDir(DoorTarget.ANDROID, environment.codeGenerator, environment.options)
         }
 
         return emptyList()
