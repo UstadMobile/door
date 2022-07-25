@@ -8,6 +8,7 @@ import io.ktor.http.*
 import javax.annotation.processing.ProcessingEnvironment
 import javax.lang.model.element.TypeElement
 import androidx.room.PrimaryKey
+import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.ustadmobile.door.annotation.ReplicateEntity
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.MEMBERNAME_CLIENT_SET_BODY
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.MEMBERNAME_ENCODED_PATH
@@ -23,6 +24,13 @@ fun CodeBlock.Builder.addDelegateFunctionCall(varName: String, funSpec: FunSpec)
     return add("$varName.${funSpec.name}(")
             .add(funSpec.parameters.filter { !isContinuationParam(it.type)}.joinToString { it.name })
             .add(")")
+}
+
+fun CodeBlock.Builder.addDelegateFunctionCall(varName: String, daoFun: KSFunctionDeclaration) : CodeBlock.Builder {
+    return add("$varName.${daoFun.simpleName.asString()}(")
+        .add(daoFun.parameters.joinToString { it.name?.asString() ?: "" } )
+        .add(")")
+
 }
 
 /**

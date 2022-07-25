@@ -310,7 +310,7 @@ fun FileSpec.Builder.addDaoWrapperTypeSpec(
             .initializer("_dao")
             .build())
         .apply {
-            daoClassDeclaration.getAllFunctionsIncSuperTypesToGenerate().forEach { daoFunDeclaration ->
+            daoClassDeclaration.getAllDaoFunctionsIncSuperTypesToGenerate().forEach { daoFunDeclaration ->
                 addDaoFunctionDelegate(daoFunDeclaration, daoClassDeclaration, resolver, target)
             }
         }

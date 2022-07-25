@@ -4,22 +4,16 @@ import androidx.room.*
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
-import com.google.devtools.ksp.symbol.KSAnnotated
-import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.google.devtools.ksp.symbol.KSDeclaration
-import com.google.devtools.ksp.symbol.KSPropertyDeclaration
+import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toClassName
+import com.squareup.kotlinpoet.ksp.toTypeName
 import com.ustadmobile.door.*
 import com.ustadmobile.door.annotation.RepoHttpAccessible
 import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.attachments.EntityWithAttachment
-import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.replication.ReplicationSubscriptionManager
-import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_ANDROID_OUTPUT
-import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JS_OUTPUT
-import com.ustadmobile.lib.annotationprocessor.core.AnnotationProcessorWrapper.Companion.OPTION_JVM_DIRS
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorRepository.Companion.BOUNDARY_CALLBACK_CLASSNAME
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorRepository.Companion.DATASOURCEFACTORY_TO_BOUNDARYCALLBACK_VARNAME
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorRepository.Companion.SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER
@@ -29,9 +23,7 @@ import io.ktor.client.*
 import java.util.*
 import javax.annotation.processing.ProcessingEnvironment
 import javax.annotation.processing.RoundEnvironment
-import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
-import javax.tools.Diagnostic
 
 /**
  * Generate the table id map of entity names (strings) to the table id as per the syncableentity
@@ -221,21 +213,6 @@ fun FileSpec.Builder.addEntityWithAttachmentAdapterType(
  * Generate an extension function that will return the entitywithadapter
  * e.g. EntityName.asEntityWithAttachment()
  */
-fun FileSpec.Builder.addAsEntityWithAttachmentAdapterExtensionFun(entityWithAttachment: TypeElement): FileSpec.Builder {
-    addFunction(FunSpec.builder("asEntityWithAttachment")
-            .addModifiers(KModifier.INLINE)
-            .receiver(entityWithAttachment.asClassName())
-            .returns(EntityWithAttachment::class)
-            .addCode("return %T(this)\n",
-                    entityWithAttachment.asClassNameWithSuffix(SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER))
-            .build())
-    return this
-}
-
-/**
- * Generate an extension function that will return the entitywithadapter
- * e.g. EntityName.asEntityWithAttachment()
- */
 fun FileSpec.Builder.addAsEntityWithAttachmentAdapterExtensionFun(
     entityWithAttachment: KSClassDeclaration
 ): FileSpec.Builder {
@@ -281,138 +258,128 @@ private fun TypeSpec.Builder.addRepoDbDaoAccessor(
 /**
  * Add a TypeSpec repository implementation for the given DAO as given by daoTypeSpec
  *
- * @param daoTypeSpec The TypeSpec containing the FunSpecs for this DAO
+ * @param daoKSClass The KSClassDeclaration containing the FunSpecs for this DAO
  * @param daoClassName Classname for the abstract DAO class
- * @param processingEnv processing environment
- * @param pagingBoundaryCallbackEnabled true/false : whether or not an Android paging boundary
- * callback will be generated
- * @param isAlwaysSqlite true if the function being generated will always run on SQLite (eg
- * on Android), false otherwise (e.g. JDBC server)
+ * @param target The target platform
+ * @param
  *
  */
 fun FileSpec.Builder.addDaoRepoType(
-    daoTypeSpec: TypeSpec,
+    daoKSClass: KSClassDeclaration,
     daoClassName: ClassName,
-    processingEnv: ProcessingEnvironment,
     target: DoorTarget,
-    allKnownEntityTypesMap: Map<String, TypeElement>,
-    pagingBoundaryCallbackEnabled: Boolean = false,
-    isAlwaysSqlite: Boolean = false,
     extraConstructorParams: List<ParameterSpec> = listOf(),
+    resolver: Resolver,
+    environment: SymbolProcessorEnvironment,
 ): FileSpec.Builder {
 
-    addType(TypeSpec.classBuilder("${daoTypeSpec.name}$SUFFIX_REPOSITORY2")
-            .addProperty(PropertySpec.builder("_db", RoomDatabase::class)
-                    .initializer("_db").build())
-            .addProperty(PropertySpec.builder("_repo", DoorDatabaseRepository::class)
-                    .initializer("_repo").build())
-            .addProperty(PropertySpec.builder("_dao",
-                    daoClassName).initializer("_dao").build())
-            .addProperty(PropertySpec.builder("_httpClient",
-                    HttpClient::class).initializer("_httpClient").build())
-            .addProperty(PropertySpec.builder("_clientId", Long::class)
-                    .initializer("_clientId").build())
-            .addProperty(PropertySpec.builder("_endpoint", String::class)
-                    .initializer("_endpoint").build())
-            .superclass(daoClassName)
-            .addAnnotation(AnnotationSpec.builder(Suppress::class)
-                    .addMember("%S, %S, %S", "REDUNDANT_PROJECTION", "LocalVariableName",
-                        "ClassName")
-                    .build())
-            .primaryConstructor(FunSpec.constructorBuilder()
-                    .addParameter("_db", RoomDatabase::class)
-                    .addParameter("_repo", DoorDatabaseRepository::class)
-                    .addParameter("_dao", daoClassName)
-                    .addParameter("_httpClient", HttpClient::class)
-                    .addParameter("_clientId", Long::class)
-                    .addParameter("_endpoint", String::class)
-                    .apply {
-                        takeIf { extraConstructorParams.isNotEmpty() }?.addParameters(extraConstructorParams)
-                    }
-                    .build())
+    addType(TypeSpec.classBuilder("${daoKSClass.simpleName.asString()}$SUFFIX_REPOSITORY2")
+        .addProperty(PropertySpec.builder("_db", RoomDatabase::class)
+            .initializer("_db").build())
+        .addProperty(PropertySpec.builder("_repo", DoorDatabaseRepository::class)
+            .initializer("_repo").build())
+        .addProperty(PropertySpec.builder("_dao",
+            daoClassName).initializer("_dao").build())
+        .addProperty(PropertySpec.builder("_httpClient",
+            HttpClient::class).initializer("_httpClient").build())
+        .addProperty(PropertySpec.builder("_clientId", Long::class)
+            .initializer("_clientId").build())
+        .addProperty(PropertySpec.builder("_endpoint", String::class)
+            .initializer("_endpoint").build())
+        .superclass(daoClassName)
+        .addAnnotation(AnnotationSpec.builder(Suppress::class)
+            .addMember("%S, %S, %S", "REDUNDANT_PROJECTION", "LocalVariableName",
+                "ClassName")
+            .build())
+        .primaryConstructor(FunSpec.constructorBuilder()
+            .addParameter("_db", RoomDatabase::class)
+            .addParameter("_repo", DoorDatabaseRepository::class)
+            .addParameter("_dao", daoClassName)
+            .addParameter("_httpClient", HttpClient::class)
+            .addParameter("_clientId", Long::class)
+            .addParameter("_endpoint", String::class)
             .apply {
-                daoTypeSpec.funSpecs.forEach {
-                    addDaoRepoFun(it, daoClassName.simpleName, processingEnv, target,
-                            allKnownEntityTypesMap, pagingBoundaryCallbackEnabled, isAlwaysSqlite)
-                }
+                takeIf { extraConstructorParams.isNotEmpty() }?.addParameters(extraConstructorParams)
             }
             .build())
+        .apply {
+            daoKSClass.getAllDaoFunctionsIncSuperTypesToGenerate().forEach { daoFun ->
+                //If this is OK, then remove the name param - no need for that...
+                addDaoRepoFun(daoFun, daoKSClass, daoKSClass.simpleName.asString(), target, environment, resolver)
+            }
+        }
+        .build())
 
     return this
 }
 
 /**
  * Add a repo implementation of the given DAO FunSpec
- * @param daoFunSpec the function spec for which an implementation is being generated
+ * @param daoKSFun the function spec for which an implementation is being generated
  * @param daoName the name of the DAO class (simple name e.g. SomeDao)
- * @param processingEnv processing environment
- * @param pagingBoundaryCallbackEnabled true if an Android pagingboundarycallback is being
- * generated, false otherwise
- * @param isAlwaysSqlite true if the function will always run on SQLite, false otherwise
+ * @param doorTarget
  */
 fun TypeSpec.Builder.addDaoRepoFun(
-    daoFunSpec: FunSpec,
+    daoKSFun: KSFunctionDeclaration,
+    daoKSClass: KSClassDeclaration,
     daoName: String,
-    processingEnv: ProcessingEnvironment,
     doorTarget: DoorTarget,
-    allKnownEntityTypesMap: Map<String, TypeElement>,
-    pagingBoundaryCallbackEnabled: Boolean,
-    isAlwaysSqlite: Boolean = false
+    environment: SymbolProcessorEnvironment,
+    resolver: Resolver,
 ) : TypeSpec.Builder {
 
-    var repoMethodType = daoFunSpec.getAnnotationSpec(Repository::class.java)
-            ?.memberToString(memberName = "methodType")?.toInt() ?: Repository.METHOD_AUTO
+    var repoMethodType = daoKSFun.getAnnotation(Repository::class)?.methodType ?: Repository.METHOD_AUTO
 
     if(repoMethodType == Repository.METHOD_AUTO) {
         repoMethodType = Repository.METHOD_DELEGATE_TO_DAO
     }
 
     var generateBoundaryCallback = false
-    val returnTypeVal = daoFunSpec.returnType
+    val returnTypeVal = daoKSFun.returnType?.toTypeName()
 
-    if(pagingBoundaryCallbackEnabled
-            && returnTypeVal is ParameterizedTypeName
-            && returnTypeVal.rawType == androidx.paging.DataSource.Factory::class.asClassName()) {
+    if(doorTarget == DoorTarget.ANDROID
+        && returnTypeVal is ParameterizedTypeName
+        && returnTypeVal.rawType == androidx.paging.DataSource.Factory::class.asClassName()) {
         generateBoundaryCallback = true
         repoMethodType = Repository.METHOD_DELEGATE_TO_DAO
     }
 
+    val daoFunSpec = daoKSFun.toFunSpecBuilder(resolver, daoKSClass.asType(emptyList()))
+        .build()
     addFunction(daoFunSpec.toBuilder()
-            .removeAbstractModifier()
-            .removeAnnotations()
-            .addModifiers(KModifier.OVERRIDE)
-            .addCode(CodeBlock.builder().apply {
-                when(repoMethodType) {
-                    Repository.METHOD_DELEGATE_TO_DAO -> {
-                        if(generateBoundaryCallback) {
-                            addBoundaryCallbackCode(daoFunSpec, daoName, processingEnv)
-                        }else {
-                            addRepoDelegateToDaoCode(daoFunSpec, isAlwaysSqlite, processingEnv
-                            )
-                        }
-
-                    }
-                    Repository.METHOD_DELEGATE_TO_WEB -> {
-                        //check that this is http accessible, if not, emit error
-                        if(!daoFunSpec.hasAnnotation(RepoHttpAccessible::class.java))
-                            processingEnv.messager.printMessage(Diagnostic.Kind.ERROR,
-                                "$daoName#${daoFunSpec.name} uses delegate to web, but is not marked as http accessible")
-
-                        if(doorTarget == DoorTarget.JS && !daoFunSpec.isSuspended) {
-                            add("throw %T(%S)\n", ClassName("kotlin", "IllegalStateException"),
-                                "Synchronous HTTP is not supported on Door/Javascript!")
-                        }else {
-                            addDelegateToWebCode(daoFunSpec, daoName)
-                        }
+        .removeAbstractModifier()
+        .removeAnnotations()
+        .addModifiers(KModifier.OVERRIDE)
+        .addCode(CodeBlock.builder().apply {
+            when(repoMethodType) {
+                Repository.METHOD_DELEGATE_TO_DAO -> {
+                    if(generateBoundaryCallback) {
+                        addBoundaryCallbackCode(daoKSFun, daoName)
+                    }else {
+                        addRepoDelegateToDaoCode(daoKSFun, resolver)
                     }
 
                 }
-            }.build())
-            .build())
+                Repository.METHOD_DELEGATE_TO_WEB -> {
+                    //check that this is http accessible, if not, emit error
+                    if(!daoKSFun.hasAnnotation(RepoHttpAccessible::class))
+                        environment.logger.error("Uses delegate to web, but is not marked as http accessible",
+                            daoKSFun)
+
+                    if(doorTarget == DoorTarget.JS && daoKSFun.modifiers.contains(Modifier.SUSPEND)) {
+                        add("throw %T(%S)\n", ClassName("kotlin", "IllegalStateException"),
+                            "Synchronous HTTP is not supported on Door/Javascript!")
+                    }else {
+                        addDelegateToWebCode(daoFunSpec, daoName)
+                    }
+                }
+
+            }
+        }.build())
+        .build())
 
     return this
 }
-
 
 
 
@@ -426,21 +393,20 @@ fun TypeSpec.Builder.addDaoRepoFun(
  * TODO: Update last changed by field, return primary key values from pk manager if applicable
  */
 fun CodeBlock.Builder.addRepoDelegateToDaoCode(
-    daoFunSpec: FunSpec,
-    isAlwaysSqlite: Boolean,
-    processingEnv: ProcessingEnvironment
+    daoFun: KSFunctionDeclaration,
+    resolver: Resolver,
 ) : CodeBlock.Builder{
 
-    if(daoFunSpec.hasReturnType)
+    if(daoFun.hasReturnType(resolver))
         add("val _result = ")
 
-    add("_dao.${daoFunSpec.name}(")
-            .add(daoFunSpec.parameters.joinToString { it.name })
+    add("_dao.${daoFun.simpleName.asString()}(")
+            .add(daoFun.parameters.joinToString { it.name?.asString() ?: "" })
             .add(")\n")
 
 
 
-    if(daoFunSpec.hasReturnType) {
+    if(daoFun.hasReturnType(resolver)) {
         add("return _result\n")
     }
 
@@ -450,17 +416,13 @@ fun CodeBlock.Builder.addRepoDelegateToDaoCode(
 /**
  * Generate the Android paging boundary callback implementation
  */
-fun CodeBlock.Builder.addBoundaryCallbackCode(daoFunSpec: FunSpec, daoName: String,
-    processingEnv: ProcessingEnvironment) : CodeBlock.Builder{
+fun CodeBlock.Builder.addBoundaryCallbackCode(daoFun: KSFunctionDeclaration, daoName: String) : CodeBlock.Builder{
 
-    val boundaryCallbackFunSpec = daoFunSpec.toBuilder()
-            .addParameter(PARAM_NAME_LIMIT, INT)
-            .build()
-    add("val _dataSource = ").addDelegateFunctionCall("_dao", daoFunSpec).add("\n")
+    add("val _dataSource = ").addDelegateFunctionCall("_dao", daoFun).add("\n")
     add("val $PARAM_NAME_LIMIT = 50\n")
 
-    val unwrappedComponentType = daoFunSpec.returnType?.unwrapQueryResultComponentType()
-            ?: throw IllegalArgumentException("${daoFunSpec.name} on $daoName has no return type")
+    val unwrappedComponentType = daoFun.returnType?.toTypeName()?.unwrapQueryResultComponentType()
+            ?: throw IllegalArgumentException("${daoFun.simpleName.asString()} on $daoName has no return type")
     add("$DATASOURCEFACTORY_TO_BOUNDARYCALLBACK_VARNAME[_dataSource] = %T(_loadHelper)\n",
             BOUNDARY_CALLBACK_CLASSNAME.parameterizedBy(unwrappedComponentType))
     add("return _dataSource\n")
@@ -489,33 +451,6 @@ fun CodeBlock.Builder.addDelegateToWebCode(daoFunSpec: FunSpec, daoName: String)
 class DbProcessorRepository: AbstractDbProcessor() {
 
     override fun process(annotations: MutableSet<out TypeElement>, roundEnv: RoundEnvironment): Boolean {
-        val daos = roundEnv.getElementsAnnotatedWith(Dao::class.java)
-
-        for(daoElement in daos) {
-            val daoTypeEl = daoElement as TypeElement
-            if(daoTypeEl.isDaoWithRepository) {
-                val targets = mapOf(DoorTarget.JVM to OPTION_JVM_DIRS, DoorTarget.JS to OPTION_JS_OUTPUT)
-                targets.forEach { target ->
-                    FileSpec.builder(daoElement.packageName,
-                        "${daoTypeEl.simpleName}$SUFFIX_REPOSITORY2")
-                        .addDaoRepoType(daoTypeEl.asTypeSpecStub(processingEnv),
-                            daoTypeEl.asClassName(), processingEnv, target.key,
-                            allKnownEntityTypesMap = allKnownEntityTypesMap)
-                        .build()
-                        .writeToDirsFromArg(target.value)
-                }
-
-                FileSpec.builder(daoElement.packageName,
-                        "${daoTypeEl.simpleName}$SUFFIX_REPOSITORY2")
-                        .addDaoRepoType(daoTypeEl.asTypeSpecStub(processingEnv),
-                                daoTypeEl.asClassName(), processingEnv, DoorTarget.ANDROID,
-                                allKnownEntityTypesMap = allKnownEntityTypesMap,
-                                pagingBoundaryCallbackEnabled = false,
-                                isAlwaysSqlite = true)
-                        .build()
-                        .writeToDirsFromArg(OPTION_ANDROID_OUTPUT)
-            }
-        }
 
         return true
     }
@@ -576,6 +511,8 @@ class DbRepositoryProcessor(
             .mapNotNull {
                 it.parentDeclaration as? KSClassDeclaration
             }
+        val daoSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Dao")
+            .filterIsInstance<KSClassDeclaration>()
 
         DoorTarget.values().forEach { target ->
             dbSymbols.forEach { dbKSClass ->
@@ -595,6 +532,14 @@ class DbRepositoryProcessor(
                     .writeToPlatformDir(target, environment.codeGenerator, environment.options)
             }
 
+            daoSymbols.forEach { daoKSClass ->
+                FileSpec.builder(daoKSClass.packageName.asString(),
+                    "${daoKSClass.simpleName.asString()}$SUFFIX_REPOSITORY2")
+                    .addDaoRepoType(daoKSClass,
+                        daoKSClass.toClassName(), target, resolver = resolver, environment = environment)
+                    .build()
+                    .writeToPlatformDir(target, environment.codeGenerator, environment.options)
+            }
         }
 
         return emptyList()

@@ -93,7 +93,7 @@ fun <T: Annotation> KSClassDeclaration.getAllFunctionsIncSuperTypesWithAnnotatio
     it.hasAnyAnnotation(*annotationKClasses)
 }
 
-fun KSClassDeclaration.getAllFunctionsIncSuperTypesToGenerate(): List<KSFunctionDeclaration> {
+fun KSClassDeclaration.getAllDaoFunctionsIncSuperTypesToGenerate(): List<KSFunctionDeclaration> {
     return getAllFunctionsIncSuperTypesWithAnnotation(Query::class, Insert::class, Update::class,
         Delete::class, RawQuery::class)
 }

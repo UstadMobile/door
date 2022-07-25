@@ -34,3 +34,10 @@ fun KSFunctionDeclaration.toFunSpecBuilder(
             receiver(extensionReceiver!!.toTypeName())
         }
 }
+
+
+fun KSFunctionDeclaration.hasReturnType(
+    resolver: Resolver
+): Boolean {
+    return this.returnType != null && this.returnType != resolver.builtIns.unitType
+}
