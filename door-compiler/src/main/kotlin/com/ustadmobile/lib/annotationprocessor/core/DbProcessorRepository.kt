@@ -1,8 +1,16 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
 import androidx.room.*
+import com.google.devtools.ksp.processing.Resolver
+import com.google.devtools.ksp.processing.SymbolProcessor
+import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
+import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSDeclaration
+import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import com.squareup.kotlinpoet.ksp.toClassName
 import com.ustadmobile.door.*
 import com.ustadmobile.door.annotation.RepoHttpAccessible
 import com.ustadmobile.door.annotation.Repository
@@ -16,6 +24,7 @@ import com.ustadmobile.lib.annotationprocessor.core.DbProcessorRepository.Compan
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorRepository.Companion.DATASOURCEFACTORY_TO_BOUNDARYCALLBACK_VARNAME
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorRepository.Companion.SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorRepository.Companion.SUFFIX_REPOSITORY2
+import com.ustadmobile.lib.annotationprocessor.core.ext.*
 import io.ktor.client.*
 import java.util.*
 import javax.annotation.processing.ProcessingEnvironment
@@ -42,186 +51,168 @@ fun TypeSpec.Builder.addTableIdMapProperty(dbTypeElement: TypeElement, processin
 
 /**
  * Add a TypeSpec to the given FileSpec Builder that is an implementation of the repository for a
- * database as per the dbTypeElement parameter.
+ * database as per the dbKSClassDeclaration parameter.
  */
 fun FileSpec.Builder.addDbRepoType(
-    dbTypeElement: TypeElement,
-    processingEnv: ProcessingEnvironment,
-    syncDaoMode: Int = DbProcessorRepository.REPO_SYNCABLE_DAO_CONSTRUCT,
-    overrideClearAllTables: Boolean = true,
-    overrideSyncDao: Boolean = false,
-    overrideOpenHelper: Boolean = false,
-    addDbVersionProp: Boolean = false,
-    overrideKtorHelpers: Boolean = false,
-    overrideDataSourceProp: Boolean = false,
-    overrideWrapDbForTransaction: Boolean = false,
+    dbKSClassDeclaration: KSClassDeclaration,
     target: DoorTarget
 ): FileSpec.Builder {
-    addType(TypeSpec.classBuilder(dbTypeElement.asClassNameWithSuffix(SUFFIX_REPOSITORY2))
-            .superclass(dbTypeElement.asClassName())
-            .addSuperinterface(DoorDatabaseRepository::class)
-            .addAnnotation(AnnotationSpec.builder(Suppress::class)
-                    .addMember("%S, %S, %S, %S", "LocalVariableName", "PropertyName", "FunctionName",
-                            "ClassName")
-                    .build())
-            .primaryConstructor(FunSpec.constructorBuilder()
-                .addParameter("db", dbTypeElement.asClassName())
-                .addParameter("dbUnwrapped", dbTypeElement.asClassName())
-                .addParameter("config", RepositoryConfig::class)
-                .addParameter(ParameterSpec.builder("isRootRepository", BOOLEAN)
-                    .defaultValue("false")
-                    .build())
+    addType(TypeSpec.classBuilder(dbKSClassDeclaration.toClassNameWithSuffix(SUFFIX_REPOSITORY2))
+        .superclass(dbKSClassDeclaration.toClassName())
+        .addSuperinterface(DoorDatabaseRepository::class)
+        .addAnnotation(AnnotationSpec.builder(Suppress::class)
+            .addMember("%S, %S, %S, %S", "LocalVariableName", "PropertyName", "FunctionName",
+                "ClassName")
+            .build())
+        .primaryConstructor(FunSpec.constructorBuilder()
+            .addParameter("db", dbKSClassDeclaration.toClassName())
+            .addParameter("dbUnwrapped", dbKSClassDeclaration.toClassName())
+            .addParameter("config", RepositoryConfig::class)
+            .addParameter(ParameterSpec.builder("isRootRepository", BOOLEAN)
+                .defaultValue("false")
                 .build())
-            .addProperty(PropertySpec.builder("config", RepositoryConfig::class)
-                    .addModifiers(KModifier.OVERRIDE)
-                    .initializer("config")
-                    .build())
-            .addProperty(PropertySpec.builder("isRootRepository", BOOLEAN)
+            .build())
+        .addProperty(PropertySpec.builder("config", RepositoryConfig::class)
+            .addModifiers(KModifier.OVERRIDE)
+            .initializer("config")
+            .build())
+        .addProperty(PropertySpec.builder("isRootRepository", BOOLEAN)
+            .addModifiers(KModifier.OVERRIDE)
+            .initializer("isRootRepository")
+            .build())
+        .addProperty(PropertySpec.builder("context", Any::class)
+            .getter(FunSpec.getterBuilder()
+                .addCode("return config.context\n")
+                .build())
+            .build())
+        .addProperty(PropertySpec.builder("_db", dbKSClassDeclaration.toClassName())
+            .addModifiers(KModifier.PRIVATE)
+            .initializer("dbUnwrapped")
+            .build())
+        .addProperty(PropertySpec.builder("replicationSubscriptionManager",
+            ReplicationSubscriptionManager::class.asTypeName().copy(nullable = true))
+            .addModifiers(KModifier.OVERRIDE)
+            .initializer(CodeBlock.builder()
+                .beginControlFlow("if(isRootRepository && config.useReplicationSubscription)")
+                .add("%M()\n", MemberName("com.ustadmobile.door.replication",
+                    "makeNewSubscriptionManager"))
+                .nextControlFlow("else")
+                .add("null\n")
+                .endControlFlow()
+                .build())
+            .build())
+        .addProperty(PropertySpec.builder("db",
+                dbKSClassDeclaration.toClassName()).initializer("db")
+            .addModifiers(KModifier.OVERRIDE)
+            .build())
+        .addProperty(PropertySpec.builder("_endpoint",
+            String::class.asClassName())
+            .addModifiers(KModifier.PRIVATE)
+            .getter(FunSpec.getterBuilder()
+                .addCode("return config.endpoint")
+                .build())
+            .build())
+        .addProperty(PropertySpec.builder("_httpClient",
+            HttpClient::class.asClassName())
+            .getter(FunSpec.getterBuilder()
+                .addCode("return config.httpClient\n")
+                .build())
+            .build())
+        .addProperty(PropertySpec.builder("_repositoryHelper", RepositoryHelper::class)
+            .initializer("%T()", RepositoryHelper::class)
+            .build())
+        .addProperty(PropertySpec.builder("clientId", LONG)
+            .getter(FunSpec.getterBuilder().addCode("return config.nodeId\n").build())
+            .build())
+        .addProperty(PropertySpec.builder("dbName", String::class, KModifier.OVERRIDE)
+            .getter(FunSpec.getterBuilder()
+                .addCode("return \"Repository for [\${_db.toString()}] - \${config.endpoint}\"\n")
+                .build())
+            .build())
+        .addFunction(FunSpec.builder("clearAllTables")
+            .addModifiers(KModifier.OVERRIDE)
+            .addCode("throw %T(%S)\n", ClassName("kotlin", "IllegalStateException"),
+                "Cannot use a repository to clearAllTables!")
+            .build())
+        .applyIf(target == DoorTarget.JS) {
+            addThrowExceptionOverride("clearAllTablesAsync", suspended = true)
+        }
+        .addRepositoryHelperDelegateCalls("_repositoryHelper")
+        .applyIf(target != DoorTarget.ANDROID) {
+            addFunction(FunSpec.builder("createAllTables")
                 .addModifiers(KModifier.OVERRIDE)
-                .initializer("isRootRepository")
+                .addCode("throw %T(%S)\n",
+                    ClassName("kotlin", "IllegalStateException"),
+                    "Cannot use a repository to createAllTables!")
                 .build())
-            .addProperty(PropertySpec.builder("context", Any::class)
-                    .getter(FunSpec.getterBuilder()
-                            .addCode("return config.context\n")
-                            .build())
-                    .build())
-            .addProperty(PropertySpec.builder("_db", dbTypeElement.asClassName())
-                    .addModifiers(KModifier.PRIVATE)
-                    .initializer("dbUnwrapped")
-                    .build())
-            .addProperty(PropertySpec.builder("replicationSubscriptionManager",
-                ReplicationSubscriptionManager::class.asTypeName().copy(nullable = true))
-                .addModifiers(KModifier.OVERRIDE)
-                .initializer(CodeBlock.builder()
-                    .beginControlFlow("if(isRootRepository && config.useReplicationSubscription)")
-                    .add("%M()\n", MemberName("com.ustadmobile.door.replication",
-                        "makeNewSubscriptionManager"))
-                    .nextControlFlow("else")
-                    .add("null\n")
-                    .endControlFlow()
-                    .build())
-                .build())
-            .addProperty(PropertySpec.builder("db",
-                    dbTypeElement.asClassName()).initializer("db")
-                    .addModifiers(KModifier.OVERRIDE)
-                    .build())
-            .addProperty(PropertySpec.builder("_endpoint",
-                    String::class.asClassName())
-                    .addModifiers(KModifier.PRIVATE)
-                    .getter(FunSpec.getterBuilder()
-                            .addCode("return config.endpoint")
-                            .build())
-                    .build())
-            .addProperty(PropertySpec.builder("_httpClient",
-                    HttpClient::class.asClassName())
-                    .getter(FunSpec.getterBuilder()
-                            .addCode("return config.httpClient\n")
-                            .build())
-                    .build())
-            .addProperty(PropertySpec.builder("_repositoryHelper", RepositoryHelper::class)
-                    .initializer("%T()", RepositoryHelper::class)
-                    .build())
-            .addProperty(PropertySpec.builder("tableIdMap",
-                    Map::class.asClassName().parameterizedBy(String::class.asClassName(), INT))
-                    .getter(FunSpec.getterBuilder().addCode("return TABLE_ID_MAP\n").build())
-                    .addModifiers(KModifier.OVERRIDE)
-                    .build())
-            .addProperty(PropertySpec.builder("clientId", LONG)
-                .getter(FunSpec.getterBuilder().addCode("return config.nodeId\n").build())
-                .build())
-            .addProperty(PropertySpec.builder("dbName", String::class, KModifier.OVERRIDE)
-                .getter(FunSpec.getterBuilder()
-                    .addCode("return \"Repository for [\${_db.toString()}] - \${config.endpoint}\"\n")
-                    .build())
-                .build())
-            .addFunction(FunSpec.builder("clearAllTables")
-                    .addModifiers(KModifier.OVERRIDE)
-                    .addCode("throw %T(%S)\n", ClassName("kotlin", "IllegalStateException"),
-                        "Cannot use a repository to clearAllTables!")
-                    .build())
-            .applyIf(target == DoorTarget.JS) {
-                addThrowExceptionOverride("clearAllTablesAsync", suspended = true)
+            addOverrideGetInvalidationTrackerVal("_db")
+            addDbVersionProperty(dbKSClassDeclaration)
+        }
+        .applyIf(target == DoorTarget.ANDROID) {
+            addRoomCreateInvalidationTrackerFunction()
+            addOverrideGetRoomInvalidationTracker("_db")
+            addRoomDatabaseCreateOpenHelperFunction()
+        }
+        .apply {
+            dbKSClassDeclaration.allDbClassDaoGetters().forEach { daoGetterOrProp ->
+                addRepoDbDaoAccessor(daoGetterOrProp)
             }
-
-            .addRepositoryHelperDelegateCalls("_repositoryHelper")
-            .applyIf(overrideClearAllTables) {
-                addFunction(FunSpec.builder("createAllTables")
-                        .addModifiers(KModifier.OVERRIDE)
-                        .addCode("throw %T(%S)\n",
-                                ClassName("kotlin", "IllegalStateException"),
-                                "Cannot use a repository to createAllTables!")
-                        .build())
-            }
-            .applyIf(overrideOpenHelper) {
-                addRoomCreateInvalidationTrackerFunction()
-                addOverrideGetRoomInvalidationTracker("_db")
-                addRoomDatabaseCreateOpenHelperFunction()
-            }
-            .applyIf(!overrideOpenHelper) {
-                addOverrideGetInvalidationTrackerVal("_db")
-            }
-            .applyIf(addDbVersionProp) {
-                addDbVersionProperty(dbTypeElement)
-            }
-            .apply {
-                dbTypeElement.allDbClassDaoGetters(processingEnv).forEach { daoGetter ->
-                    addRepoDbDaoAccessor(daoGetter, processingEnv)
-                }
-            }
-            .addType(TypeSpec.companionObjectBuilder()
-                    .addTableIdMapProperty(dbTypeElement, processingEnv)
-                    .addProperty(PropertySpec.builder(DbProcessorRepository.DB_NAME_VAR, String::class)
-                            .addModifiers(KModifier.CONST)
-                            .initializer("%S", dbTypeElement.simpleName)
-                            .mutable(false).build())
-                    .build())
+        }
+        .addType(TypeSpec.companionObjectBuilder()
+            .addProperty(PropertySpec.builder(DbProcessorRepository.DB_NAME_VAR, String::class)
+                .addModifiers(KModifier.CONST)
+                .initializer("%S", dbKSClassDeclaration.simpleName.asString())
+                .mutable(false).build())
             .build())
 
+        .build())
     return this
 }
+
 
 /**
  * Generate an EntityWithAttachment inline adapter class
  */
-fun FileSpec.Builder.addEntityWithAttachmentAdapterType(entityWithAttachment: TypeElement,
-    processingEnv: ProcessingEnvironment) : FileSpec.Builder {
-    val attachmentInfo = EntityAttachmentInfo(entityWithAttachment)
+fun FileSpec.Builder.addEntityWithAttachmentAdapterType(
+    entityKSClass: KSClassDeclaration,
+) : FileSpec.Builder {
+    val attachmentInfo = EntityAttachmentInfo(entityKSClass)
     val nullableStringClassName = String::class.asClassName().copy(nullable = true)
-    addType(TypeSpec.classBuilder("${entityWithAttachment.simpleName}${SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER}")
-            .addModifiers(KModifier.INLINE)
-            .addSuperinterface(EntityWithAttachment::class)
-            .primaryConstructor(
-                    FunSpec.constructorBuilder()
-                            .addParameter("entity", entityWithAttachment.asClassName())
-                            .build())
-            .addProperty(
-                    PropertySpec.builder("entity", entityWithAttachment.asClassName())
-                            .addModifiers(KModifier.PRIVATE)
-                            .initializer("entity")
-                            .build())
-            .addProperty(
-                    PropertySpec.builder("attachmentUri", nullableStringClassName, KModifier.OVERRIDE)
-                            .mutable(mutable = true)
-                            .delegateGetterAndSetter("entity.${attachmentInfo.uriPropertyName}")
-                            .build())
-            .addProperty(
-                    PropertySpec.builder("attachmentMd5", nullableStringClassName, KModifier.OVERRIDE)
-                            .mutable(true)
-                            .delegateGetterAndSetter("entity.${attachmentInfo.md5PropertyName}")
-                            .build())
-            .addProperty(
-                    PropertySpec.builder("attachmentSize", INT, KModifier.OVERRIDE)
-                            .mutable(true)
-                            .delegateGetterAndSetter("entity.${attachmentInfo.sizePropertyName}")
-                            .build())
-            .addProperty(
-                    PropertySpec.builder("tableName", String::class, KModifier.OVERRIDE)
-                            .getter(FunSpec.getterBuilder()
-                                    .addCode("return %S\n", entityWithAttachment.simpleName)
-                                    .build())
-                            .build()
-            )
-            .build())
+    addType(TypeSpec.classBuilder(entityKSClass.toClassNameWithSuffix(SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER))
+        .addModifiers(KModifier.INLINE)
+        .addSuperinterface(EntityWithAttachment::class)
+        .primaryConstructor(
+            FunSpec.constructorBuilder()
+                .addParameter("entity", entityKSClass.toClassName())
+                .build())
+        .addProperty(
+            PropertySpec.builder("entity", entityKSClass.toClassName())
+                .addModifiers(KModifier.PRIVATE)
+                .initializer("entity")
+                .build())
+        .addProperty(
+            PropertySpec.builder("attachmentUri", nullableStringClassName, KModifier.OVERRIDE)
+                .mutable(mutable = true)
+                .delegateGetterAndSetter("entity.${attachmentInfo.uriPropertyName}")
+                .build())
+        .addProperty(
+            PropertySpec.builder("attachmentMd5", nullableStringClassName, KModifier.OVERRIDE)
+                .mutable(true)
+                .delegateGetterAndSetter("entity.${attachmentInfo.md5PropertyName}")
+                .build())
+        .addProperty(
+            PropertySpec.builder("attachmentSize", INT, KModifier.OVERRIDE)
+                .mutable(true)
+                .delegateGetterAndSetter("entity.${attachmentInfo.sizePropertyName}")
+                .build())
+        .addProperty(
+            PropertySpec.builder("tableName", String::class, KModifier.OVERRIDE)
+                .getter(FunSpec.getterBuilder()
+                    .addCode("return %S\n", entityKSClass.simpleName.asString())
+                    .build())
+                .build()
+        )
+        .build())
 
     return this
 }
@@ -241,35 +232,48 @@ fun FileSpec.Builder.addAsEntityWithAttachmentAdapterExtensionFun(entityWithAtta
     return this
 }
 
-
 /**
- * Add an accessor function for the given dao accessor (and any related ktor helper daos if
- * specified).
+ * Generate an extension function that will return the entitywithadapter
+ * e.g. EntityName.asEntityWithAttachment()
  */
+fun FileSpec.Builder.addAsEntityWithAttachmentAdapterExtensionFun(
+    entityWithAttachment: KSClassDeclaration
+): FileSpec.Builder {
+    addFunction(FunSpec.builder("asEntityWithAttachment")
+        .addModifiers(KModifier.INLINE)
+        .receiver(entityWithAttachment.toClassName())
+        .returns(EntityWithAttachment::class)
+        .addCode("return %T(this)\n",
+            entityWithAttachment.toClassNameWithSuffix(SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER))
+        .build())
+    return this
+}
+
+
 private fun TypeSpec.Builder.addRepoDbDaoAccessor(
-    daoGetter: ExecutableElement,
-    processingEnv: ProcessingEnvironment
-) : TypeSpec.Builder{
-    val daoTypeEl = daoGetter.returnType.asTypeElement(processingEnv)
-            ?: throw IllegalArgumentException("Dao getter has no return type")
-    if(!daoTypeEl.hasAnnotation(Repository::class.java)) {
-        addAccessorOverride(daoGetter, CodeBlock.of("throw %T(%S)\n",
+    daoGetterOrProp: KSDeclaration
+): TypeSpec.Builder {
+    val daoKSDecl = daoGetterOrProp.propertyOrReturnType()?.resolve()?.declaration as? KSClassDeclaration
+        ?: throw IllegalArgumentException("addRepoDbDaoAccessor: no return type ")
+    if(!daoKSDecl.hasAnnotation(Repository::class)) {
+        addDaoPropOrGetterOverride(daoGetterOrProp, CodeBlock.of("throw %T(%S)\n",
                 ClassName("kotlin", "IllegalStateException"),
-                "${daoTypeEl.simpleName} is not annotated with @Repository"))
+                "${daoKSDecl.simpleName.asString()} is not annotated with @Repository"))
         return this
     }
 
-    addProperty(PropertySpec.builder("_${daoTypeEl.simpleName}",
-                daoTypeEl.asClassNameWithSuffix(SUFFIX_REPOSITORY2))
-            .delegate(CodeBlock.builder().beginControlFlow("lazy")
-                    .add("%T(db, this, db.%L, _httpClient, clientId, _endpoint)",
-                            daoTypeEl.asClassNameWithSuffix(SUFFIX_REPOSITORY2),
-                            daoGetter.makeAccessorCodeBlock())
-                    .endControlFlow()
-                    .build())
+    addProperty(PropertySpec.builder("_${daoKSDecl.simpleName.asString()}",
+            daoKSDecl.toClassNameWithSuffix(SUFFIX_REPOSITORY2),
+            KModifier.PRIVATE)
+        .delegate(CodeBlock.builder().beginControlFlow("lazy")
+            .add("%T(db, this, db.%L, _httpClient, clientId, _endpoint)\n",
+                daoKSDecl.toClassNameWithSuffix(SUFFIX_REPOSITORY2),
+                daoGetterOrProp.toPropertyOrEmptyFunctionCaller())
+            .endControlFlow()
             .build())
+        .build())
 
-    addAccessorOverride(daoGetter, CodeBlock.of("return  _${daoTypeEl.simpleName}"))
+    addDaoPropOrGetterOverride(daoGetterOrProp, CodeBlock.of("return  _${daoKSDecl.simpleName.asString()}"))
 
     return this
 }
@@ -485,53 +489,6 @@ fun CodeBlock.Builder.addDelegateToWebCode(daoFunSpec: FunSpec, daoName: String)
 class DbProcessorRepository: AbstractDbProcessor() {
 
     override fun process(annotations: MutableSet<out TypeElement>, roundEnv: RoundEnvironment): Boolean {
-        val dbs = roundEnv.getElementsAnnotatedWith(Database::class.java)
-
-
-        for(dbTypeEl in dbs) {
-            val hasRepos = (dbTypeEl as TypeElement).dbHasRepositories(processingEnv)
-
-            if(!hasRepos)
-                continue //This database has no repositories - skip it
-
-            FileSpec.builder(dbTypeEl.packageName, "${dbTypeEl.simpleName}$SUFFIX_REPOSITORY2")
-                    .addDbRepoType(dbTypeEl, processingEnv,
-                        syncDaoMode = REPO_SYNCABLE_DAO_CONSTRUCT,
-                        addDbVersionProp = true,
-                        overrideDataSourceProp = true,
-                        overrideWrapDbForTransaction = true,
-                        target = DoorTarget.JVM)
-                    .build()
-                    .writeToDirsFromArg(OPTION_JVM_DIRS)
-
-            FileSpec.builder(dbTypeEl.packageName, "${dbTypeEl.simpleName}$SUFFIX_REPOSITORY2")
-                .addDbRepoType(dbTypeEl, processingEnv,
-                    syncDaoMode = REPO_SYNCABLE_DAO_CONSTRUCT,
-                    addDbVersionProp = true,
-                    overrideDataSourceProp = true,
-                    overrideWrapDbForTransaction = false,
-                    target = DoorTarget.JS)
-                .build()
-                .writeToDirsFromArg(OPTION_JS_OUTPUT)
-
-            FileSpec.builder(dbTypeEl.packageName, "${dbTypeEl.simpleName}$SUFFIX_REPOSITORY2")
-                    .addDbRepoType(dbTypeEl, processingEnv,
-                        syncDaoMode = REPO_SYNCABLE_DAO_FROMDB, overrideClearAllTables = false,
-                        overrideSyncDao = true, overrideOpenHelper = true,
-                        overrideKtorHelpers = true,
-                        target = DoorTarget.ANDROID)
-                    .build()
-                    .writeToDirsFromArg(OPTION_ANDROID_OUTPUT)
-            dbTypeEl.allDbEntities(processingEnv)
-                    .filter { it.entityHasAttachments }.forEach { entityEl ->
-                        FileSpec.builder(entityEl.packageName, "${entityEl.simpleName}$SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER")
-                                .addEntityWithAttachmentAdapterType(entityEl, processingEnv)
-                                .addAsEntityWithAttachmentAdapterExtensionFun(entityEl)
-                                .build()
-                                .writeToDirsFromArg(listOf(OPTION_JVM_DIRS, OPTION_ANDROID_OUTPUT, OPTION_JS_OUTPUT))
-            }
-        }
-
         val daos = roundEnv.getElementsAnnotatedWith(Dao::class.java)
 
         for(daoElement in daos) {
@@ -601,7 +558,45 @@ class DbProcessorRepository: AbstractDbProcessor() {
                 BOUNDARY_CALLBACK_CLASSNAME.parameterizedBy(STAR))
 
     }
+}
 
+class DbRepositoryProcessor(
+    private val environment: SymbolProcessorEnvironment,
+) : SymbolProcessor {
 
+    override fun process(resolver: Resolver): List<KSAnnotated> {
+        val dbSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Database")
+            .filterIsInstance<KSClassDeclaration>()
+            .filter { dbKSClassDecl ->
+                dbKSClassDecl.dbEnclosedDaos().any { it.hasAnnotation(Repository::class) }
+            }
 
+        val entitiesWithAttachments = resolver.getSymbolsWithAnnotation("com.ustadmobile.door.annotation.AttachmentUri")
+            .filterIsInstance<KSPropertyDeclaration>()
+            .mapNotNull {
+                it.parentDeclaration as? KSClassDeclaration
+            }
+
+        DoorTarget.values().forEach { target ->
+            dbSymbols.forEach { dbKSClass ->
+                FileSpec.builder(dbKSClass.packageName.asString(),
+                    "${dbKSClass.simpleName.asString()}$SUFFIX_REPOSITORY2")
+                    .addDbRepoType(dbKSClass, target)
+                    .build()
+                    .writeToPlatformDir(target, environment.codeGenerator, environment.options)
+            }
+
+            entitiesWithAttachments.forEach { entityWithAttachment ->
+                FileSpec.builder(entityWithAttachment.packageName.asString(),
+                    "${entityWithAttachment.simpleName.asString()}$SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER")
+                    .addEntityWithAttachmentAdapterType(entityWithAttachment)
+                    .addAsEntityWithAttachmentAdapterExtensionFun(entityWithAttachment)
+                    .build()
+                    .writeToPlatformDir(target, environment.codeGenerator, environment.options)
+            }
+
+        }
+
+        return emptyList()
+    }
 }

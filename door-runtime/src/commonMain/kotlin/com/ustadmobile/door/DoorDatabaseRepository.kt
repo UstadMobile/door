@@ -40,12 +40,6 @@ interface DoorDatabaseRepository {
 
     var connectivityStatus: Int
 
-    /**
-     * This map will be a generated map of table names (e.g. EntityName) to the corresponding TableId
-     * for all syncable entities
-     */
-    val tableIdMap: Map<String, Int>
-
     val replicationSubscriptionManager: ReplicationSubscriptionManager?
 
     companion object {

@@ -9,7 +9,8 @@ class SymbolProcessorWrapper(
     environment: SymbolProcessorEnvironment,
 ) : SymbolProcessor {
 
-    private val processors = listOf(ReplicateWrapperProcessor(environment), DbHttpServerProcessor(environment))
+    private val processors = listOf(ReplicateWrapperProcessor(environment), DbHttpServerProcessor(environment),
+        DbRepositoryProcessor(environment))
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         return processors.flatMap { processor ->
