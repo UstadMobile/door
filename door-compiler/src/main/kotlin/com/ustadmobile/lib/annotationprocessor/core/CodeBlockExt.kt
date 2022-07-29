@@ -1,17 +1,21 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import androidx.room.ColumnInfo
+import androidx.room.Entity
 import com.squareup.kotlinpoet.*
 import io.ktor.client.request.forms.*
 import io.ktor.content.*
 import io.ktor.http.*
-import javax.annotation.processing.ProcessingEnvironment
 import javax.lang.model.element.TypeElement
 import androidx.room.PrimaryKey
+import com.google.devtools.ksp.processing.Resolver
+import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import com.ustadmobile.door.annotation.ReplicateEntity
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.MEMBERNAME_CLIENT_SET_BODY
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.MEMBERNAME_ENCODED_PATH
+import com.ustadmobile.lib.annotationprocessor.core.ext.entityPrimaryKeyProps
+import com.ustadmobile.lib.annotationprocessor.core.ext.entityTableName
+import com.ustadmobile.lib.annotationprocessor.core.ext.getAnnotation
+import com.ustadmobile.lib.annotationprocessor.core.ext.toCreateTableSql
 
 /**
  * Generate a delegation style function call, e.g.
@@ -69,44 +73,6 @@ fun CodeBlock.Builder.beginIfNotNullOrEmptyControlFlow(varName: String, isList: 
 
 
 /**
- * When generating code for a parameter we often want to add some statements that would run directly
- * on a given variable if it is a singular type, or use a forEach loop if it is a list or array.
- *
- * e.g.
- *
- * singular.changeSeqNum = 0
- *
- * or
- *
- * list.forEach {
- *     it.changeSeqNum = 0
- * }
- *
- * @param param the ParameterSpec that gives the type and the variable name
- * @param codeBlocks codeBlocks that should be run against each component of the parameter if it is
- * a list or array, or directly against the parameter if it is singular. Each will be automatically
- * prefixed with the parameter name for singular components, or "it" for lists and arrays
- * @return this
- */
-fun CodeBlock.Builder.addRunCodeBlocksOnParamComponents(param: ParameterSpec, vararg codeBlocks: CodeBlock) : CodeBlock.Builder {
-    if(param.type.isListOrArray()) {
-        beginControlFlow("${param.name}.forEach")
-        codeBlocks.forEach {
-            add("it.")
-            add(it)
-        }
-        endControlFlow()
-    }else {
-        codeBlocks.forEach {
-            add("${param.name}.")
-            add(it)
-        }
-    }
-
-    return this
-}
-
-/**
  * Add SQL to the output. This could be done as appending to a list variable, or this can be done as a function call
  */
 fun CodeBlock.Builder.addSql(
@@ -129,38 +95,29 @@ fun CodeBlock.Builder.addSql(
  * the indices argument (e.g. for those that come from the Entity annotation) and via the
  * entityTypeSpec for those that are specified using ColumnInfo(index=true) annotation.
  *
- * @param entityTypeSpec a TypeSpec that represents the entity a table is being created for
+ * @param entityKSClass a KSClassDeclaration that represents the entity a table is being created for
  * @param execSqlFn the literal string that should be added to call a function that runs SQL
  * @param dbProductType DoorDbType.SQLITE or POSTGRES
- * @param indices a list of IndexMirror representing the indices that should be added.
+
  */
 fun CodeBlock.Builder.addCreateTableCode(
-    entityTypeSpec: TypeSpec,
-    packageName: String,
+    entityKSClass: KSClassDeclaration,
     execSqlFn: String,
     dbProductType: Int,
-    processingEnv: ProcessingEnvironment,
-    indices: List<IndexMirror> = listOf(),
-    sqlListVar: String? = null
+    sqlListVar: String? = null,
+    resolver: Resolver,
 ) : CodeBlock.Builder {
-    addSql(execSqlFn, sqlListVar, entityTypeSpec.toCreateTableSql(dbProductType, packageName, processingEnv))
-    indices.forEach {
-        val indexName = if(it.name != "") {
-            it.name
+    addSql(execSqlFn, sqlListVar, entityKSClass.toCreateTableSql(dbProductType, resolver))
+
+    entityKSClass.getAnnotation(Entity::class)?.indices?.forEach { index ->
+        val indexName = if(index.name != "") {
+            index.name
         }else {
-            "index_${entityTypeSpec.name}_${it.value.joinToString(separator = "_", postfix = "", prefix = "")}"
+            "index_${entityKSClass.entityTableName}_${index.value.joinToString(separator = "_", postfix = "", prefix = "")}"
         }
 
-        addSql(execSqlFn, sqlListVar, "CREATE ${if(it.unique){ "UNIQUE " } else { "" } }INDEX $indexName" +
-                " ON ${entityTypeSpec.name} (${it.value.joinToString()})")
-    }
-
-    entityTypeSpec.entityFields().forEach { field ->
-        if(field.annotations.any { it.className == ColumnInfo::class.asClassName()
-                        && it.members.findBooleanMemberValue("index") ?: false }) {
-            addSql(execSqlFn, sqlListVar,
-                    "CREATE INDEX index_${entityTypeSpec.name}_${field.name} ON ${entityTypeSpec.name} (${field.name})")
-        }
+        addSql(execSqlFn, sqlListVar, "CREATE ${if(index.unique){ "UNIQUE " } else { "" } }INDEX $indexName" +
+                " ON ${entityKSClass.entityTableName} (${index.value.joinToString()})")
     }
 
     return this
@@ -316,6 +273,26 @@ private fun TypeElement.generateZombieAttachmentInsertSql(): String {
 }
 
 /**
+ * Generate the SQL that will be used to insert into the Zombie SQL trigger where an old attachment md5 is no longer in
+ * use
+ */
+private fun KSClassDeclaration.generateZombieAttachmentInsertSql(): String {
+    val attachmentInfo = EntityAttachmentInfo(this)
+    val pkFieldName = entityPrimaryKeyProps.first().simpleName.asString()
+
+    return """
+        INSERT INTO ZombieAttachmentData(zaUri) 
+        SELECT OLD.${attachmentInfo.uriPropertyName} AS zaUri
+          FROM $entityTableName   
+         WHERE ${entityTableName}.$pkFieldName = OLD.$pkFieldName
+           AND (SELECT COUNT(*) 
+                  FROM $entityTableName
+                 WHERE ${attachmentInfo.md5PropertyName} = OLD.${attachmentInfo.md5PropertyName}) = 0
+    """
+}
+
+
+/**
  * Add code that will generate triggers to catch Zombie attachment uris on SQLite
  */
 fun CodeBlock.Builder.addGenerateAttachmentTriggerSqlite(
@@ -327,6 +304,27 @@ fun CodeBlock.Builder.addGenerateAttachmentTriggerSqlite(
     addSql(execSqlFn, stmtListVar, """
         CREATE TRIGGER ATTUPD_${entity.simpleName}
         AFTER UPDATE ON ${entity.simpleName} FOR EACH ROW WHEN
+        OLD.${attachmentInfo.md5PropertyName} IS NOT NULL
+        BEGIN
+        ${entity.generateZombieAttachmentInsertSql()}; 
+        END
+    """)
+
+    return this
+}
+
+/**
+ * Add code that will generate triggers to catch Zombie attachment uris on SQLite
+ */
+fun CodeBlock.Builder.addGenerateAttachmentTriggerSqlite(
+    entity: KSClassDeclaration,
+    execSqlFn: String,
+    stmtListVar: String? = null
+) : CodeBlock.Builder{
+    val attachmentInfo = EntityAttachmentInfo(entity)
+    addSql(execSqlFn, stmtListVar, """
+        CREATE TRIGGER ATTUPD_${entity.entityTableName}
+        AFTER UPDATE ON ${entity.entityTableName} FOR EACH ROW WHEN
         OLD.${attachmentInfo.md5PropertyName} IS NOT NULL
         BEGIN
         ${entity.generateZombieAttachmentInsertSql()}; 
@@ -354,6 +352,32 @@ fun CodeBlock.Builder.addGenerateAttachmentTriggerPostgres(entity: TypeElement, 
         AFTER UPDATE ON ${entity.simpleName}
         FOR EACH ROW WHEN (OLD.${attachmentInfo.md5PropertyName} IS NOT NULL)
         EXECUTE PROCEDURE attach_${entity.simpleName}_fn();
+    """.trimIndent())
+
+    return this
+}
+
+/**
+ * Add code that will generate triggers to catch Zombie attachment uris on Postgres
+ */
+fun CodeBlock.Builder.addGenerateAttachmentTriggerPostgres(
+    entity: KSClassDeclaration,
+    stmtListVar: String
+) : CodeBlock.Builder {
+    val attachmentInfo = EntityAttachmentInfo(entity)
+    add("$stmtListVar += %S\n", """
+        CREATE OR REPLACE FUNCTION attach_${entity.entityTableName}_fn() RETURNS trigger AS ${'$'}${'$'}
+        BEGIN
+        ${entity.generateZombieAttachmentInsertSql()};
+        RETURN NEW;
+        END ${'$'}${'$'}
+        LANGUAGE plpgsql
+    """.trimIndent())
+    add("$stmtListVar += %S\n", """
+        CREATE TRIGGER attach_${entity.entityTableName}_trig
+        AFTER UPDATE ON ${entity.entityTableName}
+        FOR EACH ROW WHEN (OLD.${attachmentInfo.md5PropertyName} IS NOT NULL)
+        EXECUTE PROCEDURE attach_${entity.entityTableName}_fn();
     """.trimIndent())
 
     return this

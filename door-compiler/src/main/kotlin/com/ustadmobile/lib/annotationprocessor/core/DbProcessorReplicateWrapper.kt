@@ -360,7 +360,7 @@ class DbProcessorReplicateWrapper: AbstractDbProcessor()  {
 
 }
 
-class ReplicateWrapperProcessor(
+class DoorReplicateWrapperProcessor(
     private val environment: SymbolProcessorEnvironment,
 ) : SymbolProcessor{
 

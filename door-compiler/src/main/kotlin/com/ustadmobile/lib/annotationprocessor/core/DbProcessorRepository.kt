@@ -29,7 +29,7 @@ import javax.lang.model.element.TypeElement
  * Generate the table id map of entity names (strings) to the table id as per the syncableentity
  * annotation
  */
-fun TypeSpec.Builder.addTableIdMapProperty(dbTypeElement: TypeElement, processingEnv: ProcessingEnvironment) : TypeSpec.Builder {
+fun TypeSpec.Builder.addTableIdMapProperty() : TypeSpec.Builder {
     addProperty(PropertySpec.builder("TABLE_ID_MAP",
             Map::class.asClassName().parameterizedBy(String::class.asClassName(), INT))
             .initializer(CodeBlock.builder()
@@ -495,7 +495,7 @@ class DbProcessorRepository: AbstractDbProcessor() {
     }
 }
 
-class DbRepositoryProcessor(
+class DoorRepositoryProcessor(
     private val environment: SymbolProcessorEnvironment,
 ) : SymbolProcessor {
 

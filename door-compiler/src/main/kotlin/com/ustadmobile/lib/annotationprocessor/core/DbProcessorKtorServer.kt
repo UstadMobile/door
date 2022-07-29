@@ -648,7 +648,7 @@ class DbProcessorKtorServer: AbstractDbProcessor() {
     }
 }
 
-class DbHttpServerProcessor(
+class DoorHttpServerProcessor(
     private val environment: SymbolProcessorEnvironment,
 ) : SymbolProcessor {
 

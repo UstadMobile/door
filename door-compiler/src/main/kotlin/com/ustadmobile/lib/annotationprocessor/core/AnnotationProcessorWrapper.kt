@@ -44,8 +44,7 @@ import com.ustadmobile.lib.annotationprocessor.core.ext.setDefaultParamValue
 class AnnotationProcessorWrapper: AbstractProcessor() {
 
     val processors = listOf(DbProcessorJdbcKotlin(), DbProcessorKtorServer(),
-            DbProcessorRepository(), DbProcessorAndroid(), DbProcessorReplicateWrapper(),
-            DbProcessorReplicationMigration())
+            DbProcessorRepository(), DbProcessorAndroid(), DbProcessorReplicateWrapper())
 
     lateinit var messager: MessagerWrapper
 

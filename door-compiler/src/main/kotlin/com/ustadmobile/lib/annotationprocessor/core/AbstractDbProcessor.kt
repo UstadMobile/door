@@ -42,40 +42,6 @@ fun defaultSqlQueryVal(typeName: TypeName) = if(typeName in SQL_NUMERIC_TYPES) {
     "null"
 }
 
-fun findEntitiesWithAnnotation(entityType: ClassName, annotationClass: Class<out Annotation>,
-                               processingEnv: ProcessingEnvironment,
-                               embedPath: List<String> = listOf()): Map<List<String>, ClassName> {
-    if(entityType in QUERY_SINGULAR_TYPES)
-        return mapOf()
-
-
-    val entityTypeEl = processingEnv.elementUtils.getTypeElement(entityType.canonicalName)
-    if(entityTypeEl == null){
-        processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
-                "Entity type: " + entityType.canonicalName)
-
-    }
-    val syncableEntityList = mutableMapOf<List<String>, ClassName>()
-    ancestorsToList(entityTypeEl, processingEnv).forEach {
-        if(it.getAnnotation(annotationClass) != null)
-            syncableEntityList.put(embedPath, it.asClassName())
-
-        it.enclosedElements.filter { it.getAnnotation(Embedded::class.java) != null}.forEach {
-            val subEmbedPath = mutableListOf(*embedPath.toTypedArray()) + "${it.simpleName}"
-            syncableEntityList.putAll(findEntitiesWithAnnotation(it.asType().asTypeName() as ClassName,
-                    annotationClass, processingEnv, subEmbedPath))
-        }
-    }
-
-    return syncableEntityList.toMap()
-}
-
-fun jdbcDaoTypeSpecBuilder(simpleName: String, superTypeName: TypeName) = TypeSpec.classBuilder(simpleName)
-        .primaryConstructor(FunSpec.constructorBuilder().addParameter("_db",
-                RoomDatabase::class).build())
-        .addProperty(PropertySpec.builder("_db", RoomDatabase::class).initializer("_db").build())
-        .superclass(superTypeName)
-
 
 /**
  * Determine if the given
@@ -168,7 +134,7 @@ internal fun generateKtorRequestCodeBlockForMethod(httpEndpointVarName: String =
     val nonQueryParams = getHttpBodyParams(params)
     val codeBlock = CodeBlock.builder()
             .beginControlFlow("val $httpStatementVarName = _httpClient.%M<%T>",
-                    if(nonQueryParams.isNullOrEmpty()) CLIENT_GET_MEMBER_NAME else CLIENT_POST_MEMBER_NAME,
+                    if(nonQueryParams.isEmpty()) CLIENT_GET_MEMBER_NAME else CLIENT_POST_MEMBER_NAME,
                     HttpStatement::class)
             .beginControlFlow("url")
             .add("%M($httpEndpointVarName)\n", MemberName("io.ktor.http", "takeFrom"))
@@ -824,16 +790,6 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
             messager.printMessage(kind, messageStr, element)
         }else {
             messager.printMessage(kind, messageStr)
-        }
-    }
-
-    /**
-     * Write the given file spec to directories specified in the annotation processor argument. Paths
-     * should be separated by the path separator character (platform dependent - e.g. : on Unix, ; on Windows)
-     */
-    protected fun writeFileSpecToOutputDirs(fileSpec: FileSpec, argName: String, useFilerAsDefault: Boolean = true) {
-        (processingEnv.options[argName]?.split(File.pathSeparator) ?: listOf(processingEnv.options["kapt.kotlin.generated"]!!)).forEach {
-            fileSpec.writeTo(File(it))
         }
     }
 

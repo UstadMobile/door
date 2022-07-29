@@ -36,6 +36,11 @@ fun <T: Annotation> KSAnnotated.getAnnotation(annotationKClazz: KClass<T>): T? {
 }
 
 @OptIn(KspExperimental::class)
+fun <T: Annotation> KSAnnotated.getAnnotations(annotationKClazz: KClass<T>): List<T> {
+    return getAnnotationsByType(annotationKClazz).toList()
+}
+
+@OptIn(KspExperimental::class)
 fun <T: Annotation> KSAnnotated.getAnnotationOrNull(annotationKClazz: KClass<T>): T? {
     return getAnnotationsByType(annotationKClazz).firstOrNull()
 }
