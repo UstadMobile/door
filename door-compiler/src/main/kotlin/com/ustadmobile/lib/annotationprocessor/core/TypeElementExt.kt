@@ -7,7 +7,6 @@ import javax.lang.model.element.*
 import javax.lang.model.type.DeclaredType
 import javax.lang.model.type.ExecutableType
 import androidx.room.*
-import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.squareup.kotlinpoet.metadata.toKmClass
 import com.ustadmobile.door.annotation.*
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.SUFFIX_DEFAULT_RECEIVEVIEW
@@ -35,14 +34,6 @@ internal fun TypeElement.asEntityTypeSpecBuilder(): TypeSpec.Builder {
 
     return typeSpecBuilder
 }
-
-/**
- * Provides a list of the indexes that are on a given table. Using the Index value itself can lead
- * to classnotfound errors. Adding this to a TypeSpec leads to having to parse strings with arrays,
- * quotes, etc.
- */
-internal fun TypeElement.indicesAsIndexMirrorList() =
-        getAnnotation(Entity::class.java).indices.map { IndexMirror(it) }
 
 
 internal fun TypeElement.asEntityTypeSpec() = this.asEntityTypeSpecBuilder().build()
@@ -85,15 +76,6 @@ fun TypeElement.allOverridableMethods(processingEnv: ProcessingEnvironment,
 fun TypeElement.allDbClassDaoGetters(processingEnv: ProcessingEnvironment) =
         allOverridableMethods(processingEnv)
             .filter { it.returnType.asTypeElement(processingEnv)?.hasAnnotation(Dao::class.java) == true}
-
-/**
- * Where this TypeElement represents a Database, this is a shorthand that gives all the DAO classes
- * that require a repository
- */
-fun TypeElement.allDbClassDaoGettersWithRepo(processingEnv: ProcessingEnvironment) =
-        allDbClassDaoGetters(processingEnv).filter {
-            it.returnType.asTypeElement(processingEnv)?.isDaoWithRepository == true
-        }
 
 /**
  * Gets a list of all ancestor parent classes and interfaces.
@@ -156,41 +138,9 @@ fun TypeElement.allDbEntities(processingEnv: ProcessingEnvironment): List<TypeEl
     return dbAnnotationMirror.getClassArrayValue("entities", processingEnv)
 }
 
-/**
- * Where this TypeElement represents a database class, get a list of all entities that have
- * an attachment.
- */
-fun TypeElement.allEntitiesWithAttachments(processingEnv: ProcessingEnvironment) =
-        allDbEntities(processingEnv).filter {
-            it.enclosedElementsWithAnnotation(AttachmentUri::class.java).isNotEmpty()
-        }
-
 
 fun TypeElement.asClassNameWithSuffix(suffix: String) =
         ClassName(packageName, "$simpleName$suffix")
-
-
-/**
- * Indicates whether or not this database should have a read only wrapper generated. The ReadOnlyWrapper should be
- * be generated for databses that have repositories and replicated entities.
- */
-fun TypeElement.dbHasReplicateWrapper(processingEnv: ProcessingEnvironment) : Boolean {
-    val hasRepos = dbEnclosedDaos(processingEnv).any { it.hasAnnotation(Repository::class.java) }
-    val hasReplicatedEntities = allDbEntities(processingEnv).any { it.hasAnnotation(ReplicateEntity::class.java) }
-    return hasRepos && hasReplicatedEntities
-}
-
-fun TypeElement.dbHasRepositories(processingEnv: ProcessingEnvironment) : Boolean {
-    return dbEnclosedDaos(processingEnv).any { it.hasAnnotation(Repository::class.java) }
-}
-
-/**
- * If the given TypeElement represents a Dao, this will return a map of the ClassNames for DAOs
- * for the primary and local KTOR Helper Daos that are required.
- */
-val TypeElement.daoKtorHelperDaoClassNames: Map<String, ClassName>
-    get() = mapOf("Master" to this.asClassNameWithSuffix("${SUFFIX_KTOR_HELPER}Master"),
-        "Local" to this.asClassNameWithSuffix("${SUFFIX_KTOR_HELPER}Local"))
 
 
 /**
@@ -329,19 +279,6 @@ val TypeElement.replicationEntityReceiveViewName: String
 val TypeElement.replicationTrackerForeignKey: Element
     get() = enclosedElementsWithAnnotation(ReplicationEntityForeignKey::class.java, ElementKind.FIELD).firstOrNull()
         ?: throw IllegalArgumentException("${this.qualifiedName} has no replicationentityforeignkey")
-
-fun <A: Annotation> TypeElement.firstFieldWithAnnotation(annotationClass: Class<A>): Element {
-    return enclosedElementsWithAnnotation(annotationClass).first()
-}
-
-fun <A: Annotation> TypeElement.firstFieldWithAnnotationNameOrNull(annotationClass: Class<A>): CodeBlock {
-    val annotatedElement = enclosedElementsWithAnnotation(annotationClass).firstOrNull()
-    return if(annotatedElement != null) {
-        CodeBlock.of("%S", annotatedElement.simpleName)
-    }else {
-        CodeBlock.of("null")
-    }
-}
 
 fun  <A: Annotation> TypeElement.kmPropertiesWithAnnotation(annotationClass: Class<A>): List<KmProperty> {
     val kmClass = getAnnotation(Metadata::class.java).toKmClass()

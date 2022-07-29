@@ -14,11 +14,11 @@ import javax.lang.model.element.*
 import javax.lang.model.type.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toClassName
+import com.squareup.kotlinpoet.ksp.toTypeName
 import com.ustadmobile.door.*
 import net.sf.jsqlparser.parser.CCJSqlParserUtil
 import net.sf.jsqlparser.statement.select.Select
 import net.sf.jsqlparser.util.TablesNamesFinder
-import org.jetbrains.annotations.Nullable
 import javax.lang.model.element.TypeElement
 import javax.lang.model.type.TypeMirror
 import kotlin.reflect.jvm.internal.impl.name.FqName
@@ -152,43 +152,45 @@ fun makeInsertAdapterMethodName(
 /**
  * Generate the DatabaseMetadata object for the given database.
  */
-fun FileSpec.Builder.addDatabaseMetadataType(dbTypeElement: TypeElement, processingEnv: ProcessingEnvironment): FileSpec.Builder {
-    addType(TypeSpec.classBuilder("${dbTypeElement.simpleName}$SUFFIX_DOOR_METADATA")
-        .superclass(DoorDatabaseMetadata::class.asClassName().parameterizedBy(dbTypeElement.asClassName()))
-        .addProperty(PropertySpec.builder("dbClass", KClass::class.asClassName().parameterizedBy(dbTypeElement.asClassName()))
+private fun FileSpec.Builder.addDatabaseMetadataType(
+    dbKSClass: KSClassDeclaration,
+): FileSpec.Builder {
+    addType(TypeSpec.classBuilder("${dbKSClass.simpleName.asString()}$SUFFIX_DOOR_METADATA")
+        .superclass(DoorDatabaseMetadata::class.asClassName().parameterizedBy(dbKSClass.toClassName()))
+        .addProperty(PropertySpec.builder("dbClass", KClass::class.asClassName().parameterizedBy(dbKSClass.toClassName()))
             .addModifiers(KModifier.OVERRIDE)
             .getter(FunSpec.getterBuilder()
-                .addCode("return %T::class\n", dbTypeElement)
+                .addCode("return %T::class\n", dbKSClass.toClassName())
                 .build())
             .build())
         .addProperty(PropertySpec.builder("hasReadOnlyWrapper", Boolean::class)
             .addModifiers(KModifier.OVERRIDE)
             .getter(FunSpec.getterBuilder()
-                .addCode("return %L\n", dbTypeElement.dbHasReplicateWrapper(processingEnv))
+                .addCode("return %L\n", dbKSClass.dbHasReplicateWrapper())
                 .build())
             .build())
         .addProperty(PropertySpec.builder("hasAttachments", Boolean::class)
             .addModifiers(KModifier.OVERRIDE)
             .getter(FunSpec.getterBuilder()
-                .addCode("return %L\n", dbTypeElement.allDbEntities(processingEnv).any { it.entityHasAttachments })
+                .addCode("return %L\n", dbKSClass.allDbEntities().any { it.entityHasAttachments() })
                 .build())
             .build())
         .addProperty(PropertySpec.builder("syncableTableIdMap", Map::class.parameterizedBy(String::class, Int::class))
             .addModifiers(KModifier.OVERRIDE)
             .getter(FunSpec.getterBuilder()
-                .addCode("return TABLE_ID_MAP\n", dbTypeElement.asClassNameWithSuffix(SUFFIX_REPOSITORY2))
+                .addCode("return TABLE_ID_MAP\n", dbKSClass.toClassNameWithSuffix(SUFFIX_REPOSITORY2))
                 .build())
             .build())
         .addProperty(PropertySpec.builder("version", INT)
             .addModifiers(KModifier.OVERRIDE)
             .getter(FunSpec.getterBuilder()
-                .addCode("return ${dbTypeElement.getAnnotation(Database::class.java).version}\n")
+                .addCode("return ${dbKSClass.getAnnotation(Database::class)?.version ?: -1}\n")
                 .build())
             .build())
         .addProperty(PropertySpec.builder("allTables", List::class.parameterizedBy(String::class))
             .addModifiers(KModifier.OVERRIDE)
             .initializer(CodeBlock.builder()
-                .add("listOf(%L)\n", dbTypeElement.allDbEntities(processingEnv).map { it.simpleName.toString() }
+                .add("listOf(%L)\n", dbKSClass.allDbEntities().map { it.simpleName.asString() }
                     .joinToString(prefix = "\"", postfix = "\"", separator = "\", \""))
                 .build())
             .build())
@@ -199,12 +201,12 @@ fun FileSpec.Builder.addDatabaseMetadataType(dbTypeElement: TypeElement, process
                     .beginControlFlow("lazy(%T.NONE)", LazyThreadSafetyMode::class)
                     .add("mapOf<%T, %T>(\n", INT, ReplicationEntityMetaData::class)
                     .apply {
-                        dbTypeElement.allDbEntities(processingEnv)
-                            .filter { it.hasAnnotation(ReplicateEntity::class.java)}.forEach { replicateEntity ->
-                                add("%L to ", replicateEntity.getAnnotation(ReplicateEntity::class.java).tableId)
-                                addReplicateEntityMetaDataCode(replicateEntity, processingEnv)
+                        dbKSClass.allDbEntities()
+                            .filter { it.hasAnnotation(ReplicateEntity::class)}.forEach { replicateEntity ->
+                                add("%L to ", replicateEntity.getAnnotation(ReplicateEntity::class)?.tableId ?: -1)
+                                addReplicateEntityMetaDataCode(replicateEntity)
                                 add(",\n")
-                        }
+                            }
                     }
                     .add(")\n")
                     .endControlFlow()
@@ -271,40 +273,39 @@ private fun FileSpec.Builder.addJsImplementationsClassesObject(
 }
 
 private fun CodeBlock.Builder.addReplicateEntityMetaDataCode(
-    entity: TypeElement,
-    processingEnv: ProcessingEnvironment
+    entity: KSClassDeclaration,
 ): CodeBlock.Builder {
 
-    fun CodeBlock.Builder.addFieldsCodeBlock(typeEl: TypeElement) : CodeBlock.Builder{
+    fun CodeBlock.Builder.addFieldsCodeBlock(typeEl: KSClassDeclaration) : CodeBlock.Builder{
         add("listOf(")
-        typeEl.entityFields.forEach {
-            add("%T(%S, %L),", ReplicationFieldMetaData::class, it.simpleName,
-                it.asType().asTypeName().javaToKotlinType().toSqlTypesInt())
+        typeEl.entityProps().forEach {
+            add("%T(%S, %L),", ReplicationFieldMetaData::class, it.simpleName.asString(),
+                it.type.resolve().toTypeName().toSqlTypesInt())
         }
         add(")")
         return this
     }
 
-    val repEntityAnnotation = entity.getAnnotation(ReplicateEntity::class.java)
-    val trackerTypeEl = entity.getReplicationTracker(processingEnv)
+    val repEntityAnnotation = entity.getAnnotation(ReplicateEntity::class)
+    val trackerTypeEl = entity.getReplicationTracker()
     add("%T(", ReplicationEntityMetaData::class)
-    add("%L, ", repEntityAnnotation.tableId)
-    add("%L, ", repEntityAnnotation.priority)
+    add("%L, ", repEntityAnnotation?.tableId)
+    add("%L, ", repEntityAnnotation?.priority)
     add("%S, ", entity.entityTableName)
     add("%S, ", trackerTypeEl.entityTableName)
     add("%S, ", entity.replicationEntityReceiveViewName)
-    add("%S, ", entity.entityPrimaryKey?.simpleName.toString())
-    add("%S, ", entity.firstFieldWithAnnotation(ReplicationVersionId::class.java).simpleName)
-    add("%S, ", trackerTypeEl.firstFieldWithAnnotation(ReplicationEntityForeignKey::class.java))
-    add("%S, ", trackerTypeEl.firstFieldWithAnnotation(ReplicationDestinationNodeId::class.java))
-    add("%S, ", trackerTypeEl.firstFieldWithAnnotation(ReplicationVersionId::class.java))
-    add("%S, \n", trackerTypeEl.firstFieldWithAnnotation(ReplicationPending::class.java))
+    add("%S, ", entity.entityPrimaryKeyProps.first().simpleName.asString())
+    add("%S, ", entity.firstPropWithAnnotation(ReplicationVersionId::class).simpleName.asString())
+    add("%S, ", trackerTypeEl.firstPropWithAnnotation(ReplicationEntityForeignKey::class).simpleName.asString())
+    add("%S, ", trackerTypeEl.firstPropWithAnnotation(ReplicationDestinationNodeId::class).simpleName.asString())
+    add("%S, ", trackerTypeEl.firstPropWithAnnotation(ReplicationVersionId::class).simpleName.asString())
+    add("%S, \n", trackerTypeEl.firstPropWithAnnotation(ReplicationPending::class).simpleName.asString())
     addFieldsCodeBlock(entity).add(",\n")
     addFieldsCodeBlock(trackerTypeEl).add(",\n")
-    add(entity.firstFieldWithAnnotationNameOrNull(AttachmentUri::class.java)).add(",\n")
-    add(entity.firstFieldWithAnnotationNameOrNull(AttachmentMd5::class.java)).add(",\n")
-    add(entity.firstFieldWithAnnotationNameOrNull(AttachmentSize::class.java)).add(",\n")
-    add("%L", repEntityAnnotation.batchSize)
+    add(entity.firstPropNameWithAnnotationOrNull(AttachmentUri::class)).add(",\n")
+    add(entity.firstPropNameWithAnnotationOrNull(AttachmentMd5::class)).add(",\n")
+    add(entity.firstPropNameWithAnnotationOrNull(AttachmentSize::class)).add(",\n")
+    add("%L", repEntityAnnotation?.batchSize ?: 1000)
     add(")")
     return this
 }
@@ -944,12 +945,6 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             .mapNotNull { it as? TypeElement }
 
         for(dbTypeEl in dbs) {
-            Napier.d("Creating metadata for ${dbTypeEl.simpleName}")
-            FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_DOOR_METADATA)
-                .addDatabaseMetadataType(dbTypeEl, processingEnv)
-                .build()
-                .writeToDirsFromArg(listOf(OPTION_JVM_DIRS, OPTION_ANDROID_OUTPUT, OPTION_JS_OUTPUT))
-
             Napier.d("Creating runOnChangeRunner for ${dbTypeEl.simpleName}")
             FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_REP_RUN_ON_CHANGE_RUNNER)
                 .addReplicationRunOnChangeRunnerType(dbTypeEl)
@@ -1644,6 +1639,12 @@ class DoorJdbcProcessor(
             JDBC_TARGETS.forEach { target ->
                 FileSpec.builder(dbKSClass.packageName.asString(), dbKSClass.simpleName.asString() + SUFFIX_JDBC_KT2)
                     .addJdbcDbImplType(dbKSClass, DoorTarget.JVM, resolver)
+                    .build()
+                    .writeToPlatformDir(target, environment.codeGenerator, environment.options)
+            }
+            DoorTarget.values().forEach { target ->
+                FileSpec.builder(dbKSClass.packageName.asString(), dbKSClass.simpleName.asString() + SUFFIX_DOOR_METADATA)
+                    .addDatabaseMetadataType(dbKSClass)
                     .build()
                     .writeToPlatformDir(target, environment.codeGenerator, environment.options)
             }

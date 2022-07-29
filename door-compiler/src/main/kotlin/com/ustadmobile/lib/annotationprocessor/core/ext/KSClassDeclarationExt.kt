@@ -251,3 +251,16 @@ val KSClassDeclaration.replicationTrackerForeignKey: KSPropertyDeclaration
 
 val KSClassDeclaration.replicationEntityReceiveViewName: String
     get() = getAnnotation(ReplicateReceiveView::class)?.name ?: (simpleName.asString() + SUFFIX_DEFAULT_RECEIVEVIEW)
+
+fun <A:Annotation> KSClassDeclaration.firstPropWithAnnotation(annotationClass: KClass<A>): KSPropertyDeclaration {
+    return getAllProperties().first { it.hasAnnotation(annotationClass) }
+}
+
+fun <A: Annotation> KSClassDeclaration.firstPropNameWithAnnotationOrNull(
+    annotationClass: KClass<A>
+): CodeBlock {
+    return getAllProperties().firstOrNull { it.hasAnnotation(annotationClass) }?.let {
+        CodeBlock.of("%S", it.simpleName.asString())
+    } ?: CodeBlock.of("null")
+}
+
