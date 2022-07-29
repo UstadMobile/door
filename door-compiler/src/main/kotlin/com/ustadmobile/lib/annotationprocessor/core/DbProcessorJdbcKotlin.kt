@@ -218,30 +218,28 @@ fun FileSpec.Builder.addDatabaseMetadataType(dbTypeElement: TypeElement, process
     return this
 }
 
-
-fun FileSpec.Builder.addJsImplementationsClassesObject(
-    dbTypeElement: TypeElement,
-    processingEnv: ProcessingEnvironment
+private fun FileSpec.Builder.addJsImplementationsClassesObject(
+    dbKSClass: KSClassDeclaration,
 ) : FileSpec.Builder {
     val jsImplClassName = ClassName("com.ustadmobile.door.util", "DoorJsImplClasses")
-    addType(TypeSpec.objectBuilder(dbTypeElement.simpleName.toString() + SUFFIX_JS_IMPLEMENTATION_CLASSES)
-        .superclass(jsImplClassName.parameterizedBy(dbTypeElement.asClassName()))
+    addType(TypeSpec.objectBuilder(dbKSClass.simpleName.asString() + SUFFIX_JS_IMPLEMENTATION_CLASSES)
+        .superclass(jsImplClassName.parameterizedBy(dbKSClass.toClassName()))
         .addProperty(PropertySpec.builder("dbKClass",
-                KClass::class.asClassName().parameterizedBy(dbTypeElement.asClassName()))
+            KClass::class.asClassName().parameterizedBy(dbKSClass.toClassName()))
             .addModifiers(KModifier.OVERRIDE)
-            .initializer("%T::class", dbTypeElement)
+            .initializer("%T::class", dbKSClass.toClassName())
             .build())
         .addProperty(PropertySpec.builder("dbImplKClass", KClass::class.asTypeName().parameterizedBy(STAR))
             .addModifiers(KModifier.OVERRIDE)
-            .initializer("%T::class", dbTypeElement.asClassNameWithSuffix(SUFFIX_JDBC_KT2))
+            .initializer("%T::class", dbKSClass.toClassNameWithSuffix(SUFFIX_JDBC_KT2))
             .build())
         .addProperty(PropertySpec.builder("replicateWrapperImplClass", KClass::class.asTypeName()
-                .parameterizedBy(STAR).copy(nullable = true))
+            .parameterizedBy(STAR).copy(nullable = true))
             .addModifiers(KModifier.OVERRIDE)
             .initializer(CodeBlock.builder()
                 .apply {
-                    if(dbTypeElement.dbHasReplicateWrapper(processingEnv)) {
-                        add("%T::class", dbTypeElement.asClassNameWithSuffix(DoorDatabaseReplicateWrapper.SUFFIX))
+                    if(dbKSClass.dbHasReplicateWrapper()) {
+                        add("%T::class", dbKSClass.toClassNameWithSuffix(DoorDatabaseReplicateWrapper.SUFFIX))
                     }else {
                         add("null")
                     }
@@ -253,8 +251,8 @@ fun FileSpec.Builder.addJsImplementationsClassesObject(
             .addModifiers(KModifier.OVERRIDE)
             .initializer(CodeBlock.builder()
                 .apply {
-                    if(dbTypeElement.dbHasRepositories(processingEnv)) {
-                        add("%T::class", dbTypeElement.asClassNameWithSuffix(SUFFIX_REPOSITORY2))
+                    if(dbKSClass.dbEnclosedDaos().any { it.hasAnnotation(Repository::class) }) {
+                        add("%T::class", dbKSClass.toClassNameWithSuffix(SUFFIX_REPOSITORY2))
                     }else {
                         add("null")
                     }
@@ -262,9 +260,9 @@ fun FileSpec.Builder.addJsImplementationsClassesObject(
                 .build())
             .build())
         .addProperty(PropertySpec.builder("metadata",
-            DoorDatabaseMetadata::class.asClassName().parameterizedBy(dbTypeElement.asClassName()))
+            DoorDatabaseMetadata::class.asClassName().parameterizedBy(dbKSClass.toClassName()))
             .addModifiers(KModifier.OVERRIDE)
-            .initializer("%T()", dbTypeElement.asClassNameWithSuffix(SUFFIX_DOOR_METADATA))
+            .initializer("%T()", dbKSClass.toClassNameWithSuffix(SUFFIX_DOOR_METADATA))
             .build())
         .build())
 
@@ -946,11 +944,6 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
             .mapNotNull { it as? TypeElement }
 
         for(dbTypeEl in dbs) {
-            FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_JS_IMPLEMENTATION_CLASSES)
-                .addJsImplementationsClassesObject(dbTypeEl, processingEnv)
-                .build()
-                .writeToDirsFromArg(OPTION_JS_OUTPUT)
-
             Napier.d("Creating metadata for ${dbTypeEl.simpleName}")
             FileSpec.builder(dbTypeEl.packageName, dbTypeEl.simpleName.toString() + SUFFIX_DOOR_METADATA)
                 .addDatabaseMetadataType(dbTypeEl, processingEnv)
@@ -1654,6 +1647,11 @@ class DoorJdbcProcessor(
                     .build()
                     .writeToPlatformDir(target, environment.codeGenerator, environment.options)
             }
+
+            FileSpec.builder(dbKSClass.packageName.asString(), dbKSClass.simpleName.asString() + SUFFIX_JS_IMPLEMENTATION_CLASSES)
+                .addJsImplementationsClassesObject(dbKSClass)
+                .build()
+                .writeToPlatformDir(DoorTarget.JS, environment.codeGenerator, environment.options)
         }
 
         return emptyList()
