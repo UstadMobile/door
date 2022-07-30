@@ -11,10 +11,7 @@ import kotlin.reflect.KClass
  * As per experimental getAnnotationsByType, but returns the KSAnnotation instance
  */
 fun <T: Annotation> KSAnnotated.getKSAnnotationsByType(annotationKClass: KClass<T>): Sequence<KSAnnotation> {
-    return annotations.filter {
-        it.shortName.getShortName() == annotationKClass.simpleName && it.annotationType.resolve().declaration
-            .qualifiedName?.asString() == annotationKClass.qualifiedName
-    }
+    return annotations.filter { it.isAnnotationClass(annotationKClass) }
 }
 
 /**
