@@ -4,6 +4,7 @@ import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSTypeAlias
+import com.squareup.kotlinpoet.CodeBlock
 import com.ustadmobile.door.DoorDbType
 
 fun KSType.unwrapComponentTypeIfListOrArray(
@@ -18,11 +19,14 @@ fun KSType.unwrapComponentTypeIfListOrArray(
 
 }
 
+fun KSType.isList(): Boolean {
+    return (declaration as? KSClassDeclaration)?.isListDeclaration() == true
+}
+
 fun KSType.isListOrArrayType(
     resolver: Resolver
 ): Boolean {
-    return (this == resolver.builtIns.arrayType)
-            || ((this.declaration as? KSClassDeclaration)?.isListDeclaration() == true)
+    return (this == resolver.builtIns.arrayType) || isList()
 }
 
 fun KSType.resolveIfAlias(): KSType {
@@ -42,14 +46,14 @@ private fun Resolver.sqliteRealTypes(): List<KSType> {
     return listOf(builtIns.floatType, builtIns.doubleType).flatMap { listOf(it, it.makeNullable()) }
 }
 
+private fun KSType.equalsIgnoreNullable(otherType: KSType) : Boolean {
+    return this == otherType || this == otherType.makeNullable()
+}
+
 fun KSType.toSqlType(
     dbType: Int,
     resolver: Resolver,
 ): String {
-    fun KSType.equalsIgnoreNullable(otherType: KSType) : Boolean {
-        return this == otherType || this == otherType.makeNullable()
-    }
-
     val builtIns = resolver.builtIns
     return when {
         this.equalsIgnoreNullable(builtIns.stringType) -> "TEXT"
@@ -64,4 +68,61 @@ fun KSType.toSqlType(
         this.equalsIgnoreNullable(builtIns.doubleType) -> "DOUBLE PRECISION"
         else -> "INVALID UNSUPPORTED TYPE"
     }
+}
+
+fun KSType.defaultTypeValueCode(
+    resolver: Resolver
+): CodeBlock {
+    val builtIns = resolver.builtIns
+    val that = this
+    return CodeBlock.builder()
+        .apply {
+            when {
+                isMarkedNullable -> add("null")
+                that == builtIns.intType -> add("0")
+                that == builtIns.longType -> add("0L")
+                that == builtIns.byteType -> add("0.toByte()")
+                that == builtIns.floatType -> add("0.toFloat()")
+                that == builtIns.doubleType -> add("0.toDouble()")
+                that == builtIns.booleanType -> add("false")
+                that == builtIns.stringType -> add("\"\"")
+                (that.declaration as? KSClassDeclaration)?.isListDeclaration() == true -> {
+                    add("mutableListOf()")
+                }
+                (that.declaration as? KSClassDeclaration)?.isListDeclaration() == true -> {
+                    add("emptyList()")
+                }
+            }
+        }
+        .build()
+}
+
+fun KSType.preparedStatementSetterGetterTypeName(
+    resolver: Resolver
+): String {
+    val builtIns = resolver.builtIns
+    return when {
+        this.equalsIgnoreNullable(builtIns.intType) -> "Int"
+        this.equalsIgnoreNullable(builtIns.byteType) -> "Byte"
+        this.equalsIgnoreNullable(builtIns.longType) -> "Long"
+        this.equalsIgnoreNullable(builtIns.floatType) -> "Float"
+        this.equalsIgnoreNullable(builtIns.doubleType) -> "Double"
+        this.equalsIgnoreNullable(builtIns.booleanType) -> "Boolean"
+        this.equalsIgnoreNullable(builtIns.stringType) -> "String"
+        this == builtIns.arrayType -> "Array"
+        (this.declaration as? KSClassDeclaration)?.isListDeclaration() == true -> "Array"
+        else -> "ERR_UNKNOWN_TYPE"
+    }
+}
+
+fun KSType.isArrayType(): Boolean {
+    return (declaration as? KSClassDeclaration)?.isArrayDeclaration() == true
+}
+
+fun KSType.isLongArray(): Boolean {
+    return (declaration as? KSClassDeclaration)?.qualifiedName?.asString() == "kotlin.LongArray"
+}
+
+fun KSType.isIntArray(): Boolean {
+    return (declaration as? KSClassDeclaration)?.qualifiedName?.asString() == "kotlin.IntArray"
 }

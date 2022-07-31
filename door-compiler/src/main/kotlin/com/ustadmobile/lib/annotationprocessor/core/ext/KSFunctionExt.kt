@@ -16,3 +16,7 @@ fun KSFunction.firstParamEntityType(
     return parameterTypes.first()?.unwrapComponentTypeIfListOrArray(resolver)
         ?: throw IllegalArgumentException("firstParamEntityComponentType: No component type!")
 }
+
+fun KSFunction.hasReturnType(resolver: Resolver): Boolean {
+    return returnType != null && returnType != resolver.builtIns.unitType
+}

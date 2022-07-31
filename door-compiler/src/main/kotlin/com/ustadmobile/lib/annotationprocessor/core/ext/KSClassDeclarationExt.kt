@@ -103,6 +103,13 @@ fun KSClassDeclaration.isListDeclaration(): Boolean {
     return qualifiedName?.asString() in listOf("kotlin.collections.List", "kotlin.collections.MutableList")
 }
 
+fun KSClassDeclaration.isMutableListDeclaration(): Boolean {
+    return qualifiedName?.asString() == "kotlin.collections.MutableList"
+}
+
+fun KSClassDeclaration.isArrayDeclaration(): Boolean {
+    return qualifiedName?.asString() == "kotlin.Array"
+}
 
 fun KSClassDeclaration.toClassNameWithSuffix(
     suffix: String
