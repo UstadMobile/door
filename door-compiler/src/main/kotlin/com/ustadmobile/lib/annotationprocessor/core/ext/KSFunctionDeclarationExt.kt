@@ -3,6 +3,7 @@ package com.ustadmobile.lib.annotationprocessor.core.ext
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSType
+import com.google.devtools.ksp.symbol.Modifier
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.ParameterSpec
@@ -39,5 +40,8 @@ fun KSFunctionDeclaration.toFunSpecBuilder(
 fun KSFunctionDeclaration.hasReturnType(
     resolver: Resolver
 ): Boolean {
-    return this.returnType != null && this.returnType != resolver.builtIns.unitType
+    return this.returnType?.resolve() != null && this.returnType?.resolve() != resolver.builtIns.unitType
 }
+
+val KSFunctionDeclaration.isSuspended: Boolean
+    get() = Modifier.SUSPEND in modifiers

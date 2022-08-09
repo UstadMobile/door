@@ -6,10 +6,7 @@ import androidx.room.*
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
-import com.google.devtools.ksp.symbol.KSAnnotated
-import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import com.google.devtools.ksp.symbol.KSType
+import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.*
 import javax.annotation.processing.*
 import javax.lang.model.element.*
@@ -49,6 +46,7 @@ import com.ustadmobile.lib.annotationprocessor.core.DbProcessorJdbcKotlin.Compan
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
 import io.github.aakira.napier.Napier
 import java.io.File
+import javax.lang.model.element.Modifier
 
 val QUERY_SINGULAR_TYPES = listOf(INT, LONG, SHORT, BYTE, BOOLEAN, FLOAT, DOUBLE,
         String::class.asTypeName(), String::class.asTypeName().copy(nullable = true))
@@ -1493,81 +1491,6 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
         return this
     }
 
-    fun TypeSpec.Builder.addDaoUpdateFunction(
-        funElement: ExecutableElement,
-        daoTypeElement: TypeElement
-    ) : TypeSpec.Builder {
-        Napier.d("DbProcessorJdbcKotlin: addDaoUpdateFunction: start ${daoTypeElement.simpleName}#${funElement.simpleName}")
-        val funSpec = funElement.asFunSpecConvertedToKotlinTypesForDaoFun(
-            daoTypeElement.asType() as DeclaredType, processingEnv).build()
-        val entityType = funSpec.parameters.first().type.unwrapListOrArrayComponentType()
-        val entityTypeEl = (entityType as ClassName).asTypeElement(processingEnv)
-            ?: throw IllegalStateException("Could not resolve ${entityType.canonicalName}")
-        val pkEls = entityTypeEl.entityPrimaryKeys
-        val nonPkFields = entityTypeEl.entityFields.filter {
-            it.simpleName !in pkEls.map { it.simpleName }
-        }
-        val sqlSetPart = nonPkFields.map { "${it.simpleName} = ?" }.joinToString()
-        val sqlStmt  = "UPDATE ${entityTypeEl.simpleName} SET $sqlSetPart " +
-                "WHERE ${pkEls.joinToString(separator = " AND ") { "${it.simpleName} = ?" }}"
-        val firstParam = funSpec.parameters.first()
-        var entityVarName = firstParam.name
-
-        addFunction(funSpec.toBuilder()
-            .removeAnnotations()
-            .removeAbstractModifier()
-            .addModifiers(KModifier.OVERRIDE)
-            .addCode(CodeBlock.builder()
-                .applyIf(funSpec.hasReturnType) {
-                    add("var _result = %L\n", funSpec.returnType?.defaultTypeValueCode())
-                }
-                .add("val _sql = %S\n", sqlStmt)
-                .beginControlFlow("_db.%M(_sql)", prepareAndUseStatmentMemberName(funSpec.isSuspended))
-                .add(" _stmt ->\n")
-                .applyIf(firstParam.type.isListOrArray()) {
-                    add("_stmt.getConnection().setAutoCommit(false)\n")
-                        .beginControlFlow("for(_entity in ${firstParam.name})")
-                    entityVarName = "_entity"
-                }
-                .apply {
-                    var fieldIndex = 1
-                    nonPkFields.forEach {
-                        add("_stmt.set${it.asType().asTypeName().preparedStatementSetterGetterTypeName}")
-                        add("(%L, %L)\n", fieldIndex++, "$entityVarName.${it.simpleName}")
-                    }
-                    pkEls.forEach { pkEl ->
-                        add("_stmt.set${pkEl.asType().asTypeName().preparedStatementSetterGetterTypeName}")
-                        add("(%L, %L)\n", fieldIndex++, "$entityVarName.${pkEl.simpleName}")
-                    }
-                }
-                .applyIf(funSpec.hasReturnType) {
-                    add("_result += ")
-                }
-                .applyIf(funSpec.isSuspended) {
-                    add("_stmt.%M()\n", MEMBERNAME_EXEC_UPDATE_ASYNC)
-                }
-                .applyIf(!funSpec.isSuspended) {
-                    add("_stmt.executeUpdate()\n")
-                }
-                .applyIf(firstParam.type.isListOrArray()) {
-                    endControlFlow()
-                    add("_stmt.getConnection().commit()\n")
-                }
-                .endControlFlow()
-                .applyIf(funSpec.hasReturnType) {
-                    add("return _result")
-                }
-                .build())
-
-            .build())
-
-        Napier.d("DbProcessorJdbcKotlin: addDaoUpdateFunction: finish ${daoTypeElement.simpleName}#${funElement.simpleName}")
-        return this
-    }
-
-
-
-
 
     fun makeLogPrefix(enclosing: TypeElement, method: ExecutableElement) = "DoorDb: ${enclosing.qualifiedName}. ${method.simpleName} "
 
@@ -1599,6 +1522,9 @@ fun FileSpec.Builder.addDaoJdbcImplType(
             daoKSClass.getAllFunctions().filter { it.hasAnnotation(Insert::class) }.forEach { daoFun ->
                 addDaoInsertFunction(daoFun, daoKSClass, resolver, target)
             }
+            daoKSClass.getAllFunctions().filter { it.hasAnnotation(Update::class) }.forEach { daoFun ->
+                addDaoUpdateFunction(daoFun, daoKSClass, resolver)
+            }
         }
         .build())
 
@@ -1623,6 +1549,82 @@ fun TypeSpec.Builder.addDaoInsertFunction(
             .build())
         .build())
     Napier.d("Finish dao insert function: ${daoFun.simpleName.asString()} on ${daoKSClass.simpleName.asString()}")
+    return this
+}
+
+fun TypeSpec.Builder.addDaoUpdateFunction(
+    daoFunDecl: KSFunctionDeclaration,
+    daoKSClass: KSClassDeclaration,
+    resolver: Resolver,
+) : TypeSpec.Builder {
+    val funLogName = "${daoKSClass.simpleName.asString()}#${daoFunDecl.simpleName.asString()}"
+    Napier.d("DbProcessorJdbcKotlin: addDaoUpdateFunction: start $funLogName")
+    val funSpec = daoFunDecl.toFunSpecBuilder(resolver, daoKSClass.asType(emptyList()))
+
+    val daoFun = daoFunDecl.asMemberOf(daoKSClass.asType(emptyList()))
+    val entityType = daoFun.parameterTypes.firstOrNull()
+        ?.unwrapComponentTypeIfListOrArray(resolver) ?: throw IllegalArgumentException("$funLogName cannot find param type")
+    val entityKSClass = entityType.declaration as KSClassDeclaration
+    val pkProps = entityKSClass.entityPrimaryKeyProps
+    val nonPkFields = entityKSClass.entityProps(false).filter {
+        it !in pkProps
+    }
+    val sqlSetPart = nonPkFields.map { "${it.simpleName.asString()} = ?" }.joinToString()
+    val sqlStmt  = "UPDATE ${entityKSClass.entityTableName} SET $sqlSetPart " +
+            "WHERE ${pkProps.joinToString(separator = " AND ") { "${it.simpleName.asString()} = ?" }}"
+    val firstParam = funSpec.parameters.first()
+    var entityVarName = firstParam.name
+
+    addFunction(funSpec
+        .removeAnnotations()
+        .removeAbstractModifier()
+        .addModifiers(KModifier.OVERRIDE)
+        .addCode(CodeBlock.builder()
+            .applyIf(daoFunDecl.hasReturnType(resolver)) {
+                add("var _result = %L\n", daoFun.returnType?.defaultTypeValueCode(resolver))
+            }
+            .add("val _sql = %S\n", sqlStmt)
+            .beginControlFlow("_db.%M(_sql)",
+                AbstractDbProcessor.prepareAndUseStatmentMemberName(daoFunDecl.isSuspended))
+            .add(" _stmt ->\n")
+            .applyIf(firstParam.type.isListOrArray()) {
+                add("_stmt.getConnection().setAutoCommit(false)\n")
+                    .beginControlFlow("for(_entity in ${firstParam.name})")
+                entityVarName = "_entity"
+            }
+            .apply {
+                var fieldIndex = 1
+                nonPkFields.forEach {
+                    add("_stmt.set${it.type.resolve().preparedStatementSetterGetterTypeName(resolver)}")
+                    add("(%L, %L)\n", fieldIndex++, "$entityVarName.${it.simpleName.asString()}")
+                }
+                pkProps.forEach { pkEl ->
+                    add("_stmt.set${pkEl.type.resolve().preparedStatementSetterGetterTypeName(resolver)}")
+                    add("(%L, %L)\n", fieldIndex++, "$entityVarName.${pkEl.simpleName.asString()}")
+                }
+            }
+            .applyIf(daoFun.hasReturnType(resolver)) {
+                add("_result += ")
+            }
+            .applyIf(daoFunDecl.isSuspended) {
+                add("_stmt.%M()\n", AbstractDbProcessor.MEMBERNAME_EXEC_UPDATE_ASYNC)
+            }
+            .applyIf(!daoFunDecl.isSuspended) {
+                add("_stmt.executeUpdate()\n")
+            }
+            .applyIf(firstParam.type.isListOrArray()) {
+                endControlFlow()
+                add("_stmt.getConnection().commit()\n")
+            }
+            .endControlFlow()
+            .applyIf(daoFunDecl.hasReturnType(resolver)) {
+                add("return _result")
+            }
+            .build())
+
+        .build())
+
+    Napier.d("DbProcessorJdbcKotlin: addDaoUpdateFunction: finish $funLogName")
     return this
 }
 
