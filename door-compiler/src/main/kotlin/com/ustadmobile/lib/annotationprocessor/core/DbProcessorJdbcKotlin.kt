@@ -1433,65 +1433,6 @@ class DbProcessorJdbcKotlin: AbstractDbProcessor() {
     }
 
 
-    fun TypeSpec.Builder.addDaoDeleteFunction(
-        funElement: ExecutableElement,
-        daoTypeElement: TypeElement
-    ) : TypeSpec.Builder {
-        Napier.d("DbProcessorJdbcKotlin: addDaoDeleteFunction: start ${daoTypeElement.simpleName}#${funElement.simpleName}")
-        val funSpec = funElement.asFunSpecConvertedToKotlinTypesForDaoFun(
-            daoTypeElement.asType() as DeclaredType, processingEnv).build()
-        val entityType = funSpec.parameters.first().type.unwrapListOrArrayComponentType()
-        val entityTypeEl = (entityType as ClassName).asTypeElement(processingEnv)
-            ?: throw IllegalStateException("Could not resolve ${entityType.canonicalName}")
-        val pkEls = entityTypeEl.entityPrimaryKeys
-        val stmtSql = "DELETE FROM ${entityTypeEl.simpleName} WHERE " +
-                pkEls.joinToString(separator = " AND ") { "${it.simpleName} = ?" }
-        val firstParam = funSpec.parameters.first()
-        var entityVarName = firstParam.name
-
-        addFunction(funSpec.toBuilder()
-            .removeAbstractModifier()
-            .removeAnnotations()
-            .addModifiers(KModifier.OVERRIDE)
-            .addCode(CodeBlock.builder()
-                .add("var _numChanges = 0\n")
-                .beginControlFlow("_db.%M(%S)", prepareAndUseStatmentMemberName(funSpec.isSuspended),
-                    stmtSql)
-                .add(" _stmt ->\n")
-                .applyIf(firstParam.type.isListOrArray()) {
-                    add("_stmt.getConnection().setAutoCommit(false)\n")
-                    beginControlFlow("for(_entity in ${firstParam.name})")
-                    entityVarName = "_entity"
-                }
-                .apply {
-                    pkEls.forEachIndexed { index, pkEl ->
-                        add("_stmt.set${pkEl.asType().asTypeName().preparedStatementSetterGetterTypeName}(%L, %L)\n",
-                            index + 1, "$entityVarName.${pkEl.simpleName}")
-                    }
-                }
-                .apply {
-                    if(funSpec.isSuspended) {
-                        add("_numChanges += _stmt.%M()\n", MEMBERNAME_EXEC_UPDATE_ASYNC)
-                    }else {
-                        add("_numChanges += _stmt.executeUpdate()\n")
-                    }
-                }
-                .applyIf(firstParam.type.isListOrArray()) {
-                    endControlFlow()
-                    add("_stmt.getConnection().commit()\n")
-                }
-                .endControlFlow()
-                .applyIf(funSpec.hasReturnType) {
-                    add("return _numChanges\n")
-                }
-                .build())
-            .build())
-
-        Napier.d("DbProcessorJdbcKotlin: addDaoDeleteFunction: finish ${daoTypeElement.simpleName}#${funElement.simpleName}")
-        return this
-    }
-
-
     fun makeLogPrefix(enclosing: TypeElement, method: ExecutableElement) = "DoorDb: ${enclosing.qualifiedName}. ${method.simpleName} "
 
     companion object {
@@ -1524,6 +1465,9 @@ fun FileSpec.Builder.addDaoJdbcImplType(
             }
             daoKSClass.getAllFunctions().filter { it.hasAnnotation(Update::class) }.forEach { daoFun ->
                 addDaoUpdateFunction(daoFun, daoKSClass, resolver)
+            }
+            daoKSClass.getAllFunctions().filter { it.hasAnnotation(Delete::class) }.forEach { daoFun ->
+                addDaoDeleteFunction(daoFun, daoKSClass, resolver)
             }
         }
         .build())
@@ -1625,6 +1569,65 @@ fun TypeSpec.Builder.addDaoUpdateFunction(
         .build())
 
     Napier.d("DbProcessorJdbcKotlin: addDaoUpdateFunction: finish $funLogName")
+    return this
+}
+
+fun TypeSpec.Builder.addDaoDeleteFunction(
+    daoFunDecl: KSFunctionDeclaration,
+    daoDecl: KSClassDeclaration,
+    resolver: Resolver,
+) : TypeSpec.Builder {
+    val logName = "${daoDecl.simpleName.asString()}#${daoFunDecl.simpleName.asString()}"
+    Napier.d("DbProcessorJdbcKotlin: addDaoDeleteFunction: start $logName")
+    val funSpec = daoFunDecl.toFunSpecBuilder(resolver, daoDecl.asType(emptyList()))
+    val entityType = daoFunDecl.asMemberOf(daoDecl.asType(emptyList())).firstParamEntityType(resolver)
+    val entityClassDecl = entityType.declaration as KSClassDeclaration
+    val pkEls = entityClassDecl.entityPrimaryKeyProps
+    val stmtSql = "DELETE FROM ${entityClassDecl.entityTableName} WHERE " +
+            pkEls.joinToString(separator = " AND ") { "${it.simpleName.asString()} = ?" }
+    val firstParam = funSpec.parameters.first()
+    var entityVarName = firstParam.name
+
+    addFunction(funSpec
+        .removeAbstractModifier()
+        .removeAnnotations()
+        .addModifiers(KModifier.OVERRIDE)
+        .addCode(CodeBlock.builder()
+            .add("var _numChanges = 0\n")
+            .beginControlFlow("_db.%M(%S)",
+                AbstractDbProcessor.prepareAndUseStatmentMemberName(daoFunDecl.isSuspended),
+                stmtSql)
+            .add(" _stmt ->\n")
+            .applyIf(firstParam.type.isListOrArray()) {
+                add("_stmt.getConnection().setAutoCommit(false)\n")
+                beginControlFlow("for(_entity in ${firstParam.name})")
+                entityVarName = "_entity"
+            }
+            .apply {
+                pkEls.forEachIndexed { index, pkProp ->
+                    add("_stmt.set${pkProp.type.resolve().preparedStatementSetterGetterTypeName(resolver)}(%L, %L)\n",
+                        index + 1, "$entityVarName.${pkProp.simpleName.asString()}")
+                }
+            }
+            .apply {
+                if(daoFunDecl.isSuspended) {
+                    add("_numChanges += _stmt.%M()\n", AbstractDbProcessor.MEMBERNAME_EXEC_UPDATE_ASYNC)
+                }else {
+                    add("_numChanges += _stmt.executeUpdate()\n")
+                }
+            }
+            .applyIf(firstParam.type.isListOrArray()) {
+                endControlFlow()
+                add("_stmt.getConnection().commit()\n")
+            }
+            .endControlFlow()
+            .applyIf(daoFunDecl.hasReturnType(resolver)) {
+                add("return _numChanges\n")
+            }
+            .build())
+        .build())
+
+    Napier.d("DbProcessorJdbcKotlin: addDaoDeleteFunction: finish $logName")
     return this
 }
 
