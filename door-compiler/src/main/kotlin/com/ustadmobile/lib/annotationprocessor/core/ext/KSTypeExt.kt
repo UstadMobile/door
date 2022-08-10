@@ -1,9 +1,9 @@
 package com.ustadmobile.lib.annotationprocessor.core.ext
 
+import androidx.lifecycle.LiveData
+import androidx.paging.DataSource
 import com.google.devtools.ksp.processing.Resolver
-import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.google.devtools.ksp.symbol.KSType
-import com.google.devtools.ksp.symbol.KSTypeAlias
+import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.CodeBlock
 import com.ustadmobile.door.DoorDbType
 
@@ -18,6 +18,25 @@ fun KSType.unwrapComponentTypeIfListOrArray(
     }
 
 }
+
+fun KSType.unwrapLiveDataOrDataSourceFactoryResultType(
+    resolver: Resolver,
+): KSType {
+    val qualifiedName = this.declaration.qualifiedName?.asString()
+    if (qualifiedName == LiveData::class.qualifiedName) {
+        return this.arguments.first().type?.resolve()
+            ?: throw IllegalArgumentException("unwrapLiveDataOrDataSourceFactoryResultType: Cannot resolve LiveData type!")
+    } else if (qualifiedName == DataSource.Factory::class.qualifiedName) {
+        val entityTypeRef = resolver.createKSTypeReferenceFromKSType(this)
+        return resolver.getClassDeclarationByName(resolver.getKSNameFromString("kotlin.collections.List"))
+            ?.asType(listOf(resolver.getTypeArgument(entityTypeRef, Variance.INVARIANT)))
+                ?: throw IllegalArgumentException("unwrapLiveDataOrDataSourceFactoryResultType: could not lookup datasource comp type")
+    }else {
+        return this
+    }
+
+}
+
 
 fun KSType.isList(): Boolean {
     return (declaration as? KSClassDeclaration)?.isListDeclaration() == true
@@ -97,6 +116,16 @@ fun KSType.defaultTypeValueCode(
         .build()
 }
 
+fun KSType.defaultSqlQueryVal(resolver: Resolver) : String {
+    return when {
+        this in resolver.sqlNumericNonNullTypes() -> "0"
+        this == resolver.builtIns.booleanType  -> "false"
+        this == resolver.builtIns.stringType -> "''"
+        else -> "null"
+    }
+}
+
+
 fun KSType.preparedStatementSetterGetterTypeName(
     resolver: Resolver
 ): String {
@@ -126,3 +155,10 @@ fun KSType.isLongArray(): Boolean {
 fun KSType.isIntArray(): Boolean {
     return (declaration as? KSClassDeclaration)?.qualifiedName?.asString() == "kotlin.IntArray"
 }
+
+fun KSType.isDataSourceFactory() = declaration.isDataSourceFactory()
+
+fun KSType.isLiveData() = declaration.isLiveData()
+
+fun KSType.isDataSourceFactoryOrLiveData() = declaration.isDataSourceFactoryOrLiveData()
+

@@ -18,3 +18,10 @@ fun <R> ResultSet.mapRows(block: (ResultSet) -> R): List<R> {
 
     return mappedResults
 }
+
+fun <R> ResultSet.mapNextRow(defaultVal: R, block: (ResultSet) -> R): R {
+    return if(next())
+        block(this)
+    else
+        defaultVal
+}

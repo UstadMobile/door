@@ -220,7 +220,7 @@ fun KSClassDeclaration.toCreateTableSql(
         val defaultVal = columnInfo?.defaultValue
         if(columnInfo != null && defaultVal != ColumnInfo.VALUE_UNSPECIFIED) {
             //Postgres uses an actual boolean type. SQLite / Room is using an Integer with a 0 or 1 value.
-            if(dbType == DoorDbType.POSTGRES && fieldProp.type == resolver.builtIns.booleanType) {
+            if(dbType == DoorDbType.POSTGRES && fieldProp.type.resolve() == resolver.builtIns.booleanType) {
                 sql += " DEFAULT " + if(defaultVal == "1") {
                     "true"
                 }else {
@@ -269,5 +269,42 @@ fun <A: Annotation> KSClassDeclaration.firstPropNameWithAnnotationOrNull(
     return getAllProperties().firstOrNull { it.hasAnnotation(annotationClass) }?.let {
         CodeBlock.of("%S", it.simpleName.asString())
     } ?: CodeBlock.of("null")
+}
+
+fun KSClassDeclaration.asTypeParameterizedBy(
+    resolver: Resolver,
+    vararg types: KSType
+) : KSType {
+    return asType(types.map { ksType ->
+        resolver.getTypeArgument(resolver.createKSTypeReferenceFromKSType(ksType), Variance.INVARIANT)
+    })
+}
+
+/**
+ * Get a list of all the properties that need to be on a resultset for the given entity. This includes those that are
+ * in embedded fields
+ */
+fun KSClassDeclaration.getAllResultSetColumnProperties(
+    resolver: Resolver
+): List<KSPropertyDeclaration> {
+    val allProps = this.getAllProperties().toList()
+    val embeddedProps = allProps.filter { it.hasAnnotation(Embedded::class) }
+        .flatMap { (it.type.resolve().declaration as? KSClassDeclaration)?.getAllResultSetColumnProperties(resolver) ?: emptyList() }
+    return embeddedProps + allProps.filter { !it.isTransient && it.type.resolve() in resolver.querySingularTypes() }
+}
+
+fun KSClassDeclaration.getAllColumnProperties(
+    resolver: Resolver
+): List<KSPropertyDeclaration> {
+    return getAllProperties().filter { !it.isTransient && it.type.resolve() in resolver.querySingularTypes() }.toList()
+}
+
+fun KSClassDeclaration.entityEmbeddedEntities(
+    resolver: Resolver
+): List<KSClassDeclaration> {
+    return getAllProperties().toList().filter { it.hasAnnotation(Embedded::class) }.flatMap {
+        val embeddedClassDecl = it.type.resolve().declaration as KSClassDeclaration
+        listOf(embeddedClassDecl) + embeddedClassDecl.entityEmbeddedEntities(resolver)
+    }
 }
 

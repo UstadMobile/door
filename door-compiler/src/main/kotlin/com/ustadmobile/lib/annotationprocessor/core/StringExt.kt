@@ -1,6 +1,9 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
+import com.google.devtools.ksp.processing.Resolver
+import com.google.devtools.ksp.symbol.KSType
 import com.squareup.kotlinpoet.TypeName
+import com.ustadmobile.lib.annotationprocessor.core.ext.defaultSqlQueryVal
 
 /**
  * Determine if the given SQL runs a query that could modify a table. This will return true
@@ -67,6 +70,21 @@ fun String.replaceQueryNamedParamsWithDefaultValues(
     var newSql = this
     queryNamedParams.forEach {
         newSql = newSql.replace(":${it.key}", defaultSqlQueryVal(it.value))
+    }
+
+    return newSql
+}
+
+/**
+ * Shorthand to replace all named parameters
+ */
+fun String.replaceQueryNamedParamsWithDefaultTypeValues(
+    queryNamedParams: Map<String, KSType>,
+    resolver: Resolver
+) : String{
+    var newSql = this
+    queryNamedParams.forEach {
+        newSql = newSql.replace(":${it.key}",  it.value.defaultSqlQueryVal(resolver))
     }
 
     return newSql

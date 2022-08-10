@@ -1,6 +1,8 @@
 package com.ustadmobile.lib.annotationprocessor.core.ext
 
+import androidx.lifecycle.LiveData
 import com.google.devtools.ksp.symbol.*
+import androidx.paging.DataSource
 
 fun KSDeclaration.propertyOrReturnType(): KSTypeReference? {
     return when(this) {
@@ -17,4 +19,14 @@ fun KSDeclaration.toPropertyOrEmptyFunctionCaller(): String {
 
     return accessor
 }
+
+fun KSDeclaration.isDataSourceFactory(): Boolean {
+    return (this as? KSClassDeclaration)?.qualifiedName?.asString() == DataSource.Factory::class.qualifiedName
+}
+
+fun KSDeclaration.isLiveData(): Boolean {
+    return (this as? KSClassDeclaration)?.qualifiedName?.asString() == LiveData::class.qualifiedName
+}
+
+fun KSDeclaration.isDataSourceFactoryOrLiveData() =  isDataSourceFactory() || isLiveData()
 

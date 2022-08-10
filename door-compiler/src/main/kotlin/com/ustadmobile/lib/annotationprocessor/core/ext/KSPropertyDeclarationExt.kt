@@ -15,3 +15,6 @@ val KSPropertyDeclaration.entityPropColumnName: String
         else
             simpleName.asString()
     }
+
+val KSPropertyDeclaration.isTransient: Boolean
+    get() = hasAnnotation(Transient::class)
