@@ -17,8 +17,11 @@ actual class SimpleDoorQuery actual constructor(private val sql: String, overrid
     }
 
 
-    override fun bindToPreparedStmt(stmt: PreparedStatement, db: RoomDatabase, con: Connection) {
+    //Cast is here to be clear about jdbc array vs. normal array
+    @Suppress("USELESS_CAST")
+    override fun bindToPreparedStmt(stmt: PreparedStatement, db: RoomDatabase) {
         val paramsToBind = values
+        val connection = stmt.getConnection()
         if(paramsToBind != null) {
             var paramIndex = 1
             for(param in paramsToBind) {
@@ -39,7 +42,7 @@ actual class SimpleDoorQuery actual constructor(private val sql: String, overrid
 
 
                     val arrayParam = if(db.arraySupported) {
-                        con.createArrayOf(paramType, valuesArr)
+                        connection.createArrayOf(paramType, valuesArr)
                     }else {
                         JdbcArrayProxy(paramType, valuesArr)
                     } as com.ustadmobile.door.jdbc.Array

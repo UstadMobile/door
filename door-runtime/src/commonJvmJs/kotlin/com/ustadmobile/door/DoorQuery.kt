@@ -12,7 +12,7 @@ actual interface DoorQuery {
 
     val values: Array<out Any?>?
 
-    fun bindToPreparedStmt(stmt: PreparedStatement, db: RoomDatabase, con: Connection)
+    fun bindToPreparedStmt(stmt: PreparedStatement, db: RoomDatabase)
 
 
 }

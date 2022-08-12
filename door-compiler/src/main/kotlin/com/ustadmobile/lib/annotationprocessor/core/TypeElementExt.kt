@@ -16,9 +16,6 @@ import com.ustadmobile.lib.annotationprocessor.core.ext.getClassArrayValue
 import kotlinx.metadata.KmProperty
 import javax.lang.model.type.TypeMirror
 
-val ALL_QUERY_ANNOTATIONS = listOf(Query::class.java, Update::class.java, Delete::class.java,
-        Insert::class.java)
-
 internal fun TypeElement.asEntityTypeSpecBuilder(): TypeSpec.Builder {
     val typeSpecBuilder = TypeSpec.classBuilder(this.simpleName.toString())
     this.enclosedElements
@@ -37,45 +34,6 @@ internal fun TypeElement.asEntityTypeSpecBuilder(): TypeSpec.Builder {
 
 
 internal fun TypeElement.asEntityTypeSpec() = this.asEntityTypeSpecBuilder().build()
-
-internal fun TypeElement.hasDataSourceFactory(paramTypeFilter: (List<TypeName>) -> Boolean = {true})
-        = enclosedElements.any { it.kind == ElementKind.METHOD
-        && (it as ExecutableElement).returnType.asTypeName().isDataSourceFactory(paramTypeFilter) }
-
-/**
- * Get a list of all the methods of the given TypeElement including those that are declared in
- * parent classes and interfaces that can be overriden. This function can exclude methods that are
- * already implemented in parent classes (including resolving generic types as required)
- */
-fun TypeElement.allOverridableMethods(processingEnv: ProcessingEnvironment,
-                                      enclosing: DeclaredType = this.asType() as DeclaredType,
-                                      includeImplementedMethods: Boolean = false) :List<ExecutableElement> {
-    return ancestorsAsList(processingEnv).flatMap {
-        it.enclosedElements.filter {
-            it.kind ==  ElementKind.METHOD
-                    && (includeImplementedMethods || Modifier.ABSTRACT in it.modifiers) //abstract methods in this class
-                    && (Modifier.FINAL !in it.modifiers)
-        } + it.interfaces.flatMap {
-            processingEnv.typeUtils.asElement(it).enclosedElements.filter { it.kind == ElementKind.METHOD } //methods from the interface
-        }
-    }.filter {
-        includeImplementedMethods || !isMethodImplemented(it as ExecutableElement, this, processingEnv)
-    }.distinctBy {
-        val signatureParamTypes = (processingEnv.typeUtils.asMemberOf(enclosing, it) as ExecutableType)
-                .parameterTypes.filter { ! isContinuationParam(it.asTypeName()) }
-        MethodToImplement(it.simpleName.toString(), signatureParamTypes.map { it.asTypeName() })
-    }.map {
-        it as ExecutableElement
-    }
-}
-
-/**
- * Shorthand extension for a TypeElement that represents a class with the @Database annotation
- * that will give a list of all the DAO getter functions
- */
-fun TypeElement.allDbClassDaoGetters(processingEnv: ProcessingEnvironment) =
-        allOverridableMethods(processingEnv)
-            .filter { it.returnType.asTypeElement(processingEnv)?.hasAnnotation(Dao::class.java) == true}
 
 /**
  * Gets a list of all ancestor parent classes and interfaces.
@@ -138,44 +96,6 @@ fun TypeElement.allDbEntities(processingEnv: ProcessingEnvironment): List<TypeEl
     return dbAnnotationMirror.getClassArrayValue("entities", processingEnv)
 }
 
-
-fun TypeElement.asClassNameWithSuffix(suffix: String) =
-        ClassName(packageName, "$simpleName$suffix")
-
-
-/**
- * Where this TypeElement represents a DAO, this is a shorthand to provide a list of all methods on
- * the DAO which are annotated with any kind of Query (inc Query, Delete, Update, Insert)
- */
-fun TypeElement.allDaoQueryMethods() = allMethodsWithAnnotation(ALL_QUERY_ANNOTATIONS)
-
-/**
- * Convert this TypeElement into a Kotlin Poet FunSpec that can be used to generate implementations.
- * TypeSpecs are often used as the basis for generation logic because we can generate it (eg. for
- * SyncDaos etc). This extension function converts a TypeElement from the annotation processor
- * environment into an equivalent TypeSpec.
- *
- */
-fun TypeElement.asTypeSpecStub(processingEnv: ProcessingEnvironment): TypeSpec {
-    val declaredType = this.asType() as DeclaredType
-    val thisTypeEl = this
-    return TypeSpec.classBuilder(asClassName())
-            .applyIf(Modifier.ABSTRACT in modifiers) {
-                addModifiers(KModifier.ABSTRACT)
-            }
-            .apply {
-                allOverridableMethods(processingEnv).forEach {executableEl ->
-                    val resolvedType = executableEl.asMemberOf(thisTypeEl, processingEnv)
-                    val returnTypeName = resolvedType.suspendedSafeReturnType
-
-                    addFunction(executableEl.asFunSpecConvertedToKotlinTypes(declaredType,
-                        processingEnv, forceNullableReturn = returnTypeName.isNullableAsSelectReturnResult,
-                        forceNullableParameterTypeArgs = returnTypeName.isNullableParameterTypeAsSelectReturnResult)
-                            .build())
-                }
-            }
-            .build()
-}
 
 /**
  * Check to see if this represents a TypeElement for a Dao which is annotated with Repository.
@@ -286,18 +206,3 @@ fun  <A: Annotation> TypeElement.kmPropertiesWithAnnotation(annotationClass: Cla
     return kmClass.properties.filter { it.name in elementsWithAnnotationNames }
 }
 
-fun TypeElement.findDaoGetter(daoTypeElement: TypeElement, processingEnv: ProcessingEnvironment): CodeBlock {
-    val executableFunEl = enclosedElements
-        .first { it.kind == ElementKind.METHOD && (it as ExecutableElement).returnType.asTypeElement(processingEnv) == daoTypeElement }
-    return (executableFunEl as ExecutableElement).makeAccessorCodeBlock()
-}
-
-val TypeElement.isReplicateEntityWithAutoIncPrimaryKey: Boolean
-    get() {
-        if(!hasAnnotation(ReplicateEntity::class.java))
-            return false
-
-        val pkEntity = enclosedElementsWithAnnotation(PrimaryKey::class.java, ElementKind.FIELD).firstOrNull() ?: return false
-
-        return pkEntity.getAnnotation(PrimaryKey::class.java).autoGenerate
-    }

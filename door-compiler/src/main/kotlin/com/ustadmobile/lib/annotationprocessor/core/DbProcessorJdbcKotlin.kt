@@ -1,7 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
 import androidx.lifecycle.LiveData
-import androidx.paging.DataSource
 import androidx.room.*
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
@@ -9,21 +8,13 @@ import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.*
 import javax.annotation.processing.*
-import javax.lang.model.element.*
-import javax.lang.model.type.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.ustadmobile.door.*
-import net.sf.jsqlparser.parser.CCJSqlParserUtil
-import net.sf.jsqlparser.statement.select.Select
-import net.sf.jsqlparser.util.TablesNamesFinder
 import javax.lang.model.element.TypeElement
-import javax.lang.model.type.TypeMirror
 import kotlin.reflect.jvm.internal.impl.name.FqName
 import kotlin.reflect.jvm.internal.impl.builtins.jvm.JavaToKotlinClassMap
-import javax.lang.model.util.SimpleTypeVisitor7
-import javax.tools.Diagnostic
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.annotation.*
 import com.ustadmobile.door.attachments.AttachmentFilter
@@ -31,7 +22,6 @@ import com.ustadmobile.door.entities.ChangeLog
 import com.ustadmobile.door.ext.DoorDatabaseMetadata
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
 import com.ustadmobile.door.ext.minifySql
-import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.replication.ReplicationRunOnChangeRunner
 import com.ustadmobile.door.replication.ReplicationEntityMetaData
 import com.ustadmobile.door.replication.ReplicationFieldMetaData
@@ -42,15 +32,14 @@ import kotlinx.coroutines.GlobalScope
 import kotlin.reflect.KClass
 import com.ustadmobile.door.util.NodeIdAuthCache
 import com.ustadmobile.door.util.TransactionDepthCounter
+import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.MEMBERNAME_EXEC_UPDATE_ASYNC
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorJdbcKotlin.Companion.SUFFIX_JDBC_KT2
 import com.ustadmobile.lib.annotationprocessor.core.DbProcessorJdbcKotlin.Companion.SUFFIX_JS_IMPLEMENTATION_CLASSES
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.DelicateCoroutinesApi
 import java.io.File
-import java.sql.ResultSet
-import java.sql.SQLException
-import java.sql.Statement
-import javax.lang.model.element.Modifier
+import kotlin.math.abs
 
 val QUERY_SINGULAR_TYPES = listOf(INT, LONG, SHORT, BYTE, BOOLEAN, FLOAT, DOUBLE,
         String::class.asTypeName(), String::class.asTypeName().copy(nullable = true))
@@ -89,21 +78,6 @@ fun isContinuationParam(paramTypeName: TypeName) = paramTypeName is Parameterize
         paramTypeName.rawType.canonicalName == "kotlin.coroutines.Continuation"
 
 /**
- * Figures out the return type of a method. This will also figure out the return type of a suspended method
- */
-fun resolveReturnTypeIfSuspended(method: ExecutableType) : TypeName {
-    val continuationParam = method.parameterTypes.firstOrNull { isContinuationParam(it.asTypeName()) }
-    return if(continuationParam != null) {
-        //The continuation parameter is always the last parameter, and has one type argument
-        val contReturnType = (method.parameterTypes.last() as DeclaredType).typeArguments.first().extendsBoundOrSelf().asTypeName()
-        removeTypeProjection(contReturnType)
-        //Open classes can result in <out T> being generated instead of just <T>. Therefor we want to remove the wildcard
-    }else {
-        method.returnType.asTypeName().javaToKotlinType()
-    }
-}
-
-/**
  * Remove <out T>
  */
 fun removeTypeProjection(typeName: TypeName) =
@@ -113,20 +87,6 @@ fun removeTypeProjection(typeName: TypeName) =
         typeName.javaToKotlinType()
     }
 
-
-/**
- * If the return type is LiveData, Factory, etc. then unwrap that into the result type.
- */
-fun resolveQueryResultType(returnTypeName: TypeName)  =
-        if(returnTypeName is ParameterizedTypeName
-                && returnTypeName.rawType == LiveData::class.asClassName()) {
-            returnTypeName.typeArguments[0]
-        }else if(returnTypeName is ParameterizedTypeName
-            && returnTypeName.rawType == DataSource.Factory::class.asClassName())
-            List::class.asClassName().parameterizedBy(returnTypeName.typeArguments[1])
-        else {
-            returnTypeName
-        }
 
 fun makeInsertAdapterMethodName(
     paramType: KSType,
@@ -192,8 +152,9 @@ private fun FileSpec.Builder.addDatabaseMetadataType(
         .addProperty(PropertySpec.builder("allTables", List::class.parameterizedBy(String::class))
             .addModifiers(KModifier.OVERRIDE)
             .initializer(CodeBlock.builder()
-                .add("listOf(%L)\n", dbKSClass.allDbEntities().map { it.simpleName.asString() }
-                    .joinToString(prefix = "\"", postfix = "\"", separator = "\", \""))
+                .add("listOf(%L)\n",
+                    dbKSClass.allDbEntities()
+                        .joinToString(prefix = "\"", postfix = "\"", separator = "\", \"") { it.simpleName.asString() })
                 .build())
             .build())
         .addProperty(PropertySpec.builder("replicateEntities", Map::class.parameterizedBy(Int::class, ReplicationEntityMetaData::class))
@@ -445,183 +406,6 @@ private fun FileSpec.Builder.addReplicationRunOnChangeRunnerType(
 }
 
 
-/**
- * This class represents a POKO object in the result. It is a tree like structure (e.g. each item
- * has oen parent, and can have multiple children). The root object has no parent.
- *
- * This class gathers up all properties from the class itself and ancestors. It will also recursively
- * search through any fields with the @Embedded annotation
- */
-class ResultEntityField(val parentField: ResultEntityField?, val name: String,
-                        val type: TypeName, val embeddedType: TypeElement?,
-                        processingEnv: ProcessingEnvironment){
-
-    val childFields: List<ResultEntityField>
-
-    init {
-        if(embeddedType != null) {
-            val ancestorClasses = ancestorsToList(embeddedType, processingEnv)
-            val allFields = ancestorClasses
-                    .flatMap { it.enclosedElements.filter {
-                        it.kind == ElementKind.FIELD  && Modifier.STATIC !in it.modifiers && Modifier.TRANSIENT !in it.modifiers
-                    } }
-
-            childFields = allFields.map { ResultEntityField(this, it.simpleName.toString(),
-                    it.asType().asTypeName(),
-                    if(it.getAnnotation(Embedded::class.java) != null) {
-                        processingEnv.typeUtils.asElement(it.asType()) as TypeElement?
-                    }else {
-                        null
-                    }, processingEnv)
-            }
-        }else {
-            childFields = listOf()
-        }
-    }
-
-    fun createSetterCodeBlock(rawQuery: Boolean = false, resultSetVarName: String = "_resultSet",
-                              colIndexVarName: String? = null): CodeBlock {
-        val codeBlock = CodeBlock.builder()
-        val checkForNullEmbeddedObject = parentField != null
-        val nullFieldCountVarName = "_${name}_nullFieldCount"
-
-        if(checkForNullEmbeddedObject) {
-            codeBlock.add("var $nullFieldCountVarName = 0\n")
-        }
-        childFields.filter { it.embeddedType == null }.forEach {
-            val getterName = "get${it.type.preparedStatementSetterGetterTypeName}"
-            codeBlock.add("val tmp_${it.name}")
-
-            val setValAndCheckForNullBlock = CodeBlock.builder().add(" = ${resultSetVarName}.$getterName(%S)\n",
-                    it.name)
-            if(checkForNullEmbeddedObject){
-                setValAndCheckForNullBlock.add("if(${resultSetVarName}.wasNull())·{·$nullFieldCountVarName++·}\n")
-            }
-
-            if(rawQuery) {
-                val valType = it.type.javaToKotlinType()
-                codeBlock.add(": %T\n", valType.copy(nullable = valType == String::class.asClassName()))
-                        .beginControlFlow("if($colIndexVarName.containsKey(%S))", it.name)
-                        .add("tmp_${it.name} ").add(setValAndCheckForNullBlock.build())
-                        .nextControlFlow("else")
-                if(checkForNullEmbeddedObject) {
-                    codeBlock.add("$nullFieldCountVarName++\n")
-                }
-                codeBlock.add("tmp_${it.name} = ${defaultVal(it.type)}\n")
-                        .endControlFlow()
-            }else {
-                codeBlock.add(setValAndCheckForNullBlock.build())
-            }
-        }
-
-        if(checkForNullEmbeddedObject) {
-            codeBlock.beginControlFlow("if($nullFieldCountVarName < ${childFields.size})")
-        }
-
-        //check the embedded path of parents
-        val parentsList = mutableListOf<ResultEntityField>(this)
-
-
-        var nextParent = parentField
-        while(nextParent != null) {
-            parentsList.add(nextParent)
-            nextParent = nextParent.parentField
-        }
-
-
-        parentsList.reverse()
-        val rootItem = parentsList[0]
-        var entityPath  = ""
-
-        if(parentField == null) {
-            //this is the root item
-            codeBlock.add("val $name = %T()\n", embeddedType)
-            entityPath = name
-        }else {
-            val predecessorsList = parentsList.subList(1, parentsList.size)
-            predecessorsList.forEachIndexed { index, parent ->
-                val predecessors = predecessorsList.subList(0, index + 1)
-                entityPath = "${rootItem.name}.${predecessors.joinToString(separator = "!!.") { it.name }}"
-                codeBlock.beginControlFlow("if($entityPath == null)")
-                        .add("$entityPath = %T()\n", parent.embeddedType)
-                        .endControlFlow()
-                entityPath += "!!"
-            }
-        }
-
-        childFields.filter { it.embeddedType == null }.forEach {
-            codeBlock.add("${entityPath}.${it.name} = tmp_${it.name}\n")
-        }
-
-
-        if(checkForNullEmbeddedObject) {
-            codeBlock.endControlFlow()
-        }
-
-        childFields.filter { it.embeddedType != null }.forEach {
-            codeBlock.add(it.createSetterCodeBlock(rawQuery = rawQuery, resultSetVarName = resultSetVarName,
-                    colIndexVarName = colIndexVarName))
-        }
-
-        return codeBlock.build()
-    }
-
-}
-
-/**
- *
- */
-internal fun ancestorsToList(child: TypeElement, processingEnv: ProcessingEnvironment): List<TypeElement> {
-    val entityAncestors = mutableListOf<TypeElement>()
-
-    var nextEntity = child as TypeElement?
-
-    do {
-        entityAncestors.add(nextEntity!!)
-        val nextElement = processingEnv.typeUtils.asElement(nextEntity.superclass)
-        nextEntity = if(nextElement is TypeElement && nextElement.qualifiedName.toString() != "java.lang.Object") {
-            nextElement
-        } else {
-            null
-        }
-    }while(nextEntity != null)
-
-    return entityAncestors
-}
-
-fun defaultVal(typeName: TypeName) : CodeBlock {
-    val codeBlock = CodeBlock.builder()
-    val kotlinType = typeName.javaToKotlinType()
-    when(kotlinType) {
-        INT -> codeBlock.add("0")
-        LONG -> codeBlock.add("0L")
-        BYTE -> codeBlock.add("0.toByte()")
-        FLOAT -> codeBlock.add("0.toFloat()")
-        DOUBLE -> codeBlock.add("0.toDouble()")
-        BOOLEAN -> codeBlock.add("false")
-        String::class.asTypeName() -> codeBlock.add("null as String?")
-        else -> {
-            if(kotlinType is ParameterizedTypeName && kotlinType.rawType == List::class.asClassName()) {
-                val typeArg = if(kotlinType.typeArguments[0] == String::class.asTypeName()) {
-                    kotlinType.typeArguments[0].copy(nullable = true)
-                }else {
-                    kotlinType.typeArguments[0]
-                }
-
-                codeBlock.add("mutableListOf<%T>()", typeArg)
-            }else {
-                codeBlock.add("null as %T?", typeName)
-            }
-        }
-    }
-
-    return codeBlock.build()
-}
-
-@Deprecated("Should use extension function for this")
-fun isListOrArray(typeName: TypeName) = (typeName is ClassName && typeName.canonicalName =="kotlin.Array")
-        || (typeName is ParameterizedTypeName && typeName.rawType == List::class.asClassName())
-
 val SQL_COMPONENT_TYPE_MAP = mapOf(LONG to "BIGINT",
         INT to "INTEGER",
         SHORT to "SMALLINT",
@@ -632,62 +416,16 @@ val SQL_COMPONENT_TYPE_MAP = mapOf(LONG to "BIGINT",
 
 fun sqlArrayComponentTypeOf(typeName: TypeName): String {
     if(typeName is ParameterizedTypeName) {
-        return SQL_COMPONENT_TYPE_MAP.get(typeName.typeArguments[0])!!
+        return SQL_COMPONENT_TYPE_MAP[typeName.typeArguments[0]]!!
     }
 
     return "UNKNOWN"
 }
 
-//Limitation: this does not currently support interface inheritence
-data class MethodToImplement(val methodName: String, val paramTypes: List<TypeName>)
-
-fun isMethodImplemented(method: ExecutableElement, enclosingClass: TypeElement, processingEnv: ProcessingEnvironment): Boolean {
-    val enclosingClassType = enclosingClass.asType() as DeclaredType
-    val methodResolved = processingEnv.typeUtils.asMemberOf(enclosingClassType,
-            method) as ExecutableType
-    return ancestorsToList(enclosingClass, processingEnv).any {
-        it.enclosedElements.any {
-            it is ExecutableElement
-                    && !(Modifier.ABSTRACT in it.modifiers)
-                    && it.simpleName == method.simpleName
-                    && processingEnv.typeUtils.isSubsignature(methodResolved,
-                        processingEnv.typeUtils.asMemberOf(enclosingClassType, it) as ExecutableType)
-        }
-    }
-}
-
-// As per
-// https://android.googlesource.com/platform/frameworks/support/+/androidx-master-dev/room/compiler/src/main/kotlin/androidx/room/ext/element_ext.kt
-// converts ? in Set< ? extends Foo> to Foo
-fun TypeMirror.extendsBound(): TypeMirror? {
-    return this.accept(object : SimpleTypeVisitor7<TypeMirror?, Void?>() {
-        override fun visitWildcard(type: WildcardType, ignored: Void?): TypeMirror? {
-            return type.extendsBound ?: type.superBound
-        }
-    }, null)
-}
-/**
- * If the type mirror is in form of ? extends Foo, it returns Foo; otherwise, returns the TypeMirror
- * itself.
- */
-fun TypeMirror.extendsBoundOrSelf(): TypeMirror {
-    return extendsBound() ?: this
-}
-
-
-/**
- * Determine if the result type is nullable. Any single result entity object or String result can be
- * null (e.g. no such object was found by the query). Primitives cannot be null as they will be 0/false.
- * Lists and arrays (parameterized types) cannot be null: no results will provide an non-null empty
- * list/array.
- */
-fun isNullableResultType(typeName: TypeName) = typeName != UNIT
-        && !PRIMITIVE.contains(typeName)
-        && !(typeName is ParameterizedTypeName)
-
 
 val PRIMITIVE = listOf(INT, LONG, BOOLEAN, SHORT, BYTE, FLOAT, DOUBLE)
 
+@OptIn(DelicateCoroutinesApi::class)
 fun FileSpec.Builder.addJdbcDbImplType(
     dbKSClass: KSClassDeclaration,
     target: DoorTarget,
@@ -1084,7 +822,7 @@ fun CodeBlock.Builder.addDaoJdbcInsertCodeBlock(
         ?: throw IllegalArgumentException("${daoKSFun.simpleName.asString()} has no param type")
     val entityKSClass = daoFunction.firstParamEntityType(resolver).declaration as KSClassDeclaration
     val pgOnConflict = daoKSFun.getAnnotation(PgOnConflict::class)?.value
-    val pgOnConflictHash = pgOnConflict?.hashCode()?.let { Math.abs(it) }?.toString() ?: ""
+    val pgOnConflictHash = pgOnConflict?.hashCode()?.let { abs(it) }?.toString() ?: ""
     val upsertMode = daoKSFun.getAnnotation(Insert::class)?.onConflict == OnConflictStrategy.REPLACE
     val entityInserterPropName = "_insertAdapter${entityKSClass.simpleName.asString()}_${if(upsertMode) "upsert" else ""}$pgOnConflictHash"
     if(!daoTypeBuilder.propertySpecs.any { it.name == entityInserterPropName }) {
@@ -1098,7 +836,7 @@ fun CodeBlock.Builder.addDaoJdbcInsertCodeBlock(
 
 
     val insertMethodName = makeInsertAdapterMethodName(paramType, daoFunction.returnType,
-        daoKSFun.modifiers.contains(com.google.devtools.ksp.symbol.Modifier.SUSPEND), resolver)
+        daoKSFun.modifiers.contains(Modifier.SUSPEND), resolver)
     add("$entityInserterPropName.$insertMethodName(${daoKSFun.parameters.first().name?.asString()})")
 
     val returnType = daoKSFun.returnType?.resolve()
@@ -1252,192 +990,11 @@ fun TypeSpec.Builder.addDaoJdbcEntityInsertAdapter(
 class DbProcessorJdbcKotlin: AbstractDbProcessor() {
 
     override fun process(annotations: MutableSet<out TypeElement>?, roundEnv: RoundEnvironment): Boolean {
-//        val daos = roundEnv.getElementsAnnotatedWith(Dao::class.java)
-//
-//        for(daoElement in daos) {
-//            Napier.d("Processing dao: ${daoElement.simpleName}")
-//            val daoTypeEl = daoElement as TypeElement
-//            FileSpec.builder(daoElement.packageName,
-//                daoElement.simpleName.toString() + SUFFIX_JDBC_KT2)
-//                .addDaoJdbcImplType(daoTypeEl)
-//                .build()
-//                .writeToDirsFromArg(listOf(OPTION_JVM_DIRS, OPTION_JS_OUTPUT))
-//        }
 
         Napier.d("DbProcessJdbcKotlin: process complete")
         return true
     }
 
-
-
-//    fun FileSpec.Builder.addDaoJdbcImplType(
-//        daoTypeElement: TypeElement
-//    ) : FileSpec.Builder{
-//        Napier.d("DbProcessorJdbcKotlin: addDaoJdbcImplType: start ${daoTypeElement.simpleName}")
-//        addImport("com.ustadmobile.door", "DoorDbType")
-//        addType(TypeSpec.classBuilder("${daoTypeElement.simpleName}$SUFFIX_JDBC_KT2")
-//            .primaryConstructor(FunSpec.constructorBuilder().addParameter("_db",
-//                RoomDatabase::class).build())
-//            .addProperty(PropertySpec.builder("_db", RoomDatabase::class).initializer("_db").build())
-//            .superclass(daoTypeElement.asClassName())
-//            .apply {
-//                daoTypeElement.allOverridableMethods(processingEnv).forEach { executableEl ->
-//                    when {
-//                        executableEl.hasAnnotation(Insert::class.java) ->
-//                            addDaoInsertFunction(executableEl, daoTypeElement, this)
-//
-//                        executableEl.hasAnyAnnotation(Query::class.java, RawQuery::class.java) ->
-//                            addDaoQueryFunction(executableEl, daoTypeElement)
-//
-//                        executableEl.hasAnnotation(Update::class.java) ->
-//                            addDaoUpdateFunction(executableEl, daoTypeElement)
-//
-//                        executableEl.hasAnnotation(Delete::class.java) ->
-//                            addDaoDeleteFunction(executableEl, daoTypeElement)
-//                    }
-//                }
-//            }
-//            .build())
-//
-//        Napier.d("DbProcessorJdbcKotlin: addDaoJdbcImplType: finish ${daoTypeElement.simpleName}")
-//        return this
-//    }
-
-    fun TypeSpec.Builder.addDaoQueryFunction(
-        funElement: ExecutableElement,
-        daoTypeElement: TypeElement
-    ): TypeSpec.Builder {
-        Napier.d("DbProcessorJdbcKotlin: addDaoQueryFunction: start ${daoTypeElement.simpleName}#${funElement.simpleName}")
-        val funSpec = funElement.asFunSpecConvertedToKotlinTypesForDaoFun(
-            daoTypeElement.asType() as DeclaredType, processingEnv).build()
-
-        val queryVarsMap = funSpec.parameters.map { it.name to it.type }.toMap()
-        val querySql = funElement.getAnnotation(Query::class.java)?.value
-        val postgresQuerySql = funElement.getAnnotation(PostgresQuery::class.java)?.value
-        val resultType = funSpec.returnType?.unwrapLiveDataOrDataSourceFactory() ?: UNIT
-        val rawQueryParamName = if(funElement.hasAnnotation(RawQuery::class.java))
-            funSpec.parameters.first().name
-        else
-            null
-
-        fun CodeBlock.Builder.addLiveDataImpl(
-            liveQueryVarsMap: Map<String, TypeName> = queryVarsMap,
-            liveResultType: TypeName = resultType,
-            liveSql: String? = querySql,
-            liveRawQueryParamName: String? = rawQueryParamName,
-            livePostgreSql: String? = postgresQuerySql
-        ): CodeBlock.Builder {
-            val tablesToWatch = mutableListOf<String>()
-            val specifiedLiveTables = funElement.getAnnotation(QueryLiveTables::class.java)
-            if(specifiedLiveTables == null) {
-                try {
-                    val select = CCJSqlParserUtil.parse(liveSql) as Select
-                    val tablesNamesFinder = TablesNamesFinder()
-                    tablesToWatch.addAll(tablesNamesFinder.getTableList(select))
-                }catch(e: Exception) {
-                    messager.printMessage(Diagnostic.Kind.ERROR,
-                        "${makeLogPrefix(funElement.enclosingElement as TypeElement, funElement)}: " +
-                                "Sorry: JSQLParser could not parse the query : " +
-                                querySql +
-                                "Please manually specify the tables to observe using @QueryLiveTables annotation")
-                }
-            }else {
-                tablesToWatch.addAll(specifiedLiveTables.value)
-            }
-
-            beginControlFlow("%T<%T>(_db, listOf(%L)) ",
-                LiveDataImpl::class.asClassName(),
-                liveResultType.copy(nullable = isNullableResultType(liveResultType)),
-                tablesToWatch.map {"\"$it\""}.joinToString())
-            .addJdbcQueryCode(liveResultType, liveQueryVarsMap, liveSql,
-                daoTypeElement, funElement, resultVarName = "_liveResult",
-                suspended = true, rawQueryVarName = liveRawQueryParamName,
-                querySqlPostgres = livePostgreSql)
-            .add("_liveResult")
-            .applyIf(liveResultType.isList()) {
-                add(".toList()")
-            }
-            .add("\n")
-            .endControlFlow()
-            .build()
-
-            Napier.d("DbProcessorJdbcKotlin: addDaoQueryFunction: end ${daoTypeElement.simpleName}#${funElement.simpleName}")
-            return this
-        }
-
-        addFunction(funSpec.toBuilder()
-            .removeAbstractModifier()
-            .removeAnnotations()
-            .addModifiers(KModifier.OVERRIDE)
-            .applyIf(funSpec.returnType?.isDataSourceFactory() == true) {
-                val returnTypeUnwrapped = funSpec.returnType?.unwrapQueryResultComponentType()
-                    ?: throw IllegalStateException("TODO: datasource not typed - ${daoTypeElement.qualifiedName}#${funSpec.name}")
-                addCode("val _result = %L\n",
-                TypeSpec.anonymousClassBuilder()
-                    .superclass(DataSource.Factory::class.asTypeName().parameterizedBy(INT,
-                        returnTypeUnwrapped))
-                    .addFunction(FunSpec.builder("getData")
-                        .addModifiers(KModifier.OVERRIDE)
-                        .returns(LiveData::class.asTypeName()
-                            .parameterizedBy(List::class.asTypeName().parameterizedBy(returnTypeUnwrapped)))
-                        .addParameter("_offset", INT)
-                        .addParameter("_limit", INT)
-                        .addCode(CodeBlock.builder()
-                            .applyIf(rawQueryParamName != null) {
-                                add("val _rawQuery = $rawQueryParamName.%M(\n",
-                                    MemberName("com.ustadmobile.door.ext", "copyWithExtraParams"))
-                                add("sql = \"SELECT * FROM (\${$rawQueryParamName.getSql()}) LIMIT ? OFFSET ?\",\n")
-                                add("extraParams = arrayOf(_limit, _offset))\n")
-                            }
-                            .add("return ")
-                            .addLiveDataImpl(
-                                liveQueryVarsMap = queryVarsMap + mapOf("_offset" to INT, "_limit" to INT),
-                                liveResultType = List::class.asClassName().parameterizedBy(returnTypeUnwrapped),
-                                liveSql = querySql?.let { "SELECT * FROM ($it) LIMIT :_limit OFFSET :_offset " },
-                                liveRawQueryParamName = rawQueryParamName?.let { "_rawQuery" },
-                                livePostgreSql =  postgresQuerySql?.let { "SELECT * FROM ($it) LIMIT :_limit OFFSET :_offset " }
-                            )
-                            .build())
-                        .build())
-                    .addFunction(FunSpec.builder("getLength")
-                        .addModifiers(KModifier.OVERRIDE)
-                        .returns(LiveData::class.asTypeName().parameterizedBy(INT))
-                        .addCode(CodeBlock.builder()
-                            .applyIf(rawQueryParamName != null) {
-                                add("val _rawQuery = $rawQueryParamName.%M(\n",
-                                    MemberName("com.ustadmobile.door.ext", "copy"))
-                                add("sql = \"SELECT COUNT(*) FROM (\${$rawQueryParamName.getSql()})\")\n")
-                            }
-                            .add("return ")
-                            .addLiveDataImpl(
-                                liveResultType = INT,
-                                liveSql = querySql?.let { "SELECT COUNT(*) FROM ($querySql) "},
-                                liveRawQueryParamName = rawQueryParamName?.let { "_rawQuery" },
-                                livePostgreSql = postgresQuerySql?.let { "SELECT COUNT(*) FROM ($querySql) "})
-                            .build())
-                        .build())
-                    .build())
-            }.applyIf(funSpec.returnType?.isLiveData() == true) {
-                addCode(CodeBlock.builder()
-                    .add("val _result = ")
-                    .addLiveDataImpl()
-                    .build())
-            }.applyIf(funSpec.returnType?.isDataSourceFactoryOrLiveData() != true) {
-                addCode(CodeBlock.builder().addJdbcQueryCode(resultType, queryVarsMap, querySql,
-                    daoTypeElement, funElement, rawQueryVarName = rawQueryParamName,
-                    suspended = funSpec.isSuspended, querySqlPostgres = postgresQuerySql)
-                    .build())
-            }
-            .applyIf(funSpec.hasReturnType) {
-                addCode("return _result\n")
-            }
-            .build())
-
-        return this
-    }
-
-
-    fun makeLogPrefix(enclosing: TypeElement, method: ExecutableElement) = "DoorDb: ${enclosing.qualifiedName}. ${method.simpleName} "
 
     companion object {
 
@@ -1456,7 +1013,6 @@ fun FileSpec.Builder.addDaoJdbcImplType(
     resolver: Resolver,
     environment: SymbolProcessorEnvironment,
     target: DoorTarget,
-    dbConnection: Connection,
 ) : FileSpec.Builder{
     Napier.d("DbProcessorJdbcKotlin: addDaoJdbcImplType: start ${daoKSClass.simpleName.asString()}")
     val allFunctions = daoKSClass.getAllFunctions()
@@ -1476,8 +1032,8 @@ fun FileSpec.Builder.addDaoJdbcImplType(
             allFunctions.filter { it.hasAnnotation(Delete::class) }.forEach { daoFun ->
                 addDaoDeleteFunction(daoFun, daoKSClass, resolver)
             }
-            allFunctions.filter { it.hasAnnotation(Query::class) }.forEach { daoFun ->
-                addDaoQueryFunction(daoFun, daoKSClass, resolver, environment, dbConnection)
+            allFunctions.filter { it.hasAnnotation(Query::class) || it.hasAnnotation(RawQuery::class) }.forEach { daoFun ->
+                addDaoQueryFunction(daoFun, daoKSClass, resolver, environment)
             }
         }
         .build())
@@ -1523,7 +1079,7 @@ fun TypeSpec.Builder.addDaoUpdateFunction(
     val nonPkFields = entityKSClass.entityProps(false).filter {
         it !in pkProps
     }
-    val sqlSetPart = nonPkFields.map { "${it.simpleName.asString()} = ?" }.joinToString()
+    val sqlSetPart = nonPkFields.joinToString { "${it.simpleName.asString()} = ?" }
     val sqlStmt  = "UPDATE ${entityKSClass.entityTableName} SET $sqlSetPart " +
             "WHERE ${pkProps.joinToString(separator = " AND ") { "${it.simpleName.asString()} = ?" }}"
     val firstParam = funSpec.parameters.first()
@@ -1561,7 +1117,7 @@ fun TypeSpec.Builder.addDaoUpdateFunction(
                 add("_result += ")
             }
             .applyIf(daoFunDecl.isSuspended) {
-                add("_stmt.%M()\n", AbstractDbProcessor.MEMBERNAME_EXEC_UPDATE_ASYNC)
+                add("_stmt.%M()\n", MEMBERNAME_EXEC_UPDATE_ASYNC)
             }
             .applyIf(!daoFunDecl.isSuspended) {
                 add("_stmt.executeUpdate()\n")
@@ -1621,7 +1177,7 @@ fun TypeSpec.Builder.addDaoDeleteFunction(
             }
             .apply {
                 if(daoFunDecl.isSuspended) {
-                    add("_numChanges += _stmt.%M()\n", AbstractDbProcessor.MEMBERNAME_EXEC_UPDATE_ASYNC)
+                    add("_numChanges += _stmt.%M()\n", MEMBERNAME_EXEC_UPDATE_ASYNC)
                 }else {
                     add("_numChanges += _stmt.executeUpdate()\n")
                 }
@@ -1646,12 +1202,9 @@ fun TypeSpec.Builder.addDaoQueryFunction(
     daoDecl: KSClassDeclaration,
     resolver: Resolver,
     environment: SymbolProcessorEnvironment,
-    dbConnection: Connection,
 ): TypeSpec.Builder {
     val logName = "${daoDecl.simpleName.asString()}#${daoFunDecl.simpleName.asString()}"
     Napier.d("DbProcessorJdbcKotlin: addDaoQueryFunction: start $logName")
-//    val funSpec = funElement.asFunSpecConvertedToKotlinTypesForDaoFun(
-//        daoTypeElement.asType() as DeclaredType, processingEnv).build()
     val daoKSType = daoDecl.asType(emptyList())
     val funSpec = daoFunDecl.toFunSpecBuilder(resolver, daoKSType)
     val daoFun = daoFunDecl.asMemberOf(daoKSType)
@@ -1662,7 +1215,6 @@ fun TypeSpec.Builder.addDaoQueryFunction(
 
     //funSpec.parameters.map { it.name to it.type }.toMap()
     val querySql = daoFunDecl.getAnnotation(Query::class)?.value
-    val postgresQuerySql = daoFunDecl.getAnnotation(PostgresQuery::class)?.value
     val resultType = daoFun.returnType?.unwrapLiveDataOrDataSourceFactoryResultType(resolver) ?: resolver.builtIns.unitType
 
     val rawQueryParamName = if(daoFunDecl.hasAnnotation(RawQuery::class))
@@ -1670,118 +1222,76 @@ fun TypeSpec.Builder.addDaoQueryFunction(
     else
         null
 
-    fun CodeBlock.Builder.addLiveDataImpl(
-        liveQueryVarsMap: Map<String, KSType> = queryVarsMap,
-        liveResultType: KSType = resultType,
-        liveSql: String? = querySql,
-        liveRawQueryParamName: String? = rawQueryParamName,
-        livePostgreSql: String? = postgresQuerySql
-    ): CodeBlock.Builder {
-        val tablesToWatch = mutableListOf<String>()
-        val specifiedLiveTables = daoFunDecl.getAnnotation(QueryLiveTables::class)
-        if(specifiedLiveTables == null) {
-            try {
-                val select = CCJSqlParserUtil.parse(liveSql) as Select
-                val tablesNamesFinder = TablesNamesFinder()
-                tablesToWatch.addAll(tablesNamesFinder.getTableList(select))
-            }catch(e: Exception) {
-                environment.logger.error("Sorry: JSQLParser could not parse the query : " +
-                        querySql +
-                        "Please manually specify the tables to observe using @QueryLiveTables annotation", daoFunDecl)
-            }
-        }else {
-            tablesToWatch.addAll(specifiedLiveTables.value)
-        }
-
-        beginControlFlow("%T<%T>(_db, listOf(%L)) ",
-            LiveDataImpl::class.asClassName(),
-            liveResultType.toTypeName(),
-            tablesToWatch.map {"\"$it\""}.joinToString())
-            .addJdbcQueryCode(dbConnection, resolver, environment, liveResultType, liveQueryVarsMap, liveSql,
-                daoDecl, daoFun, resultVarName = "_liveResult",
-                suspended = true, rawQueryVarName = liveRawQueryParamName,
-                querySqlPostgres = livePostgreSql, daoFunDecl = daoFunDecl)
-            .add("_liveResult")
-            .applyIf(liveResultType.isList()) {
-                add(".toList()")
-            }
-            .add("\n")
-            .endControlFlow()
-            .build()
-
-        Napier.d("DbProcessorJdbcKotlin: addDaoQueryFunction: end $logName")
-        return this
-    }
-
     addFunction(funSpec
         .removeAbstractModifier()
         .removeAnnotations()
         .addModifiers(KModifier.OVERRIDE)
         .applyIf(daoFun.returnType?.isDataSourceFactory() == true) {
-//            val returnTypeUnwrapped = daoFun.returnType?.unwrapLiveDataOrDataSourceFactoryResultType(resolver)
-//                ?: throw IllegalStateException("TODO: datasource not typed - $logName")
-//            addCode("val _result = %L\n",
-//                TypeSpec.anonymousClassBuilder()
-//                    .superclass(DataSource.Factory::class.asTypeName().parameterizedBy(INT,
-//                        returnTypeUnwrapped.toTypeName()))
-//                    .addFunction(FunSpec.builder("getData")
-//                        .addModifiers(KModifier.OVERRIDE)
-//                        .returns(LiveData::class.asTypeName()
-//                            .parameterizedBy(List::class.asTypeName().parameterizedBy(returnTypeUnwrapped.toTypeName())))
-//                        .addParameter("_offset", INT)
-//                        .addParameter("_limit", INT)
-//                        .addCode(CodeBlock.builder()
-//                            .applyIf(rawQueryParamName != null) {
-//                                add("val _rawQuery = $rawQueryParamName.%M(\n",
-//                                    MemberName("com.ustadmobile.door.ext", "copyWithExtraParams"))
-//                                add("sql = \"SELECT * FROM (\${$rawQueryParamName.getSql()}) LIMIT ? OFFSET ?\",\n")
-//                                add("extraParams = arrayOf(_limit, _offset))\n")
-//                            }
-//                            .add("return ")
-//                            .addLiveDataImpl(
-//                                liveQueryVarsMap = queryVarsMap + mapOf("_offset" to resolver.builtIns.intType,
-//                                    "_limit" to resolver.builtIns.intType),
-//                                liveResultType = resolver.getClassDeclarationByName("kotlin.collections.List")!!
-//                                    .asTypeParameterizedBy(resolver, returnTypeUnwrapped),
-//                                //List::class.asClassName().parameterizedBy(returnTypeUnwrapped.toTypeName()),
-//                                liveSql =  "SELECT * FROM ($querySql) LIMIT :_limit OFFSET :_offset " ,
-//                                liveRawQueryParamName = rawQueryParamName?.let { "_rawQuery" },
-//                                livePostgreSql =  postgresQuerySql?.let { "SELECT * FROM ($it) LIMIT :_limit OFFSET :_offset " }
-//                            )
-//                            .build())
-//                        .build())
-//                    .addFunction(FunSpec.builder("getLength")
-//                        .addModifiers(KModifier.OVERRIDE)
-//                        .returns(LiveData::class.asTypeName().parameterizedBy(INT))
-//                        .addCode(CodeBlock.builder()
-//                            .applyIf(rawQueryParamName != null) {
-//                                add("val _rawQuery = $rawQueryParamName.%M(\n",
-//                                    MemberName("com.ustadmobile.door.ext", "copy"))
-//                                add("sql = \"SELECT COUNT(*) FROM (\${$rawQueryParamName.getSql()})\")\n")
-//                            }
-//                            .add("return ")
-//                            .addLiveDataImpl(
-//                                liveResultType = resolver.builtIns.intType,
-//                                liveSql = querySql?.let { "SELECT COUNT(*) FROM ($querySql) "},
-//                                liveRawQueryParamName = rawQueryParamName?.let { "_rawQuery" },
-//                                livePostgreSql = postgresQuerySql?.let { "SELECT COUNT(*) FROM ($querySql) "})
-//                            .build())
-//                        .build())
-//                    .build())
+            val resultComponentType = resultType.unwrapComponentTypeIfListOrArray(resolver)
+            val dataSourceQueryVarsMap = queryVarsMap + mapOf("_offset" to resolver.builtIns.intType,
+                "_limit" to resolver.builtIns.intType)
+            addCode(CodeBlock.builder()
+                .add("return %L\n",
+                    TypeSpec.anonymousClassBuilder()
+                        .superclass(daoFun.returnType?.toTypeName() ?: throw IllegalArgumentException("DataSourceFactory no return type"))
+                        .addFunction(FunSpec.builder("getData")
+                            .addModifiers(KModifier.OVERRIDE)
+                            .returns(LiveData::class.asTypeName()
+                                .parameterizedBy(List::class.asTypeName().parameterizedBy(resultComponentType.toTypeName())))
+                            .addParameter("_offset", INT)
+                            .addParameter("_limit", INT)
+                            .addCode(CodeBlock.builder()
+                                .applyIf(rawQueryParamName != null) {
+                                    add("val $rawQueryParamName = $rawQueryParamName.%M(\n",
+                                        MemberName("com.ustadmobile.door.ext", "copyWithExtraParams"))
+                                    add("sql = \"SELECT * FROM (\${$rawQueryParamName.getSql()}) LIMIT ? OFFSET ?\",\n")
+                                    add("extraParams = arrayOf(_limit, _offset))\n")
+                                }
+                                .add("return ")
+                                .beginControlFlow("%T(_db, listOf(%L)) ",
+                                    LiveDataImpl::class.asClassName(),
+                                    daoFunDecl.getQueryTables(environment.logger).joinToString { "\"$it\"" })
+                                .addJdbcQueryCode(daoFunDecl, daoDecl, dataSourceQueryVarsMap, resolver,
+                                    querySql = querySql?.let { "SELECT * FROM ($it) LIMIT :_limit OFFSET :_offset" })
+                                .endControlFlow()
+                                .build())
+                            .build())
+                        .addFunction(FunSpec.builder("getLength")
+                            .addModifiers(KModifier.OVERRIDE)
+                            .returns(LiveData::class.asTypeName().parameterizedBy(INT))
+                            .addCode(CodeBlock.builder()
+                                .applyIf(rawQueryParamName != null) {
+                                    add("val $rawQueryParamName = $rawQueryParamName.%M(\n",
+                                        MemberName("com.ustadmobile.door.ext", "copy"))
+                                    add("sql = \"SELECT COUNT(*) FROM (\${$rawQueryParamName.getSql()})\")\n")
+                                }
+                                .add("return ")
+                                .beginControlFlow("%T(_db, listOf(%L)) ",
+                                    LiveDataImpl::class.asClassName(),
+                                    daoFunDecl.getQueryTables(environment.logger).joinToString { "\"$it\"" })
+                                .addJdbcQueryCode(daoFunDecl, daoDecl, dataSourceQueryVarsMap, resolver,
+                                    resultType = resolver.builtIns.intType,
+                                    querySql = querySql?.let { "SELECT COUNT(*) FROM ($querySql) " })
+                                .endControlFlow()
+                                .build())
+                            .build())
+                        .build())
+                .build())
         }.applyIf(daoFun.returnType?.isLiveData() == true) {
-//            addCode(CodeBlock.builder()
-//                .add("val _result = ")
-//                .addLiveDataImpl()
-//                .build())
+            addCode(CodeBlock.builder()
+                .add("return ")
+                .beginControlFlow("%T(_db, listOf(%L)) ",
+                    LiveDataImpl::class.asClassName(),
+                    daoFunDecl.getQueryTables(environment.logger).joinToString { "\"$it\"" })
+                .addJdbcQueryCode(daoFunDecl, daoDecl, queryVarsMap, resolver)
+                .endControlFlow()
+                .build())
         }.applyIf(daoFun.returnType?.isDataSourceFactoryOrLiveData() != true) {
+            if(daoFun.hasReturnType(resolver))
+                addCode("return ")
             addCode(CodeBlock.builder()
                 .addJdbcQueryCode(daoFunDecl, daoDecl, queryVarsMap, resolver)
                 .build())
-
-//            addCode(CodeBlock.builder().addJdbcQueryCode(dbConnection, resolver, environment, resultType, queryVarsMap,
-//                querySql, daoDecl, daoFun, rawQueryVarName = rawQueryParamName,
-//                suspended = daoFunDecl.isSuspended, querySqlPostgres = postgresQuerySql, daoFunDecl = daoFunDecl)
-//                .build())
         }
         .build())
 
@@ -1802,7 +1312,7 @@ fun CodeBlock.Builder.beginPrepareAndUseStatementFlow(
     return this
 }
 
-fun CodeBlock.Builder.beginExecQueryFlow(
+private fun CodeBlock.Builder.beginExecQueryOrUpdateFlow(
     suspended: Boolean,
     stmtVarName: String = "_stmt",
     resultVarName: String = "_result",
@@ -1826,12 +1336,13 @@ fun CodeBlock.Builder.addMapResultRowCode(
     resolver: Resolver,
     resultVarName: String = "_result",
 ): CodeBlock.Builder {
-    val resultComponentType = resultType.unwrapComponentTypeIfListOrArray(resolver)
-    if(resultType.isListOrArrayType(resolver)) {
+    val queryReturnType = resultType.unwrapLiveDataOrDataSourceFactoryResultType(resolver)
+    val resultComponentType = queryReturnType.unwrapComponentTypeIfListOrArray(resolver)
+    if(queryReturnType.isListOrArrayType(resolver) || resultType.isDataSourceFactory()) {
         beginControlFlow("$resultVarName.%M", MemberName("com.ustadmobile.door.jdbc.ext", "mapRows"))
     }else {
         beginControlFlow("$resultVarName.%M(%L)", MemberName("com.ustadmobile.door.jdbc.ext", "mapNextRow"),
-            resultType.defaultTypeValueCode(resolver))
+            queryReturnType.defaultTypeValueCode(resolver))
     }
 
     if(resultComponentType in resolver.querySingularTypes()){
@@ -1981,235 +1492,33 @@ fun CodeBlock.Builder.addJdbcQueryCode(
     daoFunDecl: KSFunctionDeclaration,
     daoClassDecl: KSClassDeclaration,
     queryVarsMap: Map<String, KSType>,
-    resolver: Resolver
-): CodeBlock.Builder {
-    val querySql = daoFunDecl.getAnnotation(Query::class)?.value
-    val daoFun = daoFunDecl.asMemberOf(daoClassDecl.asType(emptyList()))
-    if(daoFunDecl.hasReturnType(resolver)) {
-        add("return ")
-    }
-    beginPrepareAndUseStatementFlow(daoFunDecl, daoClassDecl, resolver)
-    addSetPreparedStatementParams(querySql!!, queryVarsMap, resolver)
-    beginExecQueryFlow(suspended = daoFunDecl.isSuspended)
-    if(!querySql.isSQLAModifyingQuery()) {
-        addMapResultRowCode(daoFun.returnType!!, resolver)
-    }
-
-    endControlFlow()
-    endControlFlow()
-    return this
-}
-
-
-/**
- * Generate a codeblock with the JDBC code required to perform a query and return the given
- * result type
- *
- * @param returnType the return type of the query
- * @param queryVars: map of String (variable name) to the type of parameter. Used to set
- * parameters on the preparedstatement
- * @param querySql The actual query SQL itself (e.g. as per the Query annotation)
- * @param daoClassDecl TypeElement (e.g the DAO) in which it is enclosed, used to resolve parameter types
- * @param daoFun The method that this implementation is being generated for. Used for error reporting purposes
- * @param resultVarName The variable name for the result of the query (this will be as per resultType,
- * with any wrapping (e.g. LiveData) removed.
- */
-//TODO: Check for invalid combos. Cannot have querySql and rawQueryVarName as null. Cannot have rawquery doing update
-fun CodeBlock.Builder.addJdbcQueryCode(
-    dbConnection: Connection,
     resolver: Resolver,
-    environment: SymbolProcessorEnvironment,
-    returnType: KSType,
-    queryVars: Map<String, KSType>,
-    querySql: String?,
-    daoClassDecl: KSClassDeclaration?,
-    daoFun: KSFunction,
-    daoFunDecl: KSFunctionDeclaration?,
-    resultVarName: String = "_result",
-    rawQueryVarName: String? = null,
-    suspended: Boolean = false,
-    querySqlPostgres: String? = null
+    querySql: String? = daoFunDecl.getAnnotation(Query::class)?.value,
+    resultType: KSType? = daoFunDecl.asMemberOf(daoClassDecl.asType(emptyList())).returnType,
 ): CodeBlock.Builder {
-    // The result, with any wrapper (e.g. LiveData or DataSource.Factory) removed
-    val resultType = returnType.unwrapLiveDataOrDataSourceFactoryResultType(resolver)//   resolveQueryResultType(returnType)
-
-    // The individual entity type e.g. Entity or String etc
-    //val entityType = resolveEntityFromResultType(resultType)
-    val entityType = resultType.unwrapComponentTypeIfListOrArray(resolver)
-
-//    val entityTypeElement = if(entityType is ClassName) {
-//        processingEnv.elementUtils.getTypeElement(entityType.canonicalName)
-//    } else {
-//        null
-//    }
-
-//    val resultEntityField = if(entityTypeElement != null) {
-//        ResultEntityField(null, "_entity", entityTypeElement.asClassName(),
-//            entityTypeElement, processingEnv)
-//    }else {
-//        null
-//    }
-
-    val isUpdateOrDelete = querySql != null && querySql.isSQLAModifyingQuery()
-
-
-    val preparedStatementSql = querySql?.replaceQueryNamedParamsWithQuestionMarks()
-
-    if(preparedStatementSql != null) {
-        val namedParams = preparedStatementSql.getSqlQueryNamedParameters()
-
-        val missingParams = namedParams.filter { it !in queryVars.keys }
-        if(missingParams.isNotEmpty()) {
-            environment.logger.error("The following named " +
-                    "params in query that are not parameters of the function: ${missingParams.joinToString()}",
-                daoFunDecl)
-//            messager.printMessage(Diagnostic.Kind.ERROR,
-//                "On ${daoClassDecl?.qualifiedName}.${daoFun?.simpleName} has the following named " +
-//                        "params in query that are not parameters of the function: ${missingParams.joinToString()}")
-        }
+    beginPrepareAndUseStatementFlow(daoFunDecl, daoClassDecl, resolver)
+    if(querySql != null)
+        addSetPreparedStatementParams(querySql, queryVarsMap, resolver)
+    else if(daoFunDecl.hasAnnotation(RawQuery::class)){
+        add("${daoFunDecl.parameters.first().name?.asString()}.bindToPreparedStmt(_stmt, _db)\n")
     }
 
-    val preparedStatementSqlPostgres = querySqlPostgres?.replaceQueryNamedParamsWithQuestionMarks()
-        ?: querySql?.replaceQueryNamedParamsWithQuestionMarks()?.sqlToPostgresSql()
 
-
-    if(daoFun.hasReturnType(resolver))
-        add("var $resultVarName = %L\n", daoFun.returnType?.defaultTypeValueCode(resolver))
-
-    if(rawQueryVarName == null) {
-        add("val _stmtConfig = %T(%S ", PreparedStatementConfig::class, preparedStatementSql)
-        if(queryVars.any { it.value.isListOrArrayType(resolver) })
-            add(",hasListParams = true")
-
-        if(preparedStatementSql?.trim() != preparedStatementSqlPostgres?.trim())
-            add(", postgreSql = %S", preparedStatementSqlPostgres)
-
-        add(")\n")
-
+    if(querySql?.isSQLAModifyingQuery() != true) {
+        beginExecQueryOrUpdateFlow(suspended = daoFunDecl.isSuspended)
+        addMapResultRowCode(resultType!!, resolver)
+        endControlFlow()
     }else {
-        add("val _stmtConfig = %T($rawQueryVarName.getSql(), hasListParams = $rawQueryVarName.%M())\n",
-            PreparedStatementConfig::class, MemberName("com.ustadmobile.door.ext", "hasListOrArrayParams"))
-    }
-
-
-    beginControlFlow("_db.%M(_stmtConfig)", AbstractDbProcessor.prepareAndUseStatmentMemberName(suspended))
-    add("_stmt ->\n")
-
-    if(querySql != null) {
-        var paramIndex = 1
-        val queryVarsNotSubstituted = mutableListOf<String>()
-        querySql.getSqlQueryNamedParameters().forEach {
-            val paramType = queryVars[it]
-            if(paramType == null ) {
-                queryVarsNotSubstituted.add(it)
-            }else if(paramType.isListOrArrayType(resolver)) {
-                //val con = null as Connection
-                val arrayTypeName = sqlArrayComponentTypeOf(paramType.toTypeName())
-                add("_stmt.setArray(${paramIndex++}, _stmt.getConnection().%M(%S, %L.toTypedArray()))\n",
-                    MemberName("com.ustadmobile.door.ext", "createArrayOrProxyArrayOf"),
-                    arrayTypeName, it)
-            }else {
-                add("_stmt.set${paramType.preparedStatementSetterGetterTypeName(resolver)}(${paramIndex++}, " +
-                        "${it})\n")
-            }
-        }
-
-        if(queryVarsNotSubstituted.isNotEmpty()) {
-            environment.logger.error(
-                "Parameters in query not found in method signature: ${queryVarsNotSubstituted.joinToString()}",
-                daoFunDecl)
-            return this
-        }
-    }else {
-        add("$rawQueryVarName.bindToPreparedStmt(_stmt, _db, _stmt.getConnection())\n")
-    }
-
-    val resultSet: ResultSet?
-    val execStmt: Statement?
-    try {
-        execStmt = dbConnection.createStatement()
-
-        if(isUpdateOrDelete) {
-            //This can't be. An update will not be done using a RawQuery (that would just be done using execSQL)
-            if(querySql == null)
-                throw IllegalStateException("QuerySql cannot be null")
-
-            /*
-             Run this query now so that we would get an exception if there is something wrong with it.
-             */
-            execStmt?.executeUpdate(querySql.replaceQueryNamedParamsWithDefaultTypeValues(queryVars, resolver))
-            add("val _numUpdates = _stmt.")
-            if(suspended) {
-                add("%M()\n", MemberName("com.ustadmobile.door.jdbc.ext", "executeUpdateAsyncKmp"))
-            }else {
-                add("executeUpdate()\n")
-            }
-
-            if(daoFun.hasReturnType(resolver)) {
-                add("$resultVarName = _numUpdates\n")
-            }
+        if(daoFunDecl.isSuspended) {
+            add("_stmt.%M()\n", MEMBERNAME_EXEC_UPDATE_ASYNC)
         }else {
-            if(suspended) {
-                beginControlFlow("_stmt.%M().%M ",
-                    AbstractDbProcessor.MEMBERNAME_ASYNC_QUERY, AbstractDbProcessor.MEMBERNAME_RESULTSET_USERESULTS
-                )
-            }else {
-                beginControlFlow("_stmt.executeQuery().%M ",
-                    AbstractDbProcessor.MEMBERNAME_RESULTSET_USERESULTS
-                )
-            }
-
-            add(" _resultSet ->\n")
-
-            val colNames = mutableListOf<String>()
-            if(querySql != null) {
-                resultSet = execStmt?.executeQuery(querySql.replaceQueryNamedParamsWithDefaultTypeValues(queryVars,
-                    resolver))
-                val metaData = resultSet!!.metaData
-                for(i in 1 .. metaData.columnCount) {
-                    colNames.add(metaData.getColumnName(i))
-                }
-            }
-
-            val entityVarName = "_entity"
-
-            if(entityType !in resolver.querySingularTypes() && rawQueryVarName != null) {
-                add("val _columnIndexMap = _resultSet.%M()\n",
-                    MemberName("com.ustadmobile.door.ext", "columnIndexMap"))
-            }
-
-
-            if(resultType.isListOrArrayType(resolver)) {
-                beginControlFlow("while(_resultSet.next())")
-            }else {
-                beginControlFlow("if(_resultSet.next())")
-            }
-
-            if(entityType in resolver.querySingularTypes()) {
-                add("val $entityVarName = _resultSet.get${entityType.preparedStatementSetterGetterTypeName(resolver)}(1)\n")
-            }else {
-//                add(resultEntityField!!.createSetterCodeBlock(rawQuery = rawQueryVarName != null,
-//                    colIndexVarName = "_columnIndexMap"))
-            }
-
-            if(resultType.isListOrArrayType(resolver)) {
-                add("$resultVarName.add(_entity)\n")
-            }else {
-                add("$resultVarName = _entity\n")
-            }
-
-            endControlFlow()
-            endControlFlow() //end use of resultset
+            add("_stmt.executeUpdate()\n")
         }
-    }catch(e: SQLException) {
-        environment.logger.error("Exception running query SQL '$querySql' : ${e.message}", daoFunDecl)
     }
 
     endControlFlow()
-
     return this
 }
-
 
 
 class DoorJdbcProcessor(
@@ -2256,7 +1565,7 @@ class DoorJdbcProcessor(
             JDBC_TARGETS.forEach { target ->
                 FileSpec.builder(daoKSClass.packageName.asString(),
                     daoKSClass.simpleName.asString() + SUFFIX_JDBC_KT2)
-                    .addDaoJdbcImplType(daoKSClass, resolver, environment, target, dbConnection)
+                    .addDaoJdbcImplType(daoKSClass, resolver, environment, target)
                     .build()
                     .writeToPlatformDir(target, environment.codeGenerator, environment.options)
             }

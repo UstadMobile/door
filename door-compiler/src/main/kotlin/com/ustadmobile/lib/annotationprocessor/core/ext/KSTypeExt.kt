@@ -27,7 +27,7 @@ fun KSType.unwrapLiveDataOrDataSourceFactoryResultType(
         return this.arguments.first().type?.resolve()
             ?: throw IllegalArgumentException("unwrapLiveDataOrDataSourceFactoryResultType: Cannot resolve LiveData type!")
     } else if (qualifiedName == DataSource.Factory::class.qualifiedName) {
-        val entityTypeRef = resolver.createKSTypeReferenceFromKSType(this)
+        val entityTypeRef = arguments.get(1).type ?: throw IllegalArgumentException("Factory has no type argument")
         return resolver.getClassDeclarationByName(resolver.getKSNameFromString("kotlin.collections.List"))
             ?.asType(listOf(resolver.getTypeArgument(entityTypeRef, Variance.INVARIANT)))
                 ?: throw IllegalArgumentException("unwrapLiveDataOrDataSourceFactoryResultType: could not lookup datasource comp type")
