@@ -10,7 +10,7 @@ import com.ustadmobile.lib.annotationprocessor.core.ext.hasAnnotation
 /**
  * Used to represent the attachment-related fields on a database entity class.
  */
-class EntityAttachmentInfo {
+class EntityAttachmentInfo(ksClassDeclaration: KSClassDeclaration) {
 
     val uriPropertyName: String
 
@@ -18,7 +18,7 @@ class EntityAttachmentInfo {
 
     val sizePropertyName: String
 
-    constructor(ksClassDeclaration: KSClassDeclaration) {
+    init {
         val allProperties = ksClassDeclaration.getAllProperties()
         uriPropertyName = allProperties
             .first { it.hasAnnotation(AttachmentUri::class) }.simpleName.asString()

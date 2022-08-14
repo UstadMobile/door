@@ -39,9 +39,6 @@ fun TypeSpec.Builder.addAccessorOverride(methodName: String, returnType: TypeNam
     }
 }
 
-fun TypeSpec.Builder.addAccessorOverride(executableElement: ExecutableElement, codeBlock: CodeBlock)  =
-        addAccessorOverride(executableElement.simpleName.toString(), executableElement.returnType.asTypeName(), codeBlock)
-
 fun TypeSpec.Builder.addDaoPropOrGetterOverride(
     daoPropOrGetterDeclaration: KSDeclaration,
     codeBlock: CodeBlock,
@@ -157,32 +154,6 @@ fun TypeSpec.Builder.addRoomCreateInvalidationTrackerFunction() : TypeSpec.Build
             .build())
 
     return this
-}
-
-/**
- * Returns a list of the entity fields of a particular object. If getAutoIncLast is true, then
- * any autoincrement primary key will always be returned at the end of the list, e.g. so that a
- * preparedstatement insert with or without an autoincrement id can share the same code to set
- * all other parameters.
- *
- * @param getAutoIncLast if true, then always return any field that is auto increment at the very end
- * @return List of VariableElement representing the entity fields that are persisted
- */
-fun TypeSpec.entityFields(getAutoIncLast: Boolean = true): List<PropertySpec> {
-    val propertyList = propertySpecs.toMutableList()
-
-    if(getAutoIncLast) {
-        val autoIncPropIdx = propertyList
-                .indexOfFirst { it.annotations.any { it.className == PrimaryKey::class.asClassName()
-                        && it.members.any { it.toString().contains("autoGenerate") }} }
-
-        if(autoIncPropIdx >= 0) {
-            val autoIncField = propertyList.removeAt(autoIncPropIdx)
-            propertyList.add(autoIncField)
-        }
-    }
-
-    return propertyList
 }
 
 /**
