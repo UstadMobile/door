@@ -10,12 +10,6 @@ fun <A:Annotation> KSAnnotation.isAnnotationClass(annotationKClass: KClass<A>): 
         .qualifiedName?.asString() == annotationKClass.qualifiedName
 }
 
-fun KSAnnotation.getArgValueAsClass(argName: String) : KSClassDeclaration? {
-    return arguments.firstOrNull { it.name?.asString() == argName }?.value?.let {
-        (it as KSType).declaration as KSClassDeclaration
-    }
-}
-
 @Suppress("UNCHECKED_CAST")
 fun KSAnnotation.getArgValueAsClassList(argName: String): List<KSClassDeclaration> {
     val ksTypeList = arguments.firstOrNull { it.name?.asString() == argName }?.value as?

@@ -5,8 +5,6 @@ import com.squareup.kotlinpoet.*
 import io.ktor.client.request.forms.*
 import io.ktor.content.*
 import io.ktor.http.*
-import javax.lang.model.element.TypeElement
-import androidx.room.PrimaryKey
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
@@ -35,40 +33,6 @@ fun CodeBlock.Builder.addDelegateFunctionCall(varName: String, daoFun: KSFunctio
         .add(daoFun.parameters.joinToString { it.name?.asString() ?: "" } )
         .add(")")
 
-}
-
-/**
- * Add a section to this CodeBlock that will declare a variable for the clientId and get it
- * from the header.
- *
- * e.g.
- * val clientIdVarName = call.request.header("X-nid")?.toLong() ?: 0
- *
- * @param varName the varname to create in the CodeBlock
- * @param serverType SERVER_TYPE_KTOR or SERVER_TYPE_NANOHTTPD
- *
- */
-fun CodeBlock.Builder.addGetClientIdHeader(varName: String, serverType: Int) : CodeBlock.Builder {
-    takeIf { serverType == DbProcessorKtorServer.SERVER_TYPE_KTOR }
-            ?.add("val $varName = %M.request.%M(%S)?.toLong() ?: 0\n",
-                    DbProcessorKtorServer.CALL_MEMBER,
-                    MemberName("io.ktor.request","header"),
-                    "x-nid")
-    takeIf { serverType == DbProcessorKtorServer.SERVER_TYPE_NANOHTTPD }
-            ?.add("val $varName = _session.headers.get(%S)?.toLong() ?: 0\n",
-                "x-nid")
-
-    return this
-}
-
-fun CodeBlock.Builder.beginIfNotNullOrEmptyControlFlow(varName: String, isList: Boolean) : CodeBlock.Builder{
-    if(isList) {
-        beginControlFlow("if(!$varName.isEmpty())")
-    }else {
-        beginControlFlow("if($varName != null)")
-    }
-
-    return this
 }
 
 

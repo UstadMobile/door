@@ -26,10 +26,3 @@ fun PropertySpec.Builder.delegateGetterAndSetter(delegate: String) : PropertySpe
     return this
 }
 
-val PropertySpec.isEntityPrimaryKey: Boolean
-    get() = annotations.any { it.typeName == PrimaryKey::class.asTypeName() }
-
-val PropertySpec.isEntityAutoGenPrimaryKey: Boolean
-    get() = isEntityPrimaryKey && annotations.first { it.typeName == PrimaryKey::class.asTypeName() }
-                .members.findBooleanMemberValue("autoGenerate") == true
-

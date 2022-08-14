@@ -15,8 +15,6 @@ import com.ustadmobile.door.DoorDatabaseReplicateWrapper
 import com.ustadmobile.door.annotation.LastChangedTime
 import com.ustadmobile.door.annotation.ReplicateEntity
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
-import javax.annotation.processing.RoundEnvironment
-import javax.lang.model.element.TypeElement
 
 /**
  * Add a DAO accessor for a database replication wrapper (e.g. property or function). If the given DAO
@@ -346,18 +344,6 @@ private fun KSFunctionDeclaration.isDaoReplicateEntityWriteFunction(
         val fnResolved = asMemberOf(daoClassDeclaration.asType(emptyList()))
         fnResolved.firstParamEntityType(resolver).declaration.hasAnnotation(ReplicateEntity::class)
     }
-}
-
-/**
- * Generates an implementation of DoorDatabaseReplicateWrapper for databases and daos being processed.
- */
-class DbProcessorReplicateWrapper: AbstractDbProcessor()  {
-
-    override fun process(annotations: MutableSet<out TypeElement>?, roundEnv: RoundEnvironment): Boolean {
-        //Not used anymore - will be removed soon - now done using KSP
-        return true
-    }
-
 }
 
 class DoorReplicateWrapperProcessor(

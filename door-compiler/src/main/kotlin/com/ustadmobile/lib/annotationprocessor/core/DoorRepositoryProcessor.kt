@@ -14,16 +14,12 @@ import com.ustadmobile.door.annotation.RepoHttpAccessible
 import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.attachments.EntityWithAttachment
 import com.ustadmobile.door.replication.ReplicationSubscriptionManager
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorRepository.Companion.BOUNDARY_CALLBACK_CLASSNAME
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorRepository.Companion.DATASOURCEFACTORY_TO_BOUNDARYCALLBACK_VARNAME
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorRepository.Companion.SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorRepository.Companion.SUFFIX_REPOSITORY2
+import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.BOUNDARY_CALLBACK_CLASSNAME
+import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.DATASOURCEFACTORY_TO_BOUNDARYCALLBACK_VARNAME
+import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER
+import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.SUFFIX_REPOSITORY2
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
 import io.ktor.client.*
-import java.util.*
-import javax.annotation.processing.ProcessingEnvironment
-import javax.annotation.processing.RoundEnvironment
-import javax.lang.model.element.TypeElement
 
 /**
  * Generate the table id map of entity names (strings) to the table id as per the syncableentity
@@ -151,7 +147,7 @@ fun FileSpec.Builder.addDbRepoType(
             }
         }
         .addType(TypeSpec.companionObjectBuilder()
-            .addProperty(PropertySpec.builder(DbProcessorRepository.DB_NAME_VAR, String::class)
+            .addProperty(PropertySpec.builder(DoorRepositoryProcessor.DB_NAME_VAR, String::class)
                 .addModifiers(KModifier.CONST)
                 .initializer("%S", dbKSClassDeclaration.simpleName.asString())
                 .mutable(false).build())
@@ -448,52 +444,6 @@ fun CodeBlock.Builder.addDelegateToWebCode(daoFunSpec: FunSpec, daoName: String)
 
     return this
 }
-class DbProcessorRepository: AbstractDbProcessor() {
-
-    override fun process(annotations: MutableSet<out TypeElement>, roundEnv: RoundEnvironment): Boolean {
-
-        return true
-    }
-
-
-    companion object {
-        //including the underscore as it should
-        const val SUFFIX_REPOSITORY2 = "_Repo"
-
-        const val SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER = "_EwaAdapter"
-
-        /**
-         * When creating a repository, the Syncable DAO is constructed (JDBC). This is because
-         * the database itself cannot have fields or method signatures that are themselves generated
-         * classes
-         */
-        const val REPO_SYNCABLE_DAO_CONSTRUCT = 1
-
-        /**
-         * When creatin ga repository, the Syncable DAO is obtained from the database. This is done
-         * on Room on Android, where the database class is slightly modified and all DAOs must come
-         * from the database object
-         */
-        const val REPO_SYNCABLE_DAO_FROMDB = 2
-
-        /**
-         * A static string which is generated for the database name part of the http path, which is
-         * passed from the database repository to the DAO repository so it can use the correct http
-         * path e.g. endpoint/dbname/daoname
-         */
-        const val DB_NAME_VAR = "_DB_NAME"
-
-        const val DATASOURCEFACTORY_TO_BOUNDARYCALLBACK_VARNAME = "_dataSourceFactoryToBoundaryCallbackMap"
-
-        val BOUNDARY_CALLBACK_CLASSNAME = ClassName("com.ustadmobile.door",
-                "RepositoryBoundaryCallback")
-
-        val BOUNDARY_CALLBACK_MAP_CLASSNAME = WeakHashMap::class.asClassName().parameterizedBy(
-                androidx.paging.DataSource.Factory::class.asClassName().parameterizedBy(INT, STAR),
-                BOUNDARY_CALLBACK_CLASSNAME.parameterizedBy(STAR))
-
-    }
-}
 
 class DoorRepositoryProcessor(
     private val environment: SymbolProcessorEnvironment,
@@ -543,5 +493,24 @@ class DoorRepositoryProcessor(
         }
 
         return emptyList()
+    }
+
+    companion object {
+        //including the underscore as it should
+        const val SUFFIX_REPOSITORY2 = "_Repo"
+
+        const val SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER = "_EwaAdapter"
+
+        /**
+         * A static string which is generated for the database name part of the http path, which is
+         * passed from the database repository to the DAO repository so it can use the correct http
+         * path e.g. endpoint/dbname/daoname
+         */
+        const val DB_NAME_VAR = "_DB_NAME"
+
+        const val DATASOURCEFACTORY_TO_BOUNDARYCALLBACK_VARNAME = "_dataSourceFactoryToBoundaryCallbackMap"
+
+        val BOUNDARY_CALLBACK_CLASSNAME = ClassName("com.ustadmobile.door",
+            "RepositoryBoundaryCallback")
     }
 }

@@ -1,7 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
 import com.google.devtools.ksp.symbol.KSClassDeclaration
-import javax.lang.model.element.TypeElement
 import com.ustadmobile.door.annotation.AttachmentUri
 import com.ustadmobile.door.annotation.AttachmentMd5
 import com.ustadmobile.door.annotation.AttachmentSize

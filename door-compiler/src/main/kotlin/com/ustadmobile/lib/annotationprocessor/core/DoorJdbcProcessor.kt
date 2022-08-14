@@ -7,12 +7,10 @@ import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.*
-import javax.annotation.processing.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.ustadmobile.door.*
-import javax.lang.model.element.TypeElement
 import kotlin.reflect.jvm.internal.impl.name.FqName
 import kotlin.reflect.jvm.internal.impl.builtins.jvm.JavaToKotlinClassMap
 import com.ustadmobile.door.DoorDbType
@@ -27,14 +25,14 @@ import com.ustadmobile.door.replication.ReplicationEntityMetaData
 import com.ustadmobile.door.replication.ReplicationFieldMetaData
 import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
 import com.ustadmobile.door.util.DeleteZombieAttachmentsListener
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorRepository.Companion.SUFFIX_REPOSITORY2
 import kotlinx.coroutines.GlobalScope
 import kotlin.reflect.KClass
 import com.ustadmobile.door.util.NodeIdAuthCache
 import com.ustadmobile.door.util.TransactionDepthCounter
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.MEMBERNAME_EXEC_UPDATE_ASYNC
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorJdbcKotlin.Companion.SUFFIX_JDBC_KT2
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorJdbcKotlin.Companion.SUFFIX_JS_IMPLEMENTATION_CLASSES
+import com.ustadmobile.lib.annotationprocessor.core.DoorJdbcProcessor.Companion.SUFFIX_JDBC_KT2
+import com.ustadmobile.lib.annotationprocessor.core.DoorJdbcProcessor.Companion.SUFFIX_JS_IMPLEMENTATION_CLASSES
+import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.SUFFIX_REPOSITORY2
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -287,7 +285,7 @@ private fun FileSpec.Builder.addReplicationRunOnChangeRunnerType(
         .filter { it.hasAnnotation(ReplicateEntity::class) }
 
 
-    addType(TypeSpec.classBuilder(dbKSClass.toClassNameWithSuffix(DbProcessorJdbcKotlin.SUFFIX_REP_RUN_ON_CHANGE_RUNNER))
+    addType(TypeSpec.classBuilder(dbKSClass.toClassNameWithSuffix(DoorJdbcProcessor.SUFFIX_REP_RUN_ON_CHANGE_RUNNER))
         .addSuperinterface(ReplicationRunOnChangeRunner::class)
         .addAnnotation(AnnotationSpec.builder(Suppress::class)
             .addMember("%S, %S, %S, %S", "LocalVariableName", "RedundantVisibilityModifier", "unused", "ClassName")
@@ -510,7 +508,7 @@ fun FileSpec.Builder.addJdbcDbImplType(
                 .beginControlFlow("if(this == %M)",
                     MemberName("com.ustadmobile.door.ext", "rootDatabase"))
                 .add("%T(this, %T(this), %T)\n", ReplicationNotificationDispatcher::class,
-                    dbKSClass.toClassNameWithSuffix(DbProcessorJdbcKotlin.SUFFIX_REP_RUN_ON_CHANGE_RUNNER),
+                    dbKSClass.toClassNameWithSuffix(DoorJdbcProcessor.SUFFIX_REP_RUN_ON_CHANGE_RUNNER),
                         GlobalScope::class)
                 .nextControlFlow("else")
                 .add("rootDatabase.%M\n",
@@ -986,27 +984,6 @@ fun TypeSpec.Builder.addDaoJdbcEntityInsertAdapter(
     return this
 }
 
-
-class DbProcessorJdbcKotlin: AbstractDbProcessor() {
-
-    override fun process(annotations: MutableSet<out TypeElement>?, roundEnv: RoundEnvironment): Boolean {
-
-        Napier.d("DbProcessJdbcKotlin: process complete")
-        return true
-    }
-
-
-    companion object {
-
-        //As it should be including the underscore - the above will be deprecated
-        const val SUFFIX_JDBC_KT2 = "_JdbcKt"
-
-        const val SUFFIX_REP_RUN_ON_CHANGE_RUNNER = "_ReplicationRunOnChangeRunner"
-
-        const val SUFFIX_JS_IMPLEMENTATION_CLASSES = "JsImplementations"
-
-    }
-}
 
 fun FileSpec.Builder.addDaoJdbcImplType(
     daoKSClass: KSClassDeclaration,
@@ -1549,7 +1526,7 @@ class DoorJdbcProcessor(
                     .build()
                     .writeToPlatformDir(target, environment.codeGenerator, environment.options)
 
-                FileSpec.builder(dbKSClass.packageName.asString(), dbKSClass.simpleName.asString() + DbProcessorJdbcKotlin.SUFFIX_REP_RUN_ON_CHANGE_RUNNER)
+                FileSpec.builder(dbKSClass.packageName.asString(), dbKSClass.simpleName.asString() + SUFFIX_REP_RUN_ON_CHANGE_RUNNER)
                     .addReplicationRunOnChangeRunnerType(dbKSClass)
                     .build()
                     .writeToPlatformDir(target, environment.codeGenerator, environment.options)
@@ -1577,6 +1554,14 @@ class DoorJdbcProcessor(
     companion object {
 
         val JDBC_TARGETS = listOf(DoorTarget.JVM, DoorTarget.JS)
+
+
+        //As it should be including the underscore - the above will be deprecated
+        const val SUFFIX_JDBC_KT2 = "_JdbcKt"
+
+        const val SUFFIX_REP_RUN_ON_CHANGE_RUNNER = "_ReplicationRunOnChangeRunner"
+
+        const val SUFFIX_JS_IMPLEMENTATION_CLASSES = "JsImplementations"
     }
 
 }

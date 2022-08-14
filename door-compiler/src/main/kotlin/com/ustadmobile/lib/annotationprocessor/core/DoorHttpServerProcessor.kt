@@ -23,18 +23,21 @@ import com.ustadmobile.door.annotation.MinReplicationVersion
 import com.ustadmobile.door.annotation.RepoHttpAccessible
 import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.ext.DoorTag
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.CODEBLOCK_KTOR_NO_CONTENT_RESPOND
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.CODEBLOCK_NANOHTTPD_NO_CONTENT_RESPONSE
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.DI_INSTANCE_MEMBER
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.DI_INSTANCE_TYPETOKEN_MEMBER
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.DI_ON_MEMBER
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.GET_MEMBER
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.POST_MEMBER
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SERVER_TYPE_KTOR
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SERVER_TYPE_NANOHTTPD
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SUFFIX_KTOR_ROUTE
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SUFFIX_NANOHTTPD_ADDURIMAPPING
-import com.ustadmobile.lib.annotationprocessor.core.DbProcessorKtorServer.Companion.SUFFIX_NANOHTTPD_URIRESPONDER
+import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.CALL_MEMBER
+import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.CODEBLOCK_KTOR_NO_CONTENT_RESPOND
+import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.CODEBLOCK_NANOHTTPD_NO_CONTENT_RESPONSE
+import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.DI_ERASED_MEMBER
+import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.DI_INSTANCE_MEMBER
+import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.DI_INSTANCE_TYPETOKEN_MEMBER
+import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.DI_ON_MEMBER
+import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.GET_MEMBER
+import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.POST_MEMBER
+import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.RESPOND_MEMBER
+import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.SERVER_TYPE_KTOR
+import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.SERVER_TYPE_NANOHTTPD
+import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.SUFFIX_KTOR_ROUTE
+import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.SUFFIX_NANOHTTPD_ADDURIMAPPING
+import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.SUFFIX_NANOHTTPD_URIRESPONDER
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
 import fi.iki.elonen.NanoHTTPD
 import fi.iki.elonen.router.RouterNanoHTTPD
@@ -42,9 +45,6 @@ import io.ktor.http.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 import org.kodein.di.DI
-import javax.annotation.processing.ProcessingEnvironment
-import javax.annotation.processing.RoundEnvironment
-import javax.lang.model.element.TypeElement
 
 fun CodeBlock.Builder.addNanoHttpdResponse(varName: String, addNonNullOperator: Boolean = false,
                                            applyToResponseCodeBlock: CodeBlock? = null)
@@ -56,8 +56,7 @@ fun CodeBlock.Builder.addNanoHttpdResponse(varName: String, addNonNullOperator: 
             ?.endControlFlow()
 
 fun CodeBlock.Builder.addKtorResponse(varName: String)
-        = add("%M.%M($varName)\n", DbProcessorKtorServer.CALL_MEMBER,
-            DbProcessorKtorServer.RESPOND_MEMBER)
+        = add("%M.%M($varName)\n", CALL_MEMBER, RESPOND_MEMBER)
 
 
 fun FunSpec.Builder.addParametersForHttpDb(isPrimaryDefaultVal: Boolean): FunSpec.Builder {
@@ -379,7 +378,7 @@ fun CodeBlock.Builder.addGetParamFromHttpRequest(typeName: TypeName, paramName: 
     if(typeName.isHttpQueryQueryParam()) {
         if(typeName in QUERY_SINGULAR_TYPES) {
             if(serverType == SERVER_TYPE_KTOR) {
-                add("%M.request.queryParameters[%S]", DbProcessorKtorServer.CALL_MEMBER, paramName)
+                add("%M.request.queryParameters[%S]", CALL_MEMBER, paramName)
             }else {
                 add("_session.parameters.get(%S)?.get(0)", paramName)
             }
@@ -390,7 +389,7 @@ fun CodeBlock.Builder.addGetParamFromHttpRequest(typeName: TypeName, paramName: 
             }
         }else {
             if(serverType == SERVER_TYPE_KTOR) {
-                add("%M.request.queryParameters.getAll(%S)", DbProcessorKtorServer.CALL_MEMBER,
+                add("%M.request.queryParameters.getAll(%S)", CALL_MEMBER,
                         paramName)
             }else {
                 add("_session.parameters[%S]", paramName)
@@ -406,7 +405,7 @@ fun CodeBlock.Builder.addGetParamFromHttpRequest(typeName: TypeName, paramName: 
         val getJsonStrCodeBlock = if(multipartHelperVarName != null) {
             CodeBlock.of("$multipartHelperVarName.receiveJsonStr()")
         }else if(serverType == SERVER_TYPE_KTOR){
-            CodeBlock.of("%M.%M<String>()", DbProcessorKtorServer.CALL_MEMBER,
+            CodeBlock.of("%M.%M<String>()", CALL_MEMBER,
                     MemberName("io.ktor.server.request", "receiveOrNull"))
         }else {
             CodeBlock.of("mutableMapOf<String,String>().also{_session.parseBody(it)}.get(%S)",
@@ -507,7 +506,7 @@ fun FileSpec.Builder.addDbKtorRouteFunction(
                 }
 
                 add("val _typeToken: %T<%T> = %M()\n", org.kodein.type.TypeToken::class.java,
-                    dbClassDeclaration.toClassName(), DbProcessorKtorServer.DI_ERASED_MEMBER)
+                    dbClassDeclaration.toClassName(), DI_ERASED_MEMBER)
                 if(dbClassDeclaration.dbHasReplicateWrapper()) {
                     add("%M(_typeToken, %T::class, json)\n",
                         MemberName("com.ustadmobile.door.replication", "doorReplicationRoute"),
@@ -590,64 +589,6 @@ fun FileSpec.Builder.addDbNanoHttpdMapperFunction(
  *  be generated.
  *
  */
-
-
-class DbProcessorKtorServer: AbstractDbProcessor() {
-
-
-
-    override fun process(annotations: MutableSet<out TypeElement>?, roundEnv: RoundEnvironment): Boolean {
-
-        return true
-    }
-
-
-    companion object {
-
-        const val SUFFIX_KTOR_ROUTE = "_KtorRoute"
-
-        const val SUFFIX_KTOR_HELPER = "_KtorHelper"
-
-        const val SUFFIX_KTOR_HELPER_MASTER = "_KtorHelperMaster"
-
-        const val SUFFIX_KTOR_HELPER_LOCAL = "_KtorHelperLocal"
-
-        const val SUFFIX_NANOHTTPD_URIRESPONDER = "_UriResponder"
-
-        const val SUFFIX_NANOHTTPD_ADDURIMAPPING = "_AddUriMapping"
-
-        val GET_MEMBER = MemberName("io.ktor.server.routing", "get")
-
-        val POST_MEMBER = MemberName("io.ktor.server.routing", "post")
-
-        val CALL_MEMBER = MemberName("io.ktor.server.application", "call")
-
-        val RESPOND_MEMBER = MemberName("io.ktor.server.response", "respond")
-
-        val RESPONSE_HEADER = MemberName("io.ktor.server.response", "header")
-
-        val DI_ON_MEMBER = MemberName("org.kodein.di", "on")
-
-        val DI_INSTANCE_MEMBER = MemberName("org.kodein.di", "instance")
-
-        val DI_INSTANCE_TYPETOKEN_MEMBER = MemberName("org.kodein.di", "Instance")
-
-        val DI_ERASED_MEMBER = MemberName("org.kodein.type", "erased")
-
-        const val SERVER_TYPE_KTOR = 1
-
-        const val SERVER_TYPE_NANOHTTPD = 2
-
-        internal val CODEBLOCK_NANOHTTPD_NO_CONTENT_RESPONSE = CodeBlock.of(
-                "return %T.newFixedLengthResponse(%T.Status.NO_CONTENT, %T.MIME_TYPE_PLAIN, %S)\n",
-                NanoHTTPD::class, NanoHTTPD.Response::class, DoorConstants::class, "")
-
-        internal val CODEBLOCK_KTOR_NO_CONTENT_RESPOND = CodeBlock.of("%M.%M(%T.NoContent, %S)\n",
-                CALL_MEMBER, RESPOND_MEMBER, HttpStatusCode::class, "")
-
-    }
-}
-
 class DoorHttpServerProcessor(
     private val environment: SymbolProcessorEnvironment,
 ) : SymbolProcessor {
@@ -688,6 +629,45 @@ class DoorHttpServerProcessor(
         }
 
         return emptyList()
+    }
+
+    companion object {
+
+        const val SUFFIX_KTOR_ROUTE = "_KtorRoute"
+
+        const val SUFFIX_NANOHTTPD_URIRESPONDER = "_UriResponder"
+
+        const val SUFFIX_NANOHTTPD_ADDURIMAPPING = "_AddUriMapping"
+
+        val GET_MEMBER = MemberName("io.ktor.server.routing", "get")
+
+        val POST_MEMBER = MemberName("io.ktor.server.routing", "post")
+
+        val CALL_MEMBER = MemberName("io.ktor.server.application", "call")
+
+        val RESPOND_MEMBER = MemberName("io.ktor.server.response", "respond")
+
+        val RESPONSE_HEADER = MemberName("io.ktor.server.response", "header")
+
+        val DI_ON_MEMBER = MemberName("org.kodein.di", "on")
+
+        val DI_INSTANCE_MEMBER = MemberName("org.kodein.di", "instance")
+
+        val DI_INSTANCE_TYPETOKEN_MEMBER = MemberName("org.kodein.di", "Instance")
+
+        val DI_ERASED_MEMBER = MemberName("org.kodein.type", "erased")
+
+        const val SERVER_TYPE_KTOR = 1
+
+        const val SERVER_TYPE_NANOHTTPD = 2
+
+        internal val CODEBLOCK_NANOHTTPD_NO_CONTENT_RESPONSE = CodeBlock.of(
+            "return %T.newFixedLengthResponse(%T.Status.NO_CONTENT, %T.MIME_TYPE_PLAIN, %S)\n",
+            NanoHTTPD::class, NanoHTTPD.Response::class, DoorConstants::class, "")
+
+        internal val CODEBLOCK_KTOR_NO_CONTENT_RESPOND = CodeBlock.of("%M.%M(%T.NoContent, %S)\n",
+            CALL_MEMBER, RESPOND_MEMBER, HttpStatusCode::class, "")
+
     }
 }
 

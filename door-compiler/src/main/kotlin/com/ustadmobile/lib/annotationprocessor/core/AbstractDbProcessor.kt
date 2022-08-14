@@ -96,52 +96,11 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
 
     protected lateinit var messager: Messager
 
-    protected var dbConnection: Connection? = null
-
-    /**
-     * When we generate the code for a Query annotation function that performs an update or delete,
-     * we use this so that we can match the case of the table name. This will be setup by
-     * AnnotationProcessorWrapper calling processDb.
-     */
-    protected var allKnownEntityNames = mutableListOf<String>()
-
-    /**
-     * Provides a map that can be used to find the TypeElement for a given table name. This will be
-     * setup by AnnotationProcessorWrapper calling processDb.
-     */
-    protected var allKnownEntityTypesMap = mutableMapOf<String, TypeElement>()
-
     override fun init(p0: ProcessingEnvironment) {
         super.init(p0)
         messager = p0.messager
     }
 
-
-    /**
-     * Write the given FileSpec to the directories specified in the annotation processor arguments.
-     * Paths should be separated by the path separator character (platform dependent - e.g. :
-     * on Unix, ; on Windows)
-     */
-    protected fun FileSpec.writeToDirsFromArg(argName: String, useFilerAsDefault: Boolean = true) {
-        writeToDirsFromArg(listOf(argName), useFilerAsDefault)
-    }
-
-    protected fun FileSpec.writeToDirsFromArg(argNames: List<String>, useFilerAsDefault: Boolean = true) {
-        val outputArgDirs = argNames.flatMap {argName ->
-            processingEnv.options[argName]?.split(File.pathSeparator)
-                    ?: if(useFilerAsDefault) { listOf("filer") } else { listOf() }
-        }
-
-        outputArgDirs.forEach {
-            val outputPath = if(it == "filer") {
-                processingEnv.options["kapt.kotlin.generated"]!!
-            }else {
-                it
-            }
-
-            writeTo(File(outputPath))
-        }
-    }
 
     companion object {
         val CLASSNAME_CONNECTION = ClassName("com.ustadmobile.door.jdbc", "Connection")

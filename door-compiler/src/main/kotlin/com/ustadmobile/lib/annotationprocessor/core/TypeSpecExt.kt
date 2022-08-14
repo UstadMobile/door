@@ -19,26 +19,6 @@ import com.ustadmobile.lib.annotationprocessor.core.ext.propertyOrReturnType
 import com.ustadmobile.lib.annotationprocessor.core.ext.toPropertyOrEmptyFunctionCaller
 import kotlin.IllegalArgumentException
 
-/**
- * Add a method or property that overrides the given accessor. The ExecutableElement could be a
- * getter method - in which case we need to add a Kotlin property with a getter method. Otherwise we
- * add an overriding function
- */
-fun TypeSpec.Builder.addAccessorOverride(methodName: String, returnType: TypeName, codeBlock: CodeBlock) {
-    if(methodName.startsWith("get")) {
-        val propName = methodName.substring(3, 4).lowercase() + methodName.substring(4)
-        val getterFunSpec = FunSpec.getterBuilder().addCode(codeBlock)
-        addProperty(PropertySpec.builder(propName, returnType,
-                KModifier.OVERRIDE).getter(getterFunSpec.build()).build())
-    }else {
-        addFunction(FunSpec.builder(methodName)
-                .addModifiers(KModifier.OVERRIDE)
-                .returns(returnType)
-                .addCode(codeBlock)
-                .build())
-    }
-}
-
 fun TypeSpec.Builder.addDaoPropOrGetterOverride(
     daoPropOrGetterDeclaration: KSDeclaration,
     codeBlock: CodeBlock,
