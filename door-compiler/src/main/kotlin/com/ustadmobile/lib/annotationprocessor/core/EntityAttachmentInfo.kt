@@ -18,15 +18,6 @@ class EntityAttachmentInfo {
 
     val sizePropertyName: String
 
-    constructor(typeElement: TypeElement) {
-        uriPropertyName = typeElement.enclosedElements
-                .first { it.hasAnnotation(AttachmentUri::class.java) }.simpleName.toString()
-        md5PropertyName = typeElement.enclosedElements
-                .first { it.hasAnnotation(AttachmentMd5::class.java) }.simpleName.toString()
-        sizePropertyName = typeElement.enclosedElements
-                .first { it.hasAnnotation(AttachmentSize::class.java) }.simpleName.toString()
-    }
-
     constructor(ksClassDeclaration: KSClassDeclaration) {
         val allProperties = ksClassDeclaration.getAllProperties()
         uriPropertyName = allProperties

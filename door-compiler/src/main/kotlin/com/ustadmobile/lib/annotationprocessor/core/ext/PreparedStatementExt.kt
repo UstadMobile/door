@@ -1,42 +1,32 @@
 package com.ustadmobile.lib.annotationprocessor.core.ext
 
+import com.google.devtools.ksp.processing.Resolver
+import com.google.devtools.ksp.symbol.KSType
 import com.ustadmobile.door.ext.createArrayOrProxyArrayOf
-import com.ustadmobile.lib.annotationprocessor.core.toSqlType
-import com.ustadmobile.lib.annotationprocessor.core.unwrapListOrArrayComponentType
 import java.sql.PreparedStatement
-import javax.annotation.processing.ProcessingEnvironment
-import javax.lang.model.type.DeclaredType
-import javax.lang.model.type.TypeKind
-import javax.lang.model.type.TypeMirror
 
 fun PreparedStatement.setDefaultParamValue(
-    processingEnv: ProcessingEnvironment,
+    resolver: Resolver,
     index: Int,
     paramName: String,
-    paramType: TypeMirror,
+    paramType: KSType,
     dbType: Int
-){
-    when(paramType.kind) {
-        TypeKind.BOOLEAN -> setBoolean(index, false)
-        TypeKind.BYTE -> setByte(index, 0)
-        TypeKind.SHORT -> setShort(index, 0)
-        TypeKind.INT -> setInt(index, 0)
-        TypeKind.LONG -> setLong(index, 0)
-        TypeKind.FLOAT -> setFloat(index, 0.toFloat())
-        TypeKind.DOUBLE -> setDouble(index, 0.toDouble())
-        TypeKind.DECLARED -> {
-            val declaredType = paramType as DeclaredType
-            if(declaredType.asElement() == processingEnv.elementUtils.getTypeElement("java.lang.String")) {
-                setString(index, null)
-            }else if(declaredType.asElement() == processingEnv.elementUtils.getTypeElement("java.util.List")) {
-                val componentType = declaredType.unwrapListOrArrayComponentType(processingEnv)
-                setArray(index, connection.createArrayOrProxyArrayOf(componentType.toSqlType(dbType, processingEnv),
-                    arrayOf()))
-            }
-
-            else {
-                throw com.ustadmobile.door.jdbc.SQLException("$paramName Unsupported type: $paramType")
-            }
+) {
+    val builtIns = resolver.builtIns
+    when {
+        paramType.isMarkedNullable -> setObject(index, null)
+        paramType == builtIns.booleanType -> setBoolean(index, false)
+        paramType == builtIns.byteType -> setByte(index, 0)
+        paramType == builtIns.shortType -> setShort(index, 0)
+        paramType == builtIns.intType -> setInt(index, 0)
+        paramType == builtIns.longType -> setLong(index, 0L)
+        paramType == builtIns.floatType -> setFloat(index, 0.toFloat())
+        paramType == builtIns.doubleType -> setDouble(index, 0.toDouble())
+        paramType == builtIns.stringType -> setString(index, "")
+        paramType.isListOrArrayType(resolver) -> {
+            val componentType = paramType.unwrapComponentTypeIfListOrArray(resolver)
+            setArray(index, connection.createArrayOrProxyArrayOf(componentType.toSqlType(dbType, resolver),
+                arrayOf()))
         }
         else -> throw com.ustadmobile.door.jdbc.SQLException("$paramName Unsupported type: $paramType")
     }

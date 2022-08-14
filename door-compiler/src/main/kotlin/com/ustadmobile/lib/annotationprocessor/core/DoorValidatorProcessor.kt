@@ -1,19 +1,29 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
 import androidx.room.Entity
+import androidx.room.Query
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.squareup.kotlinpoet.asTypeName
+import com.squareup.kotlinpoet.metadata.toKmClass
 import com.ustadmobile.door.DoorDbType
+import com.ustadmobile.door.DoorDbType.Companion.productNameForDbType
+import com.ustadmobile.door.PreparedStatementConfig
+import com.ustadmobile.door.annotation.*
+import com.ustadmobile.door.entities.ZombieAttachmentData
+import com.ustadmobile.door.ext.prepareStatement
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
 import org.sqlite.SQLiteDataSource
 import java.io.File
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException
+import javax.lang.model.element.ExecutableElement
+import javax.tools.Diagnostic
 
 /**
  * This processor will create all tables on all databases for a given round of processing. It will also attempt
@@ -29,6 +39,8 @@ class DoorValidatorProcessor(
     val sqliteConnection: Connection
 
     val pgConnection: Connection?
+
+    val connectionMap: Map<Int, Connection?>
 
     init {
         val sqliteTmpFile = File.createTempFile("dbprocessorkt", ".db")
@@ -49,6 +61,8 @@ class DoorValidatorProcessor(
                 null
             }
         }
+
+        connectionMap = mapOf(DoorDbType.SQLITE to sqliteConnection, DoorDbType.POSTGRES to pgConnection)
     }
 
     private fun createAllTables(resolver: Resolver) {
@@ -82,7 +96,6 @@ class DoorValidatorProcessor(
             stmts.forEach {  stmtEntry ->
                 val dbType = stmtEntry.key
                 stmtEntry.value?.use { stmt ->
-                    //val typeEntitySpec: TypeSpec = entity.asEntityTypeSpec()
                     val createTableSql = entity.toCreateTableSql(dbType, resolver)
                     try {
                         stmt.execute(createTableSql)
@@ -90,19 +103,286 @@ class DoorValidatorProcessor(
                         logger.error("SQLException creating table for:" +
                                 "${entity.simpleName.asString()} : ${sqle.message}. SQL was \"$createTableSql\"", entity)
                     }
-
-//                    if(dbType == DoorDbType.SQLITE) {
-//                        allKnownEntityNames.add(typeEntitySpec.name!!)
-//                        allKnownEntityTypesMap[typeEntitySpec.name!!] = entity
-//                    }
                 }
-
             }
         }
     }
 
+    private fun validateReplicateEntities(resolver: Resolver) {
+        val dbs = resolver.getSymbolsWithAnnotation("androidx.room.Database")
+            .filterIsInstance<KSClassDeclaration>()
+
+        val allReplicateEntities = dbs.flatMap { it.allDbEntities() }.toSet()
+            .filter { it.hasAnnotation(ReplicateEntity::class) }
+
+        val replicableEntitiesGroupedById = allReplicateEntities
+            .groupBy { it.getAnnotation(ReplicateEntity::class)?.tableId ?: 0 }
+
+        replicableEntitiesGroupedById.filter { it.value.size > 1 }.forEach { duplicates ->
+            logger.error(
+                "Duplicate replicate tableId ${duplicates.key} : ${duplicates.value.joinToString { it.simpleName.asString() }} ",
+                duplicates.value.first())
+        }
+
+        //Check entities with the ReplicateEntity annotation have all the required fields
+        allReplicateEntities.forEach { entity ->
+            try {
+                val entityRepTrkr = entity.getReplicationTracker()
+
+                val entityVersionIdField = entity.getAllProperties().filter { it.hasAnnotation(ReplicationVersionId::class) }.toList()
+                if(entityVersionIdField.size != 1)
+                    logger.error(
+                        "@ReplicateEntity ${entity.qualifiedName?.asString()} must have exactly one field annotated @ReplicationVersionId",
+                        entity)
+
+
+                if(!entityRepTrkr.hasAnnotation(Entity::class))
+                    logger.error("Replication ${entityRepTrkr.qualifiedName?.asString()} tracker " +
+                            "entity does not have @Entity annotation", entityRepTrkr)
+
+                val trkrForeignKey = entityRepTrkr.getAllProperties()
+                    .filter { it.hasAnnotation(ReplicationEntityForeignKey::class) }.toList()
+
+                if(trkrForeignKey.size != 1 ||
+                    entity.entityPrimaryKeyProps.firstOrNull()?.type?.resolve() !=
+                    entityRepTrkr.getAllProperties().filter { it.hasAnnotation(ReplicationEntityForeignKey::class) }
+                        .firstOrNull()?.type?.resolve()
+                ) {
+                    logger.error("Replication tracker ${entityRepTrkr.qualifiedName?.asString()} must have exactly one field annotated " +
+                                "@ReplicationEntityForeignKey of the same type as the entity ${entity.qualifiedName?.asString()} " +
+                                "primary key", entity)
+                }
+
+                val trkrVersionId = entityRepTrkr.getAllProperties().filter { it.hasAnnotation(ReplicationVersionId::class) }
+                    .toList()
+                if(trkrVersionId.size != 1 ||
+                    trkrVersionId.first().type.resolve() != entityVersionIdField.firstOrNull()?.type?.resolve()) {
+                    logger.error("Replication tracker ${entityRepTrkr.qualifiedName?.asString()} must have exactly one field annotated " +
+                                "@ReplicationVersionId and it must be the same type as the field annotated " +
+                                "@ReplicationVersionId on the main entity ${entity.qualifiedName?.asString()}",
+                        entityRepTrkr)
+                }
+
+                val trkrNodeId = entityRepTrkr.getAllProperties()
+                    .filter { it.hasAnnotation(ReplicationDestinationNodeId::class) }.toList()
+                if(trkrNodeId.size != 1 || trkrNodeId.first().type.resolve() != resolver.builtIns.longType) {
+                    logger.error( "Replication tracker ${entityRepTrkr.qualifiedName?.asString()} " +
+                            "must have exactly one field annotated @ReplicationDestinationNodeId and it must be of " +
+                            "type long", entityRepTrkr)
+                }
+
+                val trkrPending = entityRepTrkr.getAllProperties().filter { it.hasAnnotation(ReplicationPending::class) }
+                    .toList()
+                if(trkrPending.size != 1 || trkrPending.first().type.resolve() != resolver.builtIns.booleanType) {
+                    logger.error( "Replication Tracker ${entityRepTrkr.qualifiedName?.asString()}" +
+                            " must have exactly one field annotated @ReplicationPending and it must be of type" +
+                            " boolean, default value should be true", entityRepTrkr)
+                }
+
+                //check for duplicate fields between tracker and entity
+                val entityProps = entity.getAllColumnProperties(resolver)
+                val trkrFieldPropNames = entityRepTrkr.getAllColumnProperties(resolver).map { it.entityPropColumnName }
+
+                val duplicateFieldElements = entityProps.filter { it.entityPropColumnName in trkrFieldPropNames }
+                if(duplicateFieldElements.isNotEmpty()) {
+                    logger.error( "Same field names used in both entity " +
+                            "${entity.qualifiedName?.asString()} and tracker. ( " +
+                            "${duplicateFieldElements.joinToString { it.simpleName.asString() }  }) This is " +
+                            "not allowed as it will lead to a conflict in SQL query row names",
+                        entity)
+                }
+
+
+            }catch(e: IllegalArgumentException){
+                logger.error("ReplicateEntity ${entity.qualifiedName?.asString()} must have a tracker entity specified",
+                    entity)
+            }
+        }
+    }
+
+    private fun validateTriggers(resolver: Resolver) {
+        val dbs = resolver.getSymbolsWithAnnotation("androidx.room.Database")
+            .filterIsInstance<KSClassDeclaration>()
+        //After all tables have been created, check that the SQL in all triggers is actually valid
+        dbs.flatMap { it.allDbEntities() }.toSet()
+            .filter { it.hasAnnotation(Triggers::class) }
+            .forEach { entity ->
+                entity.getAnnotations(Triggers::class).firstOrNull()?.value?.forEach { trigger ->
+                    val stmt = sqliteConnection.createStatement()!!
+                    val pgStmt = pgConnection?.createStatement()
+                    val stmtsMap = mapOf(DoorDbType.SQLITE to stmt, DoorDbType.POSTGRES to pgStmt)
+                    val repTrkr = entity.getReplicationTracker()
+
+                    //When the trigger SQL runs it will have access to NEW.(fieldName). We won't have that when we try and
+                    //test the validity of the SQL statement here. Therefor NEW.(fieldname) and OLD.(fieldname) will be
+                    //replaced with 0, null, or false based on the column type.
+                    fun String.substituteTriggerPrefixes(dbProductType: Int) : String {
+                        var sqlFormatted = this
+
+                        val availablePrefixes = mutableListOf<String>()
+                        if(!trigger.events.any { it == Trigger.Event.DELETE })
+                            availablePrefixes += "NEW"
+
+                        if(!trigger.events.any { it == Trigger.Event.INSERT })
+                            availablePrefixes += "OLD"
+
+                        availablePrefixes.forEach { prefix ->
+                            entity.getAllColumnProperties(resolver).forEach { field ->
+                                sqlFormatted = sqlFormatted.replaceColNameWithDefaultValueInSql(
+                                    "$prefix.${field.simpleName.asString()}",
+                                    field.type.resolve().defaultSqlQueryVal(resolver, dbProductType))
+                            }
+                            repTrkr.takeIf { trigger.on == Trigger.On.RECEIVEVIEW }?.getAllColumnProperties(resolver)?.forEach { field ->
+                                sqlFormatted = sqlFormatted.replaceColNameWithDefaultValueInSql("$prefix.${field.simpleName.asString()}",
+                                    field.type.resolve().defaultSqlQueryVal(resolver, dbProductType))
+                            }
+                        }
+
+                        return sqlFormatted
+                    }
+
+
+                    stmtsMap.forEach {entry ->
+                        var sqlToRun = trigger.conditionSql.substituteTriggerPrefixes(entry.key)
+                        try {
+                            if(entry.key == DoorDbType.POSTGRES)
+                                sqlToRun = sqlToRun.sqlToPostgresSql()
+
+                            entry.value.takeIf { trigger.conditionSql != "" }?.executeQuery(sqlToRun)
+                        }catch(e: SQLException) {
+                            logger.error("Trigger ${trigger.name} condition SQL using ${productNameForDbType(entry.key)} error on: ${e.message}",
+                                entity)
+                        }
+                    }
+
+
+                    if(trigger.sqlStatements.isEmpty())
+                        logger.error("Trigger ${trigger.name} has no SQL statements", entity)
+
+
+                    var dbType = 0
+                    var sqlToRun: String
+                    trigger.sqlStatements.forEach { sql ->
+                        try {
+                            stmtsMap.forEach { stmtEntry ->
+                                dbType = stmtEntry.key
+                                sqlToRun = sql.substituteTriggerPrefixes(stmtEntry.key)
+                                if(dbType == DoorDbType.POSTGRES)
+                                    sqlToRun = sqlToRun.sqlToPostgresSql()
+
+                                stmtEntry.value?.executeUpdate(sqlToRun)
+                            }
+                        }catch(e: SQLException) {
+                            logger.error("Trigger ${trigger.name} ${productNameForDbType(dbType)} exception running ${e.message} running '$sql'}",
+                                entity)
+                        }
+                    }
+                }
+            }
+    }
+
+    private fun validateEntitiesWithAttachments(resolver: Resolver) {
+        val entities = resolver.getSymbolsWithAnnotation("androidx.room.Entity")
+            .filterIsInstance<KSClassDeclaration>()
+        entities.filter { it.getAllProperties().any { it.hasAnnotation(AttachmentUri::class) } }.forEach { entity ->
+            if(entity.getAllProperties().filter { it.hasAnnotation(AttachmentMd5::class) }.toList().size != 1)
+                logger.error("Has AttachmentUri field, must have exactly one AttachmentMd5 field",
+                    entity)
+
+            if(entity.getAllProperties().filter { it.hasAnnotation(AttachmentSize::class) }.toList().size != 1) {
+                logger.error("Has AttachmentUri field, must have exactly one AttachmentSize field", entity)
+            }
+
+            if(!entity.hasAnnotation(ReplicateEntity::class)) {
+                logger.error("Has AttachmentUri field, MUST be annotated with @ReplicateEntity", entity)
+            }
+        }
+
+        val dbs = resolver.getSymbolsWithAnnotation("androidx.room.Database")
+            .filterIsInstance<KSClassDeclaration>()
+        dbs.filter { db ->
+           db.allDbEntities().any { it.entityHasAttachments() } &&
+                   !db.allDbEntities().any { it.qualifiedName?.asString() == ZombieAttachmentData::class.qualifiedName }
+        }.forEach { db ->
+            logger.error("Database has entities with attachments, must have ZombieAttachmentData entity", db)
+        }
+    }
+
+    private fun validateDaos(resolver: Resolver) {
+        val daos = resolver.getSymbolsWithAnnotation("androidx.room.Dao")
+            .filterIsInstance<KSClassDeclaration>()
+        daos.forEach { dao ->
+
+            dao.getAllFunctions().filter { it.hasAnnotation(Query::class) }.forEach { queryFunDecl ->
+                val queryAnnotation = queryFunDecl.getAnnotation(Query::class)!!
+                val queryFun = queryFunDecl.asMemberOf(dao.asType(emptyList()))
+            //dao.enclosedElementsWithAnnotation(Query::class.java).map { it as ExecutableElement }.forEach { queryFun ->
+
+                //check that the query parameters on both versions match
+                val sqliteQueryParams = queryAnnotation.value.getSqlQueryNamedParameters()
+                val postgresQueryParams = (queryFunDecl.getAnnotation(PostgresQuery::class)?.value ?:
+                    queryAnnotation.value.sqlToPostgresSql()).getSqlQueryNamedParameters()
+
+                if(sqliteQueryParams != postgresQueryParams) {
+                    logger.error("Query parameters don't match: " +
+                                "Query parameters must feature the same names in the same order on both platforms " +
+                                "SQLite params=${sqliteQueryParams.joinToString()} " +
+                                "Postgres params=${postgresQueryParams.joinToString()}", queryFunDecl)
+                }
+
+
+                connectionMap.filter {
+                    it.value != null && !(it.key == DoorDbType.POSTGRES && queryFunDecl.hasAnnotation(SqliteOnly::class))
+                }.forEach { connectionEntry ->
+                    val query = queryAnnotation.value.let {
+                        if(connectionEntry.key == DoorDbType.POSTGRES) {
+                            queryFunDecl.getAnnotation(PostgresQuery::class)?.value ?: it.sqlToPostgresSql()
+                        }else {
+                            it
+                        }
+                    }
+
+                    val queryNamedParams = query.getSqlQueryNamedParameters()
+                    val queryWithQuestionPlaceholders = query.replaceQueryNamedParamsWithQuestionMarks(queryNamedParams)
+                    val connectionEntryCon = connectionEntry.value!! //This is OK because of the filter above.
+
+                    try {
+                        val preparedStatementConfig = PreparedStatementConfig(queryWithQuestionPlaceholders,
+                            hasListParams = queryFunDecl.hasAnyListOrArrayParams(resolver))
+                        connectionEntryCon.prepareStatement(preparedStatementConfig, connectionEntry.key).use { statement ->
+                            queryNamedParams.forEachIndexed { index, paramName ->
+                                val paramIndex = queryFunDecl.parameters.indexOfFirst { it.name?.asString() == paramName }
+                                val paramType = queryFun.parameterTypes[paramIndex]
+                                    ?: throw IllegalArgumentException("Could not find type for $paramName")
+                                statement.setDefaultParamValue(resolver, index + 1, paramName,
+                                    paramType, connectionEntry.key)
+                            }
+
+                            if(!query.isSQLAModifyingQuery()) {
+                                statement.executeQuery()
+                            }else {
+                                statement.executeUpdate()
+                            }
+                        }
+                    }catch(e: Exception) {
+                        logger.error("Error running query for DAO function: $e", queryFunDecl)
+                        if(e !is SQLException) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
     override fun process(resolver: Resolver): List<KSAnnotated> {
         createAllTables(resolver)
+        validateReplicateEntities(resolver)
+        validateTriggers(resolver)
+        validateEntitiesWithAttachments(resolver)
+        validateDaos(resolver)
+
         return emptyList()
     }
 

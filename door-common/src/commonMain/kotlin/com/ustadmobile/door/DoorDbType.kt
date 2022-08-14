@@ -20,6 +20,15 @@ class DoorDbType {
 
         fun typeIntFromProductName(productName: String) = PRODUCT_NAME_MAP[productName] ?: -1
 
+        fun productNameForDbType(dbProductType: Int) : String {
+            return when(dbProductType) {
+                SQLITE -> "SQLite"
+                POSTGRES -> "Postgres"
+                else -> "UNKNOWN"
+            }
+        }
+
+
     }
 }
 

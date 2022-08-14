@@ -18,7 +18,6 @@ import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.ustadmobile.door.*
 import com.ustadmobile.door.entities.ChangeLog
 import com.ustadmobile.door.ext.minifySql
-import com.ustadmobile.lib.annotationprocessor.core.ext.toSql
 import io.github.aakira.napier.Napier
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.statement.HttpStatement
@@ -112,162 +111,11 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
      */
     protected var allKnownEntityTypesMap = mutableMapOf<String, TypeElement>()
 
-    /**
-     * Initiates internal info about the databases that are being processed, then calls the main
-     * process function. This is called by AnnotationProcessorWrapper
-     *
-     * @param annotations as per the main annotation processor process method
-     * @param roundEnv as per the main annotation processor process method
-     * @param dbConnection a JDBC Connection object that can be used to run queries
-     * @param allKnownEntityNames as per the allKnownEntityNames property
-     * @param allKnownEntityTypesMap as per the allKnownEntityTypesMap property
-     */
-    fun processDb(annotations: MutableSet<out TypeElement>,
-                           roundEnv: RoundEnvironment,
-                           dbConnection: Connection,
-                           allKnownEntityNames: MutableList<String>,
-                           allKnownEntityTypesMap: MutableMap<String, TypeElement>)  : Boolean {
-        this.allKnownEntityNames = allKnownEntityNames
-        this.allKnownEntityTypesMap = allKnownEntityTypesMap
-        this.dbConnection = dbConnection
-        return process(annotations, roundEnv)
-    }
-
     override fun init(p0: ProcessingEnvironment) {
         super.init(p0)
         messager = p0.messager
     }
 
-    /**
-     * Add triggers that will insert into the ChangeLog table
-     */
-    protected fun CodeBlock.Builder.addReplicateEntityChangeLogTrigger(
-        entityType: TypeElement,
-        sqlListVar: String,
-        dbProductType: Int,
-    ) : CodeBlock.Builder{
-        val replicateEntity = entityType.getAnnotation(ReplicateEntity::class.java)
-        val primaryKeyEl = entityType.entityPrimaryKey
-            ?: throw IllegalArgumentException("addReplicateEntityChangeLogTrigger ${entityType.qualifiedName} has NO PRIMARY KEY!")
-
-        data class TriggerParams(val opName: String, val prefix: String, val opCode: Int) {
-            val opPrefix = opName.lowercase().substring(0, 3)
-        }
-
-        if(dbProductType == DoorDbType.SQLITE) {
-            val triggerParams = listOf(
-                TriggerParams("INSERT", "NEW", ChangeLog.CHANGE_UPSERT),
-                TriggerParams("UPDATE", "NEW", ChangeLog.CHANGE_UPSERT),
-                TriggerParams("DELETE", "OLD", ChangeLog.CHANGE_DELETE)
-            )
-
-            triggerParams.forEach { params ->
-                /*
-                Note: REPLACE INTO etc. does not work because the conflict policy will be determined by the statement
-                triggering this as per https://sqlite.org/lang_createtrigger.html Section 2.
-                "An ON CONFLICT clause may be specified as part of an UPDATE or INSERT action within the body of the
-                trigger. However if an ON CONFLICT clause is specified as part of the statement causing the trigger to
-                 fire, then conflict handling policy of the outer statement is used instead."
-                 */
-                add("$sqlListVar += %S\n",
-                    """
-                CREATE TRIGGER ch_${params.opPrefix}_${replicateEntity.tableId}
-                       AFTER ${params.opName} ON ${entityType.entityTableName}
-                BEGIN
-                       INSERT INTO ChangeLog(chTableId, chEntityPk, chType)
-                       SELECT ${replicateEntity.tableId} AS chTableId, 
-                              ${params.prefix}.${primaryKeyEl.simpleName} AS chEntityPk, 
-                              ${params.opCode} AS chType
-                        WHERE NOT EXISTS(
-                              SELECT chTableId 
-                                FROM ChangeLog 
-                               WHERE chTableId = ${replicateEntity.tableId}
-                                 AND chEntityPk = ${params.prefix}.${primaryKeyEl.simpleName}); 
-                END
-                """.minifySql())
-            }
-        }else {
-            val triggerParams = listOf(
-                TriggerParams("UPDATE OR INSERT", "NEW", ChangeLog.CHANGE_UPSERT),
-                TriggerParams("DELETE", "OLD", ChangeLog.CHANGE_DELETE))
-            triggerParams.forEach { params ->
-                add("$sqlListVar += %S\n",
-                    """
-               CREATE OR REPLACE FUNCTION 
-               ch_${params.opPrefix}_${replicateEntity.tableId}_fn() RETURNS TRIGGER AS $$
-               BEGIN
-               INSERT INTO ChangeLog(chTableId, chEntityPk, chType)
-                       VALUES (${replicateEntity.tableId}, ${params.prefix}.${primaryKeyEl.simpleName}, ${params.opCode})
-               ON CONFLICT(chTableId, chEntityPk) DO UPDATE
-                       SET chType = ${params.opCode};
-               RETURN NULL;
-               END $$
-               LANGUAGE plpgsql         
-            """.minifySql())
-                add("$sqlListVar += %S\n",
-                    """
-            CREATE TRIGGER ch_${params.opPrefix}_${replicateEntity.tableId}_trig 
-                   AFTER ${params.opName} ON ${entityType.entityTableName}
-                   FOR EACH ROW
-                   EXECUTE PROCEDURE ch_${params.opPrefix}_${replicateEntity.tableId}_fn();
-            """.minifySql())
-            }
-
-
-        }
-
-        return this
-    }
-
-    /**
-     * Add a ReceiveView for the given EntityTypeElement.
-     */
-    protected fun CodeBlock.Builder.addCreateReceiveView(
-        entityTypeEl: TypeElement,
-        sqlListVar: String
-    ): CodeBlock.Builder {
-        val trkrEl = entityTypeEl.getReplicationTracker(processingEnv)
-        val receiveViewAnn = entityTypeEl.getAnnotation(ReplicateReceiveView::class.java)
-        val viewName = receiveViewAnn?.name ?: "${entityTypeEl.entityTableName}$SUFFIX_DEFAULT_RECEIVEVIEW"
-        val sql = receiveViewAnn?.value ?: """
-            SELECT ${entityTypeEl.simpleName}.*, ${trkrEl.entityTableName}.*
-              FROM ${entityTypeEl.simpleName}
-                   LEFT JOIN ${trkrEl.simpleName} ON ${trkrEl.entityTableName}.${trkrEl.replicationTrackerForeignKey.simpleName} = 
-                        ${entityTypeEl.entityTableName}.${entityTypeEl.entityPrimaryKey?.simpleName}
-        """.minifySql()
-        add("$sqlListVar += %S\n", "CREATE VIEW $viewName AS $sql")
-        return this
-    }
-
-
-
-    protected fun CodeBlock.Builder.addCreateTriggersCode(
-        entityType: TypeElement,
-        stmtListVar: String,
-        dbProductType: Int
-    ): CodeBlock.Builder {
-        Napier.d("Door Wrapper: addCreateTriggersCode ${entityType.simpleName}")
-        entityType.getAnnotationsByType(Triggers::class.java).firstOrNull()?.value?.forEach { trigger ->
-            trigger.toSql(entityType, dbProductType).forEach { sqlStr ->
-                add("$stmtListVar += %S\n", sqlStr)
-            }
-        }
-
-        return this
-    }
-
-
-    fun logMessage(kind: Diagnostic.Kind, message: String, enclosing: TypeElement? = null,
-                   element: Element? = null, annotation: AnnotationMirror? = null) {
-        val messageStr = "DoorDb: ${enclosing?.qualifiedName}#${element?.simpleName} $message "
-        if(annotation != null && element != null) {
-            messager.printMessage(kind, messageStr, element, annotation)
-        }else if(element != null) {
-            messager.printMessage(kind, messageStr, element)
-        }else {
-            messager.printMessage(kind, messageStr)
-        }
-    }
 
     /**
      * Write the given FileSpec to the directories specified in the annotation processor arguments.

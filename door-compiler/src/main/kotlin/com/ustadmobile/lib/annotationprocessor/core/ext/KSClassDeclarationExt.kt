@@ -280,19 +280,6 @@ fun KSClassDeclaration.asTypeParameterizedBy(
     })
 }
 
-/**
- * Get a list of all the properties that need to be on a resultset for the given entity. This includes those that are
- * in embedded fields
- */
-fun KSClassDeclaration.getAllResultSetColumnProperties(
-    resolver: Resolver
-): List<KSPropertyDeclaration> {
-    val allProps = this.getAllProperties().toList()
-    val embeddedProps = allProps.filter { it.hasAnnotation(Embedded::class) }
-        .flatMap { (it.type.resolve().declaration as? KSClassDeclaration)?.getAllResultSetColumnProperties(resolver) ?: emptyList() }
-    return embeddedProps + allProps.filter { !it.isTransient && it.type.resolve() in resolver.querySingularTypes() }
-}
-
 fun KSClassDeclaration.getAllColumnProperties(
     resolver: Resolver
 ): List<KSPropertyDeclaration> {

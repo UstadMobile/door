@@ -76,21 +76,6 @@ fun String.replaceQueryNamedParamsWithDefaultValues(
 }
 
 /**
- * Shorthand to replace all named parameters
- */
-fun String.replaceQueryNamedParamsWithDefaultTypeValues(
-    queryNamedParams: Map<String, KSType>,
-    resolver: Resolver
-) : String{
-    var newSql = this
-    queryNamedParams.forEach {
-        newSql = newSql.replace(":${it.key}",  it.value.defaultSqlQueryVal(resolver))
-    }
-
-    return newSql
-}
-
-/**
  * For SQL with named parameters (e.g. "SELECT * FROM Table WHERE uid = :paramName") return a
  * list of all named parameters.
  *

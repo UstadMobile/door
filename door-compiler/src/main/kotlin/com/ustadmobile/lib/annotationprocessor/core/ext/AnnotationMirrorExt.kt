@@ -20,13 +20,6 @@ fun List<AnnotationMirror>.findByClass(processingEnv: ProcessingEnvironment, kla
     return null
 }
 
-fun List<AnnotationMirror>.filterByClass(processingEnv: ProcessingEnvironment, klass: KClass<out Annotation>): List<AnnotationMirror> {
-    return filter {
-        val typeEl = processingEnv.typeUtils.asElement(it.annotationType) as? TypeElement
-        typeEl?.qualifiedName.toString() == klass.qualifiedName
-    }
-}
-
 /**
  * Where an annotation class contains Class values, the AnnotationValue.value object will
  * be a list of AnnotationValues, and their .value objects will be a TypeMirror
@@ -49,10 +42,5 @@ private fun AnnotationValue.mapAnnotationValuesToTypeElements(
 fun AnnotationMirror.getClassArrayValue(valueKey: String, processingEnv: ProcessingEnvironment): List<TypeElement> {
     val annotationValueEntry = elementValues.entries.firstOrNull { it.key.simpleName.toString() == valueKey }?.value
     return annotationValueEntry?.mapAnnotationValuesToTypeElements(processingEnv) ?: listOf()
-}
-
-fun AnnotationMirror.getClassValue(valueKey: String, processingEnv: ProcessingEnvironment): TypeElement? {
-    val annotationValueEntry = elementValues.entries.firstOrNull { it.key.simpleName.toString() == valueKey }?.value
-     return annotationValueEntry?.mapAnnotationValuesToTypeElements(processingEnv)?.firstOrNull()
 }
 

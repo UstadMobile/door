@@ -74,3 +74,7 @@ fun KSFunctionDeclaration.getQueryTables(
 
     return tablesToWatch.toList()
 }
+
+fun KSFunctionDeclaration.hasAnyListOrArrayParams(resolver: Resolver): Boolean {
+    return parameters.any { it.type.resolve().isListOrArrayType(resolver) }
+}

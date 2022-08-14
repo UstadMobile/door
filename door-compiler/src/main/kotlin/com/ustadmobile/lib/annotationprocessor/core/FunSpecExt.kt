@@ -17,20 +17,6 @@ fun <A: Annotation> FunSpec.hasAnnotation(annotationClass: Class<A>) : Boolean {
 }
 
 /**
- * Simple shorthand to see if the given FunSpec has any of the annotations from the vararg params
- */
-fun <A : Annotation> FunSpec.hasAnyAnnotation(vararg annotationsClasses: Class<out A>) : Boolean {
-    val annotationClassNames = annotationsClasses.map { it.asClassName() }
-    return annotations.any { annotationSpec ->
-        annotationClassNames.any { it == annotationSpec.className }
-    }
-}
-
-fun <A: Annotation> FunSpec.getAnnotationSpec(annotationClass: Class<A>): AnnotationSpec? {
-    return annotations.firstOrNull { it.className.canonicalName == annotationClass.canonicalName }
-}
-
-/**
  * Where this function represents a DAO function with a query, get the query SQL
  */
 fun FunSpec.daoQuerySql() = annotations.daoQuerySql()
@@ -54,13 +40,6 @@ val FunSpec.isSuspended: Boolean
 val FunSpec.hasReturnType: Boolean
     get() = returnType != null && returnType != UNIT
 
-/**
- * Shorthand to get the type of entity component type for an update, insert, or delete function. This
- * will unwrap list or arrays to give the actual component (singular) type name
- */
-val FunSpec.entityParamComponentType: TypeName
-    get() = parameters.first().type.unwrapListOrArrayComponentType()
-
 
 /**
  * Shorthand to make the function non-abstract
@@ -77,16 +56,3 @@ fun FunSpec.Builder.removeAnnotations(): FunSpec.Builder {
     return this
 }
 
-/**
- * Shorthand to check if the given function spec should have an http endpoint generated (e.g. Annotated RepoHttpAccessible)
- */
-fun FunSpec.hasHttpEndpoint(): Boolean {
-    return hasAnnotation(RepoHttpAccessible::class.java)
-}
-
-/**
- * Shorthand to filter a list of funspecs to provide only those
- */
-fun List<FunSpec>.specsWithHttpEndpoint(): List<FunSpec> {
-    return filter { it.hasHttpEndpoint() }
-}

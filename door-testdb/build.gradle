@@ -3,7 +3,6 @@ import java.time.Duration
 plugins {
     id 'org.jetbrains.kotlin.multiplatform'
     id 'org.jetbrains.kotlin.plugin.serialization'
-    id "org.jetbrains.kotlin.kapt"
     id "com.google.devtools.ksp"
 }
 
@@ -15,18 +14,6 @@ repositories {
     mavenLocal()
 }
 
-def platformTypeAttr = Attribute.of("org.jetbrains.kotlin.platform.type", String)
-
-afterEvaluate {
-    configurations.all { configuration ->
-        // Workaround for kapt bug with MPP dependencies
-        // https://youtrack.jetbrains.com/issue/KT-31641
-        // https://youtrack.jetbrains.com/issue/KT-33206
-        if (name.contains('kapt')) {
-            attributes.attribute(platformTypeAttr, "jvm")
-        }
-    }
-}
 
 kotlin {
     /* Targets configuration omitted. 
@@ -121,21 +108,6 @@ kotlin {
     }
 }
 
-kapt {
-    arguments {
-        arg("doordb_android_out", project.file("../test-app-android/build/generated/source/door-test-db"))
-        //Uncomment lines below to allow debugging on generated source code.
-        //arg("doordb_ktor_out", "$buildDir/generated/source/doordb-jvm")
-        //arg("doordb_jvm_out", "$buildDir/generated/source/doordb-jvm")
-        arg("doordb_js_out", "$buildDir/generated/source/door-js")
-        arg("doordb_source_path", project.file("src/commonMain/kotlin"))
-        arg("doordb_migrations_out", project.file("$buildDir/generated/door-migrations"))
-        arg("doordb_postgres_url", rootProject.ext.localProperties["door.postgresUrl"])
-        arg("doordb_postgres_user", rootProject.ext.localProperties["door.postgresUser"])
-        arg("doordb_postgres_password", rootProject.ext.localProperties["door.postgresPass"])
-    }
-}
-
 // The Javascript can only build after the jvm build runs (as the JVM build triggers the annotation processor which
 // generates the Js implementation.
 compileKotlinJs.dependsOn(jvmMainClasses)
@@ -155,5 +127,4 @@ ksp {
 
 dependencies {
     kspJvm project(":door-compiler")
-    kapt project(":door-compiler")
 }

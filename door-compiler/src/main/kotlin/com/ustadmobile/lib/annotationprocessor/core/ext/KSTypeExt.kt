@@ -116,9 +116,13 @@ fun KSType.defaultTypeValueCode(
         .build()
 }
 
-fun KSType.defaultSqlQueryVal(resolver: Resolver) : String {
+fun KSType.defaultSqlQueryVal(
+    resolver: Resolver,
+    dbProductType: Int,
+) : String {
     return when {
         this in resolver.sqlNumericNonNullTypes() -> "0"
+        dbProductType == DoorDbType.SQLITE && this == resolver.builtIns.booleanType -> "0"
         this == resolver.builtIns.booleanType  -> "false"
         this == resolver.builtIns.stringType -> "''"
         else -> "null"
