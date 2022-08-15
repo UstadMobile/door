@@ -11,6 +11,7 @@ import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toClassName
+import com.squareup.kotlinpoet.ksp.writeTo
 import com.ustadmobile.door.DoorDatabaseReplicateWrapper
 import com.ustadmobile.door.annotation.LastChangedTime
 import com.ustadmobile.door.annotation.ReplicateEntity
@@ -353,15 +354,16 @@ class DoorReplicateWrapperProcessor(
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val dbSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Database")
             .filterIsInstance<KSClassDeclaration>()
+
+        val target = environment.platforms.firstOrNull()?.doorTarget() ?: throw IllegalStateException("No KSP Platform!")
+
         dbSymbols.forEach { dbClassDecl ->
             if(dbClassDecl.dbHasReplicateWrapper()) {
-                DoorTarget.values().forEach { target ->
-                    FileSpec.builder(dbClassDecl.packageName.asString(),
-                        "${dbClassDecl.simpleName.asString()}${DoorDatabaseReplicateWrapper.SUFFIX}")
-                        .addDbWrapperTypeSpec(dbClassDecl, resolver, target)
-                        .build()
-                        .writeToPlatformDir(target, environment.codeGenerator, environment.options)
-                }
+                FileSpec.builder(dbClassDecl.packageName.asString(),
+                    "${dbClassDecl.simpleName.asString()}${DoorDatabaseReplicateWrapper.SUFFIX}")
+                    .addDbWrapperTypeSpec(dbClassDecl, resolver, target)
+                    .build()
+                    .writeTo(environment.codeGenerator, false)
             }
         }
 
@@ -369,16 +371,12 @@ class DoorReplicateWrapperProcessor(
             .filterIsInstance<KSClassDeclaration>()
         daoSymbols.forEach { daoClassDec ->
             if(daoClassDec.daoHasReplicateEntityWriteFunctions(resolver)) {
-                DoorTarget.values().forEach { target ->
-                    FileSpec.builder(daoClassDec.packageName.asString(),
-                        "${daoClassDec.simpleName.asString()}${DoorDatabaseReplicateWrapper.SUFFIX}")
-                        .addDaoWrapperTypeSpec(daoClassDec, resolver, target)
-                        .build()
-                        .writeToPlatformDir(target, environment.codeGenerator, environment.options)
-
-                }
+                FileSpec.builder(daoClassDec.packageName.asString(),
+                    "${daoClassDec.simpleName.asString()}${DoorDatabaseReplicateWrapper.SUFFIX}")
+                    .addDaoWrapperTypeSpec(daoClassDec, resolver, target)
+                    .build()
+                    .writeTo(environment.codeGenerator, false)
             }
-
         }
 
         return emptyList()

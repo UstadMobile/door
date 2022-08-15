@@ -10,6 +10,7 @@ import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
+import com.squareup.kotlinpoet.ksp.writeTo
 import com.ustadmobile.door.*
 import kotlin.reflect.jvm.internal.impl.name.FqName
 import kotlin.reflect.jvm.internal.impl.builtins.jvm.JavaToKotlinClassMap
@@ -1502,7 +1503,6 @@ class DoorJdbcProcessor(
     private val environment: SymbolProcessorEnvironment,
 ): SymbolProcessor {
 
-
     //Messy, but better than changing the superclass. This MUST be set by the SymbolProcessorWrapper first
     internal lateinit var dbConnection: java.sql.Connection
 
@@ -1513,39 +1513,41 @@ class DoorJdbcProcessor(
         val daoSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Dao")
             .filterIsInstance<KSClassDeclaration>()
 
+        val target = environment.platforms.firstOrNull()?.doorTarget()
+            ?: throw IllegalArgumentException("Door/KSP: No platforms!")
+
         dbSymbols.forEach {  dbKSClass ->
-            JDBC_TARGETS.forEach { target ->
-                FileSpec.builder(dbKSClass.packageName.asString(), dbKSClass.simpleName.asString() + SUFFIX_JDBC_KT2)
-                    .addJdbcDbImplType(dbKSClass, DoorTarget.JVM, resolver)
-                    .build()
-                    .writeToPlatformDir(target, environment.codeGenerator, environment.options)
-            }
-            DoorTarget.values().forEach { target ->
-                FileSpec.builder(dbKSClass.packageName.asString(), dbKSClass.simpleName.asString() + SUFFIX_DOOR_METADATA)
-                    .addDatabaseMetadataType(dbKSClass)
-                    .build()
-                    .writeToPlatformDir(target, environment.codeGenerator, environment.options)
-
-                FileSpec.builder(dbKSClass.packageName.asString(), dbKSClass.simpleName.asString() + SUFFIX_REP_RUN_ON_CHANGE_RUNNER)
-                    .addReplicationRunOnChangeRunnerType(dbKSClass)
-                    .build()
-                    .writeToPlatformDir(target, environment.codeGenerator, environment.options)
-            }
-
-            FileSpec.builder(dbKSClass.packageName.asString(), dbKSClass.simpleName.asString() + SUFFIX_JS_IMPLEMENTATION_CLASSES)
-                .addJsImplementationsClassesObject(dbKSClass)
+            FileSpec.builder(dbKSClass.packageName.asString(), dbKSClass.simpleName.asString() + SUFFIX_DOOR_METADATA)
+                .addDatabaseMetadataType(dbKSClass)
                 .build()
-                .writeToPlatformDir(DoorTarget.JS, environment.codeGenerator, environment.options)
+                .writeTo(environment.codeGenerator, false)
+
+            FileSpec.builder(dbKSClass.packageName.asString(), dbKSClass.simpleName.asString() + SUFFIX_REP_RUN_ON_CHANGE_RUNNER)
+                .addReplicationRunOnChangeRunnerType(dbKSClass)
+                .build()
+                .writeTo(environment.codeGenerator, false)
+
+            if(target in JDBC_TARGETS) {
+                FileSpec.builder(dbKSClass.packageName.asString(), dbKSClass.simpleName.asString() + SUFFIX_JDBC_KT2)
+                    .addJdbcDbImplType(dbKSClass, target, resolver)
+                    .build()
+                    .writeTo(environment.codeGenerator, false)
+            }
+
+            if(target == DoorTarget.JS)
+                FileSpec.builder(dbKSClass.packageName.asString(),
+                        dbKSClass.simpleName.asString() + SUFFIX_JS_IMPLEMENTATION_CLASSES)
+                    .addJsImplementationsClassesObject(dbKSClass)
+                    .build()
+                    .writeTo(environment.codeGenerator, false)
         }
 
         daoSymbols.forEach { daoKSClass ->
-            JDBC_TARGETS.forEach { target ->
-                FileSpec.builder(daoKSClass.packageName.asString(),
-                    daoKSClass.simpleName.asString() + SUFFIX_JDBC_KT2)
-                    .addDaoJdbcImplType(daoKSClass, resolver, environment, target)
-                    .build()
-                    .writeToPlatformDir(target, environment.codeGenerator, environment.options)
-            }
+            FileSpec.builder(daoKSClass.packageName.asString(),
+                daoKSClass.simpleName.asString() + SUFFIX_JDBC_KT2)
+                .addDaoJdbcImplType(daoKSClass, resolver, environment, target)
+                .build()
+                .writeTo(environment.codeGenerator, false)
         }
 
         return emptyList()

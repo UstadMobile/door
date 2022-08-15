@@ -35,7 +35,7 @@ package androidx.room
  * fields).
  */
 @Target(AnnotationTarget.FIELD, AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY_GETTER, AnnotationTarget.PROPERTY_SETTER)
-@Retention(AnnotationRetention.BINARY)
+@Retention(AnnotationRetention.RUNTIME)
 annotation class PrimaryKey(
         /**
          * Set to true to let SQLite generate the unique id.

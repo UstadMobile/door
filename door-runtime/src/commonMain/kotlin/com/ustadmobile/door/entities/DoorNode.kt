@@ -4,7 +4,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-@Entity
+@Entity(primaryKeys = ["nodeId"])
 class DoorNode {
 
     @PrimaryKey(autoGenerate = true)

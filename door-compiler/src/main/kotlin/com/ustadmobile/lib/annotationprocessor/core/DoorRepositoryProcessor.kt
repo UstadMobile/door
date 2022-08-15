@@ -9,11 +9,13 @@ import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
+import com.squareup.kotlinpoet.ksp.writeTo
 import com.ustadmobile.door.*
 import com.ustadmobile.door.annotation.RepoHttpAccessible
 import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.attachments.EntityWithAttachment
 import com.ustadmobile.door.replication.ReplicationSubscriptionManager
+import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_ILLEGALSTATEEXCEPTION
 import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.BOUNDARY_CALLBACK_CLASSNAME
 import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.DATASOURCEFACTORY_TO_BOUNDARYCALLBACK_VARNAME
 import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER
@@ -366,7 +368,7 @@ fun TypeSpec.Builder.addDaoRepoFun(
                         add("throw %T(%S)\n", ClassName("kotlin", "IllegalStateException"),
                             "Synchronous HTTP is not supported on Door/Javascript!")
                     }else {
-                        addDelegateToWebCode(daoFunSpec, daoName)
+                        addDelegateToWebCode(daoFunSpec, daoName, doorTarget)
                     }
                 }
 
@@ -426,7 +428,17 @@ fun CodeBlock.Builder.addBoundaryCallbackCode(daoFun: KSFunctionDeclaration, dao
     return this
 }
 
-fun CodeBlock.Builder.addDelegateToWebCode(daoFunSpec: FunSpec, daoName: String) : CodeBlock.Builder {
+fun CodeBlock.Builder.addDelegateToWebCode(
+    daoFunSpec: FunSpec,
+    daoName: String,
+    target: DoorTarget
+) : CodeBlock.Builder {
+    if(target == DoorTarget.JS) {
+        add("throw %T(%S)\n", CLASSNAME_ILLEGALSTATEEXCEPTION,
+            "${daoName}.${daoFunSpec.name} : non-suspended delegate to web not supported on JS")
+        return this
+    }
+
     if(daoFunSpec.hasReturnType) {
         add("return ")
     }
@@ -464,32 +476,32 @@ class DoorRepositoryProcessor(
         val daoSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Dao")
             .filterIsInstance<KSClassDeclaration>()
 
-        DoorTarget.values().forEach { target ->
-            dbSymbols.forEach { dbKSClass ->
-                FileSpec.builder(dbKSClass.packageName.asString(),
-                    "${dbKSClass.simpleName.asString()}$SUFFIX_REPOSITORY2")
-                    .addDbRepoType(dbKSClass, target)
-                    .build()
-                    .writeToPlatformDir(target, environment.codeGenerator, environment.options)
-            }
+        val target = environment.platforms.firstOrNull()?.doorTarget() ?: throw IllegalStateException("No KSP Platform!")
 
-            entitiesWithAttachments.forEach { entityWithAttachment ->
-                FileSpec.builder(entityWithAttachment.packageName.asString(),
-                    "${entityWithAttachment.simpleName.asString()}$SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER")
-                    .addEntityWithAttachmentAdapterType(entityWithAttachment)
-                    .addAsEntityWithAttachmentAdapterExtensionFun(entityWithAttachment)
-                    .build()
-                    .writeToPlatformDir(target, environment.codeGenerator, environment.options)
-            }
+        dbSymbols.forEach { dbKSClass ->
+            FileSpec.builder(dbKSClass.packageName.asString(),
+                "${dbKSClass.simpleName.asString()}$SUFFIX_REPOSITORY2")
+                .addDbRepoType(dbKSClass, target)
+                .build()
+                .writeTo(environment.codeGenerator, false)
+        }
 
-            daoSymbols.forEach { daoKSClass ->
-                FileSpec.builder(daoKSClass.packageName.asString(),
-                    "${daoKSClass.simpleName.asString()}$SUFFIX_REPOSITORY2")
-                    .addDaoRepoType(daoKSClass,
-                        daoKSClass.toClassName(), target, resolver = resolver, environment = environment)
-                    .build()
-                    .writeToPlatformDir(target, environment.codeGenerator, environment.options)
-            }
+        entitiesWithAttachments.forEach { entityWithAttachment ->
+            FileSpec.builder(entityWithAttachment.packageName.asString(),
+                "${entityWithAttachment.simpleName.asString()}$SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER")
+                .addEntityWithAttachmentAdapterType(entityWithAttachment)
+                .addAsEntityWithAttachmentAdapterExtensionFun(entityWithAttachment)
+                .build()
+                .writeTo(environment.codeGenerator, false)
+        }
+
+        daoSymbols.forEach { daoKSClass ->
+            FileSpec.builder(daoKSClass.packageName.asString(),
+                "${daoKSClass.simpleName.asString()}$SUFFIX_REPOSITORY2")
+                .addDaoRepoType(daoKSClass,
+                    daoKSClass.toClassName(), target, resolver = resolver, environment = environment)
+                .build()
+                .writeTo(environment.codeGenerator, false)
         }
 
         return emptyList()

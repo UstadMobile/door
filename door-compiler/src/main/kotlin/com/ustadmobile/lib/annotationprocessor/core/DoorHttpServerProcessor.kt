@@ -14,6 +14,7 @@ import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
+import com.squareup.kotlinpoet.ksp.writeTo
 import com.ustadmobile.door.AbstractDoorUriResponder
 import com.ustadmobile.door.DoorConstants
 import com.ustadmobile.door.DoorDaoProvider
@@ -595,37 +596,59 @@ class DoorHttpServerProcessor(
 
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-
         val dbSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Database")
             .filterIsInstance<KSClassDeclaration>()
-        dbSymbols.forEach { dbClassDecl ->
-            if(dbClassDecl.dbEnclosedDaos().any { it.hasAnnotation(Repository::class) }) {
-                FileSpec.builder(dbClassDecl.packageName.asString(),
-                    "${dbClassDecl.simpleName.asString()}$SUFFIX_KTOR_ROUTE")
-                    .addDbKtorRouteFunction(dbClassDecl)
-                    .build()
-                    .writeToPlatformDir(DoorTarget.JVM, environment.codeGenerator, environment.options)
-                FileSpec.builder(dbClassDecl.packageName.asString(),
-                    "${dbClassDecl.simpleName.asString()}$SUFFIX_NANOHTTPD_ADDURIMAPPING")
-                    .addDbNanoHttpdMapperFunction(dbClassDecl, resolver)
-                    .build()
-                    .writeToPlatformDir(DoorTarget.ANDROID, environment.codeGenerator, environment.options)
-            }
-        }
 
         val daoSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Dao")
             .filterIsInstance<KSClassDeclaration>()
             .filter { it.hasAnnotation(Repository::class) }
-        daoSymbols.forEach { daoClassDecl ->
-            FileSpec.builder(daoClassDecl.packageName.asString(), "${daoClassDecl.simpleName.asString()}$SUFFIX_KTOR_ROUTE")
-                .addDaoKtorRouteFun(daoClassDecl, daoClassDecl.toClassName(), resolver)
-                .build()
-                .writeToPlatformDir(DoorTarget.JVM, environment.codeGenerator, environment.options)
 
-            FileSpec.builder(daoClassDecl.packageName.asString(), "${daoClassDecl.simpleName.asString()}$SUFFIX_NANOHTTPD_URIRESPONDER")
-                .addNanoHttpdResponder(daoClassDecl, resolver)
-                .build()
-                .writeToPlatformDir(DoorTarget.ANDROID, environment.codeGenerator, environment.options)
+        val target = environment.platforms.firstOrNull()?.doorTarget()
+            ?: throw IllegalArgumentException("Door/KSP: No platforms!")
+
+        when(target) {
+            DoorTarget.JVM -> {
+                dbSymbols.forEach { dbClassDecl ->
+                    if (dbClassDecl.dbEnclosedDaos().any { it.hasAnnotation(Repository::class) }) {
+                        FileSpec.builder(
+                            dbClassDecl.packageName.asString(),
+                            "${dbClassDecl.simpleName.asString()}$SUFFIX_KTOR_ROUTE")
+                            .addDbKtorRouteFunction(dbClassDecl)
+                            .build()
+                            .writeTo(environment.codeGenerator, false)
+                    }
+                }
+
+                daoSymbols.forEach { daoClassDecl ->
+                    FileSpec.builder(daoClassDecl.packageName.asString(), "${daoClassDecl.simpleName.asString()}$SUFFIX_KTOR_ROUTE")
+                        .addDaoKtorRouteFun(daoClassDecl, daoClassDecl.toClassName(), resolver)
+                        .build()
+                        .writeTo(environment.codeGenerator, false)
+                }
+            }
+
+            DoorTarget.ANDROID -> {
+                dbSymbols.forEach { dbClassDecl ->
+                    if (dbClassDecl.dbEnclosedDaos().any { it.hasAnnotation(Repository::class) }) {
+                        FileSpec.builder(dbClassDecl.packageName.asString(),
+                            "${dbClassDecl.simpleName.asString()}$SUFFIX_NANOHTTPD_ADDURIMAPPING")
+                            .addDbNanoHttpdMapperFunction(dbClassDecl, resolver)
+                            .build()
+                            .writeTo(environment.codeGenerator, false)
+                    }
+                }
+
+                daoSymbols.forEach { daoClassDecl ->
+                    FileSpec.builder(daoClassDecl.packageName.asString(), "${daoClassDecl.simpleName.asString()}$SUFFIX_NANOHTTPD_URIRESPONDER")
+                        .addNanoHttpdResponder(daoClassDecl, resolver)
+                        .build()
+                        .writeTo(environment.codeGenerator, false)
+                }
+            }
+
+            else -> {
+                // do nothing
+            }
         }
 
         return emptyList()

@@ -5,7 +5,8 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 @Entity(indices = [Index(value = ["pnDeviceId", "pnTableId"], unique = true),
-        Index(value = ["pnDeviceId", "pnTimestamp"], unique = false)])
+        Index(value = ["pnDeviceId", "pnTimestamp"], unique = false)],
+        primaryKeys = ["pnUid"])
 class UpdateNotification(
         @PrimaryKey(autoGenerate = true)
         var pnUid: Long = 0,

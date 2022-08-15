@@ -4,7 +4,8 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(indices = arrayOf(Index("tableId", "nodeId", name="table_node_idx", unique = true)))
+@Entity(indices = arrayOf(Index("tableId", "nodeId", name="table_node_idx", unique = true)),
+    primaryKeys = ["repStatusId"])
 class ReplicationStatus {
 
     @PrimaryKey(autoGenerate = true)

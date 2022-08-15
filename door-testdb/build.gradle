@@ -93,7 +93,6 @@ kotlin {
         }
 
         jsMain {
-            kotlin.srcDir("$buildDir/generated/source/door-js")
             dependencies {
                 implementation project(":door-room-kmp")
             }
@@ -108,16 +107,9 @@ kotlin {
     }
 }
 
-// The Javascript can only build after the jvm build runs (as the JVM build triggers the annotation processor which
-// generates the Js implementation.
-compileKotlinJs.dependsOn(jvmMainClasses)
-
 ksp {
     arg("doordb_android_out", project.file("../test-app-android/build/generated/source/door-test-db").absolutePath)
     //Uncomment lines below to allow debugging on generated source code.
-    //arg("doordb_ktor_out", "$buildDir/generated/source/doordb-jvm")
-    //arg("doordb_jvm_out", "$buildDir/generated/source/doordb-jvm")
-    arg("doordb_js_out", "$buildDir/generated/source/door-js")
     arg("doordb_source_path", project.file("src/commonMain/kotlin").absolutePath)
     arg("doordb_migrations_out", project.file("$buildDir/generated/door-migrations").absolutePath)
     arg("doordb_postgres_url", rootProject.ext.localProperties["door.postgresUrl"])
@@ -127,4 +119,5 @@ ksp {
 
 dependencies {
     kspJvm project(":door-compiler")
+    kspJs project(":door-compiler")
 }

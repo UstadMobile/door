@@ -12,15 +12,7 @@ class AnnotationProcessorWrapper {
 
         const val OPTION_SOURCE_PATH = "doordb_source_path"
 
-        const val OPTION_JVM_DIRS = "doordb_jvm_out"
-
         const val OPTION_ANDROID_OUTPUT = "doordb_android_out"
-
-        const val OPTION_KTOR_OUTPUT = "doordb_ktor_out"
-
-        const val OPTION_NANOHTTPD_OUTPUT = "doordb_nanohttpd_out"
-
-        const val OPTION_JS_OUTPUT = "doordb_js_out"
 
         const val OPTION_MIGRATIONS_OUTPUT = "doordb_migrations_out"
 

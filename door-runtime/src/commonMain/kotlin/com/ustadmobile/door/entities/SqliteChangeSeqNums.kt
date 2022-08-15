@@ -10,7 +10,8 @@ import androidx.room.PrimaryKey
  * because replace performs a delete, and then an insert (making the old change sequence number
  * unavailable).
  */
-@Entity(indices = [Index(value = ["sCsnNextLocal"]), Index(value =["sCsnNextPrimary"])])
+@Entity(indices = [Index(value = ["sCsnNextLocal"]), Index(value =["sCsnNextPrimary"])],
+        primaryKeys = ["sCsnTableId"])
 class SqliteChangeSeqNums(
         @PrimaryKey
         var sCsnTableId: Int = 0,
