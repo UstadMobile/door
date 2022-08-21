@@ -9,3 +9,5 @@ include ':test-app-android'
 include 'door-testdb-server'
 include 'door-jdbc'
 include 'door-common'
+include 'door-annotations'
+

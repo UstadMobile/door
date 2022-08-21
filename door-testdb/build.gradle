@@ -46,6 +46,7 @@ kotlin {
                 implementation kotlin('stdlib-common')
                 implementation project(":door-runtime")
                 compileOnly project(":door-room-kmp")
+                compileOnly project(":door-annotations")
                 implementation project(":door-jdbc")
                 implementation project(":door-common")
 
@@ -99,7 +100,6 @@ kotlin {
         }
 
         jsTest {
-            kotlin.srcDir("$buildDir/generated/source/door-js")
             dependencies {
                 implementation kotlin('test-js')
             }

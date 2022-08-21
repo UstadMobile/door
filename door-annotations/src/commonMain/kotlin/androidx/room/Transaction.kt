@@ -1,4 +1,5 @@
 package androidx.room
+
 /**
  * Marks a method in a [Dao] class as a transaction method.
  *
