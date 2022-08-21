@@ -1,6 +1,6 @@
 package com.ustadmobile.door.ext
 
-import androidx.room.RoomDatabase
+import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.DoorConstants
 import com.ustadmobile.door.DoorDatabaseReplicateWrapper
 import io.ktor.server.application.*

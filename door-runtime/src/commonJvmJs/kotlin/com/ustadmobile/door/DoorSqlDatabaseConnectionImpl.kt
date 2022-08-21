@@ -1,6 +1,6 @@
 package com.ustadmobile.door
 
-import com.ustadmobile.door.ext.useStatement
+import com.ustadmobile.door.jdbc.ext.useStatement
 import com.ustadmobile.door.jdbc.Connection
 
 class DoorSqlDatabaseConnectionImpl(override val connection: Connection) : DoorSqlDatabase {

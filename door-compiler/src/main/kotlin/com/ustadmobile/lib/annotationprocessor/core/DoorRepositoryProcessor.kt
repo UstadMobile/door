@@ -1,6 +1,7 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
 import androidx.room.*
+import com.ustadmobile.door.room.*
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
@@ -135,7 +136,7 @@ fun FileSpec.Builder.addDbRepoType(
                     ClassName("kotlin", "IllegalStateException"),
                     "Cannot use a repository to createAllTables!")
                 .build())
-            addOverrideGetInvalidationTrackerVal("_db")
+            addOverrideGetInvalidationTracker("_db")
             addDbVersionProperty(dbKSClassDeclaration)
         }
         .applyIf(target == DoorTarget.ANDROID) {
@@ -337,7 +338,7 @@ fun TypeSpec.Builder.addDaoRepoFun(
 
     if(doorTarget == DoorTarget.ANDROID
         && returnTypeVal is ParameterizedTypeName
-        && returnTypeVal.rawType == androidx.paging.DataSource.Factory::class.asClassName()) {
+        && returnTypeVal.rawType == com.ustadmobile.door.paging.DataSource.Factory::class.asClassName()) {
         generateBoundaryCallback = true
         repoMethodType = Repository.METHOD_DELEGATE_TO_DAO
     }

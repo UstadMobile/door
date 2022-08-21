@@ -11,6 +11,7 @@ import com.squareup.kotlinpoet.ksp.toTypeName
 import com.ustadmobile.door.DoorDbType
 import javax.lang.model.element.ExecutableElement
 import com.ustadmobile.door.RepositoryConnectivityListener
+import com.ustadmobile.door.room.InvalidationTracker
 import javax.annotation.processing.ProcessingEnvironment
 import javax.lang.model.element.TypeElement
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_ILLEGALSTATEEXCEPTION
@@ -149,13 +150,13 @@ fun TypeSpec.Builder.addOverrideGetRoomInvalidationTracker(realDbVarName: String
     return this
 }
 
-fun TypeSpec.Builder.addOverrideGetInvalidationTrackerVal(realDbVarName: String) : TypeSpec.Builder {
-    addProperty(PropertySpec.builder("invalidationTracker", InvalidationTracker::class,
-            KModifier.OVERRIDE)
-        .getter(FunSpec.getterBuilder()
-            .addCode("return $realDbVarName.invalidationTracker")
-            .build())
+fun TypeSpec.Builder.addOverrideGetInvalidationTracker(realDbVarName: String) : TypeSpec.Builder {
+    addFunction(FunSpec.builder("getInvalidationTracker")
+        .returns(InvalidationTracker::class)
+        .addModifiers(KModifier.OVERRIDE)
+        .addCode("return $realDbVarName.getInvalidationTracker()\n")
         .build())
+
     return this
 }
 

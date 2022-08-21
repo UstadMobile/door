@@ -1,6 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import androidx.room.RoomDatabase
+import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.DoorDatabaseRepository
 
 /**

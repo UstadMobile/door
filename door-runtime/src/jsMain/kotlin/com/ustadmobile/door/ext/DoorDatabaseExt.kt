@@ -3,10 +3,8 @@ package com.ustadmobile.door.ext
 import androidx.room.RoomDatabase
 import com.ustadmobile.door.*
 import com.ustadmobile.door.jdbc.SQLException
-import com.ustadmobile.door.sqljsjdbc.SQLiteDatasourceJs
+import com.ustadmobile.door.room.RoomJdbcImpl
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
 import kotlin.reflect.KClass
 
 /**

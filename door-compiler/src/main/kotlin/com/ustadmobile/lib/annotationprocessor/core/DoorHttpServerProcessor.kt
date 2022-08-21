@@ -1,7 +1,7 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import androidx.lifecycle.LiveData
-import androidx.room.RoomDatabase
+import com.ustadmobile.door.lifecycle.LiveData
+import com.ustadmobile.door.room.RoomDatabase
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment

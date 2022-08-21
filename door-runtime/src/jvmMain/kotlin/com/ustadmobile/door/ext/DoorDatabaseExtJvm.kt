@@ -1,10 +1,9 @@
 package com.ustadmobile.door.ext
 
-import androidx.room.RoomDatabase
+import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.*
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
-import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
-import com.ustadmobile.door.util.NodeIdAuthCache
+import com.ustadmobile.door.room.RoomJdbcImpl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

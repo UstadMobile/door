@@ -1,6 +1,6 @@
 package com.ustadmobile.door.ext
 
-import androidx.room.RoomDatabase
+import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.*
 import kotlin.reflect.KClass
 import com.ustadmobile.door.jdbc.*

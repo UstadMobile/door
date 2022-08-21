@@ -1,7 +1,7 @@
 package com.ustadmobile.door.ext
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.Observer
+import com.ustadmobile.door.lifecycle.LiveData
+import com.ustadmobile.door.lifecycle.Observer
 import com.ustadmobile.door.doorMainDispatcher
 import kotlinx.coroutines.*
 

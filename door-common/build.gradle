@@ -59,7 +59,6 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
-                implementation project(":door-jdbc")
                 implementation kotlin('stdlib-common')
             }
         }

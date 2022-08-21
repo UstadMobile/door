@@ -1,8 +1,11 @@
 package com.ustadmobile.door.ext
 
-import androidx.room.RoomDatabase
+import com.ustadmobile.door.room.RoomDatabase
+import com.ustadmobile.door.room.RoomJdbcImpl
 import com.ustadmobile.door.*
 import com.ustadmobile.door.jdbc.*
+import com.ustadmobile.door.jdbc.ext.useStatement
+import com.ustadmobile.door.jdbc.ext.useStatementAsync
 import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
 import com.ustadmobile.door.util.NodeIdAuthCache
 import com.ustadmobile.door.util.systemTimeInMillis

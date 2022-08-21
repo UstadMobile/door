@@ -1,7 +1,7 @@
 package com.ustadmobile.door
 
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleOwner
+import com.ustadmobile.door.lifecycle.Lifecycle
+import com.ustadmobile.door.lifecycle.LifecycleOwner
 
 
 actual class RepositoryLoadHelperLifecycleHelper actual constructor(lifecycleOwner: LifecycleOwner) {
@@ -26,7 +26,7 @@ actual class RepositoryLoadHelperLifecycleHelper actual constructor(lifecycleOwn
      * Returns the current state as an Int as per DoorLifecycleObserver constants
      */
     actual val currentState: Int
-        get() = actLifecycleOwner?.lifecycle?.currentState?.ordinal ?: Lifecycle.State.DESTROYED.ordinal
+        get() = actLifecycleOwner?.getLifecycle()?.getCurrentState()?.ordinal ?: Lifecycle.State.DESTROYED.ordinal
 
     actual fun dispose() {
         actLifecycleOwner = null

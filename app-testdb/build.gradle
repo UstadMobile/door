@@ -32,9 +32,7 @@ dependencies {
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
 
     implementation project(":door-runtime")
-    implementation project(":door-room-kmp")
     implementation project(":door-testdb")
-    implementation project(":door-jdbc")
 
     implementation "io.ktor:ktor-client-js:$version_ktor"
 }

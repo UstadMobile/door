@@ -1,6 +1,6 @@
 package com.ustadmobile.door.attachments
 
-import androidx.room.RoomDatabase
+import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.DoorUri
 import com.ustadmobile.door.entities.ZombieAttachmentData
 import com.ustadmobile.door.ext.prepareAndUseStatementAsync

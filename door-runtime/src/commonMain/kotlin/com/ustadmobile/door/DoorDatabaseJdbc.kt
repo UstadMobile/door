@@ -1,7 +1,7 @@
 package com.ustadmobile.door
 
-import androidx.room.InvalidationTracker
-import androidx.room.RoomDatabase
+import com.ustadmobile.door.room.InvalidationTracker
+import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
@@ -58,8 +58,6 @@ interface DoorDatabaseJdbc {
     val realIncomingReplicationListenerHelper: IncomingReplicationListenerHelper
 
     val transactionDepthCounter: TransactionDepthCounter
-
-    val invalidationTracker: InvalidationTracker
 
     val realAttachmentStorageUri: DoorUri?
 

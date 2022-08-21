@@ -1,6 +1,6 @@
 package com.ustadmobile.door
 
-import androidx.room.RoomDatabase
+import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.ext.dbType
 import com.ustadmobile.door.jdbc.*
 import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp

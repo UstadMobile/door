@@ -1,7 +1,7 @@
 package repdb
 
 import androidx.room.*
-import androidx.lifecycle.LiveData
+import com.ustadmobile.door.lifecycle.LiveData
 import com.ustadmobile.door.annotation.*
 
 @Dao

@@ -1,6 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import androidx.lifecycle.Observer
+import com.ustadmobile.door.lifecycle.Observer
 import com.ustadmobile.door.*
 import db2.ExampleDatabase2
 import db2.ExampleEntity2

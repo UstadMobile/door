@@ -1,7 +1,7 @@
 package com.ustadmobile.lib.annotationprocessor.core.ext
 
-import androidx.lifecycle.LiveData
-import androidx.paging.DataSource
+import com.ustadmobile.door.lifecycle.LiveData
+import com.ustadmobile.door.paging.DataSource
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.CodeBlock

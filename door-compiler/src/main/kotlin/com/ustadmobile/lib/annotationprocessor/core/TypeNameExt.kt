@@ -1,6 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import androidx.lifecycle.LiveData
+import com.ustadmobile.door.lifecycle.LiveData
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.ustadmobile.door.jdbc.TypesKmp
@@ -23,7 +23,7 @@ fun TypeName.toSqlTypesInt() = when {
 
 internal fun TypeName.isDataSourceFactory(paramTypeFilter: (List<TypeName>) -> Boolean = {true}): Boolean {
     return this is ParameterizedTypeName
-            && this.rawType == androidx.paging.DataSource.Factory::class.asClassName()
+            && this.rawType == com.ustadmobile.door.paging.DataSource.Factory::class.asClassName()
             && paramTypeFilter(this.typeArguments)
 }
 
@@ -60,7 +60,7 @@ val TypeName.isNullableAsSelectReturnResult
 fun TypeName.unwrapLiveDataOrDataSourceFactory()  =
     when {
         this is ParameterizedTypeName && rawType == LiveData::class.asClassName() -> typeArguments[0]
-        this is ParameterizedTypeName && rawType == androidx.paging.DataSource.Factory::class.asClassName() ->
+        this is ParameterizedTypeName && rawType == com.ustadmobile.door.paging.DataSource.Factory::class.asClassName() ->
             List::class.asClassName().parameterizedBy(typeArguments[1])
         else -> this
     }

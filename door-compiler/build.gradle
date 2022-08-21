@@ -32,8 +32,6 @@ compileTestKotlin {
 dependencies {
     implementation project(":door-runtime")
     implementation project(":door-common")
-    implementation project(':door-room-kmp')
-    implementation project(":door-jdbc")
     implementation project(":door-annotations")
     implementation "org.jetbrains.kotlin:kotlin-stdlib"
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"

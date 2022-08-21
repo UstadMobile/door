@@ -2,7 +2,7 @@ package com.ustadmobile.lib.annotationprocessor.core
 
 import androidx.room.Delete
 import androidx.room.Insert
-import androidx.room.RoomDatabase
+import com.ustadmobile.door.room.RoomDatabase
 import androidx.room.Update
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
@@ -280,7 +280,7 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
                 addOverrideGetRoomInvalidationTracker("_db")
             }
             .applyIf(target != DoorTarget.ANDROID) {
-                addOverrideGetInvalidationTrackerVal("_db")
+                addOverrideGetInvalidationTracker("_db")
             }
 
             .build()

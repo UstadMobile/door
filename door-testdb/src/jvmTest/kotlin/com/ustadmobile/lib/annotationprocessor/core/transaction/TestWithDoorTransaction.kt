@@ -1,6 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core.transaction
 
-import androidx.room.InvalidationTracker
+import com.ustadmobile.door.room.InvalidationTracker
 import com.ustadmobile.door.DatabaseBuilder
 import com.ustadmobile.door.entities.DoorNode
 import com.ustadmobile.door.ext.withDoorTransaction
@@ -77,7 +77,7 @@ class TestWithDoorTransaction {
         }
 
         invalidationObserver = spy(realInvalidationObserver)
-        db.invalidationTracker.addObserver(invalidationObserver)
+        db.getInvalidationTracker().addObserver(invalidationObserver)
     }
 
     private fun assertInvocationCounts() {

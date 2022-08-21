@@ -36,7 +36,6 @@ kotlin {
             dependencies {
                 implementation kotlin('stdlib-common')
                 implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$version_coroutines"
-                implementation project(":door-jdbc")
                 implementation project(":door-common")
             }
         }

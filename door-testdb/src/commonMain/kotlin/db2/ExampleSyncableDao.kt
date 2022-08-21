@@ -4,8 +4,8 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
-import androidx.paging.DataSource
-import androidx.lifecycle.LiveData
+import com.ustadmobile.door.paging.DataSource
+import com.ustadmobile.door.lifecycle.LiveData
 import com.ustadmobile.door.SyncNode
 import com.ustadmobile.door.annotation.ParamName
 import com.ustadmobile.door.annotation.RepoHttpAccessible

@@ -1,8 +1,8 @@
 package com.ustadmobile.door
 
-import androidx.lifecycle.LiveData
-import androidx.room.InvalidationTracker
-import androidx.room.RoomDatabase
+import com.ustadmobile.door.room.InvalidationTracker
+import com.ustadmobile.door.room.RoomDatabase
+import com.ustadmobile.door.lifecycle.LiveData
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 
@@ -20,13 +20,13 @@ class LiveDataImpl<T>(
 
     override fun onActive() {
         super.onActive()
-        db.invalidationTracker.addObserver(observer)
+        db.getInvalidationTracker().addObserver(observer)
         update()
     }
 
     override fun onInactive() {
         super.onInactive()
-        db.invalidationTracker.removeObserver(observer)
+        db.getInvalidationTracker().removeObserver(observer)
     }
 
     internal fun update() {

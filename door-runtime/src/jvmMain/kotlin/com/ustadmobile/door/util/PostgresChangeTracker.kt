@@ -1,6 +1,6 @@
 package com.ustadmobile.door.util
 
-import androidx.room.RoomDatabase
+import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.doorDatabaseMetadata
@@ -41,7 +41,7 @@ class PostgresChangeTracker(
                         val notifications = pgConnection.notifications
                         if(notifications.isNotEmpty()) {
                             val tablesChanged = notifications.map { it.parameter }
-                            jdbcDatabase.invalidationTracker.onTablesInvalidated(tablesChanged.toSet())
+                            (jdbcDatabase as RoomDatabase).getInvalidationTracker().onTablesInvalidated(tablesChanged.toSet())
                         }
                         delay(20)
                     }

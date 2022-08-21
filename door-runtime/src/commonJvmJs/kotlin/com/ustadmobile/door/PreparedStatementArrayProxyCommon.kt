@@ -1,7 +1,7 @@
 package com.ustadmobile.door
 import com.ustadmobile.door.jdbc.*
 import com.ustadmobile.door.jdbc.types.*
-import com.ustadmobile.door.ext.useStatement
+import com.ustadmobile.door.jdbc.ext.useStatement
 import kotlin.math.max
 
 abstract class PreparedStatementArrayProxyCommon(

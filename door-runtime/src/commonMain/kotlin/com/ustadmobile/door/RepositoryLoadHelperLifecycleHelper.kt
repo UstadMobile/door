@@ -1,6 +1,6 @@
 package com.ustadmobile.door
 
-import androidx.lifecycle.LifecycleOwner
+import com.ustadmobile.door.lifecycle.LifecycleOwner
 
 /**
  * This expect/actual is used by RepositoryLoadHelper to monitor the lifecycle of anything which is

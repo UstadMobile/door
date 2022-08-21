@@ -1,8 +1,8 @@
 package com.ustadmobile.door
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.Observer
+import com.ustadmobile.door.lifecycle.LiveData
+import com.ustadmobile.door.lifecycle.MutableLiveData
+import com.ustadmobile.door.lifecycle.Observer
 import com.ustadmobile.door.ext.concurrentSafeMapOf
 
 /**

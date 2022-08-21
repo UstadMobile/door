@@ -1,8 +1,8 @@
 package com.ustadmobile.lib.annotationprocessor.core.ext
 
-import androidx.lifecycle.LiveData
+import com.ustadmobile.door.lifecycle.LiveData
 import com.google.devtools.ksp.symbol.*
-import androidx.paging.DataSource
+import com.ustadmobile.door.paging.DataSource
 
 fun KSDeclaration.propertyOrReturnType(): KSTypeReference? {
     return when(this) {

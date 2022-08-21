@@ -1,7 +1,7 @@
 package dbonly
 
 import androidx.room.Database
-import androidx.room.RoomDatabase
+import com.ustadmobile.door.room.RoomDatabase
 
 @Database(entities = [VanillaEntity::class], version = 1)
 abstract class VanillaDatabase : RoomDatabase() {

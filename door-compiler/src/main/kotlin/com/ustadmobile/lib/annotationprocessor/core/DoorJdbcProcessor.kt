@@ -1,6 +1,7 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import androidx.lifecycle.LiveData
+import com.ustadmobile.door.lifecycle.LiveData
+import com.ustadmobile.door.room.*
 import androidx.room.*
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
@@ -25,6 +26,7 @@ import com.ustadmobile.door.replication.ReplicationRunOnChangeRunner
 import com.ustadmobile.door.replication.ReplicationEntityMetaData
 import com.ustadmobile.door.replication.ReplicationFieldMetaData
 import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
+import com.ustadmobile.door.room.RoomJdbcImpl
 import com.ustadmobile.door.util.DeleteZombieAttachmentsListener
 import kotlinx.coroutines.GlobalScope
 import kotlin.reflect.KClass
@@ -450,8 +452,12 @@ fun FileSpec.Builder.addJdbcDbImplType(
             .initializer("dataSource")
             .build())
         .addProperty(PropertySpec.builder("jdbcImplHelper", RoomDatabaseJdbcImplHelper::class, KModifier.OVERRIDE)
-            .initializer("%T(dataSource, this, this::class.%M().allTables)\n", RoomDatabaseJdbcImplHelper::class,
-                MemberName("com.ustadmobile.door.ext", "doorDatabaseMetadata"))
+            .initializer("%T(dataSource, this, this::class.%M().allTables, %T(*this::class.%M().allTables.toTypedArray()))\n",
+                RoomDatabaseJdbcImplHelper::class,
+                MemberName("com.ustadmobile.door.ext", "doorDatabaseMetadata"),
+                InvalidationTracker::class,
+                MemberName("com.ustadmobile.door.ext", "doorDatabaseMetadata"),
+                )
             .build())
         .applyIf(target == DoorTarget.JVM) {
             addProperty(PropertySpec.builder("realAttachmentStorageUri",
@@ -486,12 +492,6 @@ fun FileSpec.Builder.addJdbcDbImplType(
         .addProperty(PropertySpec.builder("transactionDepthCounter", TransactionDepthCounter::class)
             .addModifiers(KModifier.OVERRIDE)
             .initializer("%T()\n", TransactionDepthCounter::class)
-            .build())
-        .addProperty(PropertySpec.builder("invalidationTracker", InvalidationTracker::class)
-            .addModifiers(KModifier.OVERRIDE)
-            .getter(FunSpec.getterBuilder()
-                .addCode("return jdbcImplHelper.invalidationTracker\n")
-                .build())
             .build())
         .applyIf(target == DoorTarget.JS) {
             addProperty(PropertySpec.builder("isInTransaction", Boolean::class,
@@ -560,6 +560,11 @@ fun FileSpec.Builder.addJdbcDbImplType(
             .build())
         .addCreateAllTablesFunction(dbKSClass, resolver)
         .addClearAllTablesFunction(dbKSClass, target)
+        .addFunction(FunSpec.builder("getInvalidationTracker")
+            .addModifiers(KModifier.OVERRIDE)
+            .returns(InvalidationTracker::class)
+            .addCode("return jdbcImplHelper.invalidationTracker\n")
+            .build())
         .apply {
             dbKSClass.allDbClassDaoGetters().forEach { daoGetterOrProp ->
                 val daoKSClass = daoGetterOrProp.propertyOrReturnType()?.resolve()?.declaration as? KSClassDeclaration

@@ -32,7 +32,6 @@ dependencies {
 
     implementation project(":door-testdb")
     implementation project(":door-runtime")
-    implementation project(":door-room-kmp")
 
     implementation "io.ktor:ktor-client-core:$version_ktor"
     implementation "io.ktor:ktor-client-json:$version_ktor"

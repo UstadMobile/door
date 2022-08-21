@@ -1,6 +1,7 @@
 package com.ustadmobile.door
 
-import androidx.room.RoomDatabase
+import com.ustadmobile.door.room.RoomDatabase
+
 
 class DoorDaoProvider<T: RoomDatabase, D>(val providerFn: (T) -> D) {
 

@@ -1,8 +1,6 @@
 package com.ustadmobile.door
 
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.Observer
+import com.ustadmobile.door.lifecycle.Observer
 import kotlinx.coroutines.CompletableDeferred
 
 //fun <T: Any?> LiveData<T>.observe(lifecycleOwner: LifecycleOwner, observer: (T?) -> Unit) {

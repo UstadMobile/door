@@ -53,7 +53,6 @@ tasks.whenTaskAdded { task ->
 
 dependencies {
     implementation project(":door-runtime")
-    implementation project(":door-jdbc")
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
     implementation "androidx.core:core-ktx:$version_androidx_core"
     implementation "androidx.appcompat:appcompat:$version_android_appcompat"

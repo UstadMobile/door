@@ -1,6 +1,6 @@
 package repdb
 
-import androidx.lifecycle.LiveData
+import com.ustadmobile.door.lifecycle.LiveData
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query

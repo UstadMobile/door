@@ -1,6 +1,6 @@
 package com.ustadmobile.door.attachments
 
-import androidx.room.RoomDatabase
+import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.DoorConstants
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.ext.*
@@ -58,7 +58,7 @@ actual suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<E
             entitiesWithAttachmentData.forEach { attachmentUri ->
                 currentUri = attachmentUri
                 val destPath = attachmentUri.substringAfter(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX)
-                val destFile = File(db.requireAttachmentStorageUri().toFile(), destPath)
+                val destFile: File = File(db.requireAttachmentStorageUri().toFile(), destPath)
 
                 if(!destFile.exists()) {
                     val url = URL(URL(config.endpoint),

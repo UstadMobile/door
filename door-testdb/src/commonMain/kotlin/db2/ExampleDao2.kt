@@ -1,7 +1,7 @@
 package db2
 
-import androidx.lifecycle.LiveData
-import androidx.paging.DataSource
+import com.ustadmobile.door.lifecycle.LiveData
+import com.ustadmobile.door.paging.DataSource
 import androidx.room.*
 import com.ustadmobile.door.*
 import com.ustadmobile.door.annotation.QueryLiveTables

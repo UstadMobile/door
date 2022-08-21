@@ -1,13 +1,10 @@
 rootProject.name = 'door'
 include 'door-runtime'
 include 'door-compiler'
-include 'door-room-kmp'
 include 'door-testdb'
 include 'app-testdb'
-include 'door-jdbc-room-impl'
 include ':test-app-android'
 include 'door-testdb-server'
-include 'door-jdbc'
 include 'door-common'
 include 'door-annotations'
 

@@ -1,6 +1,6 @@
 package com.ustadmobile.door
 
-import androidx.room.RoomDatabase
+import com.ustadmobile.door.room.RoomDatabase
 
 /**
  * When running an insert or update query on an entity with @ReplicateEntity, the primary key and versionId fields
