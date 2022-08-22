@@ -1,9 +1,9 @@
 package com.ustadmobile.door.util
 
-import com.ustadmobile.door.room.InvalidationTracker
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.attachments.deleteZombieAttachments
 import com.ustadmobile.door.ext.*
+import com.ustadmobile.door.room.InvalidationTrackerObserver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -17,7 +17,7 @@ class DeleteZombieAttachmentsListener(
     coroutineScope: CoroutineScope = GlobalScope,
 ) {
 
-    private val invalidationObserver = object: InvalidationTracker.Observer(arrayOf("ZombieAttachmentData")) {
+    private val invalidationObserver = object: InvalidationTrackerObserver(arrayOf("ZombieAttachmentData")) {
         override fun onInvalidated(tables: Set<String>) {
             coroutineScope.launch {
                 db.deleteZombieAttachments()

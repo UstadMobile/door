@@ -1,6 +1,6 @@
 package com.ustadmobile.door.lifecycle
 
-expect abstract class LiveData<T>() {
+expect abstract class LiveData<T: Any?>() {
 
     open fun observe(lifecycleOwner: LifecycleOwner, observer: Observer<in T>)
 
@@ -12,6 +12,9 @@ expect abstract class LiveData<T>() {
 
     @Suppress("NO_ACTUAL_FOR_EXPECT")
     protected open fun postValue(value: T)
+
+    @Suppress("NO_ACTUAL_FOR_EXPECT")
+    protected open fun setValue(value: T)
 
     open fun hasActiveObservers(): Boolean
 

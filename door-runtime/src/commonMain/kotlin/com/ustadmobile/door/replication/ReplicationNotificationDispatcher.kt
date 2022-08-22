@@ -1,11 +1,11 @@
 package com.ustadmobile.door.replication
 
-import com.ustadmobile.door.room.InvalidationTracker
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
 import com.ustadmobile.door.jdbc.ext.mapRows
 import com.ustadmobile.door.jdbc.ext.useResults
+import com.ustadmobile.door.room.InvalidationTrackerObserver
 import com.ustadmobile.door.util.DoorEventCollator
 import com.ustadmobile.door.util.NodeIdAuthCache
 import io.github.aakira.napier.Napier
@@ -30,7 +30,7 @@ class ReplicationNotificationDispatcher(
 
     private val dbMetaData: DoorDatabaseMetadata<*> = db::class.doorDatabaseMetadata()
 
-) : InvalidationTracker.Observer(db::class.doorDatabaseMetadata().replicateTableNames.toTypedArray()),
+) : InvalidationTrackerObserver(db::class.doorDatabaseMetadata().replicateTableNames.toTypedArray()),
     NodeIdAuthCache.OnNewDoorNode
 {
 

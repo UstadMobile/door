@@ -119,10 +119,12 @@ class ResultSetRoomJdbc(
         return cursor.getDouble(getColumnIndexAndSetLastFetched(columnLabel))
     }
 
+    @Deprecated("Deprecated in Java")
     override fun getBigDecimal(columnIndex: Int, scale: Int): BigDecimal {
         TODO("Not yet implemented")
     }
 
+    @Deprecated("Deprecated in Java")
     override fun getBigDecimal(columnLabel: String?, scale: Int): BigDecimal {
         TODO("Not yet implemented")
     }
@@ -199,10 +201,12 @@ class ResultSetRoomJdbc(
         TODO("Not yet implemented")
     }
 
+    @Deprecated("Deprecated in Java")
     override fun getUnicodeStream(columnIndex: Int): InputStream {
         TODO("Not yet implemented")
     }
 
+    @Deprecated("Deprecated in Java")
     override fun getUnicodeStream(columnLabel: String?): InputStream {
         TODO("Not yet implemented")
     }

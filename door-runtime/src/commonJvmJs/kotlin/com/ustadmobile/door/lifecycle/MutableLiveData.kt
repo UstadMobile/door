@@ -1,6 +1,6 @@
 package com.ustadmobile.door.lifecycle
 
-actual open class MutableLiveData<T> : LiveData<T> {
+actual open class MutableLiveData<T: Any?> : LiveData<T> {
 
     actual constructor(value: T) : super(value) {
 
@@ -12,7 +12,7 @@ actual open class MutableLiveData<T> : LiveData<T> {
         super.postValue(value)
     }
 
-    actual open fun setVal(value: T) = postValue(value)
+    public actual override fun setValue(value: T) = postValue(value)
 
 
 }

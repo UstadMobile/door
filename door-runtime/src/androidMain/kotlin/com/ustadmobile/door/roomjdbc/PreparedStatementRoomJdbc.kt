@@ -197,6 +197,7 @@ class PreparedStatementRoomJdbc(
         TODO("Not yet implemented")
     }
 
+    @Deprecated("Deprecated in Java")
     override fun setUnicodeStream(parameterIndex: Int, x: InputStream?, length: Int) {
         TODO("Not yet implemented")
     }

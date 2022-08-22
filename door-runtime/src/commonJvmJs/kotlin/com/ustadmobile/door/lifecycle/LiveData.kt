@@ -1,9 +1,10 @@
 package com.ustadmobile.door.lifecycle
 
 import com.ustadmobile.door.ext.concurrentSafeListOf
+import com.ustadmobile.door.ext.currentDoorState
 import kotlinx.atomicfu.atomic
 
-actual abstract class LiveData<T> {
+actual abstract class LiveData<T : Any?> {
 
     private val value = atomic<T?>(null)
 
@@ -66,7 +67,7 @@ actual abstract class LiveData<T> {
     }
 
     actual open fun observe(lifecycleOwner: LifecycleOwner, observer: Observer<in T>) {
-        if(lifecycleOwner.getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)) {
+        if(lifecycleOwner.getLifecycle().currentDoorState.isAtLeast(DoorState.STARTED)) {
             addActiveObserver(observer)
         }
 
@@ -98,6 +99,12 @@ actual abstract class LiveData<T> {
     }
 
     protected actual open fun postValue(value: T) {
+        this.value.value = value
+        initialValueLoaded = true
+        activeObservers.forEach { it.onChanged(value) }
+    }
+
+    protected actual open fun setValue(value: T) {
         this.value.value = value
         initialValueLoaded = true
         activeObservers.forEach { it.onChanged(value) }

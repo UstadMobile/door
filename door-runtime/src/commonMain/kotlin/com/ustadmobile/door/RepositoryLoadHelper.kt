@@ -11,7 +11,6 @@ import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlin.coroutines.coroutineContext
 import kotlin.jvm.Volatile
 
 typealias LifeCycleHelperFactory = (LifecycleOwner) -> RepositoryLoadHelperLifecycleHelper
@@ -63,7 +62,7 @@ class RepositoryLoadHelper<T>(
 
 
         override fun onChanged(t: L) {
-            setVal(t)
+            setValue(t)
         }
 
         override fun onActive() {

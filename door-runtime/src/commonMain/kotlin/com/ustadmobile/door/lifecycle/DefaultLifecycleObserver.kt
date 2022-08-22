@@ -1,29 +1,23 @@
 package com.ustadmobile.door.lifecycle
 
-interface DefaultLifecycleObserver: FullLifecycleObserver {
+expect interface DefaultLifecycleObserver {
 
-    override fun onCreate(owner: LifecycleOwner) {
+    @Suppress("NO_ACTUAL_FOR_EXPECT")
+    open fun onCreate(owner: LifecycleOwner)
 
-    }
+    @Suppress("NO_ACTUAL_FOR_EXPECT")
+    open fun onStart(owner: LifecycleOwner)
 
-    override fun onStart(owner: LifecycleOwner) {
+    @Suppress("NO_ACTUAL_FOR_EXPECT")
+    open fun onResume(owner: LifecycleOwner)
 
-    }
+    @Suppress("NO_ACTUAL_FOR_EXPECT")
+    open fun onPause(owner: LifecycleOwner)
 
-    override fun onResume(owner: LifecycleOwner) {
+    @Suppress("NO_ACTUAL_FOR_EXPECT")
+    open fun onStop(owner: LifecycleOwner)
 
-    }
-
-    override fun onPause(owner: LifecycleOwner) {
-
-    }
-
-    override fun onStop(owner: LifecycleOwner) {
-
-    }
-
-    override fun onDestroy(owner: LifecycleOwner) {
-
-    }
+    @Suppress("NO_ACTUAL_FOR_EXPECT")
+    open fun onDestroy(owner: LifecycleOwner)
 
 }

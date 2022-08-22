@@ -1,6 +1,6 @@
 package com.ustadmobile.door.lifecycle
 
-expect open class MutableLiveData<T> : LiveData<T> {
+expect open class MutableLiveData<T: Any?> : LiveData<T> {
 
     constructor(value: T)
 
@@ -8,6 +8,6 @@ expect open class MutableLiveData<T> : LiveData<T> {
 
     public override fun postValue(value: T)
 
-    open fun setVal(value: T)
+    public override fun setValue(value: T)
 
 }

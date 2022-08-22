@@ -10,19 +10,15 @@ actual open class InvalidationTracker(
 
     private val tableNames: List<String> = tables.toList()
 
-    private val observers = concurrentSafeListOf<Observer>()
+    private val observers = concurrentSafeListOf<InvalidationTrackerObserver>()
 
-    actual abstract class Observer actual constructor(val tables: Array<String>) {
 
-        actual abstract fun onInvalidated(tables: Set<String>)
 
-    }
-
-    actual open fun addObserver(observer: Observer) {
+    actual open fun addObserver(observer: InvalidationTrackerObserver) {
         observers += observer
     }
 
-    actual open fun removeObserver(observer: Observer) {
+    actual open fun removeObserver(observer: InvalidationTrackerObserver) {
         observers -= observer
     }
 
