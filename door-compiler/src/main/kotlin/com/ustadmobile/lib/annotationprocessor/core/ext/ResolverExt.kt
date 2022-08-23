@@ -1,7 +1,9 @@
 package com.ustadmobile.lib.annotationprocessor.core.ext
 
 import com.google.devtools.ksp.processing.Resolver
+import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSType
+import com.google.devtools.ksp.symbol.Modifier
 
 fun Resolver.sqlNumericNonNullTypes(): List<KSType> {
     return listOf(builtIns.byteType, builtIns.shortType, builtIns.intType, builtIns.longType, builtIns.floatType,
@@ -13,3 +15,15 @@ fun Resolver.querySingularTypes(): List<KSType> {
         builtIns.floatType, builtIns.doubleType, builtIns.stringType).flatMap { listOf(it, it.makeNullable()) }
 }
 
+
+fun Resolver.getDatabaseSymbolsToProcess(): Sequence<KSClassDeclaration>{
+    return getSymbolsWithAnnotation("com.ustadmobile.door.annotation.Database")
+        .filterIsInstance<KSClassDeclaration>()
+        .filter { Modifier.ACTUAL !in it.modifiers }
+}
+
+fun Resolver.getDaoSymbolsToProcess(): Sequence<KSClassDeclaration> {
+    return getSymbolsWithAnnotation("com.ustadmobile.door.annotation.Dao")
+        .filterIsInstance<KSClassDeclaration>()
+        .filter { Modifier.ACTUAL !in it.modifiers }
+}

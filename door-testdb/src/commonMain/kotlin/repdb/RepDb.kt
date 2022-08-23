@@ -1,6 +1,6 @@
 package repdb
 
-import androidx.room.Database
+import com.ustadmobile.door.annotation.Database
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.SyncNode
 import com.ustadmobile.door.entities.ChangeLog

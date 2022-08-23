@@ -8,13 +8,10 @@ import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.*
-import com.squareup.kotlinpoet.FileSpec
-import com.squareup.kotlinpoet.KModifier
-import com.squareup.kotlinpoet.TypeSpec
-import com.squareup.kotlinpoet.ksp.toClassName
-import com.squareup.kotlinpoet.ksp.toKModifier
-import com.squareup.kotlinpoet.ksp.toTypeName
-import com.squareup.kotlinpoet.ksp.writeTo
+import com.squareup.kotlinpoet.*
+import com.squareup.kotlinpoet.ksp.*
+import com.ustadmobile.door.annotation.Dao
+import com.ustadmobile.door.annotation.Database
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
 
 fun FileSpec.Builder.addActualClassForExpectedType(
@@ -45,11 +42,33 @@ fun FileSpec.Builder.addActualClassForExpectedType(
         }
         .addModifiers(dbKSClassDeclaration.modifiers.mapNotNull { it.toKModifier() }.filter { it != KModifier.EXPECT })
         .addModifiers(KModifier.ACTUAL)
+        .applyIf(target == DoorTarget.ANDROID) {
+            if(dbKSClassDeclaration.hasAnnotation(Dao::class)) {
+                addAnnotation(AnnotationSpec.builder(ClassName("androidx.room", "Dao")).build())
+            }else if(dbKSClassDeclaration.hasAnnotation(Database::class)) {
+                val annotationSpec = dbKSClassDeclaration.annotations.toList().first {
+                    (it.annotationType.resolve().declaration as? KSClassDeclaration)?.simpleName?.asString() == "Database"
+                }.toAnnotationSpec()
+                addAnnotation(AnnotationSpec.builder(ClassName("androidx.room", "Database"))
+                    .apply {
+                        annotationSpec.members.forEach {
+                            addMember(it)
+                        }
+                    }
+                    .build())
+            }
+        }
         .apply {
             dbKSClassDeclaration.getDeclaredFunctions().filter { !it.isConstructor() } .forEach { ksFunDec ->
                 addFunction(ksFunDec.toFunSpecBuilder(resolver, classKSType, logger)
                     .removeModifier(KModifier.EXPECT)
                     .addModifiers(KModifier.ACTUAL)
+                    .applyIf(target == DoorTarget.ANDROID) {
+                        val annotationsToCopy = listOf("Insert", "Query", "RawQuery", "Delete", "Update")
+                        copyAnnotations(ksFunDec) {
+                            it.annotationType.resolve().declaration.simpleName.asString() in annotationsToCopy
+                        }
+                    }
                     .build())
             }
 
@@ -70,11 +89,11 @@ class DoorExpectTypeAliasProcessor(
 ) : SymbolProcessor {
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        val dbSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Database")
+        val dbSymbols = resolver.getSymbolsWithAnnotation("com.ustadmobile.door.annotation.Database")
             .filterIsInstance<KSClassDeclaration>()
             .filter { Modifier.EXPECT in it.modifiers }
 
-        val daoSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Dao")
+        val daoSymbols = resolver.getSymbolsWithAnnotation("com.ustadmobile.door.annotation.Dao")
             .filterIsInstance<KSClassDeclaration>()
             .filter { Modifier.EXPECT in it.modifiers }
 

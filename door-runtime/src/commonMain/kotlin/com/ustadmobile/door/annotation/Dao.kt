@@ -1,4 +1,9 @@
-package androidx.room
+package com.ustadmobile.door.annotation
+
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.Query
+
 
 /**
  * Marks the class as a Data Access Object.

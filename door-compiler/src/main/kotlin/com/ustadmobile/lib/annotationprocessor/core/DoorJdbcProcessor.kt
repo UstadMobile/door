@@ -1517,11 +1517,9 @@ class DoorJdbcProcessor(
     internal lateinit var dbConnection: java.sql.Connection
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        val dbSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Database")
-            .filterIsInstance<KSClassDeclaration>()
+        val dbSymbols = resolver.getDatabaseSymbolsToProcess()
 
-        val daoSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Dao")
-            .filterIsInstance<KSClassDeclaration>()
+        val daoSymbols = resolver.getDaoSymbolsToProcess()
 
         val target = environment.doorTarget(resolver)
 

@@ -601,11 +601,9 @@ class DoorHttpServerProcessor(
 
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        val dbSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Database")
-            .filterIsInstance<KSClassDeclaration>()
+        val dbSymbols = resolver.getDatabaseSymbolsToProcess()
 
-        val daoSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Dao")
-            .filterIsInstance<KSClassDeclaration>()
+        val daoSymbols = resolver.getDaoSymbolsToProcess()
             .filter { it.hasAnnotation(Repository::class) }
 
         val target = environment.doorTarget(resolver)

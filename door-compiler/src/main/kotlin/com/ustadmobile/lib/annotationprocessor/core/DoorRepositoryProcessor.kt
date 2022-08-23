@@ -433,8 +433,7 @@ class DoorRepositoryProcessor(
 ) : SymbolProcessor {
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        val dbSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Database")
-            .filterIsInstance<KSClassDeclaration>()
+        val dbSymbols = resolver.getDatabaseSymbolsToProcess()
             .filter { dbKSClassDecl ->
                 dbKSClassDecl.dbEnclosedDaos().any { it.hasAnnotation(Repository::class) }
             }
@@ -444,8 +443,8 @@ class DoorRepositoryProcessor(
             .mapNotNull {
                 it.parentDeclaration as? KSClassDeclaration
             }
-        val daoSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Dao")
-            .filterIsInstance<KSClassDeclaration>()
+
+        val daoSymbols = resolver.getDaoSymbolsToProcess()
 
         val target = environment.doorTarget(resolver)
 

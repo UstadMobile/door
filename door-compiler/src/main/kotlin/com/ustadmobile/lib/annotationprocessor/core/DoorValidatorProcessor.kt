@@ -66,8 +66,8 @@ class DoorValidatorProcessor(
     }
 
     private fun createAllTables(resolver: Resolver) {
-        val dbs = resolver.getSymbolsWithAnnotation("androidx.room.Database")
-            .filterIsInstance<KSClassDeclaration>()
+        val dbs = resolver.getDatabaseSymbolsToProcess()
+
         dbs.flatMap { it.allDbEntities() }.toSet().forEach { entity ->
             if(!entity.hasAnnotation(Entity::class)) {
                 logger.error("Class used as entity on database does not have @Entity annotation",
@@ -109,8 +109,7 @@ class DoorValidatorProcessor(
     }
 
     private fun validateReplicateEntities(resolver: Resolver) {
-        val dbs = resolver.getSymbolsWithAnnotation("androidx.room.Database")
-            .filterIsInstance<KSClassDeclaration>()
+        val dbs = resolver.getDatabaseSymbolsToProcess()
 
         val allReplicateEntities = dbs.flatMap { it.allDbEntities() }.toSet()
             .filter { it.hasAnnotation(ReplicateEntity::class) }
@@ -201,8 +200,7 @@ class DoorValidatorProcessor(
     }
 
     private fun validateTriggers(resolver: Resolver) {
-        val dbs = resolver.getSymbolsWithAnnotation("androidx.room.Database")
-            .filterIsInstance<KSClassDeclaration>()
+        val dbs = resolver.getDatabaseSymbolsToProcess()
         //After all tables have been created, check that the SQL in all triggers is actually valid
         dbs.flatMap { it.allDbEntities() }.toSet()
             .filter { it.hasAnnotation(Triggers::class) }
@@ -298,8 +296,7 @@ class DoorValidatorProcessor(
             }
         }
 
-        val dbs = resolver.getSymbolsWithAnnotation("androidx.room.Database")
-            .filterIsInstance<KSClassDeclaration>()
+        val dbs = resolver.getDatabaseSymbolsToProcess()
         dbs.filter { db ->
            db.allDbEntities().any { it.entityHasAttachments() } &&
                    !db.allDbEntities().any { it.qualifiedName?.asString() == ZombieAttachmentData::class.qualifiedName }
@@ -309,8 +306,7 @@ class DoorValidatorProcessor(
     }
 
     private fun validateDaos(resolver: Resolver) {
-        val daos = resolver.getSymbolsWithAnnotation("androidx.room.Dao")
-            .filterIsInstance<KSClassDeclaration>()
+        val daos = resolver.getDaoSymbolsToProcess()
         daos.forEach { dao ->
 
             dao.getAllFunctions().filter { it.hasAnnotation(Query::class) }.forEach { queryFunDecl ->
@@ -390,8 +386,7 @@ class DoorValidatorProcessor(
      *
      */
     fun cleanup(resolver: Resolver) {
-        val dbs = resolver.getSymbolsWithAnnotation("androidx.room.Database")
-            .filterIsInstance<KSClassDeclaration>()
+        val dbs = resolver.getDatabaseSymbolsToProcess()
         pgConnection?.createStatement()?.use { pgStmt ->
             dbs.flatMap { it.allDbEntities() }.toSet().forEach { entity ->
                 pgStmt.executeUpdate("DROP TABLE IF EXISTS ${entity.entityTableName}")

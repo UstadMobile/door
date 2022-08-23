@@ -1,5 +1,6 @@
-package androidx.room
+package com.ustadmobile.door.annotation
 
+import androidx.room.Entity
 import kotlin.reflect.KClass
 
 /**
@@ -59,41 +60,41 @@ import kotlin.reflect.KClass
  */
 @Retention(AnnotationRetention.SOURCE)
 annotation class Database(
-        /**
-         * The list of entities included in the database. Each entity turns into a table in the
-         * database.
-         *
-         * @return The list of entities in the database.
-         */
-        val entities: Array<KClass<*>>,
-        /**
-         * The list of database views included in the database. Each class turns into a view in the
-         * database.
-         *
-         * @return The list of database views.
-         */
-        val views: Array<KClass<*>> = arrayOf(),
-        /**
-         * The database version.
-         *
-         * @return The database version.
-         */
-        val version: Int,
-        /**
-         * You can set annotation processor argument (`room.schemaLocation`)
-         * to tell Room to export the schema into a folder. Even though it is not mandatory, it is a
-         * good practice to have version history in your codebase and you should commit that file into
-         * your version control system (but don't ship it with your app!).
-         *
-         *
-         * When `room.schemaLocation` is set, Room will check this variable and if it is set to
-         * `true`, its schema will be exported into the given folder.
-         *
-         *
-         * `exportSchema` is `true` by default but you can disable it for databases when
-         * you don't want to keep history of versions (like an in-memory only database).
-         *
-         * @return Whether the schema should be exported to the given folder when the
-         * `room.schemaLocation` argument is set. Defaults to `true`.
-         */
-        val exportSchema: Boolean = true)
+    /**
+     * The list of entities included in the database. Each entity turns into a table in the
+     * database.
+     *
+     * @return The list of entities in the database.
+     */
+    val entities: Array<KClass<*>>,
+    /**
+     * The list of database views included in the database. Each class turns into a view in the
+     * database.
+     *
+     * @return The list of database views.
+     */
+    val views: Array<KClass<*>> = arrayOf(),
+    /**
+     * The database version.
+     *
+     * @return The database version.
+     */
+    val version: Int,
+    /**
+     * You can set annotation processor argument (`room.schemaLocation`)
+     * to tell Room to export the schema into a folder. Even though it is not mandatory, it is a
+     * good practice to have version history in your codebase and you should commit that file into
+     * your version control system (but don't ship it with your app!).
+     *
+     *
+     * When `room.schemaLocation` is set, Room will check this variable and if it is set to
+     * `true`, its schema will be exported into the given folder.
+     *
+     *
+     * `exportSchema` is `true` by default but you can disable it for databases when
+     * you don't want to keep history of versions (like an in-memory only database).
+     *
+     * @return Whether the schema should be exported to the given folder when the
+     * `room.schemaLocation` argument is set. Defaults to `true`.
+     */
+    val exportSchema: Boolean = true)

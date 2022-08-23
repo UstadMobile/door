@@ -161,4 +161,5 @@ dependencies {
     kspJvm project(":door-compiler")
     kspJs project(":door-compiler")
     kspAndroid project(":door-compiler")
+    kspAndroid "androidx.room:room-compiler:$version_android_room"
 }

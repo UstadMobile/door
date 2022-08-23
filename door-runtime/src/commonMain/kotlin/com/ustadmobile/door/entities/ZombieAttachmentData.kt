@@ -8,7 +8,7 @@ import androidx.room.PrimaryKey
  * Represents a Zombie attachment Uri. This hapens when an entity with attachments is updated
  * and the old md5 is no longer used in the table.
  */
-@Entity(primaryKeys = ["zaUid"])
+@Entity
 class ZombieAttachmentData {
 
     @PrimaryKey(autoGenerate = true)

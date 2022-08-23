@@ -1,6 +1,6 @@
 package dbonly
 
-import androidx.room.Database
+import com.ustadmobile.door.annotation.Database
 import com.ustadmobile.door.room.RoomDatabase
 
 @Database(entities = [VanillaEntity::class], version = 1)

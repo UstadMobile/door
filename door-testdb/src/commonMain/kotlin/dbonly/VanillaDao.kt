@@ -1,6 +1,6 @@
 package dbonly
 
-import androidx.room.Dao
+import com.ustadmobile.door.annotation.Dao
 import androidx.room.Query
 import androidx.room.Update
 

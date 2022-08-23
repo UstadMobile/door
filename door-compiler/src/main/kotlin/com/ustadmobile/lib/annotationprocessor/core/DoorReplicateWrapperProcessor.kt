@@ -355,12 +355,9 @@ class DoorReplicateWrapperProcessor(
 ) : SymbolProcessor{
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        val dbSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Database")
-            .filterIsInstance<KSClassDeclaration>()
-
         val target = environment.doorTarget(resolver)
 
-        dbSymbols.forEach { dbClassDecl ->
+        resolver.getDatabaseSymbolsToProcess().forEach { dbClassDecl ->
             if(dbClassDecl.dbHasReplicateWrapper()) {
                 FileSpec.builder(dbClassDecl.packageName.asString(),
                     "${dbClassDecl.simpleName.asString()}${DoorDatabaseReplicateWrapper.SUFFIX}")
@@ -370,9 +367,7 @@ class DoorReplicateWrapperProcessor(
             }
         }
 
-        val daoSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Dao")
-            .filterIsInstance<KSClassDeclaration>()
-        daoSymbols.forEach { daoClassDec ->
+        resolver.getDaoSymbolsToProcess().forEach { daoClassDec ->
             if(daoClassDec.daoHasReplicateEntityWriteFunctions(resolver)) {
                 FileSpec.builder(daoClassDec.packageName.asString(),
                     "${daoClassDec.simpleName.asString()}${DoorDatabaseReplicateWrapper.SUFFIX}")

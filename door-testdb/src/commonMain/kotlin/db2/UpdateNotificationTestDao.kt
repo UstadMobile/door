@@ -1,6 +1,6 @@
 package db2
 
-import androidx.room.Dao
+import com.ustadmobile.door.annotation.Dao
 import androidx.room.Query
 import com.ustadmobile.door.entities.UpdateNotification
 

@@ -1,18 +1,14 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import androidx.room.*
-import com.google.devtools.ksp.getAnnotationsByType
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ksp.toTypeName
-import com.ustadmobile.door.DoorDbType
-import javax.lang.model.element.ExecutableElement
 import com.ustadmobile.door.RepositoryConnectivityListener
+import com.ustadmobile.door.annotation.Database
 import com.ustadmobile.door.room.InvalidationTracker
-import javax.annotation.processing.ProcessingEnvironment
 import javax.lang.model.element.TypeElement
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_ILLEGALSTATEEXCEPTION
 import com.ustadmobile.lib.annotationprocessor.core.ext.getAnnotation

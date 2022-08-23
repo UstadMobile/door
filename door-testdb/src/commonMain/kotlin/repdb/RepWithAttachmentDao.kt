@@ -1,12 +1,15 @@
 package repdb
 
-import androidx.room.*
-import com.ustadmobile.door.lifecycle.LiveData
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
 import com.ustadmobile.door.annotation.*
+import com.ustadmobile.door.lifecycle.LiveData
 
 @Dao
 @Repository
-abstract class RepWithAttachmentDao {
+expect abstract class RepWithAttachmentDao {
 
     @Query("""
        REPLACE INTO RepEntityWithAttachmentTracker(waForeignKey, waDestination)

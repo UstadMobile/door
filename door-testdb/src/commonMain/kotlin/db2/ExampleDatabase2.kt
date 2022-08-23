@@ -1,6 +1,6 @@
 package db2
 
-import androidx.room.Database
+import com.ustadmobile.door.annotation.Database
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.*
 import com.ustadmobile.door.annotation.DoorNodeIdAuthRequired
