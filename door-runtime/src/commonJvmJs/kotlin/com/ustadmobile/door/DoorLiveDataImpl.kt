@@ -6,7 +6,7 @@ import com.ustadmobile.door.room.InvalidationTrackerObserver
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 
-class LiveDataImpl<T : Any>(
+class LiveDataImpl<T : Any?>(
     val db: RoomDatabase,
     val tableNames: List<String>,
     val fetchFn: suspend () -> T

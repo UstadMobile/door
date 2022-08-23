@@ -1,11 +1,8 @@
 package com.ustadmobile.door
 
-import androidx.room.InvalidationTracker
-import androidx.room.RoomDatabase
+import com.ustadmobile.door.room.InvalidationTrackerObserver
+import com.ustadmobile.door.room.RoomDatabase
 import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
 import com.ustadmobile.door.sqljsjdbc.SQLiteDatasourceJs
 import com.ustadmobile.door.util.DoorEventCollator
 
@@ -19,14 +16,14 @@ class SaveToIndexedDbChangeListener(
     tablesToListen: List<String>,
     maxWaitTime: Long
 ) {
-    private val changeListenerRequest: InvalidationTracker.Observer
+    private val changeListenerRequest: InvalidationTrackerObserver
 
     private val eventCollator = DoorEventCollator<List<String>>(maxWaitTime, GlobalScope) {
         datasource.saveDatabaseToIndexedDb()
     }
 
     init {
-        changeListenerRequest = object: InvalidationTracker.Observer(tablesToListen.toTypedArray())  {
+        changeListenerRequest = object: InvalidationTrackerObserver(tablesToListen.toTypedArray())  {
             override fun onInvalidated(tables: Set<String>) {
                 eventCollator.receiveEvent(tables.toList())
             }

@@ -1,6 +1,6 @@
 package com.ustadmobile.door.ext
 
-import androidx.room.RoomDatabase
+import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.*
 import com.ustadmobile.door.jdbc.SQLException
 import com.ustadmobile.door.room.RoomJdbcImpl

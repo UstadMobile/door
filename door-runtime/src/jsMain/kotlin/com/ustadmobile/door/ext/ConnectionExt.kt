@@ -1,6 +1,6 @@
 package com.ustadmobile.door.ext
 
-import androidx.room.RoomDatabase
+import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.PreparedStatementArrayProxy
 import com.ustadmobile.door.PreparedStatementConfig
 import com.ustadmobile.door.jdbc.Connection

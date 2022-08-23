@@ -1,6 +1,6 @@
 package com.ustadmobile.door.attachments
 
-import androidx.room.RoomDatabase
+import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.DoorConstants.HEADER_DBVERSION
 import com.ustadmobile.door.DoorConstants.HEADER_NODE
 import com.ustadmobile.door.DoorDatabaseJdbc

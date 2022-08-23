@@ -1,12 +1,12 @@
 package com.ustadmobile.door
 
-import androidx.room.InvalidationTracker
-import androidx.room.RoomDatabase
+import com.ustadmobile.door.room.InvalidationTracker
+import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.SQLException
-import com.ustadmobile.door.jdbc.ext.executeUpdateAsync
+import com.ustadmobile.door.jdbc.ext.useStatementAsync
 import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.migration.DoorMigrationAsync
 import com.ustadmobile.door.migration.DoorMigrationStatementList

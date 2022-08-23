@@ -1,20 +1,15 @@
-package androidx.room
+package com.ustadmobile.door.room
 
-import com.ustadmobile.door.RoomJdbcImpl
-import com.ustadmobile.door.ext.useStatement
-import com.ustadmobile.door.ext.useStatementAsync
-import com.ustadmobile.door.jdbc.ext.executeUpdateAsync
+import com.ustadmobile.door.jdbc.ext.useStatementAsync
 import kotlinx.coroutines.Runnable
 
 actual abstract class RoomDatabase actual constructor() {
 
-    actual open class Builder<T : RoomDatabase> {
-
-    }
-
     actual abstract fun clearAllTables()
 
-    actual abstract val invalidationTracker: InvalidationTracker
+    actual open fun getInvalidationTracker(): InvalidationTracker {
+        TODO("getInvalidationTracker: maybe override this in the generated version")
+    }
 
     abstract fun createAllTables(): List<String>
 

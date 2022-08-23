@@ -1,7 +1,5 @@
-package com.ustadmobile.door
+package com.ustadmobile.door.room
 
-import androidx.room.InvalidationTracker
-import androidx.room.RoomDatabase
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.util.TransactionMode
