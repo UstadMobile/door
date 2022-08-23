@@ -20,9 +20,11 @@ val FunSpec.hasReturnType: Boolean
 /**
  * Shorthand to make the function non-abstract
  */
-fun FunSpec.Builder.removeAbstractModifier(): FunSpec.Builder {
-    if(KModifier.ABSTRACT in modifiers)
-        modifiers.remove(KModifier.ABSTRACT)
+fun FunSpec.Builder.removeAbstractModifier() = removeModifier(KModifier.ABSTRACT)
+
+fun FunSpec.Builder.removeModifier(modifier: KModifier) : FunSpec.Builder {
+    if(modifier in modifiers)
+        modifiers.remove(modifier)
 
     return this
 }

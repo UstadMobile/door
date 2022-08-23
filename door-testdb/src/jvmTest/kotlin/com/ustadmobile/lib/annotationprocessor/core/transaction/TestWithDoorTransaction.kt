@@ -7,6 +7,7 @@ import com.ustadmobile.door.ext.withDoorTransaction
 import com.ustadmobile.door.ext.withDoorTransactionAsync
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
+import com.ustadmobile.door.room.InvalidationTrackerObserver
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert
 import org.junit.Before
@@ -36,7 +37,7 @@ class TestWithDoorTransaction {
 
     private var connectionCountBefore = 0
 
-    private lateinit var invalidationObserver: InvalidationTracker.Observer
+    private lateinit var invalidationObserver: InvalidationTrackerObserver
 
     @Before
     fun setup() {
@@ -70,7 +71,7 @@ class TestWithDoorTransaction {
 
         connectionCountBefore = connectionCount.get()
 
-        val realInvalidationObserver : InvalidationTracker.Observer = object: InvalidationTracker.Observer(arrayOf("RepEntity")) {
+        val realInvalidationObserver : InvalidationTrackerObserver = object: InvalidationTrackerObserver(arrayOf("RepEntity")) {
             override fun onInvalidated(tables: Set<String>) {
 
             }

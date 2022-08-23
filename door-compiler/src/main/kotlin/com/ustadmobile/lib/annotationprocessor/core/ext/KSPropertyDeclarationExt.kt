@@ -2,6 +2,10 @@ package com.ustadmobile.lib.annotationprocessor.core.ext
 
 import androidx.room.ColumnInfo
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
+import com.google.devtools.ksp.symbol.KSType
+import com.squareup.kotlinpoet.PropertySpec
+import com.squareup.kotlinpoet.ksp.toKModifier
+import com.squareup.kotlinpoet.ksp.toTypeName
 
 /**
  * When this property represents a field on an entity, this provides the column name. If the name is specified using
@@ -18,3 +22,12 @@ val KSPropertyDeclaration.entityPropColumnName: String
 
 val KSPropertyDeclaration.isTransient: Boolean
     get() = hasAnnotation(Transient::class)
+
+
+fun KSPropertyDeclaration.toPropSpecBuilder(
+    containingType: KSType,
+) :PropertySpec.Builder {
+    return PropertySpec.builder(simpleName.asString(), asMemberOf(containingType).toTypeName())
+        .addModifiers(modifiers.mapNotNull { it.toKModifier() })
+
+}

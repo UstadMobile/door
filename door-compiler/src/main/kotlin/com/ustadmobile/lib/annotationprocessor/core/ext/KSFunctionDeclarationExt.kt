@@ -27,7 +27,6 @@ fun KSFunctionDeclaration.toFunSpecBuilder(
 
     return FunSpec.builder(simpleName.asString())
         .addModifiers(this.modifiers.mapNotNull { it.toKModifier() })
-        .addModifiers(KModifier.OVERRIDE)
         .apply {
             ksFunction.returnType?.also {
                 returns(it.toTypeName())

@@ -13,7 +13,7 @@ import com.ustadmobile.door.entities.ZombieAttachmentData
     RepEntityWithAttachment::class, RepEntityWithAttachmentTracker::class, SyncNode::class,
     CompositePkEntity::class, ZombieAttachmentData::class
 ])
-abstract class RepDb: RoomDatabase() {
+expect abstract class RepDb: RoomDatabase {
 
     abstract val repDao: RepDao
 
