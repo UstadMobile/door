@@ -1,7 +1,7 @@
 package com.ustadmobile.door
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.Observer
+import com.ustadmobile.door.lifecycle.LiveData
+import com.ustadmobile.door.lifecycle.Observer
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
 import org.mockito.kotlin.*

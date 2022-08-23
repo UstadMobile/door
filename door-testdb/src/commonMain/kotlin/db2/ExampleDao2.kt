@@ -1,10 +1,10 @@
 package db2
 
 import com.ustadmobile.door.lifecycle.LiveData
-import com.ustadmobile.door.paging.DataSource
 import androidx.room.*
 import com.ustadmobile.door.*
 import com.ustadmobile.door.annotation.QueryLiveTables
+import com.ustadmobile.door.paging.DataSourceFactory
 
 @Dao
 abstract class ExampleDao2 {
@@ -131,13 +131,13 @@ abstract class ExampleDao2 {
 
     @RawQuery(observedEntities = [ExampleEntity2::class])
     @QueryLiveTables(["ExampleEntity2"])
-    abstract fun rawQueryForDataSource(query: DoorQuery): DataSource.Factory<Int, ExampleEntity2>
+    abstract fun rawQueryForDataSource(query: DoorQuery): DataSourceFactory<Int, ExampleEntity2>
 
     @Query("SELECT * FROM ExampleEntity2")
-    abstract fun queryAllLive(): DataSource.Factory<Int, ExampleEntity2>
+    abstract fun queryAllLive(): DataSourceFactory<Int, ExampleEntity2>
 
     @Query("SELECT * FROM ExampleEntity2")
-    abstract fun queryAllLiveAsync(): DataSource.Factory<Int, ExampleEntity2>
+    abstract fun queryAllLiveAsync(): DataSourceFactory<Int, ExampleEntity2>
 
     @RawQuery
     abstract fun rawQueryWithArrParam(query: DoorQuery): List<ExampleEntity2>

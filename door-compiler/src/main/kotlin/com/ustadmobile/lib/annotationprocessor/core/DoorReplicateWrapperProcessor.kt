@@ -4,6 +4,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import com.ustadmobile.door.room.RoomDatabase
 import androidx.room.Update
+import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
@@ -81,11 +82,12 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(
     daoClassDeclaration: KSClassDeclaration,
     resolver: Resolver,
     doorTarget: DoorTarget,
+    logger: KSPLogger,
 ) : TypeSpec.Builder {
     val functionResolved = daoFunDeclaration.asMemberOf(daoClassDeclaration.asType(emptyList()))
 
     val overridingFunction = daoFunDeclaration.toFunSpecBuilder(resolver,
-            daoClassDeclaration.asType(emptyList()))
+            daoClassDeclaration.asType(emptyList()), logger)
         .removeAbstractModifier()
         .addModifiers(KModifier.OVERRIDE)
         .build()
@@ -293,6 +295,7 @@ fun FileSpec.Builder.addDaoWrapperTypeSpec(
     daoClassDeclaration: KSClassDeclaration,
     resolver: Resolver,
     target: DoorTarget,
+    logger: KSPLogger,
 ): FileSpec.Builder {
     addType(TypeSpec.classBuilder(daoClassDeclaration.toClassNameWithSuffix(DoorDatabaseReplicateWrapper.SUFFIX))
         .superclass(daoClassDeclaration.toClassName())
@@ -310,7 +313,7 @@ fun FileSpec.Builder.addDaoWrapperTypeSpec(
             .build())
         .apply {
             daoClassDeclaration.getAllDaoFunctionsIncSuperTypesToGenerate().forEach { daoFunDeclaration ->
-                addDaoFunctionDelegate(daoFunDeclaration, daoClassDeclaration, resolver, target)
+                addDaoFunctionDelegate(daoFunDeclaration, daoClassDeclaration, resolver, target, logger)
             }
         }
         .build()
@@ -355,7 +358,7 @@ class DoorReplicateWrapperProcessor(
         val dbSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Database")
             .filterIsInstance<KSClassDeclaration>()
 
-        val target = environment.platforms.firstOrNull()?.doorTarget() ?: throw IllegalStateException("No KSP Platform!")
+        val target = environment.doorTarget(resolver)
 
         dbSymbols.forEach { dbClassDecl ->
             if(dbClassDecl.dbHasReplicateWrapper()) {
@@ -373,7 +376,7 @@ class DoorReplicateWrapperProcessor(
             if(daoClassDec.daoHasReplicateEntityWriteFunctions(resolver)) {
                 FileSpec.builder(daoClassDec.packageName.asString(),
                     "${daoClassDec.simpleName.asString()}${DoorDatabaseReplicateWrapper.SUFFIX}")
-                    .addDaoWrapperTypeSpec(daoClassDec, resolver, target)
+                    .addDaoWrapperTypeSpec(daoClassDec, resolver, target, environment.logger)
                     .build()
                     .writeTo(environment.codeGenerator, false)
             }

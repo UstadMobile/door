@@ -1,6 +1,7 @@
 import java.time.Duration
 
 plugins {
+    id 'com.android.library'
     id 'org.jetbrains.kotlin.multiplatform'
     id 'org.jetbrains.kotlin.plugin.serialization'
     id "com.google.devtools.ksp"
@@ -15,10 +16,37 @@ repositories {
 }
 
 
+android {
+    compileSdkVersion 32
+    sourceSets.main.manifest.srcFile('src/androidMain/AndroidManifest.xml')
+    defaultConfig {
+        minSdkVersion 21
+        targetSdkVersion 32
+    }
+
+    compileOptions {
+        sourceCompatibility = '1.8'
+        targetCompatibility = '1.8'
+    }
+
+    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile) {
+        kotlinOptions {
+            jvmTarget = "1.8"
+        }
+    }
+
+    buildTypes {
+        release {
+            consumerProguardFiles 'proguard-rules.pro'
+        }
+    }
+}
+
 kotlin {
-    /* Targets configuration omitted. 
-    *  To find out how to configure the targets, please follow the link:
-    *  https://kotlinlang.org/docs/reference/building-mpp-with-gradle.html#setting-up-targets */
+
+    android {
+
+    }
 
     jvm {
         compilations.all {
@@ -101,6 +129,21 @@ kotlin {
                 implementation kotlin('test-js')
             }
         }
+
+        androidMain {
+            dependencies {
+                implementation "androidx.room:room-runtime:$version_android_room"
+                implementation "androidx.room:room-ktx:$version_android_room"
+                implementation "androidx.lifecycle:lifecycle-livedata-ktx:$version_androidx_lifecycle"
+                implementation "androidx.paging:paging-runtime:$version_androidx_paging"
+                implementation "androidx.core:core-ktx:$version_androidx_core"
+                implementation "com.squareup.okhttp3:okhttp:$version_okhttp"
+                implementation "com.squareup.okhttp3:okhttp-sse:$version_okhttp"
+                implementation "com.google.code.gson:gson:$version_gson"
+                implementation "org.nanohttpd:nanohttpd:$version_nanohttpd"
+                implementation "org.nanohttpd:nanohttpd-nanolets:$version_nanohttpd"
+            }
+        }
     }
 }
 
@@ -117,4 +160,5 @@ ksp {
 dependencies {
     kspJvm project(":door-compiler")
     kspJs project(":door-compiler")
+    kspAndroid project(":door-compiler")
 }

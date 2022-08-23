@@ -1,3 +1,3 @@
 package com.ustadmobile.door.paging
 
-actual typealias DataSource<Key, Value> = androidx.paging.DataSource<Key, Value>
+actual typealias DataSourceFactory<Key, Value> = androidx.paging.DataSource.Factory<Key, Value>

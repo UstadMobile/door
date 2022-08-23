@@ -12,7 +12,7 @@ fun KSTypeAlias.findActualTypeClassDecl(): KSClassDeclaration {
 fun KSTypeAlias.findActualType() : KSType {
     val resolvedType = this.type.resolve()
     return if(resolvedType is KSTypeAlias) {
-        resolvedType.findActualType()
+        resolvedType.resolveActualTypeIfAliased()
     }else {
         resolvedType
     }

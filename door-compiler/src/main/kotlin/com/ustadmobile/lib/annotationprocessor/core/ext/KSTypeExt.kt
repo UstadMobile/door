@@ -1,7 +1,8 @@
 package com.ustadmobile.lib.annotationprocessor.core.ext
 
+import com.google.devtools.ksp.findActualType
 import com.ustadmobile.door.lifecycle.LiveData
-import com.ustadmobile.door.paging.DataSource
+import com.ustadmobile.door.paging.DataSourceFactory
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.CodeBlock
@@ -26,7 +27,7 @@ fun KSType.unwrapLiveDataOrDataSourceFactoryResultType(
     if (qualifiedName == LiveData::class.qualifiedName) {
         return this.arguments.first().type?.resolve()
             ?: throw IllegalArgumentException("unwrapLiveDataOrDataSourceFactoryResultType: Cannot resolve LiveData type!")
-    } else if (qualifiedName == DataSource.Factory::class.qualifiedName) {
+    } else if (qualifiedName == DataSourceFactory::class.qualifiedName) {
         val entityTypeRef = arguments.get(1).type ?: throw IllegalArgumentException("Factory has no type argument")
         return resolver.getClassDeclarationByName(resolver.getKSNameFromString("kotlin.collections.List"))
             ?.asType(listOf(resolver.getTypeArgument(entityTypeRef, Variance.INVARIANT)))
@@ -46,14 +47,6 @@ fun KSType.isListOrArrayType(
     resolver: Resolver
 ): Boolean {
     return (this == resolver.builtIns.arrayType) || isList()
-}
-
-fun KSType.resolveIfAlias(): KSType {
-    return if(this is KSTypeAlias) {
-        findActualType()
-    }else {
-        this
-    }
 }
 
 private fun Resolver.sqliteIntegerTypes(): List<KSType> {
@@ -166,3 +159,10 @@ fun KSType.isLiveData() = declaration.isLiveData()
 
 fun KSType.isDataSourceFactoryOrLiveData() = declaration.isDataSourceFactoryOrLiveData()
 
+fun KSType.resolveActualTypeIfAliased(): KSType {
+    return if(declaration is KSTypeAlias) {
+        (declaration as KSTypeAlias).findActualType().asType(arguments)
+    }else {
+        this
+    }
+}

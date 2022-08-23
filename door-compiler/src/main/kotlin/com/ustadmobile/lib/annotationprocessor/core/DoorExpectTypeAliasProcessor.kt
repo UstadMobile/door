@@ -3,13 +3,11 @@ package com.ustadmobile.lib.annotationprocessor.core
 import com.google.devtools.ksp.getDeclaredFunctions
 import com.google.devtools.ksp.getDeclaredProperties
 import com.google.devtools.ksp.isConstructor
+import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
-import com.google.devtools.ksp.symbol.ClassKind
-import com.google.devtools.ksp.symbol.KSAnnotated
-import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.google.devtools.ksp.symbol.Modifier
+import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.TypeSpec
@@ -17,25 +15,23 @@ import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toKModifier
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.writeTo
-import com.ustadmobile.lib.annotationprocessor.core.ext.doorTarget
-import com.ustadmobile.lib.annotationprocessor.core.ext.removeModifier
-import com.ustadmobile.lib.annotationprocessor.core.ext.toFunSpecBuilder
-import com.ustadmobile.lib.annotationprocessor.core.ext.toPropSpecBuilder
+import com.ustadmobile.lib.annotationprocessor.core.ext.*
 
 fun FileSpec.Builder.addActualClassForExpectedType(
     dbKSClassDeclaration: KSClassDeclaration,
     target: DoorTarget,
     resolver: Resolver,
+    logger: KSPLogger,
 ): FileSpec.Builder {
     val classKSType = dbKSClassDeclaration.asType(emptyList())
     val superClass = dbKSClassDeclaration.superTypes
         .map { it.resolve() }
-        .filter { (it.declaration as? KSClassDeclaration)?.classKind == ClassKind.CLASS }
+        .filter { (it.resolveActualTypeIfAliased().declaration as? KSClassDeclaration)?.classKind == ClassKind.CLASS  }
         .firstOrNull()
 
     val superInterfaces = dbKSClassDeclaration.superTypes
         .map { it.resolve() }
-        .filter { (it.declaration as? KSClassDeclaration)?.classKind == ClassKind.INTERFACE }
+        .filter { (it.resolveActualTypeIfAliased().declaration as? KSClassDeclaration)?.classKind == ClassKind.INTERFACE }
         .toList()
 
     addType(TypeSpec.classBuilder(dbKSClassDeclaration.toClassName())
@@ -51,7 +47,7 @@ fun FileSpec.Builder.addActualClassForExpectedType(
         .addModifiers(KModifier.ACTUAL)
         .apply {
             dbKSClassDeclaration.getDeclaredFunctions().filter { !it.isConstructor() } .forEach { ksFunDec ->
-                addFunction(ksFunDec.toFunSpecBuilder(resolver, classKSType)
+                addFunction(ksFunDec.toFunSpecBuilder(resolver, classKSType, logger)
                     .removeModifier(KModifier.EXPECT)
                     .addModifiers(KModifier.ACTUAL)
                     .build())
@@ -82,12 +78,11 @@ class DoorExpectTypeAliasProcessor(
             .filterIsInstance<KSClassDeclaration>()
             .filter { Modifier.EXPECT in it.modifiers }
 
-        val target = environment.platforms.firstOrNull()?.doorTarget()
-            ?: throw IllegalArgumentException("Door/KSP: No platforms!")
+        val target = environment.doorTarget(resolver)
 
         (dbSymbols + daoSymbols).forEach { dbKSClass ->
             FileSpec.builder(dbKSClass.packageName.asString(), dbKSClass.simpleName.asString())
-                .addActualClassForExpectedType(dbKSClass, target, resolver)
+                .addActualClassForExpectedType(dbKSClass, target, resolver, environment.logger)
                 .build()
                 .writeTo(environment.codeGenerator, false)
         }

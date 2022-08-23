@@ -20,6 +20,9 @@ class SymbolProcessorWrapper(
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         try {
+
+
+
             validatorProcessor.process(resolver)
 
             return if(!loggerWrapper.hasErrors) {

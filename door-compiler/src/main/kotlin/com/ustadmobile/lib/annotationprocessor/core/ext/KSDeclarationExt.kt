@@ -2,7 +2,7 @@ package com.ustadmobile.lib.annotationprocessor.core.ext
 
 import com.ustadmobile.door.lifecycle.LiveData
 import com.google.devtools.ksp.symbol.*
-import com.ustadmobile.door.paging.DataSource
+import com.ustadmobile.door.paging.DataSourceFactory
 
 fun KSDeclaration.propertyOrReturnType(): KSTypeReference? {
     return when(this) {
@@ -21,7 +21,7 @@ fun KSDeclaration.toPropertyOrEmptyFunctionCaller(): String {
 }
 
 fun KSDeclaration.isDataSourceFactory(): Boolean {
-    return (this as? KSClassDeclaration)?.qualifiedName?.asString() == DataSource.Factory::class.qualifiedName
+    return (this as? KSClassDeclaration)?.qualifiedName?.asString() == DataSourceFactory::class.qualifiedName
 }
 
 fun KSDeclaration.isLiveData(): Boolean {

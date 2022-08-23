@@ -1,5 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
+import com.google.devtools.ksp.processing.KSPLogger
 import com.ustadmobile.door.lifecycle.LiveData
 import com.ustadmobile.door.room.RoomDatabase
 import com.google.devtools.ksp.processing.Resolver
@@ -46,6 +47,7 @@ import io.ktor.http.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 import org.kodein.di.DI
+import kotlin.math.log
 
 fun CodeBlock.Builder.addNanoHttpdResponse(varName: String, addNonNullOperator: Boolean = false,
                                            applyToResponseCodeBlock: CodeBlock? = null)
@@ -91,6 +93,7 @@ fun FileSpec.Builder.addDaoKtorRouteFun(
     daoClassDecl: KSClassDeclaration,
     daoClassName: ClassName,
     resolver: Resolver,
+    logger: KSPLogger,
 ) : FileSpec.Builder {
 
     addFunction(FunSpec.builder("${daoClassDecl.simpleName.asString()}$SUFFIX_KTOR_ROUTE")
@@ -109,7 +112,7 @@ fun FileSpec.Builder.addDaoKtorRouteFun(
                 daoClassDecl.getAllFunctions().filter {
                     it.hasAnnotation(RepoHttpAccessible::class)
                 }.forEach {
-                    addKtorDaoMethodCode(it.toFunSpecBuilder(resolver, daoClassDecl.asType(emptyList())).build())
+                    addKtorDaoMethodCode(it.toFunSpecBuilder(resolver, daoClassDecl.asType(emptyList()), logger).build())
                 }
             }
             .endControlFlow()
@@ -123,6 +126,7 @@ fun FileSpec.Builder.addDaoKtorRouteFun(
 fun FileSpec.Builder.addNanoHttpdResponder(
     daoKSClassDeclaration: KSClassDeclaration,
     resolver: Resolver,
+    logger: KSPLogger,
 ): FileSpec.Builder {
 
     addType(TypeSpec.classBuilder(daoKSClassDeclaration.toClassNameWithSuffix(SUFFIX_NANOHTTPD_URIRESPONDER))
@@ -131,7 +135,7 @@ fun FileSpec.Builder.addNanoHttpdResponder(
             daoKSClassDeclaration.getAllFunctions()
                 .filter { it.hasAnnotation(RepoHttpAccessible::class) }
                 .forEach { daoFun ->
-                    addNanoHttpDaoFun(daoFun, daoKSClassDeclaration, resolver)
+                    addNanoHttpDaoFun(daoFun, daoKSClassDeclaration, resolver, logger)
                 }
         }
         .addNanoHttpdResponderFun("get", daoKSClassDeclaration.toClassName(), daoKSClassDeclaration)
@@ -147,8 +151,9 @@ fun TypeSpec.Builder.addNanoHttpDaoFun(
     daoFunDecl: KSFunctionDeclaration,
     daoClassDecl: KSClassDeclaration,
     resolver: Resolver,
+    logger: KSPLogger,
 ): TypeSpec.Builder {
-    val daoFunSpec = daoFunDecl.toFunSpecBuilder(resolver, daoClassDecl.asType(emptyList())).build()
+    val daoFunSpec = daoFunDecl.toFunSpecBuilder(resolver, daoClassDecl.asType(emptyList()), logger).build()
 
     addFunction(FunSpec.builder(daoFunDecl.simpleName.asString())
         .returns(NanoHTTPD.Response::class)
@@ -603,8 +608,7 @@ class DoorHttpServerProcessor(
             .filterIsInstance<KSClassDeclaration>()
             .filter { it.hasAnnotation(Repository::class) }
 
-        val target = environment.platforms.firstOrNull()?.doorTarget()
-            ?: throw IllegalArgumentException("Door/KSP: No platforms!")
+        val target = environment.doorTarget(resolver)
 
         when(target) {
             DoorTarget.JVM -> {
@@ -621,7 +625,7 @@ class DoorHttpServerProcessor(
 
                 daoSymbols.forEach { daoClassDecl ->
                     FileSpec.builder(daoClassDecl.packageName.asString(), "${daoClassDecl.simpleName.asString()}$SUFFIX_KTOR_ROUTE")
-                        .addDaoKtorRouteFun(daoClassDecl, daoClassDecl.toClassName(), resolver)
+                        .addDaoKtorRouteFun(daoClassDecl, daoClassDecl.toClassName(), resolver, environment.logger)
                         .build()
                         .writeTo(environment.codeGenerator, false)
                 }
@@ -640,7 +644,7 @@ class DoorHttpServerProcessor(
 
                 daoSymbols.forEach { daoClassDecl ->
                     FileSpec.builder(daoClassDecl.packageName.asString(), "${daoClassDecl.simpleName.asString()}$SUFFIX_NANOHTTPD_URIRESPONDER")
-                        .addNanoHttpdResponder(daoClassDecl, resolver)
+                        .addNanoHttpdResponder(daoClassDecl, resolver, environment.logger)
                         .build()
                         .writeTo(environment.codeGenerator, false)
                 }

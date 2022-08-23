@@ -1,6 +1,6 @@
 package com.ustadmobile.door.attachments
 
-import androidx.room.RoomDatabase
+import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.*
 import com.ustadmobile.door.ext.*
 import org.mockito.kotlin.mock
@@ -28,7 +28,7 @@ class DoorDatabaseAttachmentExtTest {
     @Before
     fun setup() {
         attachmentPath = tempDir.newFile().absolutePath
-        this::class.java.getResourceAsStream("/test-resources/cat-pic0.jpg").writeToFile(File(attachmentPath))
+        this::class.java.getResourceAsStream("/test-resources/cat-pic0.jpg")!!.writeToFile(File(attachmentPath))
 
         db = mock(extraInterfaces = arrayOf(DoorDatabaseJdbc::class)) {
             on { (this as DoorDatabaseJdbc).realAttachmentStorageUri}.thenReturn(tempDir.newFolder().toDoorUri())

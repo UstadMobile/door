@@ -3,6 +3,7 @@ package com.ustadmobile.lib.annotationprocessor.core
 import com.ustadmobile.door.lifecycle.LiveData
 import com.ustadmobile.door.room.*
 import androidx.room.*
+import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
@@ -1007,16 +1008,16 @@ fun FileSpec.Builder.addDaoJdbcImplType(
         .superclass(daoKSClass.toClassName())
         .apply {
             allFunctions.filter { it.hasAnnotation(Insert::class) }.forEach { daoFun ->
-                addDaoInsertFunction(daoFun, daoKSClass, resolver, target)
+                addDaoInsertFunction(daoFun, daoKSClass, resolver, target, environment.logger)
             }
             allFunctions.filter { it.hasAnnotation(Update::class) }.forEach { daoFun ->
-                addDaoUpdateFunction(daoFun, daoKSClass, resolver)
+                addDaoUpdateFunction(daoFun, daoKSClass, resolver, environment.logger)
             }
             allFunctions.filter { it.hasAnnotation(Delete::class) }.forEach { daoFun ->
-                addDaoDeleteFunction(daoFun, daoKSClass, resolver)
+                addDaoDeleteFunction(daoFun, daoKSClass, resolver, environment.logger)
             }
             allFunctions.filter { it.hasAnnotation(Query::class) || it.hasAnnotation(RawQuery::class) }.forEach { daoFun ->
-                addDaoQueryFunction(daoFun, daoKSClass, resolver, environment)
+                addDaoQueryFunction(daoFun, daoKSClass, resolver, environment, environment.logger)
             }
         }
         .build())
@@ -1030,10 +1031,11 @@ fun TypeSpec.Builder.addDaoInsertFunction(
     daoKSClass: KSClassDeclaration,
     resolver: Resolver,
     target: DoorTarget,
+    logger: KSPLogger,
 ): TypeSpec.Builder {
     Napier.d("Start add dao insert function: ${daoFun.simpleName.asString()} on ${daoKSClass.simpleName.asString()}")
 
-    addFunction(daoFun.toFunSpecBuilder(resolver, daoKSClass.asType(emptyList()))
+    addFunction(daoFun.toFunSpecBuilder(resolver, daoKSClass.asType(emptyList()), logger)
         .removeAbstractModifier()
         .removeAnnotations()
         .addModifiers(KModifier.OVERRIDE)
@@ -1049,10 +1051,11 @@ fun TypeSpec.Builder.addDaoUpdateFunction(
     daoFunDecl: KSFunctionDeclaration,
     daoKSClass: KSClassDeclaration,
     resolver: Resolver,
+    logger: KSPLogger
 ) : TypeSpec.Builder {
     val funLogName = "${daoKSClass.simpleName.asString()}#${daoFunDecl.simpleName.asString()}"
     Napier.d("DbProcessorJdbcKotlin: addDaoUpdateFunction: start $funLogName")
-    val funSpec = daoFunDecl.toFunSpecBuilder(resolver, daoKSClass.asType(emptyList()))
+    val funSpec = daoFunDecl.toFunSpecBuilder(resolver, daoKSClass.asType(emptyList()), logger)
 
     val daoFun = daoFunDecl.asMemberOf(daoKSClass.asType(emptyList()))
     val entityType = daoFun.parameterTypes.firstOrNull()
@@ -1125,10 +1128,11 @@ fun TypeSpec.Builder.addDaoDeleteFunction(
     daoFunDecl: KSFunctionDeclaration,
     daoDecl: KSClassDeclaration,
     resolver: Resolver,
+    logger: KSPLogger,
 ) : TypeSpec.Builder {
     val logName = "${daoDecl.simpleName.asString()}#${daoFunDecl.simpleName.asString()}"
     Napier.d("DbProcessorJdbcKotlin: addDaoDeleteFunction: start $logName")
-    val funSpec = daoFunDecl.toFunSpecBuilder(resolver, daoDecl.asType(emptyList()))
+    val funSpec = daoFunDecl.toFunSpecBuilder(resolver, daoDecl.asType(emptyList()), logger)
     val entityType = daoFunDecl.asMemberOf(daoDecl.asType(emptyList())).firstParamEntityType(resolver)
     val entityClassDecl = entityType.declaration as KSClassDeclaration
     val pkEls = entityClassDecl.entityPrimaryKeyProps
@@ -1185,11 +1189,12 @@ fun TypeSpec.Builder.addDaoQueryFunction(
     daoDecl: KSClassDeclaration,
     resolver: Resolver,
     environment: SymbolProcessorEnvironment,
+    logger: KSPLogger,
 ): TypeSpec.Builder {
     val logName = "${daoDecl.simpleName.asString()}#${daoFunDecl.simpleName.asString()}"
     Napier.d("DbProcessorJdbcKotlin: addDaoQueryFunction: start $logName")
     val daoKSType = daoDecl.asType(emptyList())
-    val funSpec = daoFunDecl.toFunSpecBuilder(resolver, daoKSType)
+    val funSpec = daoFunDecl.toFunSpecBuilder(resolver, daoKSType, logger)
     val daoFun = daoFunDecl.asMemberOf(daoKSType)
 
     val queryVarsMap = daoFunDecl.parameters.mapIndexed { index, ksValueParameter ->
@@ -1518,8 +1523,7 @@ class DoorJdbcProcessor(
         val daoSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Dao")
             .filterIsInstance<KSClassDeclaration>()
 
-        val target = environment.platforms.firstOrNull()?.doorTarget()
-            ?: throw IllegalArgumentException("Door/KSP: No platforms!")
+        val target = environment.doorTarget(resolver)
 
         dbSymbols.forEach {  dbKSClass ->
             FileSpec.builder(dbKSClass.packageName.asString(), dbKSClass.simpleName.asString() + SUFFIX_DOOR_METADATA)
@@ -1547,12 +1551,13 @@ class DoorJdbcProcessor(
                     .writeTo(environment.codeGenerator, false)
         }
 
-        daoSymbols.forEach { daoKSClass ->
+        if(target in JDBC_TARGETS) {daoSymbols.forEach { daoKSClass ->
             FileSpec.builder(daoKSClass.packageName.asString(),
-                daoKSClass.simpleName.asString() + SUFFIX_JDBC_KT2)
-                .addDaoJdbcImplType(daoKSClass, resolver, environment, target)
-                .build()
-                .writeTo(environment.codeGenerator, false)
+                    daoKSClass.simpleName.asString() + SUFFIX_JDBC_KT2)
+                    .addDaoJdbcImplType(daoKSClass, resolver, environment, target)
+                    .build()
+                    .writeTo(environment.codeGenerator, false)
+            }
         }
 
         return emptyList()

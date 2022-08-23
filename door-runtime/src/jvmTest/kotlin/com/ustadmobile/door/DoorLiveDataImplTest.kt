@@ -1,8 +1,8 @@
 package com.ustadmobile.door
 
-import androidx.lifecycle.Observer
-import androidx.room.InvalidationTracker
-import androidx.room.RoomDatabase
+import com.ustadmobile.door.lifecycle.Observer
+import com.ustadmobile.door.room.InvalidationTracker
+import com.ustadmobile.door.room.RoomDatabase
 import org.junit.Assert
 import org.junit.Test
 import org.mockito.kotlin.argThat
@@ -20,7 +20,7 @@ class LiveDataImplTest {
         val mockInvalidationTracker = mock<InvalidationTracker>()
         val mockDb = mock<RoomDatabase> {
             on {
-                invalidationTracker
+                getInvalidationTracker()
             }.thenReturn(mockInvalidationTracker)
         }
 
@@ -44,7 +44,7 @@ class LiveDataImplTest {
     fun givenEmptyLiveData_whenInactive_shouldRemoveChangeListener() {
         val mockInvalidationTracker = mock<InvalidationTracker>()
         val mockDb = mock<RoomDatabase>() {
-            on { invalidationTracker }.thenReturn(mockInvalidationTracker)
+            on { getInvalidationTracker() }.thenReturn(mockInvalidationTracker)
         }
         val fetchFnCount = AtomicInteger()
         val liveDataJdbc = LiveDataImpl<Int>(mockDb, listOf("magic")) {

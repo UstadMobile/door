@@ -3,14 +3,13 @@ package com.ustadmobile.lib.annotationprocessor.core.ext
 import androidx.room.Query
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
-import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import com.google.devtools.ksp.symbol.KSType
-import com.google.devtools.ksp.symbol.Modifier
+import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.FunSpec
-import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.ParameterSpec
+import com.squareup.kotlinpoet.ksp.TypeParameterResolver
 import com.squareup.kotlinpoet.ksp.toKModifier
 import com.squareup.kotlinpoet.ksp.toTypeName
+import com.squareup.kotlinpoet.ksp.toTypeParameterResolver
 import com.ustadmobile.door.annotation.QueryLiveTables
 import com.ustadmobile.lib.annotationprocessor.core.applyIf
 import net.sf.jsqlparser.parser.CCJSqlParserUtil
@@ -20,24 +19,42 @@ import net.sf.jsqlparser.util.TablesNamesFinder
 fun KSFunctionDeclaration.toFunSpecBuilder(
     resolver: Resolver,
     containingType: KSType,
+    logger: KSPLogger,
 ) : FunSpec.Builder {
 
     //Resolve TypeNames etc.
     val ksFunction = this.asMemberOf(containingType)
 
+    val containerDecl = containingType.declaration as? KSClassDeclaration
+
     return FunSpec.builder(simpleName.asString())
         .addModifiers(this.modifiers.mapNotNull { it.toKModifier() })
         .apply {
             ksFunction.returnType?.also {
-                returns(it.toTypeName())
+                try {
+                    returns(it.resolveActualTypeIfAliased().toTypeName(
+                        containerDecl?.typeParameters?.toTypeParameterResolver() ?: TypeParameterResolver.EMPTY))
+                }catch(e: Exception){
+                    logger.error("Invalid return type for function: $e", this@toFunSpecBuilder)
+                }
             }
         }
-        .addParameters(parameters.mapIndexed { index, param ->
-            ParameterSpec(param.name?.asString() ?: "_",
-                ksFunction.parameterTypes[index]?.toTypeName() ?: resolver.builtIns.unitType.toTypeName())
+        .addParameters(parameters.mapIndexedNotNull { index, param ->
+            try {
+                ParameterSpec(param.name?.asString() ?: "_",
+                    ksFunction.parameterTypes[index]?.toTypeName() ?: resolver.builtIns.unitType.toTypeName())
+            }catch (e: Exception) {
+                logger.error("Invalid parameter type", param)
+                null
+            }
+
         })
         .applyIf(this.extensionReceiver != null) {
-            receiver(extensionReceiver!!.toTypeName())
+            try {
+                receiver(extensionReceiver!!.toTypeName())
+            }catch(e: Exception) {
+                logger.error("Invalid receiver type: $e", this@toFunSpecBuilder)
+            }
         }
 }
 

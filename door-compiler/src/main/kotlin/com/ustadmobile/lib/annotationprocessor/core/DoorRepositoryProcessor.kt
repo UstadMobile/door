@@ -333,17 +333,9 @@ fun TypeSpec.Builder.addDaoRepoFun(
         repoMethodType = Repository.METHOD_DELEGATE_TO_DAO
     }
 
-    var generateBoundaryCallback = false
-    val returnTypeVal = daoKSFun.returnType?.toTypeName()
+    //Here: in future, if needed, generate a boundary callback or something to load data in batches.
 
-    if(doorTarget == DoorTarget.ANDROID
-        && returnTypeVal is ParameterizedTypeName
-        && returnTypeVal.rawType == com.ustadmobile.door.paging.DataSource.Factory::class.asClassName()) {
-        generateBoundaryCallback = true
-        repoMethodType = Repository.METHOD_DELEGATE_TO_DAO
-    }
-
-    val daoFunSpec = daoKSFun.toFunSpecBuilder(resolver, daoKSClass.asType(emptyList()))
+    val daoFunSpec = daoKSFun.toFunSpecBuilder(resolver, daoKSClass.asType(emptyList()), environment.logger)
         .build()
     addFunction(daoFunSpec.toBuilder()
         .removeAbstractModifier()
@@ -352,12 +344,7 @@ fun TypeSpec.Builder.addDaoRepoFun(
         .addCode(CodeBlock.builder().apply {
             when(repoMethodType) {
                 Repository.METHOD_DELEGATE_TO_DAO -> {
-                    if(generateBoundaryCallback) {
-                        addBoundaryCallbackCode(daoKSFun, daoName)
-                    }else {
-                        addRepoDelegateToDaoCode(daoKSFun, resolver)
-                    }
-
+                    addRepoDelegateToDaoCode(daoKSFun, resolver)
                 }
                 Repository.METHOD_DELEGATE_TO_WEB -> {
                     //check that this is http accessible, if not, emit error
@@ -412,23 +399,6 @@ fun CodeBlock.Builder.addRepoDelegateToDaoCode(
     return this
 }
 
-/**
- * Generate the Android paging boundary callback implementation
- */
-fun CodeBlock.Builder.addBoundaryCallbackCode(daoFun: KSFunctionDeclaration, daoName: String) : CodeBlock.Builder{
-
-    add("val _dataSource = ").addDelegateFunctionCall("_dao", daoFun).add("\n")
-    add("val $PARAM_NAME_LIMIT = 50\n")
-
-    val unwrappedComponentType = daoFun.returnType?.toTypeName()?.unwrapQueryResultComponentType()
-            ?: throw IllegalArgumentException("${daoFun.simpleName.asString()} on $daoName has no return type")
-    add("$DATASOURCEFACTORY_TO_BOUNDARYCALLBACK_VARNAME[_dataSource] = %T(_loadHelper)\n",
-            BOUNDARY_CALLBACK_CLASSNAME.parameterizedBy(unwrappedComponentType))
-    add("return _dataSource\n")
-
-    return this
-}
-
 fun CodeBlock.Builder.addDelegateToWebCode(
     daoFunSpec: FunSpec,
     daoName: String,
@@ -477,7 +447,7 @@ class DoorRepositoryProcessor(
         val daoSymbols = resolver.getSymbolsWithAnnotation("androidx.room.Dao")
             .filterIsInstance<KSClassDeclaration>()
 
-        val target = environment.platforms.firstOrNull()?.doorTarget() ?: throw IllegalStateException("No KSP Platform!")
+        val target = environment.doorTarget(resolver)
 
         dbSymbols.forEach { dbKSClass ->
             FileSpec.builder(dbKSClass.packageName.asString(),
