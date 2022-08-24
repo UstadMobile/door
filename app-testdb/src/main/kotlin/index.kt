@@ -1,4 +1,4 @@
-import androidx.lifecycle.Observer
+import com.ustadmobile.door.lifecycle.Observer
 import com.ustadmobile.door.*
 import com.ustadmobile.door.ext.asRepository
 import com.ustadmobile.door.ext.rootDatabase

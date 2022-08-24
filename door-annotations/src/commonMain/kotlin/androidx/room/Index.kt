@@ -78,7 +78,8 @@ annotation class Index(
          *
          * @return The list of column sort orders in the Index.
          */
-        val orders: Array<Order> = [],
+        @Suppress("ReplaceArrayOfWithLiteral") //Array literal will not compile on Javascript
+        val orders: Array<Order> = arrayOf(),
 ) {
 
         enum class Order {

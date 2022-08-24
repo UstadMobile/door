@@ -2,6 +2,7 @@ package com.ustadmobile.door.entities
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.ustadmobile.door.annotation.DoorPrimaryAutoGenerateKeyField
 
 
 /**
@@ -9,6 +10,7 @@ import androidx.room.PrimaryKey
  * and the old md5 is no longer used in the table.
  */
 @Entity
+@DoorPrimaryAutoGenerateKeyField("zaUid")
 class ZombieAttachmentData {
 
     @PrimaryKey(autoGenerate = true)

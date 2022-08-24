@@ -9,7 +9,6 @@ import com.ustadmobile.door.SyncNode
 import com.ustadmobile.door.annotation.ParamName
 import com.ustadmobile.door.annotation.RepoHttpAccessible
 import com.ustadmobile.door.annotation.Repository
-import com.ustadmobile.door.entities.UpdateNotification
 import com.ustadmobile.door.paging.DataSourceFactory
 
 
@@ -80,9 +79,6 @@ abstract class ExampleSyncableDao {
 
     @Query("SELECT SyncNode.* FROM SyncNode LIMIT 1")
     abstract fun getSyncNode(): SyncNode?
-
-    @Query("SELECT * FROM UpdateNotification")
-    abstract fun findAllUpdateNotifications(): List<UpdateNotification>
 
     @Query("""
    INSERT INTO ExampleSyncableEntity (esUid, esLcsn, esMcsn, esLcb, esNumber, esName, publik)

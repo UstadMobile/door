@@ -1,7 +1,4 @@
-import androidx.lifecycle.FullLifecycleObserver
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleObserver
-import androidx.lifecycle.LifecycleOwner
+import com.ustadmobile.door.lifecycle.*
 import db2.ExampleEntity2
 import kotlinx.css.*
 import kotlinx.css.properties.border
@@ -19,12 +16,13 @@ class ExampleComponent(mProps: PropsWithChildren): RComponent<PropsWithChildren,
 
     private var mPresenter: ExamplePresenter<*>? = null
 
-    private var lifecycleState = Lifecycle.State.DESTROYED
+    private var lifecycleState = DoorState.DESTROYED
 
     private val observerList: MutableList<LifecycleObserver> = mutableListOf()
 
-    override val lifecycle: Lifecycle
-        get() = TODO("Not yet implemented")
+    override fun getLifecycle(): Lifecycle {
+        TODO("Not yet implemented")
+    }
 
     override var list: List<ExampleEntity2>? = null
         get() = field
@@ -45,10 +43,10 @@ class ExampleComponent(mProps: PropsWithChildren): RComponent<PropsWithChildren,
     override fun componentDidMount() {
         mPresenter = ExamplePresenter(this, this)
         mPresenter?.onCreate()
-        lifecycleState = Lifecycle.State.STARTED
+        lifecycleState = DoorState.STARTED
 
         for (doorLifecycleObserver in observerList) {
-            (doorLifecycleObserver as FullLifecycleObserver).onCreate(this)
+            (doorLifecycleObserver as DefaultLifecycleObserver).onCreate(this)
         }
     }
 
@@ -173,10 +171,10 @@ class ExampleComponent(mProps: PropsWithChildren): RComponent<PropsWithChildren,
 //    }
 
     override fun componentWillUnmount() {
-        lifecycleState = Lifecycle.State.DESTROYED
+        lifecycleState = DoorState.DESTROYED
 
         for (doorLifecycleObserver in observerList) {
-            (doorLifecycleObserver as FullLifecycleObserver).onStop(this)
+            (doorLifecycleObserver as DefaultLifecycleObserver).onStop(this)
         }
 
         mPresenter?.onDestroy()

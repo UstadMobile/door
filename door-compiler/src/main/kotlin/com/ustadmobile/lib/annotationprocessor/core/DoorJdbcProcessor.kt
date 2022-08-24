@@ -922,7 +922,7 @@ fun TypeSpec.Builder.addDaoJdbcEntityInsertAdapter(
                     insertSql += "INTO ${entityKSClass.entityTableName} (${entityFields.joinToString { it.entityPropColumnName }}) "
                     insertSql += "VALUES("
                     insertSql += entityFields.joinToString { prop ->
-                        if(prop.getAnnotation(PrimaryKey::class)?.autoGenerate == true) {
+                        if(prop.isEntityAutoGeneratePrimaryKey) {
                             "COALESCE(?,nextval('${entityKSClass.entityTableName}_${prop.entityPropColumnName}_seq'))"
                         }else {
                             "?"
@@ -967,7 +967,7 @@ fun TypeSpec.Builder.addDaoJdbcEntityInsertAdapter(
             .addCode(CodeBlock.builder()
                 .apply {
                     entityFields.forEachIndexed { index, field ->
-                        if(field.getAnnotation(PrimaryKey::class)?.autoGenerate == true) {
+                        if(field.isEntityAutoGeneratePrimaryKey) {
                             beginControlFlow("if(entity.${field.simpleName.asString()} == %L)",
                                 field.type.resolve().defaultTypeValueCode(resolver))
                             add("stmt.setObject(%L, null)\n", index + 1)
@@ -975,7 +975,7 @@ fun TypeSpec.Builder.addDaoJdbcEntityInsertAdapter(
                         }
                         add("stmt.set${field.type.resolve().preparedStatementSetterGetterTypeName(resolver)}(%L, entity.%L)\n",
                             index + 1, field.simpleName.asString())
-                        if(field.getAnnotation(PrimaryKey::class)?.autoGenerate == true) {
+                        if(field.isEntityAutoGeneratePrimaryKey) {
                             endControlFlow()
                         }
                     }

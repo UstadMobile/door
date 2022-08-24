@@ -2,12 +2,10 @@ package com.ustadmobile.door.entities
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
-import androidx.room.PrimaryKey
 
-@Entity
+@Entity(primaryKeys = arrayOf("nodeId"))
 class DoorNode {
 
-    @PrimaryKey(autoGenerate = true)
     var nodeId: Long = 0
 
     var auth: String? = null

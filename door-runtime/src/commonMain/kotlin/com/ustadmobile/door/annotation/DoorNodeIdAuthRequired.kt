@@ -7,7 +7,7 @@ package com.ustadmobile.door.annotation
  *
  * NodeIdAuthCache must be provided via the DI in this case.
  */
-@Retention(AnnotationRetention.RUNTIME)
+@Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)
 @Suppress("unused")
 annotation class DoorNodeIdAuthRequired

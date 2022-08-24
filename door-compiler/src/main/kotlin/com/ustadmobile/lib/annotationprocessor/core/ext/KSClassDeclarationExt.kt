@@ -133,8 +133,15 @@ val KSClassDeclaration.entityPrimaryKeyProps: List<KSPropertyDeclaration>
 
         val entityAnnotation = getAnnotation(Entity::class)
             ?: throw IllegalArgumentException("entityPrimaryKeyProps ${qualifiedName?.asString()} has no entity annotation!")
+
+        val primaryKeyPropNames = if(entityAnnotation.primaryKeys.isNotEmpty()) {
+            entityAnnotation.primaryKeys
+        }else {
+            getAnnotation(DoorPrimaryAutoGenerateKeyField::class)?.value?.let { arrayOf(it) } ?: emptyArray()
+        }
+
         val allDeclaredProps = getAllProperties()
-        return entityAnnotation.primaryKeys.map {
+        return primaryKeyPropNames.map {
             allDeclaredProps.first { prop -> prop.simpleName.asString() == it }
         }
     }
@@ -142,7 +149,7 @@ val KSClassDeclaration.entityPrimaryKeyProps: List<KSPropertyDeclaration>
 val KSClassDeclaration.isReplicateEntityWithAutoIncPrimaryKey: Boolean
     get() {
         return hasAnnotation(ReplicateEntity::class) && getAllProperties().any {
-            it.getAnnotationOrNull(PrimaryKey::class)?.autoGenerate == true
+            it.isEntityAutoGeneratePrimaryKey
         }
     }
 
@@ -154,7 +161,7 @@ fun KSClassDeclaration.entityProps(
     }
 
     if(getAutoIncLast) {
-        val fieldsPartitioned = allFields.partition { it.getAnnotation(PrimaryKey::class)?.autoGenerate != true }
+        val fieldsPartitioned = allFields.partition { !it.isEntityAutoGeneratePrimaryKey }
         return fieldsPartitioned.first + fieldsPartitioned.second
     }else {
         return allFields
@@ -170,9 +177,6 @@ val KSClassDeclaration.entityTableName: String
             return simpleName.asString()
     }
 
-
-val KSClassDeclaration.entityHasAutoGeneratePrimaryKey: Boolean
-    get() = getAllProperties().any { it.getAnnotation(PrimaryKey::class)?.autoGenerate == true }
 
 /**
  * Where the given TypeSpec represents an entity, generate a string for the CREATE TABLE SQL
@@ -204,10 +208,10 @@ fun KSClassDeclaration.toCreateTableSql(
         }
 
         val pkAnnotation = fieldProp.getAnnotation(PrimaryKey::class)
-        if(pkAnnotation != null) {
+        if(pkAnnotation != null || fieldProp.isEntityAutoGeneratePrimaryKey) {
             fieldAnnotatedPk = fieldProp
             sql += " PRIMARY KEY "
-            if(pkAnnotation.autoGenerate && dbType == DoorDbType.SQLITE)
+            if(dbType == DoorDbType.SQLITE && fieldProp.isEntityAutoGeneratePrimaryKey)
                 sql += " AUTOINCREMENT "
 
         }

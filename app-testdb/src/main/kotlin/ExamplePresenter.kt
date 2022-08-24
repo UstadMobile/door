@@ -1,5 +1,5 @@
-import androidx.lifecycle.LifecycleObserver
-import androidx.lifecycle.LifecycleOwner
+import com.ustadmobile.door.lifecycle.LifecycleObserver
+import com.ustadmobile.door.lifecycle.LifecycleOwner
 import com.ustadmobile.door.*
 import com.ustadmobile.door.jdbc.types.Date
 import db2.ExampleDatabase2

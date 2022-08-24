@@ -25,7 +25,7 @@ android {
     }
 
     sourceSets {
-        main.java.srcDirs += ["build/generated/source/door-test-db"]
+
     }
 
 
@@ -53,6 +53,7 @@ tasks.whenTaskAdded { task ->
 
 dependencies {
     implementation project(":door-runtime")
+    implementation project(":door-testdb")
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
     implementation "androidx.core:core-ktx:$version_androidx_core"
     implementation "androidx.appcompat:appcompat:$version_android_appcompat"
@@ -78,8 +79,6 @@ dependencies {
     implementation "androidx.paging:paging-runtime:$version_androidx_paging"
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
     implementation "androidx.lifecycle:lifecycle-livedata-ktx:$version_androidx_lifecycle"
-
-    ksp "androidx.room:room-compiler:$version_android_room"
 
 
     testImplementation 'junit:junit:4.+'

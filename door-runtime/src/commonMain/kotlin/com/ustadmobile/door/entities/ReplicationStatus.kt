@@ -3,8 +3,10 @@ package com.ustadmobile.door.entities
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.ustadmobile.door.annotation.DoorPrimaryAutoGenerateKeyField
 
 @Entity(indices = arrayOf(Index("tableId", "nodeId", name="table_node_idx", unique = true)))
+@DoorPrimaryAutoGenerateKeyField("repStatusId")
 class ReplicationStatus {
 
     @PrimaryKey(autoGenerate = true)

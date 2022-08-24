@@ -15,8 +15,6 @@ import db2.ExampleDatabase2.Companion.DB_VERSION
     OtherSyncableEntity::class,
     ChangeLog::class,
     AccessGrant::class,
-    UpdateNotification::class,
-    SqliteChangeSeqNums::class,
     ZombieAttachmentData::class,
     DoorNode::class,
     //#DOORDB_TRACKER_ENTITIES
@@ -37,8 +35,6 @@ abstract class ExampleDatabase2 : RoomDatabase() {
     abstract fun exampleEntityPkIntDao(): ExampleEntityPkIntDao
 
     abstract fun accessGrantDao(): AccessGrantDao
-
-    abstract fun updateNotificationTestDao(): UpdateNotificationTestDao
 
 
     //#DOORDB_SYNCDAO

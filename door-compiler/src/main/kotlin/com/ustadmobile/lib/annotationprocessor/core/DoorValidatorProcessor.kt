@@ -38,9 +38,9 @@ class DoorValidatorProcessor(
 
     val sqliteConnection: Connection
 
-    val pgConnection: Connection?
+    var pgConnection: Connection?
 
-    val connectionMap: Map<Int, Connection?>
+    var connectionMap: Map<Int, Connection?>
 
     init {
         val sqliteTmpFile = File.createTempFile("dbprocessorkt", ".db")
@@ -86,7 +86,7 @@ class DoorValidatorProcessor(
 
             if(entity.entityPrimaryKeyProps.isEmpty()) {
                 logger.error(
-                    "Class ${entity.simpleName.asString()} used as entity does not have a field(s) annotated @PrimaryKey or primaryKeys set",
+                    "Class ${entity.simpleName.asString()} used as entity does not have field(s) annotated @PrimaryKey or primaryKeys set",
                     entity)
             }
 
@@ -373,6 +373,12 @@ class DoorValidatorProcessor(
 
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
+        //Only do postgres validations etc when running on JVM
+        if(environment.doorTarget(resolver) != DoorTarget.JVM) {
+            pgConnection = null
+            connectionMap = mapOf(DoorDbType.SQLITE to sqliteConnection, DoorDbType.POSTGRES to pgConnection)
+        }
+
         createAllTables(resolver)
         validateReplicateEntities(resolver)
         validateTriggers(resolver)
