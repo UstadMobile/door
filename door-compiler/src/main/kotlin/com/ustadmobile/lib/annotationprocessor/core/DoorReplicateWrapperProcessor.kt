@@ -227,6 +227,8 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
     addType(
         TypeSpec.classBuilder("${dbClassDecl.simpleName.asString()}${DoorDatabaseReplicateWrapper.SUFFIX}")
             .addOriginatingKsFileOrThrow(dbClassDecl.containingFile)
+            .addOriginatingKSClasses(dbClassDecl.allDbEntities())
+            .addOriginatingKSClasses(dbClassDecl.dbEnclosedDaos())
             .addAnnotation(AnnotationSpec.builder(Suppress::class)
                 .addMember("%S, %S", "REDUNDANT_PROJECTION", "ClassName")
                 .build())
@@ -299,6 +301,8 @@ fun FileSpec.Builder.addDaoWrapperTypeSpec(
 ): FileSpec.Builder {
     addType(TypeSpec.classBuilder(daoClassDeclaration.toClassNameWithSuffix(DoorDatabaseReplicateWrapper.SUFFIX))
         .superclass(daoClassDeclaration.toClassName())
+        .addOriginatingKSClass(daoClassDeclaration)
+        .addOriginatingKSClasses(daoClassDeclaration.allDaoEntities(resolver))
         .primaryConstructor(FunSpec.constructorBuilder()
             .addParameter("_db", RoomDatabase::class)
             .addParameter("_dao", daoClassDeclaration.toClassName())

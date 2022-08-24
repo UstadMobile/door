@@ -13,6 +13,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import com.squareup.kotlinpoet.ksp.addOriginatingKSFile
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.writeTo
@@ -97,6 +98,7 @@ fun FileSpec.Builder.addDaoKtorRouteFun(
 ) : FileSpec.Builder {
 
     addFunction(FunSpec.builder("${daoClassDecl.simpleName.asString()}$SUFFIX_KTOR_ROUTE")
+        .addOriginatingKSClass(daoClassDecl)
         .addTypeVariable(TypeVariableName.invoke("T", RoomDatabase::class))
         .receiver(Route::class)
         .addParameter("_typeToken",
@@ -130,6 +132,7 @@ fun FileSpec.Builder.addNanoHttpdResponder(
 ): FileSpec.Builder {
 
     addType(TypeSpec.classBuilder(daoKSClassDeclaration.toClassNameWithSuffix(SUFFIX_NANOHTTPD_URIRESPONDER))
+        .addOriginatingKSClass(daoKSClassDeclaration)
         .superclass(AbstractDoorUriResponder::class)
         .apply {
             daoKSClassDeclaration.getAllFunctions()
@@ -495,6 +498,7 @@ fun FileSpec.Builder.addDbKtorRouteFunction(
 
     val dbClassName = dbClassDeclaration.toClassName()
     addFunction(FunSpec.builder("${dbClassName.simpleName}$SUFFIX_KTOR_ROUTE")
+        .addOriginatingKSClass(dbClassDeclaration)
         .receiver(Route::class)
         .addParameter(ParameterSpec.builder("json", Json::class)
             .defaultValue(CodeBlock.of("%T { encodeDefaults = true } ", Json::class))
@@ -544,6 +548,7 @@ fun FileSpec.Builder.addDbNanoHttpdMapperFunction(
 ) : FileSpec.Builder {
     val dbTypeClassName = dbClassDeclaration.toClassName()
     addFunction(FunSpec.builder("${dbTypeClassName.simpleName}$SUFFIX_NANOHTTPD_ADDURIMAPPING")
+        .addOriginatingKSClass(dbClassDeclaration)
         .addParametersForHttpDb(false)
         .addParameter("_mappingPrefix", String::class)
         .addParameter("_di", DI::class)

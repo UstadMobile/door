@@ -299,3 +299,27 @@ fun KSClassDeclaration.entityEmbeddedEntities(
     }
 }
 
+/**
+ * Get a list of all the entity KSClassDeclarations that are referenced by this DAO. Used for setting originating files
+ */
+fun KSClassDeclaration.allDaoEntities(resolver: Resolver): List<KSClassDeclaration> {
+    val classKsType = this.asType(emptyList())
+    val entityList: List<KSClassDeclaration> = getAllFunctions().map { daoFun ->
+        val ksFun = daoFun.asMemberOf(classKsType)
+        if(daoFun.hasAnyAnnotation(Insert::class, Update::class, Delete::class)) {
+            val entityClassDecl =  ksFun.firstParamEntityType(resolver).declaration as? KSClassDeclaration
+            entityClassDecl?.let { listOf(it) } ?: emptyList()
+        }else if(daoFun.hasAnyAnnotation(Query::class, RawQuery::class) && ksFun.hasReturnType(resolver)) {
+            val returnKSClass = ksFun.returnType?.unwrapLiveDataOrDataSourceFactoryResultType(resolver)
+                ?.unwrapComponentTypeIfListOrArray(resolver)?.declaration as? KSClassDeclaration
+            val parentClasses = returnKSClass?.getAllSuperTypes()?.map { it.declaration }
+                ?.filterIsInstance<KSClassDeclaration>()?.toList() ?: emptyList()
+            (returnKSClass?.let { listOf(it) } ?: emptyList()) + parentClasses
+        }else {
+            emptyList()
+        }
+    }.toList().flatten().distinct()
+
+    return entityList
+}
+

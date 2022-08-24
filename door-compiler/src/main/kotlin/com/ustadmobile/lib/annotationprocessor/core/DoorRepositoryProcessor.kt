@@ -8,6 +8,7 @@ import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import com.squareup.kotlinpoet.ksp.addOriginatingKSFile
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.writeTo
@@ -49,6 +50,7 @@ fun FileSpec.Builder.addDbRepoType(
     target: DoorTarget
 ): FileSpec.Builder {
     addType(TypeSpec.classBuilder(dbKSClassDeclaration.toClassNameWithSuffix(SUFFIX_REPOSITORY2))
+        .addOriginatingKSClass(dbKSClassDeclaration)
         .superclass(dbKSClassDeclaration.toClassName())
         .addSuperinterface(DoorDatabaseRepository::class)
         .addAnnotation(AnnotationSpec.builder(Suppress::class)
@@ -170,6 +172,7 @@ fun FileSpec.Builder.addEntityWithAttachmentAdapterType(
     val attachmentInfo = EntityAttachmentInfo(entityKSClass)
     val nullableStringClassName = String::class.asClassName().copy(nullable = true)
     addType(TypeSpec.classBuilder(entityKSClass.toClassNameWithSuffix(SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER))
+        .addOriginatingKSClass(entityKSClass)
         .addModifiers(KModifier.INLINE)
         .addSuperinterface(EntityWithAttachment::class)
         .primaryConstructor(
@@ -217,6 +220,11 @@ fun FileSpec.Builder.addAsEntityWithAttachmentAdapterExtensionFun(
 ): FileSpec.Builder {
     addFunction(FunSpec.builder("asEntityWithAttachment")
         .addModifiers(KModifier.INLINE)
+        .apply {
+            entityWithAttachment.containingFile?.also {
+                addOriginatingKSFile(it)
+            }
+        }
         .receiver(entityWithAttachment.toClassName())
         .returns(EntityWithAttachment::class)
         .addCode("return %T(this)\n",
@@ -273,6 +281,7 @@ fun FileSpec.Builder.addDaoRepoType(
 ): FileSpec.Builder {
 
     addType(TypeSpec.classBuilder("${daoKSClass.simpleName.asString()}$SUFFIX_REPOSITORY2")
+        .addOriginatingKSClass(daoKSClass)
         .addProperty(PropertySpec.builder("_db", RoomDatabase::class)
             .initializer("_db").build())
         .addProperty(PropertySpec.builder("_repo", DoorDatabaseRepository::class)

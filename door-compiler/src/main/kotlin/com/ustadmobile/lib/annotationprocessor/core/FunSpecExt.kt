@@ -2,10 +2,12 @@ package com.ustadmobile.lib.annotationprocessor.core
 
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSAnnotation
+import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.UNIT
+import com.squareup.kotlinpoet.ksp.addOriginatingKSFile
 import com.squareup.kotlinpoet.ksp.toAnnotationSpec
 
 
@@ -44,6 +46,16 @@ fun FunSpec.Builder.copyAnnotations(
 ) : FunSpec.Builder {
     ksAnnotated.annotations.filter(filter).forEach {
         addAnnotation(it.toAnnotationSpec())
+    }
+
+    return this
+}
+
+fun FunSpec.Builder.addOriginatingKSClass(
+    ksClassDeclaration: KSClassDeclaration
+): FunSpec.Builder {
+    ksClassDeclaration.containingFile?.also {
+        addOriginatingKSFile(it)
     }
 
     return this

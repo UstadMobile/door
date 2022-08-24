@@ -121,6 +121,8 @@ private fun FileSpec.Builder.addDatabaseMetadataType(
 ): FileSpec.Builder {
     addType(TypeSpec.classBuilder("${dbKSClass.simpleName.asString()}$SUFFIX_DOOR_METADATA")
         .superclass(DoorDatabaseMetadata::class.asClassName().parameterizedBy(dbKSClass.toClassName()))
+        .addOriginatingKsFileOrThrow(dbKSClass.containingFile)
+        .addOriginatingKSClasses(dbKSClass.allDbEntities())
         .addProperty(PropertySpec.builder("dbClass", KClass::class.asClassName().parameterizedBy(dbKSClass.toClassName()))
             .addModifiers(KModifier.OVERRIDE)
             .getter(FunSpec.getterBuilder()
@@ -190,6 +192,7 @@ private fun FileSpec.Builder.addJsImplementationsClassesObject(
 ) : FileSpec.Builder {
     val jsImplClassName = ClassName("com.ustadmobile.door.util", "DoorJsImplClasses")
     addType(TypeSpec.objectBuilder(dbKSClass.simpleName.asString() + SUFFIX_JS_IMPLEMENTATION_CLASSES)
+        .addOriginatingKSClass(dbKSClass)
         .superclass(jsImplClassName.parameterizedBy(dbKSClass.toClassName()))
         .addProperty(PropertySpec.builder("dbKClass",
             KClass::class.asClassName().parameterizedBy(dbKSClass.toClassName()))
@@ -290,6 +293,7 @@ private fun FileSpec.Builder.addReplicationRunOnChangeRunnerType(
 
 
     addType(TypeSpec.classBuilder(dbKSClass.toClassNameWithSuffix(DoorJdbcProcessor.SUFFIX_REP_RUN_ON_CHANGE_RUNNER))
+        .addOriginatingKSClasses(daosWithRunOnChange + daosWithRunOnNewNode + allReplicateEntities)
         .addSuperinterface(ReplicationRunOnChangeRunner::class)
         .addAnnotation(AnnotationSpec.builder(Suppress::class)
             .addMember("%S, %S, %S, %S", "LocalVariableName", "RedundantVisibilityModifier", "unused", "ClassName")
@@ -435,6 +439,7 @@ fun FileSpec.Builder.addJdbcDbImplType(
 ) : FileSpec.Builder {
     addImport("com.ustadmobile.door.util", "systemTimeInMillis")
     addType(TypeSpec.classBuilder(dbKSClass.toClassNameWithSuffix(SUFFIX_JDBC_KT2))
+        .addOriginatingKSClasses(listOf(dbKSClass))
         .superclass(dbKSClass.toClassName())
         .addSuperinterface(DoorDatabaseJdbc::class)
         .addSuperinterface(RoomJdbcImpl::class)
@@ -1002,6 +1007,8 @@ fun FileSpec.Builder.addDaoJdbcImplType(
     val allFunctions = daoKSClass.getAllFunctions()
     addImport("com.ustadmobile.door", "DoorDbType")
     addType(TypeSpec.classBuilder(daoKSClass.toClassNameWithSuffix(SUFFIX_JDBC_KT2))
+        .addOriginatingKSClass(daoKSClass)
+        .addOriginatingKSClasses(daoKSClass.allDaoEntities(resolver))
         .primaryConstructor(FunSpec.constructorBuilder().addParameter("_db",
             RoomDatabase::class).build())
         .addProperty(PropertySpec.builder("_db", RoomDatabase::class).initializer("_db").build())
