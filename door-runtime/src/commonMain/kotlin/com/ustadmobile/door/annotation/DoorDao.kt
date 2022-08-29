@@ -15,10 +15,10 @@ import androidx.room.Query
  *
  * The class marked with `@Dao` should either be an interface or an abstract class. At compile
  * time, Room will generate an implementation of this class when it is referenced by a
- * [Database].
+ * [DoorDatabase].
  *
  *
- * An abstract `@Dao` class can optionally have a constructor that takes a [Database]
+ * An abstract `@Dao` class can optionally have a constructor that takes a [DoorDatabase]
  * as its only parameter.
  *
  *
@@ -33,4 +33,4 @@ import androidx.room.Query
  */
 @Target(AnnotationTarget.CLASS, AnnotationTarget.FILE)
 @Retention(AnnotationRetention.BINARY)
-annotation class Dao
+annotation class DoorDao

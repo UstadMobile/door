@@ -5,6 +5,5 @@ include 'door-testdb'
 include 'app-testdb'
 include ':test-app-android'
 include 'door-testdb-server'
-include 'door-common'
 include 'door-annotations'
 

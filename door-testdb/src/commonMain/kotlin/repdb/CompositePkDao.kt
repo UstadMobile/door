@@ -1,9 +1,9 @@
 package repdb
 
 import androidx.room.*
-import com.ustadmobile.door.annotation.Dao
+import com.ustadmobile.door.annotation.DoorDao
 
-@Dao
+@DoorDao
 expect abstract class CompositePkDao {
 
     @Insert

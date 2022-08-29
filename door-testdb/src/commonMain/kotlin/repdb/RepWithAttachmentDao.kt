@@ -7,7 +7,7 @@ import androidx.room.Update
 import com.ustadmobile.door.annotation.*
 import com.ustadmobile.door.lifecycle.LiveData
 
-@Dao
+@DoorDao
 @Repository
 expect abstract class RepWithAttachmentDao {
 

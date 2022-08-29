@@ -1,6 +1,6 @@
 package db2
 
-import com.ustadmobile.door.annotation.Dao
+import com.ustadmobile.door.annotation.DoorDao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
@@ -12,7 +12,7 @@ import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.paging.DataSourceFactory
 
 
-@Dao
+@DoorDao
 @Repository
 abstract class ExampleSyncableDao {
 

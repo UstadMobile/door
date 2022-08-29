@@ -19,7 +19,7 @@ fun KSClassDeclaration.dbEnclosedDaos(): List<KSClassDeclaration> {
 
     @OptIn(KspExperimental::class)
     fun Iterable<KSTypeReference>.daos() = filter {
-        it.resolve().declaration.isAnnotationPresent(Dao::class)
+        it.resolve().declaration.isAnnotationPresent(DoorDao::class)
     }.map {
         it.resolve().declaration as KSClassDeclaration
     }
@@ -39,7 +39,7 @@ fun KSClassDeclaration.dbEnclosedDaos(): List<KSClassDeclaration> {
 @Suppress("UNCHECKED_CAST") // No other way, and it will always work
 @OptIn(KspExperimental::class)
 fun KSClassDeclaration.allDbEntities(): List<KSClassDeclaration> {
-    val dbAnnotation = getKSAnnotationsByType(Database::class).first()
+    val dbAnnotation = getKSAnnotationsByType(DoorDatabase::class).first()
     val annotationVal = dbAnnotation.arguments.first { it.name?.asString() == "entities" }
     val entityKsTypeList = annotationVal.value as List<KSType>
     return entityKsTypeList.map {
@@ -60,9 +60,9 @@ fun KSClassDeclaration.dbHasReplicateWrapper() : Boolean {
 
 fun KSClassDeclaration.allDbClassDaoGetters(): List<KSDeclaration> {
     return getAllFunctions().filter {
-        it.returnType?.resolve()?.declaration?.hasAnnotation(Dao::class) == true
+        it.returnType?.resolve()?.declaration?.hasAnnotation(DoorDao::class) == true
     }.toList() + getAllProperties().filter {
-        it.type.resolve().declaration.hasAnnotation(Dao::class)
+        it.type.resolve().declaration.hasAnnotation(DoorDao::class)
     }.toList()
 }
 

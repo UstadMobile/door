@@ -17,13 +17,13 @@ fun Resolver.querySingularTypes(): List<KSType> {
 
 
 fun Resolver.getDatabaseSymbolsToProcess(): Sequence<KSClassDeclaration>{
-    return getSymbolsWithAnnotation("com.ustadmobile.door.annotation.Database")
+    return getSymbolsWithAnnotation("com.ustadmobile.door.annotation.DoorDatabase")
         .filterIsInstance<KSClassDeclaration>()
         .filter { Modifier.ACTUAL !in it.modifiers }
 }
 
 fun Resolver.getDaoSymbolsToProcess(): Sequence<KSClassDeclaration> {
-    return getSymbolsWithAnnotation("com.ustadmobile.door.annotation.Dao")
+    return getSymbolsWithAnnotation("com.ustadmobile.door.annotation.DoorDao")
         .filterIsInstance<KSClassDeclaration>()
         .filter { Modifier.ACTUAL !in it.modifiers }
 }

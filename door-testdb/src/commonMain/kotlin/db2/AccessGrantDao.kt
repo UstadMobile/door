@@ -1,10 +1,10 @@
 package db2
 
-import com.ustadmobile.door.annotation.Dao
+import com.ustadmobile.door.annotation.DoorDao
 import androidx.room.Insert
 import com.ustadmobile.door.annotation.Repository
 
-@Dao
+@DoorDao
 @Repository
 abstract class AccessGrantDao {
 

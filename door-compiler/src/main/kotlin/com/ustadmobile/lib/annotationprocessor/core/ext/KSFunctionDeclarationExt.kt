@@ -35,7 +35,9 @@ fun KSFunctionDeclaration.toFunSpecBuilder(
                     returns(it.resolveActualTypeIfAliased().toTypeName(
                         containerDecl?.typeParameters?.toTypeParameterResolver() ?: TypeParameterResolver.EMPTY))
                 }catch(e: Exception){
-                    logger.error("Invalid return type for function: $e", this@toFunSpecBuilder)
+                    logger.error("Invalid return type for function ${this@toFunSpecBuilder.simpleName.asString()}: " +
+                            "Ret Type=${this@toFunSpecBuilder.returnType}  " +
+                            "resolved=${this@toFunSpecBuilder.returnType?.resolve()} Error=$e", this@toFunSpecBuilder)
                 }
             }
         }

@@ -71,7 +71,6 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
-                implementation project(":door-common")
                 compileOnly project(":door-annotations")
                 implementation kotlin("stdlib-common")
                 implementation "io.ktor:ktor-client-core:$version_ktor"

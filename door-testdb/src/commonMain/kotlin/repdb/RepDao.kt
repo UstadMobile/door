@@ -1,14 +1,14 @@
 package repdb
 
 import com.ustadmobile.door.lifecycle.LiveData
-import com.ustadmobile.door.annotation.Dao
+import com.ustadmobile.door.annotation.DoorDao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
 import com.ustadmobile.door.annotation.*
 import com.ustadmobile.door.entities.DoorNode
 
-@Dao
+@DoorDao
 @Repository
 expect abstract class RepDao: RepDaoInterface<RepEntity> {
 

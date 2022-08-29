@@ -150,7 +150,7 @@ private fun FileSpec.Builder.addDatabaseMetadataType(
         .addProperty(PropertySpec.builder("version", INT)
             .addModifiers(KModifier.OVERRIDE)
             .getter(FunSpec.getterBuilder()
-                .addCode("return ${dbKSClass.getAnnotation(Database::class)?.version ?: -1}\n")
+                .addCode("return ${dbKSClass.getAnnotation(DoorDatabase::class)?.version ?: -1}\n")
                 .build())
             .build())
         .addProperty(PropertySpec.builder("allTables", List::class.parameterizedBy(String::class))
@@ -610,7 +610,7 @@ fun TypeSpec.Builder.addCreateAllTablesFunction(
     dbKSClass: KSClassDeclaration,
     resolver: Resolver,
 ) : TypeSpec.Builder {
-    val initDbVersion = dbKSClass.getAnnotation(Database::class)?.version ?: -1
+    val initDbVersion = dbKSClass.getAnnotation(DoorDatabase::class)?.version ?: -1
     Napier.d("Door Wrapper: add create all tables function for ${dbKSClass.simpleName.asString()}")
     addFunction(FunSpec.builder("createAllTables")
         .addModifiers(KModifier.OVERRIDE)
@@ -1357,7 +1357,7 @@ fun CodeBlock.Builder.addMapResultRowCode(
             }
 
             if(checkAllNull) {
-                add("val _tmp_${entityType.entityTableName}_isAllNull = _tmp_${entityType.entityTableName}_nullCount == ${allResultSetCols.size}\n")
+                add("val·_tmp_${entityType.entityTableName}_isAllNull·=·_tmp_${entityType.entityTableName}_nullCount·==·${allResultSetCols.size}\n")
             }
         }
 

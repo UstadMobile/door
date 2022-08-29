@@ -29,20 +29,20 @@ import kotlin.reflect.KClass
  * }
 </pre> *
  * The example above defines a class that has 2 tables and 3 DAO classes that are used to access it.
- * There is no limit on the number of [Entity] or [Dao] classes but they must be unique
+ * There is no limit on the number of [Entity] or [DoorDao] classes but they must be unique
  * within the Database.
  *
  *
  * Instead of running queries on the database directly, you are highly recommended to create
- * [Dao] classes. Using Dao classes will allow you to abstract the database communication in
+ * [DoorDao] classes. Using Dao classes will allow you to abstract the database communication in
  * a more logical layer which will be much easier to mock in tests (compared to running direct
  * sql queries). It also automatically does the conversion from `Cursor` to your application
  * classes so you don't need to deal with lower level database APIs for most of your data access.
  *
  *
- * Room also verifies all of your queries in [Dao] classes while the application is being
+ * Room also verifies all of your queries in [DoorDao] classes while the application is being
  * compiled so that if there is a problem in one of the queries, you will be notified instantly.
- * @see Dao
+ * @see DoorDao
  *
  * @see Entity
  *
@@ -59,7 +59,7 @@ import kotlin.reflect.KClass
  https://youtrack.jetbrains.com/issue/KT-28927
  */
 @Retention(AnnotationRetention.SOURCE)
-annotation class Database(
+annotation class DoorDatabase(
     /**
      * The list of entities included in the database. Each entity turns into a table in the
      * database.

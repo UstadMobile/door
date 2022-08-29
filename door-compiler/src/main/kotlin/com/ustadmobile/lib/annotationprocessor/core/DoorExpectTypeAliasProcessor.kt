@@ -10,8 +10,8 @@ import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ksp.*
-import com.ustadmobile.door.annotation.Dao
-import com.ustadmobile.door.annotation.Database
+import com.ustadmobile.door.annotation.DoorDao
+import com.ustadmobile.door.annotation.DoorDatabase
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
 
 fun FileSpec.Builder.addActualClassForExpectedType(
@@ -43,11 +43,11 @@ fun FileSpec.Builder.addActualClassForExpectedType(
         .addModifiers(dbKSClassDeclaration.modifiers.mapNotNull { it.toKModifier() }.filter { it != KModifier.EXPECT })
         .addModifiers(KModifier.ACTUAL)
         .applyIf(target == DoorTarget.ANDROID) {
-            if(dbKSClassDeclaration.hasAnnotation(Dao::class)) {
+            if(dbKSClassDeclaration.hasAnnotation(DoorDao::class)) {
                 addAnnotation(AnnotationSpec.builder(ClassName("androidx.room", "Dao")).build())
-            }else if(dbKSClassDeclaration.hasAnnotation(Database::class)) {
+            }else if(dbKSClassDeclaration.hasAnnotation(DoorDatabase::class)) {
                 val annotationSpec = dbKSClassDeclaration.annotations.toList().first {
-                    (it.annotationType.resolve().declaration as? KSClassDeclaration)?.simpleName?.asString() == "Database"
+                    (it.annotationType.resolve().declaration as? KSClassDeclaration)?.simpleName?.asString() == "DoorDatabase"
                 }.toAnnotationSpec()
                 addAnnotation(AnnotationSpec.builder(ClassName("androidx.room", "Database"))
                     .apply {
@@ -89,11 +89,11 @@ class DoorExpectTypeAliasProcessor(
 ) : SymbolProcessor {
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        val dbSymbols = resolver.getSymbolsWithAnnotation("com.ustadmobile.door.annotation.Database")
+        val dbSymbols = resolver.getSymbolsWithAnnotation("com.ustadmobile.door.annotation.DoorDatabase")
             .filterIsInstance<KSClassDeclaration>()
             .filter { Modifier.EXPECT in it.modifiers }
 
-        val daoSymbols = resolver.getSymbolsWithAnnotation("com.ustadmobile.door.annotation.Dao")
+        val daoSymbols = resolver.getSymbolsWithAnnotation("com.ustadmobile.door.annotation.DoorDao")
             .filterIsInstance<KSClassDeclaration>()
             .filter { Modifier.EXPECT in it.modifiers }
 

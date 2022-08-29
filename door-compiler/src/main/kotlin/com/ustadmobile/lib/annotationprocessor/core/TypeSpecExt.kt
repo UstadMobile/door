@@ -7,7 +7,7 @@ import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.ustadmobile.door.RepositoryConnectivityListener
-import com.ustadmobile.door.annotation.Database
+import com.ustadmobile.door.annotation.DoorDatabase
 import com.ustadmobile.door.room.InvalidationTracker
 import javax.lang.model.element.TypeElement
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_ILLEGALSTATEEXCEPTION
@@ -87,7 +87,7 @@ fun TypeSpec.Builder.addDbVersionProperty(dbTypeElement: TypeElement): TypeSpec.
     addProperty(PropertySpec.builder("dbVersion", INT)
             .addModifiers(KModifier.OVERRIDE)
             .getter(FunSpec.getterBuilder()
-                    .addCode("return ${dbTypeElement.getAnnotation(Database::class.java).version}")
+                    .addCode("return ${dbTypeElement.getAnnotation(DoorDatabase::class.java).version}")
                     .build())
             .build())
 
@@ -98,7 +98,7 @@ fun TypeSpec.Builder.addDbVersionProperty(dbClassDecl: KSClassDeclaration): Type
     return addProperty(PropertySpec.builder("dbVersion", INT)
         .addModifiers(KModifier.OVERRIDE)
         .getter(FunSpec.getterBuilder()
-            .addCode("return ${dbClassDecl.getAnnotation(Database::class)?.version}")
+            .addCode("return ${dbClassDecl.getAnnotation(DoorDatabase::class)?.version}")
             .build())
         .build())
 }

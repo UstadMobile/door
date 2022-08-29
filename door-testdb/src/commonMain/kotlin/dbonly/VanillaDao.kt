@@ -1,10 +1,10 @@
 package dbonly
 
-import com.ustadmobile.door.annotation.Dao
+import com.ustadmobile.door.annotation.DoorDao
 import androidx.room.Query
 import androidx.room.Update
 
-@Dao
+@DoorDao
 abstract class VanillaDao {
 
     @Query("SELECT * FROM VanillaEntity WHERE vanillaUid = :pk")

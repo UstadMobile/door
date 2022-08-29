@@ -1,6 +1,6 @@
 package db2
 
-import com.ustadmobile.door.annotation.Database
+import com.ustadmobile.door.annotation.DoorDatabase
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.*
 import com.ustadmobile.door.annotation.DoorNodeIdAuthRequired
@@ -8,7 +8,7 @@ import com.ustadmobile.door.annotation.MinReplicationVersion
 import com.ustadmobile.door.entities.*
 import db2.ExampleDatabase2.Companion.DB_VERSION
 
-@Database(version = DB_VERSION, entities = [ExampleEntity2::class, ExampleLinkEntity::class,
+@DoorDatabase(version = DB_VERSION, entities = [ExampleEntity2::class, ExampleLinkEntity::class,
     ExampleEntityPkInt::class,
     SyncNode::class,
     ExampleSyncableEntity::class,

@@ -1,9 +1,9 @@
 package db2
 
-import com.ustadmobile.door.annotation.Dao
+import com.ustadmobile.door.annotation.DoorDao
 import androidx.room.Query
 
-@Dao
+@DoorDao
 abstract class ExampleDaoWithInterface: ExampleDaoInterface<ExampleEntity2> {
 
     @Query("SELECT * FROM ExampleEntity2 WHERE uid > :param")
