@@ -15,23 +15,24 @@ import com.ustadmobile.door.annotation.DoorDatabase
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
 
 fun FileSpec.Builder.addActualClassForExpectedType(
-    dbKSClassDeclaration: KSClassDeclaration,
+    ksClassDeclaration: KSClassDeclaration,
     target: DoorTarget,
     resolver: Resolver,
     logger: KSPLogger,
 ): FileSpec.Builder {
-    val classKSType = dbKSClassDeclaration.asType(emptyList())
-    val superClass = dbKSClassDeclaration.superTypes
+    val classKSType = ksClassDeclaration.asType(emptyList())
+    val superClass = ksClassDeclaration.superTypes
         .map { it.resolve() }
         .filter { (it.resolveActualTypeIfAliased().declaration as? KSClassDeclaration)?.classKind == ClassKind.CLASS  }
         .firstOrNull()
 
-    val superInterfaces = dbKSClassDeclaration.superTypes
+    val superInterfaces = ksClassDeclaration.superTypes
         .map { it.resolve() }
         .filter { (it.resolveActualTypeIfAliased().declaration as? KSClassDeclaration)?.classKind == ClassKind.INTERFACE }
         .toList()
 
-    addType(TypeSpec.classBuilder(dbKSClassDeclaration.toClassName())
+    addType(TypeSpec.classBuilder(ksClassDeclaration.toClassName())
+        .addOriginatingKSClass(ksClassDeclaration)
         .applyIf(superClass != null) {
             superclass(superClass!!.toTypeName())
         }
@@ -40,13 +41,13 @@ fun FileSpec.Builder.addActualClassForExpectedType(
                 addSuperinterface(it.toTypeName())
             }
         }
-        .addModifiers(dbKSClassDeclaration.modifiers.mapNotNull { it.toKModifier() }.filter { it != KModifier.EXPECT })
+        .addModifiers(ksClassDeclaration.modifiers.mapNotNull { it.toKModifier() }.filter { it != KModifier.EXPECT })
         .addModifiers(KModifier.ACTUAL)
         .applyIf(target == DoorTarget.ANDROID) {
-            if(dbKSClassDeclaration.hasAnnotation(DoorDao::class)) {
+            if(ksClassDeclaration.hasAnnotation(DoorDao::class)) {
                 addAnnotation(AnnotationSpec.builder(ClassName("androidx.room", "Dao")).build())
-            }else if(dbKSClassDeclaration.hasAnnotation(DoorDatabase::class)) {
-                val annotationSpec = dbKSClassDeclaration.annotations.toList().first {
+            }else if(ksClassDeclaration.hasAnnotation(DoorDatabase::class)) {
+                val annotationSpec = ksClassDeclaration.annotations.toList().first {
                     (it.annotationType.resolve().declaration as? KSClassDeclaration)?.simpleName?.asString() == "DoorDatabase"
                 }.toAnnotationSpec()
                 addAnnotation(AnnotationSpec.builder(ClassName("androidx.room", "Database"))
@@ -59,7 +60,7 @@ fun FileSpec.Builder.addActualClassForExpectedType(
             }
         }
         .apply {
-            dbKSClassDeclaration.getDeclaredFunctions().filter { !it.isConstructor() } .forEach { ksFunDec ->
+            ksClassDeclaration.getDeclaredFunctions().filter { !it.isConstructor() } .forEach { ksFunDec ->
                 addFunction(ksFunDec.toFunSpecBuilder(resolver, classKSType, logger)
                     .removeModifier(KModifier.EXPECT)
                     .addModifiers(KModifier.ACTUAL)
@@ -72,7 +73,7 @@ fun FileSpec.Builder.addActualClassForExpectedType(
                     .build())
             }
 
-            dbKSClassDeclaration.getDeclaredProperties().forEach { ksPropDec ->
+            ksClassDeclaration.getDeclaredProperties().forEach { ksPropDec ->
                 addProperty(ksPropDec.toPropSpecBuilder(classKSType)
                     .removeModifier(KModifier.EXPECT)
                     .addModifiers(KModifier.ACTUAL)
