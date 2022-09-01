@@ -1,3 +1,54 @@
+
+## Door
+
+Door is an adaption of [Room](https://developer.android.com/training/data-storage/room) for Kotlin Multiplatform. Just 
+just put your Database and DAOs in your Kotlin Multiplatform common code, and door will generate expect/actuals for you!
+Door supports:
+* **Android**: Door will generate the actual class for Android, which in turn is then used by Room to generate the 
+implementation (the same implementation if you had used Room itself).
+* **JVM**: Door supports SQLite and PostgreSQL using JDBC. Door will generate the entire implementation for you to run 
+queries using JDBC and return results.
+* **Javascript** Door supports SQLite in the browser through SQLite.JS. Door will generate the entire implementation for
+you to run the queries and return results. Only asynchronous operations are supported (suspended functions, LiveData, 
+and DataSource.Factory)
+
+No support for iOS/Native (yet - pull request would be welcome. Happy to help support anyone who would like to work on 
+this)
+
+
+## Getting started
+Just create your Database and DAOs in Kotlin multiplatform common code:
+
+```
+import com.ustadmobile.door.room.RoomDatabase
+import com.ustadmobile.door.annotations.DoorDatabase
+
+@DoorDatabase(version = 1, 
+  entities = [ MyEntity::class, AnotherEntity::class])
+expect abstract class MyDatabase: RoomDatabase {
+     
+     val myEntityDao: MyEntityDao
+     
+     val anotherEntityDao: AnotherEntityDao 
+}
+
+import com.ustadmobile.door.annotations.DoorDao
+
+@DoorDao
+expect abstract class MyEntityDao {
+     
+     @Query("SELECT * FROM MyEntity WHERE id = :id")
+     fun myQuery(id: Int): MyEntity?
+     
+}
+```
+
+
+
+Limitations:
+* Because we are using expect/actual, no function body can be added (better to use extension functions).
+
+
 ## Debugging
 Use Gradle in debug mode e.g.:
 ```

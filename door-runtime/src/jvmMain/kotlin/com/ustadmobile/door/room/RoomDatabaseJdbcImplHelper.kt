@@ -1,13 +1,19 @@
 package com.ustadmobile.door.room
 
+import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.DoorDbType
-import com.ustadmobile.door.ext.concurrentSafeListOf
 import com.ustadmobile.door.ext.concurrentSafeMapOf
+import com.ustadmobile.door.ext.rootDatabase
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.jdbc.ext.mutableLinkedListOf
 import com.ustadmobile.door.util.TransactionMode
+import com.ustadmobile.door.util.systemTimeInMillis
+import io.github.aakira.napier.Napier
 import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeout
 
 actual class RoomDatabaseJdbcImplHelper actual constructor(
     dataSource: DataSource,
@@ -16,11 +22,7 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
     invalidationTracker: InvalidationTracker,
 ) : RoomDatabaseJdbcImplHelperCommon(dataSource, db, tableNames, invalidationTracker) {
 
-    inner class PendingTransaction(
-        val connection: Connection
-    ) {
-        val depth = atomic(0)
-    }
+    inner class PendingTransaction(val connection: Connection)
 
     override suspend fun Connection.setupSqliteTriggersAsync() {
         invalidationTracker.setupSqliteTriggersAsync(this)
@@ -36,47 +38,73 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
         }
     }
 
+    @Suppress("UNUSED_PARAMETER") //Reserved for future usage
+    private fun <R> useNewConnectionInternal(
+        transactionMode: TransactionMode,
+        block: (Connection) -> R,
+        threadId: Long,
+    ): R {
+        val startTime = systemTimeInMillis()
+        val transaction = PendingTransaction(dataSource.connection)
+        transaction.connection.autoCommit = false
+        pendingTransactionThreadMap[threadId] = transaction
+        return try {
+            if(dbType == DoorDbType.SQLITE) {
+                invalidationTracker.setupSqliteTriggers(transaction.connection)
+            }
+
+            block(transaction.connection)
+        }catch(e: Exception) {
+            Napier.e("useConnection: ERROR", e)
+            if(!transaction.connection.autoCommit) {
+                transaction.connection.rollback()
+            }
+
+            throw e
+        }finally {
+            val changedTables = mutableLinkedListOf<String>()
+            if(dbType == DoorDbType.SQLITE) {
+                changedTables.addAll(invalidationTracker.findChangedTablesOnConnection(transaction.connection))
+            }
+
+            transaction.connection.commit()
+            pendingTransactionThreadMap.remove(threadId)
+            transaction.connection.close()
+            if(pendingTransactionThreadMap.isNotEmpty()) {
+                Napier.d("useConnection: close connection for thread #$threadId (took ${systemTimeInMillis() - startTime}ms)" +
+                        " There are ${pendingTransactionThreadMap.size} pending non-async transactions still open.")
+            }
+
+
+            invalidationTracker.takeIf { changedTables.isNotEmpty() }?.onTablesInvalidated(changedTables.toSet())
+        }
+    }
+
     actual fun <R> useConnection(
         transactionMode: TransactionMode,
         block: (Connection) -> R,
     ): R {
         val threadId = Thread.currentThread().id
-        val transaction: PendingTransaction = pendingTransactionThreadMap.computeIfAbsent(threadId) {
-            val pendingTx = PendingTransaction(dataSource.connection)
-            pendingTx.connection.autoCommit = false
+        val threadPendingTransaction = pendingTransactionThreadMap[threadId]
+        val dbQueryTimeoutMs = ((db.rootDatabase as DoorDatabaseJdbc).jdbcQueryTimeout * 1000).toLong()
 
-            if(dbType == DoorDbType.SQLITE) {
-                invalidationTracker.setupSqliteTriggers(pendingTx.connection)
+        return if(threadPendingTransaction != null) {
+            try {
+                block(threadPendingTransaction.connection)
+            }catch(e: Exception){
+                Napier.e("useConnection: Exception!", e)
+                throw e
             }
-
-            pendingTx
-        }
-
-        transaction.depth.incrementAndGet()
-        var err: Throwable? = null
-        try {
-            return block(transaction.connection)
-        }catch(t: Throwable) {
-            err = t
-            if(!transaction.connection.autoCommit) {
-                transaction.connection.rollback()
-            }
-
-            throw t
-        } finally {
-            if(transaction.depth.decrementAndGet() == 0) {
-                pendingTransactionThreadMap.remove(threadId)
-
-                val changedTables = mutableLinkedListOf<String>()
-                if(dbType == DoorDbType.SQLITE && err == null) {
-                    changedTables.addAll(invalidationTracker.findChangedTablesOnConnection(transaction.connection))
+        }else if(dbType == DoorDbType.SQLITE) {
+            runBlocking {
+                withTimeout(dbQueryTimeoutMs) {
+                    sqliteMutex.withLock {
+                        useNewConnectionInternal(transactionMode, block, threadId)
+                    }
                 }
-
-                transaction.connection.commit()
-                transaction.connection.close()
-
-                invalidationTracker.takeIf { changedTables.isNotEmpty() }?.onTablesInvalidated(changedTables.toSet())
             }
+        }else {
+            useNewConnectionInternal(transactionMode, block, threadId)
         }
     }
 
