@@ -1,7 +1,8 @@
 
 ## Door
 
-Door is an adaption of [Room](https://developer.android.com/training/data-storage/room) for Kotlin Multiplatform. Just 
+Door Kotlin Symbol Processor that builds on [Room](https://developer.android.com/training/data-storage/room) and makes
+it possible to use Room databases, DAOs and entities with Kotlin Multiplatform. Just 
 just put your Database and DAOs in your Kotlin Multiplatform common code, and door will generate expect/actuals for you!
 Door supports:
 * **Android**: Door will generate the actual class for Android, which in turn is then used by Room to generate the 
