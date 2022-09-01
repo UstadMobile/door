@@ -44,7 +44,71 @@ expect abstract class MyEntityDao {
 }
 ```
 
+Then add Gradle dependencies:
+```
+plugins {
+    id "org.jetbrains.kotlin.multiplatform"
+    //Add Kotlin Symbol Processing Plugin
+    id "com.google.devtools.ksp"
+}
 
+kotlin {
+    android { }
+
+    jvm { }
+    
+    js { }
+    
+    sourceSets {
+        commonMain {
+            dependencies {
+                //Add Door itself
+                implementation "com.github.UstadMobile.door:door-runtime:$version_door"
+                compileOnly "com.github.UstadMobile.door:door-annotations:$version_door"
+            }
+        }
+        
+        androidMain {
+            dependencies {
+                //Add Room dependencies for Android
+                implementation "androidx.room:room-runtime:$version_android_room"
+                implementation "androidx.room:room-ktx:$version_android_room"
+                implementation "androidx.lifecycle:lifecycle-livedata-ktx:$version_androidx_lifecycle"
+                implementation "androidx.paging:paging-runtime:$version_androidx_paging"
+            }
+        }
+    }
+}
+
+dependencies {
+    //Add the Door and Room Kotlin Symbol Processors for applicable platforms
+    kspJvm "com.github.UstadMobile.door:door-compiler:$version_door"
+    kspJs "com.github.UstadMobile.door:door-compiler:$version_door"
+    kspAndroid "com.github.UstadMobile.door:door-compiler:$version_door"
+    kspAndroid "androidx.room:room-compiler:$version_android_room"
+}
+```
+
+Then create the database. Database creation is platform-specific, so it's best to use a dependency injection library 
+(such as KodeIN-DI).
+
+```
+JVM: 
+//Make sure a JDBC DataSource is bound to: 
+// java:/comp/env/jdbc/mydatabase
+// This will be updated to allow the direct use of a JDBC URL
+val myDatabase = DatabaseBuilder.databaseBuilder(MyDatabase::class, "mydatabase").build()
+
+Android:
+val myDatabase = DatabaseBuilder.databaseBuilder(context, MyDatabase::class, "mydatabase").build()
+
+Javascript 
+//Note: build() is a suspended function on Javascript
+val builderOptions = DatabaseBuilderOptions(
+  MyDatabase::class, MyDatabase2JsImplementations, "my_indexdb_name",workerBlobUrl)
+val myDatabase = DatabaseBuilder.databaseBuilder(builderOptions).build() 
+
+```
 
 Limitations:
 * Because we are using expect/actual, no function body can be added (better to use extension functions).

@@ -147,4 +147,37 @@ class TestWithDoorTransaction {
 
     }
 
+    @Test
+    fun givenTransactionStarted_whenExceptionThrown_thenConnectionShouldClose() {
+        try {
+            db.withDoorTransaction(RepDb::class) {
+                throw Exception("Exception in transaction!")
+            }
+        }catch(e: Exception) {
+            //do nothing
+        }
+
+
+        val lastConnectionSpy = lastConnection.get()
+        verify(lastConnectionSpy, times(1)).rollback()
+        verify(lastConnectionSpy, times(1)).close()
+    }
+
+    @Test
+    fun givenTransactionStartedAsync_whenExceptionThrown_thenConnectionShouldRollbackAndClose() {
+        runBlocking {
+            try {
+                db.withDoorTransactionAsync(RepDb::class) {
+                    throw Exception("Exception in transaction!")
+                }
+            }catch (e: Exception) {
+                //do nothing
+            }
+
+            val lastConnectionSpy = lastConnection.get()
+            verify(lastConnectionSpy, times(1)).rollback()
+            verify(lastConnectionSpy, times(1)).close()
+        }
+    }
+
 }

@@ -53,7 +53,16 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
                 invalidationTracker.setupSqliteTriggers(transaction.connection)
             }
 
-            block(transaction.connection)
+            val changedTables = mutableLinkedListOf<String>()
+            block(transaction.connection).also {
+                if(dbType == DoorDbType.SQLITE) {
+                    changedTables.addAll(invalidationTracker.findChangedTablesOnConnection(transaction.connection))
+                }
+
+                transaction.connection.commit()
+
+                invalidationTracker.takeIf { changedTables.isNotEmpty() }?.onTablesInvalidated(changedTables.toSet())
+            }
         }catch(e: Exception) {
             Napier.e("useConnection: ERROR", e)
             if(!transaction.connection.autoCommit) {
@@ -62,21 +71,12 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
 
             throw e
         }finally {
-            val changedTables = mutableLinkedListOf<String>()
-            if(dbType == DoorDbType.SQLITE) {
-                changedTables.addAll(invalidationTracker.findChangedTablesOnConnection(transaction.connection))
-            }
-
-            transaction.connection.commit()
             pendingTransactionThreadMap.remove(threadId)
             transaction.connection.close()
             if(pendingTransactionThreadMap.isNotEmpty()) {
                 Napier.d("useConnection: close connection for thread #$threadId (took ${systemTimeInMillis() - startTime}ms)" +
                         " There are ${pendingTransactionThreadMap.size} pending non-async transactions still open.")
             }
-
-
-            invalidationTracker.takeIf { changedTables.isNotEmpty() }?.onTablesInvalidated(changedTables.toSet())
         }
     }
 

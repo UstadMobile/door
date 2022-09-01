@@ -1,5 +1,6 @@
 package com.ustadmobile.door.room
 
+import com.ustadmobile.door.ext.rootDatabase
 import com.ustadmobile.door.jdbc.SQLException
 import java.util.concurrent.Callable
 import com.ustadmobile.door.jdbc.ext.useStatement
@@ -25,17 +26,13 @@ actual abstract class RoomDatabase actual constructor() {
         return callable.call()
     }
 
-    fun query(query: String, args: Array<Any>) {
-        throw IllegalStateException("This is NOT active on JVM/JDBC. It is only present to allow Android to compile")
-    }
-
 
     /**
      * Execute a batch of SQL Statements in a transaction. This is generally much faster
      * than executing statements individually.
      */
     open fun execSQLBatch(vararg sqlStatements: String) {
-        val doorRoomImpl = this as RoomJdbcImpl
+        val doorRoomImpl = rootDatabase as RoomJdbcImpl
         doorRoomImpl.jdbcImplHelper.useConnection { connection ->
             connection.setAutoCommit(false)
             connection.createStatement().useStatement { statement ->
