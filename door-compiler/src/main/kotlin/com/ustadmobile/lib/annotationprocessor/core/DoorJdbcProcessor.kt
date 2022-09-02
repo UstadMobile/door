@@ -589,7 +589,7 @@ fun FileSpec.Builder.addJdbcDbImplType(
 /**
  * Add a ReceiveView for the given EntityTypeElement.
  */
-private fun CodeBlock.Builder.addCreateReceiveView(
+internal fun CodeBlock.Builder.addCreateReceiveView(
     entityKSClass: KSClassDeclaration,
     sqlListVar: String
 ): CodeBlock.Builder {
@@ -767,7 +767,7 @@ fun CodeBlock.Builder.addReplicateEntityChangeLogTrigger(
     return this
 }
 
-private fun CodeBlock.Builder.addCreateTriggersCode(
+internal fun CodeBlock.Builder.addCreateTriggersCode(
     entityKSClass: KSClassDeclaration,
     stmtListVar: String,
     dbProductType: Int

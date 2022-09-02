@@ -1,6 +1,7 @@
 package com.ustadmobile.lib.annotationprocessor.core.ext
 
 import androidx.room.ColumnInfo
+import androidx.room.Ignore
 import androidx.room.PrimaryKey
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
@@ -23,8 +24,9 @@ val KSPropertyDeclaration.entityPropColumnName: String
             simpleName.asString()
     }
 
-val KSPropertyDeclaration.isTransient: Boolean
-    get() = hasAnnotation(Transient::class)
+val KSPropertyDeclaration.isIgnored: Boolean
+    get() = hasAnyAnnotation(Transient::class, Ignore::class) || getter?.hasAnnotation(Ignore::class) ?:
+            setter?.hasAnnotation(Ignore::class) ?: false
 
 
 fun KSPropertyDeclaration.toPropSpecBuilder(

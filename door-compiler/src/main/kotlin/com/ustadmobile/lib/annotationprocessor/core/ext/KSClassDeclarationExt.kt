@@ -156,15 +156,13 @@ val KSClassDeclaration.isReplicateEntityWithAutoIncPrimaryKey: Boolean
 fun KSClassDeclaration.entityProps(
     getAutoIncLast: Boolean = true,
 ): List<KSPropertyDeclaration> {
-    val allFields = getAllProperties().toList().filter {
-        !it.hasAnnotation(Transient::class)
-    }
+    val allFields = getAllProperties().toList().filter { !it.isIgnored }
 
-    if(getAutoIncLast) {
+    return if(getAutoIncLast) {
         val fieldsPartitioned = allFields.partition { !it.isEntityAutoGeneratePrimaryKey }
-        return fieldsPartitioned.first + fieldsPartitioned.second
+        fieldsPartitioned.first + fieldsPartitioned.second
     }else {
-        return allFields
+        allFields
     }
 }
 
@@ -287,7 +285,7 @@ fun KSClassDeclaration.asTypeParameterizedBy(
 fun KSClassDeclaration.getAllColumnProperties(
     resolver: Resolver
 ): List<KSPropertyDeclaration> {
-    return getAllProperties().filter { !it.isTransient && it.type.resolve() in resolver.querySingularTypes() }.toList()
+    return getAllProperties().filter { !it.isIgnored && it.type.resolve() in resolver.querySingularTypes() }.toList()
 }
 
 fun KSClassDeclaration.entityEmbeddedEntities(
