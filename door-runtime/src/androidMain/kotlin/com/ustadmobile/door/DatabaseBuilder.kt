@@ -12,7 +12,9 @@ import com.ustadmobile.door.ext.wrap
 import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.util.DeleteZombieAttachmentsListener
 import com.ustadmobile.door.util.DoorAndroidRoomHelper
+import io.github.aakira.napier.Napier
 import java.io.File
+import java.util.concurrent.Executors
 
 @Suppress("UNCHECKED_CAST", "unused") //This is used as an API
 class DatabaseBuilder<T: RoomDatabase>(

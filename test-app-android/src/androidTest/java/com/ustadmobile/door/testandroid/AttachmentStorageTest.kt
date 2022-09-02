@@ -41,7 +41,7 @@ class AttachmentStorageTest {
             .build()
         tempImgFile = temporaryFolder.newFile()
         tempImgFile2 = temporaryFolder.newFile()
-        this::class.java.getResourceAsStream("/cat-pic0.jpg").writeToFile(tempImgFile)
+        this::class.java.getResourceAsStream("/cat-pic0.jpg")!!.writeToFile(tempImgFile)
     }
 
     @Test
@@ -92,11 +92,11 @@ class AttachmentStorageTest {
                     latch.countDown()
             }
         }
-        repDb.invalidationTracker.addObserver(invalidationObserver)
+        repDb.getInvalidationTracker().addObserver(invalidationObserver)
 
         latch.await(2000, TimeUnit.MILLISECONDS)
 
-        repDb.invalidationTracker.removeObserver(invalidationObserver)
+        repDb.getInvalidationTracker().removeObserver(invalidationObserver)
 
         Assert.assertFalse("Old file attachment was deleted", firstFileUri.toFile().exists())
     }
