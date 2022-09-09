@@ -391,7 +391,7 @@ private fun FileSpec.Builder.addReplicationRunOnChangeRunnerType(
                             add("_transactionDb.%L.${daoFun.simpleName.asString()}(newNodeId)\n",
                                 daoAccessor?.toPropertyOrEmptyFunctionCaller())
                             add("%T.d(%S + (%M() - fnTimeCounter) + %S)\n", Napier::class,
-                                "Ran ${dao.simpleName}#${daoFun.simpleName} in ",
+                                "Ran ${dao.simpleName.asString()}#${daoFun.simpleName.asString()} in ",
                                 MemberName("com.ustadmobile.door.util", "systemTimeInMillis"),
                                 "ms")
                             val funEntitiesChanged = daoFun.getKSAnnotationsByType(ReplicationCheckPendingNotificationsFor::class)
@@ -1299,7 +1299,7 @@ fun CodeBlock.Builder.beginPrepareAndUseStatementFlow(
     resolver: Resolver,
     statementVarName: String = "_stmt"
 ): CodeBlock.Builder {
-    add("_db.%M(", AbstractDbProcessor.prepareAndUseStatmentMemberName(daoFunDecl.isSuspended))
+    add("_db.%M(", AbstractDbProcessor.prepareAndUseStatmentMemberName(daoFunDecl.useSuspendedQuery))
     addPreparedStatementConfig(daoFunDecl, daoClassDecl, resolver)
     add(") { $statementVarName -> \n")
     indent()
@@ -1500,11 +1500,11 @@ fun CodeBlock.Builder.addJdbcQueryCode(
 
 
     if(querySql?.isSQLAModifyingQuery() != true) {
-        beginExecQueryOrUpdateFlow(suspended = daoFunDecl.isSuspended)
+        beginExecQueryOrUpdateFlow(suspended = daoFunDecl.useSuspendedQuery)
         addMapResultRowCode(resultType!!, resolver)
         endControlFlow()
     }else {
-        if(daoFunDecl.isSuspended) {
+        if(daoFunDecl.useSuspendedQuery) {
             add("_stmt.%M()\n", MEMBERNAME_EXEC_UPDATE_ASYNC)
         }else {
             add("_stmt.executeUpdate()\n")

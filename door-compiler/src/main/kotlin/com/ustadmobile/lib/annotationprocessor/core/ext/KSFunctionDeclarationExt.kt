@@ -96,3 +96,12 @@ fun KSFunctionDeclaration.getQueryTables(
 fun KSFunctionDeclaration.hasAnyListOrArrayParams(resolver: Resolver): Boolean {
     return parameters.any { it.type.resolve().isListOrArrayType(resolver) }
 }
+
+val KSFunctionDeclaration.useSuspendedQuery: Boolean
+    get() {
+        val returnTypeDecl: KSDeclaration? by lazy {
+            returnType?.resolve()?.declaration
+        }
+
+        return isSuspended || (returnTypeDecl?.isLiveData() == true) || (returnTypeDecl?.isDataSourceFactory() == true)
+    }
