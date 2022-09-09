@@ -109,6 +109,7 @@ kotlin {
                 implementation "org.mockito.kotlin:mockito-kotlin:$version_kotlin_mockito"
                 implementation "io.ktor:ktor-client-okhttp:$version_ktor"
                 implementation "io.ktor:ktor-client-gson:$version_ktor"
+                implementation "io.ktor:ktor-serialization-kotlinx-json:$version_ktor"
                 implementation "com.github.h-thurow:simple-jndi:$version_simple_jndi"
                 implementation "org.apache.commons:commons-pool2:$version_apache_commons_pool2"
                 implementation "org.apache.commons:commons-dbcp2:$version_apache_commons_dbcp2"

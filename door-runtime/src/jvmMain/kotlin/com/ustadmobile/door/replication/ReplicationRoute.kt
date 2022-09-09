@@ -46,12 +46,13 @@ fun <T: RoomDatabase> Route.doorReplicationRoute(
             try {
                 val startTime = systemTimeInMillis()
                 val tableId = call.request.queryParameters["tableId"]?.toInt() ?: 0
-                Napier.d("Replication: $ENDPOINT_CHECK_FOR_ENTITIES_ALREADY_RECEIVED table $tableId : starting")
+                Napier.d("Replication: $ENDPOINT_CHECK_FOR_ENTITIES_ALREADY_RECEIVED table $tableId : starting",
+                    tag = DoorTag.LOG_TAG)
                 val di: DI by closestDI()
                 val db: RoomDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
                 val dbMetaData = dbKClass.doorDatabaseMetadata()
 
-                val pendingEntitiesStr = call.receive<String>()
+                val pendingEntitiesStr = call.receiveText()
                 val pendingEntitiesJsonArr = jsonSerializer.decodeFromString(JsonArray.serializer(), pendingEntitiesStr)
                 val alreadyReceivedTrackers = db.checkPendingReplicationTrackers(dbKClass,
                     dbMetaData, pendingEntitiesJsonArr, tableId)
@@ -77,7 +78,7 @@ fun <T: RoomDatabase> Route.doorReplicationRoute(
                 val dbMetaData = dbKClass.doorDatabaseMetadata()
                 val remoteNodeId = requireRemoteNodeIdAndAuth()
 
-                val receivedEntitiesStr = call.receive<String>()
+                val receivedEntitiesStr = call.receiveText()
                 val receivedEntitiesJsonArr = jsonSerializer.decodeFromString(JsonArray.serializer(),
                     receivedEntitiesStr)
                 db.insertReplicationsIntoReceiveView(dbMetaData, dbKClass, remoteNodeId.first, tableId,
@@ -105,7 +106,7 @@ fun <T: RoomDatabase> Route.doorReplicationRoute(
                 val db: RoomDatabase = di.direct.on(call).Instance(typeToken, tag = DoorTag.TAG_DB)
                 val dbMetaData = dbKClass.doorDatabaseMetadata()
 
-                val trackersStr = call.receive<String>()
+                val trackersStr = call.receiveText()
                 val trackersJson = jsonSerializer.decodeFromString(JsonArray.serializer(), trackersStr)
                 val (remoteNodeId, _) = requireRemoteNodeIdAndAuth()
 

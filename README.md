@@ -1,9 +1,13 @@
 
 ## Door
 
-Door Kotlin Symbol Processor that builds on [Room](https://developer.android.com/training/data-storage/room) and makes
-it possible to use Room databases, DAOs and entities with Kotlin Multiplatform. Just 
-just put your Database and DAOs in your Kotlin Multiplatform common code, and door will generate expect/actuals for you!
+Door is a Kotlin Symbol Processor that builds on [Room](https://developer.android.com/training/data-storage/room) and makes
+it possible to use Room databases, DAOs and entities with Kotlin Multiplatform (using [expect/actual](https://kotlinlang.org/docs/multiplatform-connect-to-apis.html)).
+
+Just put Database, DAO, and entity classes in your Kotlin Multiplatform common code and add the ```expect``` keyword to
+DAO and Database classes. 
+Door will generate actuals for each platform automatically!
+
 Door supports:
 * **Android**: Door will generate the actual class for Android, which in turn is then used by Room to generate the 
 implementation (the same implementation if you had used Room itself).
@@ -20,6 +24,7 @@ this)
 ## Getting started
 Just create your Database and DAOs in Kotlin multiplatform common code:
 
+Database:
 ```
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.annotations.DoorDatabase
@@ -32,7 +37,10 @@ expect abstract class MyDatabase: RoomDatabase {
      
      val anotherEntityDao: AnotherEntityDao 
 }
+```
 
+DAO:
+```
 import com.ustadmobile.door.annotations.DoorDao
 
 @DoorDao
@@ -112,7 +120,7 @@ val myDatabase = DatabaseBuilder.databaseBuilder(builderOptions).build()
 
 Limitations:
 * Because we are using expect/actual, no function body can be added (better to use extension functions).
-
+* No support for choosing entity constructors. Door requires and will always choose the no args constructor.
 
 ## Debugging
 Use Gradle in debug mode e.g.:
