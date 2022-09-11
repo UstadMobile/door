@@ -1,5 +1,9 @@
+# Door
 
-## Door
+[![Release](https://jitpack.io/v/UstadMobile/door.svg)](https://jitpack.io/#UstadMobile/door)
+![JS](https://img.shields.io/badge/platform-android-orange)
+![JVM](https://img.shields.io/badge/platform-jvm-orange)
+![JS](https://img.shields.io/badge/platform-js-orange)
 
 Door is a Kotlin Symbol Processor that builds on [Room](https://developer.android.com/training/data-storage/room) and makes
 it possible to use Room databases, DAOs and entities with Kotlin Multiplatform (using [expect/actual](https://kotlinlang.org/docs/multiplatform-connect-to-apis.html)).
@@ -18,7 +22,9 @@ you to run the queries and return results. Only asynchronous operations are supp
 and DataSource.Factory)
 
 No support for iOS/Native (yet - pull request would be welcome. Happy to help support anyone who would like to work on 
-this)
+this).
+
+Door contains an experimental [replication/sync](README-REPLICATION.md) engine that can be used to sync 
 
 
 ## Getting started
@@ -54,6 +60,15 @@ expect abstract class MyEntityDao {
 
 Then add Gradle dependencies:
 ```
+//Add jitpack repository if you don't already have it
+buildscript {
+    repositories {
+        maven {
+           url 'https://jitpack.io/'
+        }
+    }
+}
+
 plugins {
     id "org.jetbrains.kotlin.multiplatform"
     //Add Kotlin Symbol Processing Plugin
@@ -97,8 +112,8 @@ dependencies {
 }
 ```
 
-Then create the database. Database creation is platform-specific, so it's best to use a dependency injection library 
-(such as KodeIN-DI).
+Then create the database. Database creation is platform-specific, so it's best to use multiplatform dependency injection
+(such as KodeIN-DI) or create your own expect-actual function.
 
 ```
 JVM: 
@@ -121,6 +136,7 @@ val myDatabase = DatabaseBuilder.databaseBuilder(builderOptions).build()
 Limitations:
 * Because we are using expect/actual, no function body can be added (better to use extension functions).
 * No support for choosing entity constructors. Door requires and will always choose the no args constructor.
+* No support (yet) for Kotlin flow return types. This will be added very soon.
 
 ## Debugging
 Use Gradle in debug mode e.g.:
@@ -128,12 +144,27 @@ Use Gradle in debug mode e.g.:
 ./gradlew --no-daemon -Dorg.gradle.debug=true build
 ```
 
-## Postgres/SQLite query hacks
+## Postgres/SQLite query differentiation
 
-Most of the time SQL that works on SQLite works on Postgres, and vice-versa. But not always.
+Most of the time SQL that works on SQLite works on Postgres, and vice-versa. But not always. Door provides a few 
+workarounds.
 
-Door provides a few workarounds:
+Option 1: Define a different query for postgres (both queries must have the same named parameters).
+```
+@Query("""
+       REPLACE INTO TableName(col1, col2) 
+        SELECT 1 as col1, 2 as col2
+         WHERE NOT EXISTS (...)
+       """)
+@PostgresQuery("""
+              INSERT INTO TableName1(col1, col2)
+              SELECT 1 as col1, 2 as col2
+              ON CONFLICT(col1) DO UPDATE
+              SET col2 = EXCLUDED.col2
+              """)     
+```
 
+Option 2: Use comment hacks:
 ```
 @Query("""
   -- Replace into will be turned into INSERT INTO 
@@ -162,19 +193,13 @@ Door provides a few workarounds:
 
 * [app-testdb](app-testdb/) Contains a test React/JS app. Used to run manual tests that don't seem to work in automated
 JS tests.
-* [door-jdbc](door-jdbc/) Contains multiplatform expect-actuals representing the core of JDBC (e.g. required functions on Statement, 
-PreparedStatement, Connection, DataSource, etc) On Android and JVM these are just typealiases to the real JDBC interfaces. 
-On JS these are actual interfaces. The class names are the same as found in JDBC, only the package name has been changed 
-from java.sql.* to com.ustadmobile.door.jdbc*. This allows multiplatform code to use JDBC.
-* [door-room-jdbc](door-room-jdbc/) Contains an Android module that provides an implementation of door-jdbc for Room 
-databases. 
+* [door-annotations](door-annotations/) Contains androidx annotations identical to those used in room,
+used to compile on non-Android targets.
 * [door-compiler](door-compiler/) Contains the actual annotation processor based on Kotlin Poet
-* [door-room-kmp](door-room-kmp/) Provides the needed androidx classes (e.g. LiveData, annotations, etc) for 
-use on JVM and JS. This is a compileOnly dependency for common code and an implementation dependency on JVM and JS. 
-Android will use room itself as an implementation dependency.
+* [door-runtime](door-runtime/) The main runtime module - contains classes and functions used by generated
+code
 * [door-testdb](door-testdb/) Contains a few test databases that are used for unit and integration testing. These 
-databases are compiled by the annotation processor, so tests can verify functionality (e.g. insert then retrieve, 
-sync, etc)
+databases are compiled by the annotation processor, so tests can verify functionality.
 
 ## Known issues
 
