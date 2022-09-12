@@ -1297,10 +1297,11 @@ fun CodeBlock.Builder.beginPrepareAndUseStatementFlow(
     daoFunDecl: KSFunctionDeclaration,
     daoClassDecl: KSClassDeclaration,
     resolver: Resolver,
-    statementVarName: String = "_stmt"
+    statementVarName: String = "_stmt",
+    querySql: String? = daoFunDecl.getAnnotation(Query::class)?.value,
 ): CodeBlock.Builder {
     add("_db.%M(", AbstractDbProcessor.prepareAndUseStatmentMemberName(daoFunDecl.useSuspendedQuery))
-    addPreparedStatementConfig(daoFunDecl, daoClassDecl, resolver)
+    addPreparedStatementConfig(daoFunDecl, daoClassDecl, resolver, querySql)
     add(") { $statementVarName -> \n")
     indent()
 
@@ -1400,10 +1401,10 @@ fun CodeBlock.Builder.addResultSetToEntityCode(
 fun CodeBlock.Builder.addPreparedStatementConfig(
     daoFunDecl: KSFunctionDeclaration,
     daoClassDecl: KSClassDeclaration,
-    resolver: Resolver
+    resolver: Resolver,
+    querySql: String? = daoFunDecl.getAnnotation(Query::class)?.value
 ): CodeBlock.Builder {
     val daoFun = daoFunDecl.asMemberOf(daoClassDecl.asType(emptyList()))
-    val querySql = daoFunDecl.getAnnotation(Query::class)?.value
     val querySqlPostgres = daoFunDecl.getAnnotation(PostgresQuery::class)?.value
     val queryVars = daoFunDecl.parameters.mapIndexed { index, ksValueParameter ->
         ksValueParameter.name!!.asString() to daoFun.parameterTypes[index]!!
@@ -1491,7 +1492,7 @@ fun CodeBlock.Builder.addJdbcQueryCode(
     querySql: String? = daoFunDecl.getAnnotation(Query::class)?.value,
     resultType: KSType? = daoFunDecl.asMemberOf(daoClassDecl.asType(emptyList())).returnType,
 ): CodeBlock.Builder {
-    beginPrepareAndUseStatementFlow(daoFunDecl, daoClassDecl, resolver)
+    beginPrepareAndUseStatementFlow(daoFunDecl, daoClassDecl, resolver, querySql = querySql)
     if(querySql != null)
         addSetPreparedStatementParams(querySql, queryVarsMap, resolver)
     else if(daoFunDecl.hasAnnotation(RawQuery::class)){
