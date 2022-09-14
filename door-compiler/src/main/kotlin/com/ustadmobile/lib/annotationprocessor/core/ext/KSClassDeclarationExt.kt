@@ -195,7 +195,7 @@ fun KSClassDeclaration.toCreateTableSql(
         if(fieldProp.getAnnotation(PrimaryKey::class)?.autoGenerate == true) {
             when(dbType) {
                 DoorDbType.SQLITE -> sql += " INTEGER "
-                DoorDbType.POSTGRES -> sql += (if(fieldProp.type == resolver.builtIns.longType) {
+                DoorDbType.POSTGRES -> sql += (if(fieldProp.type.resolve() == resolver.builtIns.longType) {
                     " BIGSERIAL "
                 } else {
                     " SERIAL "
