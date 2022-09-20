@@ -4,7 +4,11 @@ import com.ustadmobile.door.DatabaseBuilder
 import db2.ExampleDatabase2
 import db2.ExampleEntity2
 import db2.ExampleLinkEntity
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.cancellable
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.take
 import org.junit.Assert
 import org.junit.Before
 import org.junit.BeforeClass
@@ -163,6 +167,39 @@ class TestDbBuilderKt {
                 entityToInsert, entityFromQuery)
         }
 
+    }
+
+    @Test
+    fun givenOneEntry_whenQueriedAsFlowAndNewEntityInserted_shouldEmitFirstValueThenSecond() {
+        runBlocking {
+            val entity1 = ExampleEntity2().apply {
+                name = "Bob"
+                uid = exampleDb2.exampleDao2().insertAndReturnId(this)
+            }
+
+            val flowJob = GlobalScope.async {
+                exampleDb2.exampleDao2().queryAllAsFlow()
+            }
+
+            val flow = flowJob.await()
+
+            val firstEmission = withTimeout(1000) {
+                flow.first()
+            }
+
+            ExampleEntity2().apply {
+                name = "Lenny"
+                uid = exampleDb2.exampleDao2().insertAndReturnId(this)
+            }
+
+            val secondEmission = withTimeout(1000) {
+                flow.first()
+            }
+
+            Assert.assertEquals("Initial result had one entity in list", firstEmission.size, 1)
+            Assert.assertEquals("Second result had two entities in list", secondEmission.size, 2)
+            flowJob.cancelAndJoin()
+        }
     }
 
 }

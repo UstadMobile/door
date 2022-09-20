@@ -1210,7 +1210,7 @@ fun TypeSpec.Builder.addDaoQueryFunction(
 
     //funSpec.parameters.map { it.name to it.type }.toMap()
     val querySql = daoFunDecl.getAnnotation(Query::class)?.value
-    val resultType = daoFun.returnType?.unwrapLiveDataOrDataSourceFactoryResultType(resolver) ?: resolver.builtIns.unitType
+    val resultType = daoFun.returnType?.unwrapResultType(resolver) ?: resolver.builtIns.unitType
 
     val rawQueryParamName = if(daoFunDecl.hasAnnotation(RawQuery::class))
         daoFunDecl.parameters.first().name?.asString()
@@ -1281,7 +1281,16 @@ fun TypeSpec.Builder.addDaoQueryFunction(
                 .addJdbcQueryCode(daoFunDecl, daoDecl, queryVarsMap, resolver)
                 .endControlFlow()
                 .build())
-        }.applyIf(daoFun.returnType?.isDataSourceFactoryOrLiveData() != true) {
+        }.applyIf(daoFun.returnType?.isFlow() == true) {
+            addCode(CodeBlock.builder()
+                .add("return ")
+                .beginControlFlow("_db.%M(arrayOf(%L))",
+                    MemberName("com.ustadmobile.door.flow", "doorFlow"),
+                    daoFunDecl.getQueryTables(environment.logger).joinToString { "\"$it\"" })
+                .addJdbcQueryCode(daoFunDecl, daoDecl, queryVarsMap, resolver)
+                .endControlFlow()
+                .build())
+        }.applyIf(daoFun.returnType?.isDataSourceFactoryOrLiveDataOrFlow() != true) {
             if(daoFun.hasReturnType(resolver))
                 addCode("return ")
             addCode(CodeBlock.builder()
@@ -1332,7 +1341,7 @@ fun CodeBlock.Builder.addMapResultRowCode(
     resolver: Resolver,
     resultVarName: String = "_result",
 ): CodeBlock.Builder {
-    val queryReturnType = resultType.unwrapLiveDataOrDataSourceFactoryResultType(resolver)
+    val queryReturnType = resultType.unwrapResultType(resolver)
     val resultComponentType = queryReturnType.unwrapComponentTypeIfListOrArray(resolver)
     if(queryReturnType.isListOrArrayType(resolver) || resultType.isDataSourceFactory()) {
         beginControlFlow("$resultVarName.%M", MemberName("com.ustadmobile.door.jdbc.ext", "mapRows"))

@@ -3,6 +3,7 @@ package com.ustadmobile.lib.annotationprocessor.core.ext
 import com.ustadmobile.door.lifecycle.LiveData
 import com.google.devtools.ksp.symbol.*
 import com.ustadmobile.door.paging.DataSourceFactory
+import kotlinx.coroutines.flow.Flow
 
 fun KSDeclaration.propertyOrReturnType(): KSTypeReference? {
     return when(this) {
@@ -28,5 +29,9 @@ fun KSDeclaration.isLiveData(): Boolean {
     return (this as? KSClassDeclaration)?.qualifiedName?.asString() == LiveData::class.qualifiedName
 }
 
-fun KSDeclaration.isDataSourceFactoryOrLiveData() =  isDataSourceFactory() || isLiveData()
+fun KSDeclaration.isFlow(): Boolean {
+    return (this as? KSClassDeclaration)?.qualifiedName?.asString() == Flow::class.qualifiedName
+}
+
+fun KSDeclaration.isDataSourceFactoryOrLiveDataOrFlow() =  isDataSourceFactory() || isLiveData() || isFlow()
 

@@ -136,7 +136,6 @@ val myDatabase = DatabaseBuilder.databaseBuilder(builderOptions).build()
 Limitations:
 * Because we are using expect/actual, no function body can be added (better to use extension functions).
 * No support for choosing entity constructors. Door requires and will always choose the no args constructor.
-* No support (yet) for Kotlin flow return types. This will be added very soon.
 
 ## Debugging
 Use Gradle in debug mode e.g.:

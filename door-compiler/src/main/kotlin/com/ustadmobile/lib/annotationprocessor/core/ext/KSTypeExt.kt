@@ -7,6 +7,7 @@ import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.CodeBlock
 import com.ustadmobile.door.DoorDbType
+import kotlinx.coroutines.flow.Flow
 
 fun KSType.unwrapComponentTypeIfListOrArray(
     resolver: Resolver
@@ -20,7 +21,20 @@ fun KSType.unwrapComponentTypeIfListOrArray(
 
 }
 
-fun KSType.unwrapLiveDataOrDataSourceFactoryResultType(
+/**
+ *
+ * @receiver The return type of a DAO function. This can be a primitive, object, a list or array of a primitive or object
+ * or LiveData, DataSourceFactory, or Flow with a primitive or object type reference
+ * e.g. Entity, List<Entity>, LiveData<Entity>, LiveData<List<Entity>> etc.
+ *
+ * @param resolver the KSP resolver
+ *
+ * @return The result type expected when running the actual query - either the object itself, or a list of objects. This
+ * will unwrap LiveData, Flow, and DataSourceFactory.
+ * e.g. Entity, List<Entity>, Entity, List<Entity> etc.
+ *
+ */
+fun KSType.unwrapResultType(
     resolver: Resolver,
 ): KSType {
     val qualifiedName = this.declaration.qualifiedName?.asString()
@@ -32,7 +46,12 @@ fun KSType.unwrapLiveDataOrDataSourceFactoryResultType(
         return resolver.getClassDeclarationByName(resolver.getKSNameFromString("kotlin.collections.List"))
             ?.asType(listOf(resolver.getTypeArgument(entityTypeRef, Variance.INVARIANT)))
                 ?: throw IllegalArgumentException("unwrapLiveDataOrDataSourceFactoryResultType: could not lookup datasource comp type")
-    }else {
+    }else if(qualifiedName == Flow::class.qualifiedName) {
+        return this.arguments.first().type?.resolve()
+            ?: throw IllegalArgumentException("unwrapLiveDataOrDataSourceFactoryResultType: Cannot resolve Flow type!")
+    }
+
+    else {
         return this
     }
 
@@ -157,7 +176,9 @@ fun KSType.isDataSourceFactory() = declaration.isDataSourceFactory()
 
 fun KSType.isLiveData() = declaration.isLiveData()
 
-fun KSType.isDataSourceFactoryOrLiveData() = declaration.isDataSourceFactoryOrLiveData()
+fun KSType.isDataSourceFactoryOrLiveDataOrFlow() = declaration.isDataSourceFactoryOrLiveDataOrFlow()
+
+fun KSType.isFlow() = declaration.isFlow()
 
 fun KSType.resolveActualTypeIfAliased(): KSType {
     return if(declaration is KSTypeAlias) {

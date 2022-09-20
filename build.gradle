@@ -1,5 +1,5 @@
 group 'com.github.UstadMobile.door'
-version '0.0.62g'
+version '0.0.62i'
 
 ext.localProperties = new Properties()
 
@@ -29,7 +29,6 @@ apply plugin: "com.github.ben-manes.versions"
 buildscript {
 
     ext.kotlin_version = "1.7.10"
-    ext.version_ksp = "1.0.6"
     ext.atomicfu_version = '0.18.2'
     ext.version_shadow = "7.1.2"
     ext.gradle_versions_version = "0.42.0"

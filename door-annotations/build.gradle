@@ -53,7 +53,7 @@ kotlin {
         }
     }
 
-    js(LEGACY) {
+    js(BOTH) {
         browser()
     }
 

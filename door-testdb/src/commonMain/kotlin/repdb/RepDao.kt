@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Update
 import com.ustadmobile.door.annotation.*
 import com.ustadmobile.door.entities.DoorNode
+import kotlinx.coroutines.flow.Flow
 
 @DoorDao
 @Repository
@@ -165,5 +166,10 @@ expect abstract class RepDao: RepDaoInterface<RepEntity> {
            AND trkrDestination = :destination
     """)
     abstract fun findTrackerByDestinationAndPk(pk: Long, destination: Long): RepEntityTracker?
+
+    @Query("""
+        SELECT * FROM RepEntity
+    """)
+    abstract fun findAllAsFlow(): Flow<List<RepEntity>>
 
 }

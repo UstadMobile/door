@@ -308,7 +308,7 @@ fun KSClassDeclaration.allDaoEntities(resolver: Resolver): List<KSClassDeclarati
             val entityClassDecl =  ksFun.firstParamEntityType(resolver).declaration as? KSClassDeclaration
             entityClassDecl?.let { listOf(it) } ?: emptyList()
         }else if(daoFun.hasAnyAnnotation(Query::class, RawQuery::class) && ksFun.hasReturnType(resolver)) {
-            val returnKSClass = ksFun.returnType?.unwrapLiveDataOrDataSourceFactoryResultType(resolver)
+            val returnKSClass = ksFun.returnType?.unwrapResultType(resolver)
                 ?.unwrapComponentTypeIfListOrArray(resolver)?.declaration as? KSClassDeclaration
             val parentClasses = returnKSClass?.getAllSuperTypes()?.map { it.declaration }
                 ?.filterIsInstance<KSClassDeclaration>()?.toList() ?: emptyList()

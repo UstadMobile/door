@@ -6,6 +6,7 @@ import com.ustadmobile.door.*
 import com.ustadmobile.door.annotation.DoorDao
 import com.ustadmobile.door.annotation.QueryLiveTables
 import com.ustadmobile.door.paging.DataSourceFactory
+import kotlinx.coroutines.flow.Flow
 
 @DoorDao
 abstract class ExampleDao2 {
@@ -150,5 +151,8 @@ abstract class ExampleDao2 {
          WHERE uid = :uid 
     """)
     abstract fun insertFromSelectQuery(uid: Int)
+
+    @Query("SELECT * FROM ExampleEntity2")
+    abstract fun queryAllAsFlow(): Flow<List<ExampleEntity2>>
 
 }
