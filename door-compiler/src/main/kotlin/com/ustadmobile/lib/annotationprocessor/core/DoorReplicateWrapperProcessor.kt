@@ -300,7 +300,7 @@ fun FileSpec.Builder.addDaoWrapperTypeSpec(
     logger: KSPLogger,
 ): FileSpec.Builder {
     addType(TypeSpec.classBuilder(daoClassDeclaration.toClassNameWithSuffix(DoorDatabaseReplicateWrapper.SUFFIX))
-        .superclass(daoClassDeclaration.toClassName())
+        .addSuperClassOrInterface(daoClassDeclaration)
         .addOriginatingKSClass(daoClassDeclaration)
         .addOriginatingKSClasses(daoClassDeclaration.allDaoEntities(resolver))
         .primaryConstructor(FunSpec.constructorBuilder()

@@ -1,10 +1,8 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.google.devtools.ksp.symbol.KSDeclaration
-import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import com.google.devtools.ksp.symbol.KSPropertyDeclaration
+import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.*
+import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.ustadmobile.door.RepositoryConnectivityListener
 import com.ustadmobile.door.annotation.DoorDatabase
@@ -169,6 +167,16 @@ fun TypeSpec.Builder.addThrowExceptionOverride(
         .addModifiers(KModifier.OVERRIDE)
         .addCode("throw %T(%S)\n", exceptionClass,  exceptionMessage)
         .build())
+
+    return this
+}
+
+fun TypeSpec.Builder.addSuperClassOrInterface(superKSClassDeclaration: KSClassDeclaration) : TypeSpec.Builder {
+    if(superKSClassDeclaration.classKind == ClassKind.CLASS) {
+        superclass(superKSClassDeclaration.toClassName())
+    }else {
+        addSuperinterface(superKSClassDeclaration.toClassName())
+    }
 
     return this
 }

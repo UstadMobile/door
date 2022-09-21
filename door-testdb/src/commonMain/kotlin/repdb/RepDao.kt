@@ -11,13 +11,13 @@ import kotlinx.coroutines.flow.Flow
 
 @DoorDao
 @Repository
-expect abstract class RepDao: RepDaoInterface<RepEntity> {
+expect interface RepDao: RepDaoInterface<RepEntity> {
 
     @Insert
-    abstract suspend fun insertDoorNodeAsync(node: DoorNode)
+    suspend fun insertDoorNodeAsync(node: DoorNode)
 
     @Insert
-    abstract fun insertDoorNode(node: DoorNode)
+    fun insertDoorNode(node: DoorNode)
 
     @Query("""
        REPLACE INTO RepEntityTracker(trkrForeignKey, trkrDestination)
@@ -39,7 +39,7 @@ expect abstract class RepDao: RepDaoInterface<RepEntity> {
     //Note UPDATE does not need a WHERE check - this was already checked in the insert using the where clause there
     @ReplicationRunOnChange(value = [RepEntity::class])
     @ReplicationCheckPendingNotificationsFor([RepEntity::class])
-    abstract suspend fun updateReplicationTrackers()
+    suspend fun updateReplicationTrackers()
 
 
 
@@ -66,42 +66,42 @@ expect abstract class RepDao: RepDaoInterface<RepEntity> {
     """)
     @ReplicationRunOnNewNode
     @ReplicationCheckPendingNotificationsFor([RepEntity::class])
-    abstract suspend fun updateReplicationTrackersNewNode(@NewNodeIdParam newNodeId: Long)
+    suspend fun updateReplicationTrackersNewNode(@NewNodeIdParam newNodeId: Long)
 
     @Insert
-    abstract suspend fun insertAsync(repEntity: RepEntity): Long
+    suspend fun insertAsync(repEntity: RepEntity): Long
 
     @Query("""
         SELECT RepEntityTracker.*
           FROM RepEntityTracker
     """)
-    abstract fun findAllTrackers(): LiveData<List<RepEntityTracker>>
+    fun findAllTrackers(): LiveData<List<RepEntityTracker>>
 
     @Insert
-    abstract fun insert(repEntity: RepEntity): Long
+    fun insert(repEntity: RepEntity): Long
 
     @Insert
-    abstract fun insertList(repEntityList: List<RepEntity>)
+    fun insertList(repEntityList: List<RepEntity>)
 
     @Update
-    abstract fun update(repEntity: RepEntity)
+    fun update(repEntity: RepEntity)
 
 
     @Update
-    abstract suspend fun updateAsync(repEntity: RepEntity)
+    suspend fun updateAsync(repEntity: RepEntity)
 
     @RepoHttpAccessible
     @Query("""
     SELECT COUNT(*)
       FROM RepEntity
     """)
-    abstract fun countEntities(): Int
+    fun countEntities(): Int
 
     @Query("""
     SELECT COUNT(*)
       FROM RepEntity
     """)
-    abstract fun countEntitiesLive(): LiveData<Int>
+    fun countEntitiesLive(): LiveData<Int>
 
 
     @Query("""
@@ -109,7 +109,7 @@ expect abstract class RepDao: RepDaoInterface<RepEntity> {
       FROM RepEntity
      WHERE RepEntity.rePrimaryKey = :uid 
     """)
-    abstract fun findByUid(uid: Long): RepEntity?
+    fun findByUid(uid: Long): RepEntity?
 
 
     @Query("""
@@ -117,13 +117,13 @@ expect abstract class RepDao: RepDaoInterface<RepEntity> {
       FROM RepEntity
      WHERE RepEntity.rePrimaryKey = :uid 
     """)
-    abstract suspend fun findByUidAsync(uid: Long): RepEntity?
+    suspend fun findByUidAsync(uid: Long): RepEntity?
 
     @Query("""
     SELECT RepEntity.*
       FROM RepEntity
     """)
-    abstract suspend fun findAllAsync(): List<RepEntity>
+    suspend fun findAllAsync(): List<RepEntity>
 
 
     @Query("""
@@ -131,12 +131,12 @@ expect abstract class RepDao: RepDaoInterface<RepEntity> {
       FROM RepEntity
      WHERE RepEntity.rePrimaryKey = :uid 
     """)
-    abstract fun findByUidLive(uid: Long): LiveData<RepEntity?>
+    fun findByUidLive(uid: Long): LiveData<RepEntity?>
 
     @RepoHttpAccessible
     @Repository(Repository.METHOD_DELEGATE_TO_WEB)
     @Insert
-    abstract suspend fun insertHttp(entity: RepEntity) : Long
+    suspend fun insertHttp(entity: RepEntity) : Long
 
     @Query("""
         SELECT COALESCE(
@@ -144,7 +144,7 @@ expect abstract class RepDao: RepDaoInterface<RepEntity> {
                        FROM SyncNode 
                       LIMIT 1), 0)
     """)
-    abstract suspend fun selectSyncNodeId(): Long
+    suspend fun selectSyncNodeId(): Long
 
 
     @Query("""
@@ -152,12 +152,12 @@ expect abstract class RepDao: RepDaoInterface<RepEntity> {
           FROM RepEntity
          WHERE reString IN (:strList) 
     """)
-    abstract suspend fun findInStringList(strList: List<String>): List<RepEntity>
+    suspend fun findInStringList(strList: List<String>): List<RepEntity>
 
 
     @Query("""SELECT MAX(:num1, :num2)""")
     @SqliteOnly
-    abstract suspend fun sqliteOnlyFun(num1: Int, num2: Int): Long
+    suspend fun sqliteOnlyFun(num1: Int, num2: Int): Long
 
     @Query("""
         SELECT RepEntityTracker.*
@@ -165,11 +165,11 @@ expect abstract class RepDao: RepDaoInterface<RepEntity> {
          WHERE trkrForeignKey = :pk
            AND trkrDestination = :destination
     """)
-    abstract fun findTrackerByDestinationAndPk(pk: Long, destination: Long): RepEntityTracker?
+    fun findTrackerByDestinationAndPk(pk: Long, destination: Long): RepEntityTracker?
 
     @Query("""
         SELECT * FROM RepEntity
     """)
-    abstract fun findAllAsFlow(): Flow<List<RepEntity>>
+    fun findAllAsFlow(): Flow<List<RepEntity>>
 
 }

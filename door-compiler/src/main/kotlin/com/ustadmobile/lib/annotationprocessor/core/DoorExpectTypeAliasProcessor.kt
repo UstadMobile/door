@@ -31,7 +31,13 @@ fun FileSpec.Builder.addActualClassForExpectedType(
         .filter { (it.resolveActualTypeIfAliased().declaration as? KSClassDeclaration)?.classKind == ClassKind.INTERFACE }
         .toList()
 
-    addType(TypeSpec.classBuilder(ksClassDeclaration.toClassName())
+    val builder = if(ksClassDeclaration.classKind == ClassKind.INTERFACE) {
+        TypeSpec.interfaceBuilder(ksClassDeclaration.toClassName())
+    }else {
+        TypeSpec.classBuilder(ksClassDeclaration.toClassName())
+    }
+
+    addType(builder
         .addOriginatingKSClass(ksClassDeclaration)
         .applyIf(superClass != null) {
             superclass(superClass!!.toTypeName())
@@ -64,6 +70,9 @@ fun FileSpec.Builder.addActualClassForExpectedType(
                 addFunction(ksFunDec.toFunSpecBuilder(resolver, classKSType, logger)
                     .removeModifier(KModifier.EXPECT)
                     .addModifiers(KModifier.ACTUAL)
+                    .applyIf(ksClassDeclaration.classKind == ClassKind.INTERFACE) {
+                        addModifiers(KModifier.ABSTRACT)
+                    }
                     .applyIf(target == DoorTarget.ANDROID) {
                         val annotationsToCopy = listOf("Insert", "Query", "RawQuery", "Delete", "Update")
                         copyAnnotations(ksFunDec) {

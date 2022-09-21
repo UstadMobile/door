@@ -1013,7 +1013,7 @@ fun FileSpec.Builder.addDaoJdbcImplType(
         .primaryConstructor(FunSpec.constructorBuilder().addParameter("_db",
             RoomDatabase::class).build())
         .addProperty(PropertySpec.builder("_db", RoomDatabase::class).initializer("_db").build())
-        .superclass(daoKSClass.toClassName())
+        .addSuperClassOrInterface(daoKSClass)
         .apply {
             allFunctions.filter { it.hasAnnotation(Insert::class) }.forEach { daoFun ->
                 addDaoInsertFunction(daoFun, daoKSClass, resolver, target, environment.logger)

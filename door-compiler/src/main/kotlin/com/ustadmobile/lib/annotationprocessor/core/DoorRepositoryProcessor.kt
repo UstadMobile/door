@@ -294,7 +294,7 @@ fun FileSpec.Builder.addDaoRepoType(
             .initializer("_clientId").build())
         .addProperty(PropertySpec.builder("_endpoint", String::class)
             .initializer("_endpoint").build())
-        .superclass(daoClassName)
+        .addSuperClassOrInterface(daoKSClass)
         .addAnnotation(AnnotationSpec.builder(Suppress::class)
             .addMember("%S, %S, %S", "REDUNDANT_PROJECTION", "LocalVariableName",
                 "ClassName")
