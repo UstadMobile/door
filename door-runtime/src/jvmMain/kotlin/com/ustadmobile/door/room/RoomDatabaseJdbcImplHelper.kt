@@ -20,7 +20,8 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
     db: RoomDatabase,
     tableNames: List<String>,
     invalidationTracker: InvalidationTracker,
-) : RoomDatabaseJdbcImplHelperCommon(dataSource, db, tableNames, invalidationTracker) {
+    dbType: Int,
+) : RoomDatabaseJdbcImplHelperCommon(dataSource, db, tableNames, invalidationTracker, dbType) {
 
     inner class PendingTransaction(val connection: Connection)
 
@@ -31,12 +32,6 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
     //Switch this to using concurrentSafeMap
     //Synchronous mode pending transactions
     private val pendingTransactionThreadMap = concurrentSafeMapOf<Long, PendingTransaction>()
-
-    override val dbType: Int by lazy {
-        dataSource.connection.use { connection ->
-            DoorDbType.typeIntFromProductName(connection.metaData?.databaseProductName ?: "")
-        }
-    }
 
     @Suppress("UNUSED_PARAMETER") //Reserved for future usage
     private fun <R> useNewConnectionInternal(

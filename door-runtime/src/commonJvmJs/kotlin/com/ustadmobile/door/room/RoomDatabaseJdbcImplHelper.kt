@@ -17,6 +17,7 @@ expect class RoomDatabaseJdbcImplHelper(
     db: RoomDatabase,
     tableNames: List<String>,
     invalidationTracker: InvalidationTracker,
+    dbType: Int,
 ) : RoomDatabaseJdbcImplHelperCommon {
 
     fun <R> useConnection(

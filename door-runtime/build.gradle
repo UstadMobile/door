@@ -139,6 +139,7 @@ kotlin {
                 implementation "com.squareup.okhttp3:okhttp:$version_okhttp"
                 implementation "com.squareup.okhttp3:okhttp-sse:$version_okhttp"
                 implementation "org.jetbrains.kotlin:kotlin-reflect:$version_kotlin"
+                implementation "com.zaxxer:HikariCP:$version_hikaricp"
             }
         }
         jvmTest {

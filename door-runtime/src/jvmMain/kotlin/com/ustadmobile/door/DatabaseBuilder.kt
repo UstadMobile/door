@@ -23,13 +23,19 @@ import javax.sql.DataSource
 import kotlin.reflect.KClass
 import com.ustadmobile.door.jdbc.ext.useResults
 import com.ustadmobile.door.jdbc.ext.mapRows
+import com.zaxxer.hikari.HikariConfig
+import com.zaxxer.hikari.HikariDataSource
+import org.sqlite.SQLiteConfig
+import org.sqlite.SQLiteDataSource
 
 
 @Suppress("unused") //This is used as an API
 class DatabaseBuilder<T: RoomDatabase> internal constructor(
     private var context: Any,
     private var dbClass: KClass<T>,
-    private var dbName: String,
+    private var dbUrl: String,
+    private var dbUsername: String?,
+    private var dbPassword: String?,
     private var attachmentDir: File? = null,
     private var attachmentFilters: List<AttachmentFilter> = mutableListOf(),
     private var queryTimeout: Int = PreparedStatementConfig.STATEMENT_DEFAULT_TIMEOUT_SECS,
@@ -43,109 +49,156 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
         fun <T : RoomDatabase> databaseBuilder(
             context: Any,
             dbClass: KClass<T>,
-            dbName: String,
+            dbUrl: String,
+            dbUsername: String? = null,
+            dbPassword: String? = null,
             attachmentDir: File? = null,
             attachmentFilters: List<AttachmentFilter> = listOf(),
             queryTimeout: Int = PreparedStatementConfig.STATEMENT_DEFAULT_TIMEOUT_SECS,
-        ): DatabaseBuilder<T> = DatabaseBuilder(context, dbClass, dbName, attachmentDir, attachmentFilters,
-            queryTimeout)
+        ): DatabaseBuilder<T> = DatabaseBuilder(context, dbClass, dbUrl, dbUsername, dbPassword, attachmentDir,
+            attachmentFilters, queryTimeout)
     }
 
     @Suppress("UNCHECKED_CAST")
     fun build(): T {
-        val iContext = InitialContext()
-        val dataSource = iContext.lookup("java:/comp/env/jdbc/${dbName}") as DataSource
-        val dbImplClass = Class.forName("${dbClass.java.canonicalName}_JdbcKt") as Class<T>
+        val dataSource = when {
+            dbUrl.startsWith("jdbc:") -> {
+                val jdbcUrlType = dbUrl.substringAfter("jdbc:").substringBefore(":")
+                if(jdbcUrlType != "postgres" && jdbcUrlType != "sqlite") {
+                    throw IllegalArgumentException("Invalid database type: $jdbcUrlType " +
+                            "- only postgres and sqlite are supported")
+                }
 
-        val doorDb = dbImplClass.getConstructor(RoomDatabase::class.java, DataSource::class.java,
-                String::class.java, File::class.java, List::class.java, Int::class.javaPrimitiveType)
-            .newInstance(null, dataSource, dbName, attachmentDir, attachmentFilters, queryTimeout)
+                if(jdbcUrlType == "sqlite") {
+                    HikariDataSource(HikariConfig().apply {
+                        /*
+                         SQLite in-memory mode will wipe everything whenever there is a new connection. This means
+                         we must work with a SINGLE connection.
+                         */
+                        if(dbUrl.endsWith(":memory:")) {
+                            maximumPoolSize = 1
+                            minimumIdle = 1
+                            maxLifetime = Long.MAX_VALUE
+                        }
 
-        val connection = dataSource.connection
-        val sqlDatabase = DoorSqlDatabaseConnectionImpl(connection)
-
-        val tableNames: List<String> = connection.metaData.getTables(null, null, "%", arrayOf("TABLE")).useResults { tableResult ->
-            tableResult.mapRows { it.getString("TABLE_NAME") ?: "" }
+                        dataSource = SQLiteDataSource(SQLiteConfig().apply {
+                            setJournalMode(SQLiteConfig.JournalMode.WAL)
+                            setBusyTimeout(30000)
+                            setSynchronous(SQLiteConfig.SynchronousMode.OFF)
+                            enableRecursiveTriggers(true)
+                        }).apply {
+                            url = dbUrl
+                        }
+                    })
+                }else {
+                    HikariDataSource().apply {
+                        jdbcUrl = dbUrl
+                        dbUsername?.also { username = it }
+                        dbPassword?.also { password = it }
+                    }
+                }
+            }
+            dbUrl.startsWith("java:/") -> {
+                //do JNDI lookup
+                val iContext = InitialContext()
+                iContext.lookup(dbUrl) as DataSource
+            }
+            else -> {
+                throw IllegalArgumentException("Invalid database url: $dbUrl : " +
+                        "must be either a valid jdbc Postgres or SQLite URL, or JNDI path ")
+            }
         }
 
-        if(!tableNames.any {it.lowercase() == DBINFO_TABLENAME}) {
-            //Do this directly to avoid conflicts with the change tracking systems before tables have been created
-            dataSource.connection.use { con ->
-                con.createStatement().use { stmt ->
+        dataSource.connection.use { connection ->
+            val dbType = DoorDbType.typeIntFromProductName(connection.metaData?.databaseProductName ?: "")
+
+            val dbImplClass = Class.forName("${dbClass.java.canonicalName}_JdbcKt") as Class<T>
+
+            val doorDb = dbImplClass.getConstructor(RoomDatabase::class.java, DataSource::class.java,
+                String::class.java, File::class.java, List::class.java, Int::class.javaPrimitiveType,
+                Int::class.javaPrimitiveType)
+                .newInstance(null, dataSource, dbUrl, attachmentDir, attachmentFilters, queryTimeout,
+                    dbType)
+
+
+            val sqlDatabase = DoorSqlDatabaseConnectionImpl(connection)
+
+            val tableNames: List<String> = connection.metaData.getTables(null, null, "%", arrayOf("TABLE")).useResults { tableResult ->
+                tableResult.mapRows { it.getString("TABLE_NAME") ?: "" }
+            }
+
+            if(!tableNames.any {it.lowercase() == DBINFO_TABLENAME}) {
+                //Do this directly to avoid conflicts with the change tracking systems before tables have been created
+                connection.createStatement().use { stmt ->
                     doorDb.createAllTables().forEach { sql ->
                         stmt.executeUpdate(sql)
+                    }
+                }
+
+                callbacks.forEach {
+                    when(it) {
+                        is DoorDatabaseCallbackSync -> it.onCreate(sqlDatabase)
+                        is DoorDatabaseCallbackStatementList -> {
+                            doorDb.execSQLBatch(*it.onCreate(sqlDatabase).toTypedArray())
+                        }
+                    }
+                }
+            }else {
+                var stmt = null as Statement?
+                var resultSet = null as ResultSet?
+
+                var currentDbVersion = -1
+                try {
+                    stmt = connection.createStatement()
+                    resultSet = stmt.executeQuery("SELECT dbVersion FROM _doorwayinfo")
+                    if(resultSet.next())
+                        currentDbVersion = resultSet.getInt(1)
+                }catch(e: SQLException) {
+                    throw e
+                }finally {
+                    resultSet?.close()
+                    stmt?.close()
+                }
+
+                while(currentDbVersion < doorDb.dbVersion) {
+                    val nextMigration = migrationList.filter { it.startVersion == currentDbVersion}
+                        .maxByOrNull { it.endVersion }
+                    if(nextMigration != null) {
+                        when(nextMigration) {
+                            is DoorMigrationSync -> nextMigration.migrateFn(sqlDatabase)
+                            is DoorMigrationAsync -> runBlocking { nextMigration.migrateFn(sqlDatabase) }
+                            is DoorMigrationStatementList -> doorDb.execSQLBatch(
+                                *nextMigration.migrateStmts(sqlDatabase).toTypedArray())
+                        }
+
+                        currentDbVersion = nextMigration.endVersion
+                        sqlDatabase.execSQL("UPDATE _doorwayinfo SET dbVersion = $currentDbVersion")
+                    }else {
+                        throw IllegalStateException("Need to migrate to version " +
+                                "${doorDb.dbVersion} from $currentDbVersion - could not find next migration")
                     }
                 }
             }
 
             callbacks.forEach {
                 when(it) {
-                    is DoorDatabaseCallbackSync -> it.onCreate(sqlDatabase)
+                    is DoorDatabaseCallbackSync -> it.onOpen(sqlDatabase)
                     is DoorDatabaseCallbackStatementList -> {
-                        doorDb.execSQLBatch(*it.onCreate(sqlDatabase).toTypedArray())
+                        doorDb.execSQLBatch(*it.onOpen(sqlDatabase).toTypedArray())
                     }
                 }
             }
-        }else {
-            var sqlCon = null as Connection?
-            var stmt = null as Statement?
-            var resultSet = null as ResultSet?
 
-            var currentDbVersion = -1
-            try {
-                sqlCon = dataSource.connection
-                stmt = sqlCon.createStatement()
-                resultSet = stmt.executeQuery("SELECT dbVersion FROM _doorwayinfo")
-                if(resultSet.next())
-                    currentDbVersion = resultSet.getInt(1)
-            }catch(e: SQLException) {
-                throw e
-            }finally {
-                resultSet?.close()
-                stmt?.close()
-                sqlCon?.close()
+            if(doorDb.dbType() == DoorDbType.POSTGRES) {
+                val postgresChangeTracker = PostgresChangeTracker(doorDb as DoorDatabaseJdbc)
+                postgresChangeTracker.setupTriggers()
             }
 
-            while(currentDbVersion < doorDb.dbVersion) {
-                val nextMigration = migrationList.filter { it.startVersion == currentDbVersion}
-                        .maxByOrNull { it.endVersion }
-                if(nextMigration != null) {
-                    when(nextMigration) {
-                        is DoorMigrationSync -> nextMigration.migrateFn(sqlDatabase)
-                        is DoorMigrationAsync -> runBlocking { nextMigration.migrateFn(sqlDatabase) }
-                        is DoorMigrationStatementList -> doorDb.execSQLBatch(
-                            *nextMigration.migrateStmts(sqlDatabase).toTypedArray())
-                    }
-
-                    currentDbVersion = nextMigration.endVersion
-                    sqlDatabase.execSQL("UPDATE _doorwayinfo SET dbVersion = $currentDbVersion")
-                }else {
-                    throw IllegalStateException("Need to migrate to version " +
-                            "${doorDb.dbVersion} from $currentDbVersion - could not find next migration")
-                }
+            return if(doorDb::class.doorDatabaseMetadata().hasReadOnlyWrapper) {
+                doorDb.wrap(dbClass)
+            }else {
+                doorDb
             }
-        }
-
-        callbacks.forEach {
-            when(it) {
-                is DoorDatabaseCallbackSync -> it.onOpen(sqlDatabase)
-                is DoorDatabaseCallbackStatementList -> {
-                    doorDb.execSQLBatch(*it.onOpen(sqlDatabase).toTypedArray())
-                }
-            }
-        }
-
-        connection.close()
-
-        if(doorDb.dbType() == DoorDbType.POSTGRES) {
-            val postgresChangeTracker = PostgresChangeTracker(doorDb as DoorDatabaseJdbc)
-            postgresChangeTracker.setupTriggers()
-        }
-
-        return if(doorDb::class.doorDatabaseMetadata().hasReadOnlyWrapper) {
-            doorDb.wrap(dbClass)
-        }else {
-            doorDb
         }
     }
 

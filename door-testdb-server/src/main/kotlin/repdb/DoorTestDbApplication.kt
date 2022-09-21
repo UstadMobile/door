@@ -45,7 +45,7 @@ fun Application.doorTestDbApplication() {
         bind<RepDb>(tag = DoorTag.TAG_DB) with scoped(VirtualHostScope.Default).singleton {
             val dbHostName = context.sanitizeDbName()
             InitialContext().bindNewSqliteDataSourceIfNotExisting(dbHostName)
-            DatabaseBuilder.databaseBuilder(Any(), RepDb::class, dbHostName, attachmentDir)
+            DatabaseBuilder.databaseBuilder(Any(), RepDb::class, dbHostName, attachmentDir = attachmentDir)
                 .build().also {
                     it.clearAllTables()
                     it.repDao.insert(RepEntity().apply {

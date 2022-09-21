@@ -1,5 +1,5 @@
 group 'com.github.UstadMobile.door'
-version '0.0.62j'
+version '0.0.62k'
 
 ext.localProperties = new Properties()
 
@@ -79,6 +79,7 @@ ext {
     version_kotlinx_serialization = "1.3.3"
     version_androidx_test = "1.4.0"
     version_kotlinx_metadata = "0.4.2"
+    version_hikaricp = "5.0.1"
     version_junit = "4.13"
     version_junit_jupiter = "5.8.2"
 

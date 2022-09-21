@@ -94,16 +94,14 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         }
 
         val initContext = InitialContext()
-        initContext.bindNewSqliteDataSourceIfNotExisting("RepDbRemote_$dbTimeStamp")
-        remoteRepDb = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "RepDbRemote_$dbTimeStamp",
-                remoteAttachmentDir)
+        remoteRepDb = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "jdbc:sqlite:build/tmp/repdbremote_$dbTimeStamp.sqlite",
+                attachmentDir = remoteAttachmentDir)
             .build().also {
                 it.clearAllTables()
             }
 
-        initContext.bindNewSqliteDataSourceIfNotExisting("RepDbLocal_$dbTimeStamp")
-        localRepDb = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "RepDbLocal_$dbTimeStamp",
-            temporaryFolder.newFolder("attachments-local1"))
+        localRepDb = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "jdbc:sqlite:build/tmp/repdblocal_$dbTimeStamp.sqlite",
+            attachmentDir = temporaryFolder.newFolder("attachments-local1"))
             .build().also {
                 it.clearAllTables()
             }
@@ -153,9 +151,8 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     //Setup a second local copy (e.g. simulate a second client)
     private fun setupLocalDb2() {
-        InitialContext().bindNewSqliteDataSourceIfNotExisting("RepDbLocal2_$dbTimeStamp")
-        localRepDb2 = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "RepDbLocal2_$dbTimeStamp",
-                temporaryFolder.newFolder("attachments-local2"))
+        localRepDb2 = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "jdbc:sqlite:build/tmp/repdblocal2_$dbTimeStamp.sqlite",
+                attachmentDir = temporaryFolder.newFolder("attachments-local2"))
             .build().also {
                 it.clearAllTables()
             }

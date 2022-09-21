@@ -30,7 +30,7 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
         register(builderOptions.dbImplClasses)
 
         val dbImpl = builderOptions.dbImplClasses.dbImplKClass.js.createInstance(null, dataSource,
-            builderOptions.dbName, listOf<AttachmentFilter>(), builderOptions.jdbcQueryTimeout) as T
+            builderOptions.dbName, listOf<AttachmentFilter>(), builderOptions.jdbcQueryTimeout, DoorDbType.SQLITE) as T
         val exists = IndexedDb.checkIfExists(builderOptions.dbName)
         val connection = dataSource.getConnection()
         val sqlDatabase = DoorSqlDatabaseConnectionImpl(connection)

@@ -448,13 +448,14 @@ fun FileSpec.Builder.addJdbcDbImplType(
             }
             .addParameter("realAttachmentFilters", List::class.parameterizedBy(AttachmentFilter::class))
             .addParameter("jdbcQueryTimeout", Int::class)
+            .addParameter("jdbcDbType", Int::class)
             .build())
         .addDbVersionProperty(dbKSClass)
         .addProperty(PropertySpec.builder("dataSource", AbstractDbProcessor.CLASSNAME_DATASOURCE, KModifier.OVERRIDE)
             .initializer("dataSource")
             .build())
         .addProperty(PropertySpec.builder("jdbcImplHelper", RoomDatabaseJdbcImplHelper::class, KModifier.OVERRIDE)
-            .initializer("%T(dataSource, this, this::class.%M().allTables, %T(*this::class.%M().allTables.toTypedArray()))\n",
+            .initializer("%T(dataSource, this, this::class.%M().allTables, %T(*this::class.%M().allTables.toTypedArray()), jdbcDbType)\n",
                 RoomDatabaseJdbcImplHelper::class,
                 MemberName("com.ustadmobile.door.ext", "doorDatabaseMetadata"),
                 InvalidationTracker::class,

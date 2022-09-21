@@ -22,9 +22,8 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
     protected val db: RoomDatabase,
     private val tableNames: List<String>,
     val invalidationTracker: InvalidationTracker,
+    val dbType: Int = DoorDbType.SQLITE
 ) {
-
-    open val dbType: Int = DoorDbType.SQLITE
 
     private val transactionIdAtomic = atomic(0)
 
