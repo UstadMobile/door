@@ -155,4 +155,21 @@ abstract class ExampleDao2 {
     @Query("SELECT * FROM ExampleEntity2")
     abstract fun queryAllAsFlow(): Flow<List<ExampleEntity2>>
 
+    @Query("SELECT * FROM ExampleEntity2 WHERE someNumber > :greaterThan LIMIT 1")
+    abstract fun findSingleNotNullableEntity(greaterThan: Int): ExampleEntity2
+
+    @Query("SELECT * FROM ExampleEntity2 WHERE someNumber > :greaterThan LIMIT 1")
+    abstract suspend fun findSingleNotNullableEntityAsync(greaterThan: Int): ExampleEntity2
+
+    @Query("SELECT someNumber FROM ExampleEntity2 WHERE someNumber > :greaterThan LIMIT 1")
+    abstract fun findSingleNotNullablePrimitive(greaterThan: Int): Int
+
+    @Query("SELECT someNumber FROM ExampleEntity2 WHERE someNumber > :greaterThan LIMIT 1")
+    abstract suspend fun findSingleNotNullablePrimitiveAsync(greaterThan: Int): Int
+
+    @Query("SELECT someNumber FROM ExampleEntity2 WHERE someNumber > :greaterThan LIMIT 1")
+    abstract fun findSingleNullablePrimitive(greaterThan: Int): Int?
+
+    @Query("SELECT someNumber FROM ExampleEntity2 WHERE someNumber > :greaterThan LIMIT 1")
+    abstract suspend fun findSingleNullablePrimitiveAsync(greaterThan: Int): Int?
 }

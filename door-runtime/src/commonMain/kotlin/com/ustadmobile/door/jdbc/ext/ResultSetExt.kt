@@ -19,9 +19,18 @@ fun <R> ResultSet.mapRows(block: (ResultSet) -> R): List<R> {
     return mappedResults
 }
 
+@Suppress("unused") //Used by generated code
 fun <R> ResultSet.mapNextRow(defaultVal: R, block: (ResultSet) -> R): R {
     return if(next())
         block(this)
     else
         defaultVal
+}
+
+@Suppress("unused") //Used by generated code
+fun <R> ResultSet.mapNextRow(block: (ResultSet) -> R): R {
+    return if(next())
+        block(this)
+    else
+        throw NullPointerException("mapNextRow: no row and no default value provided")
 }

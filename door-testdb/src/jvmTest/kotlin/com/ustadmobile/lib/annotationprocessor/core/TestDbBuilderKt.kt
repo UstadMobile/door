@@ -29,27 +29,6 @@ class TestDbBuilderKt {
         exampleDb2.clearAllTables()
     }
 
-    //@Test
-    fun givenDbShouldOpen() {
-        /*
-        To make this run in Android Studio:
-          1. Copy the jndi config (resources) to ./build/classes/test/lib-database-annotation-processor_jvmTest/
-          2. Run the Gradle compile task compileTestKotlinJvm
-          3. Use reflection to load classes that were created by the annotation processor
-        val addMethod = URLClassLoader::class.java.getDeclaredMethod("addURL", URL::class.java)
-        addMethod.isAccessible = true
-        addMethod.invoke(ClassLoader.getSystemClassLoader(),
-                File("/home/mike/src/UstadMobile/lib-database-annotation-processor/build/classes/kotlin/jvm/test").toURI().toURL())
-        */
-        Assert.assertNotNull(exampleDb2)
-        val exampleDao2 = exampleDb2.exampleDao2()
-        Assert.assertNotNull(exampleDao2)
-        val exList = listOf(ExampleEntity2(0, "bob",42))
-        exampleDao2.insertList(exList)
-        Assert.assertTrue(true)
-    }
-
-
     @Test
     fun givenEntryInserted_whenQueried_shouldBeEqual() {
         val entityToInsert = ExampleEntity2(0, "Bob", 50)
@@ -201,5 +180,41 @@ class TestDbBuilderKt {
             flowJob.cancelAndJoin()
         }
     }
+
+    @Test(expected = NullPointerException::class)
+    fun givenQueryEntityReturnTypeNotNullable_whenNoRowsReturned_thenShouldThrowNullPointerException() {
+        exampleDb2.exampleDao2().findSingleNotNullableEntity(Int.MAX_VALUE)
+    }
+
+    @Test(expected = NullPointerException::class)
+    fun givenQueryEntityReturnTypeNotNullableAsync_whenNoRowsReturned_thenShouldThrowNullPointerExecption() = runBlocking {
+        exampleDb2.exampleDao2().findSingleNotNullableEntityAsync(Int.MAX_VALUE)
+        Unit
+    }
+
+    @Test
+    fun givenQueryPrimitiveReturnTypeNotNullable_whenNoRowsReturned_thenShouldReturnDefaultValue() {
+        Assert.assertEquals("Primitive not nullable type query will return default value when no rows match",
+            0, exampleDb2.exampleDao2().findSingleNotNullablePrimitive(Int.MAX_VALUE))
+    }
+
+    @Test
+    fun givenQueryPrimitiveReturnTypeNotNullableAsync_whenNoRowsReturned_thenShouldReturnDefaultValue() = runBlocking {
+        Assert.assertEquals("Primitive not nullable type query will return default value when no rows match",
+            0, exampleDb2.exampleDao2().findSingleNotNullablePrimitiveAsync(Int.MAX_VALUE))
+    }
+
+    @Test
+    fun givenQueryPrimitiveReturnTypeNullable_whenNoRowsReturn_thenShouldReturnNull(){
+        Assert.assertNull("Primitive nullable type query will return null when no rows match",
+            exampleDb2.exampleDao2().findSingleNullablePrimitive(Int.MAX_VALUE))
+    }
+
+    @Test
+    fun givenQueryPrimitiveReturnTypeNullableAsync_whenNoRowsReturned_thenShouldReturnNull() = runBlocking {
+        Assert.assertNull("Primitive nullable type query will return null when no rows match",
+            exampleDb2.exampleDao2().findSingleNullablePrimitiveAsync(Int.MAX_VALUE))
+    }
+
 
 }
