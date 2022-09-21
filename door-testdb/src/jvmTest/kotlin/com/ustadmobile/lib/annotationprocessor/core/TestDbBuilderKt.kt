@@ -25,7 +25,7 @@ class TestDbBuilderKt {
 
     @Before
     fun openAndClearDb() {
-        exampleDb2 = DatabaseBuilder.databaseBuilder(Any(), ExampleDatabase2::class, "jdbc:sqlite::memory:").build()
+        exampleDb2 = DatabaseBuilder.databaseBuilder( ExampleDatabase2::class, "jdbc:sqlite::memory:").build()
         exampleDb2.clearAllTables()
     }
 

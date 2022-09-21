@@ -94,13 +94,13 @@ class TestDoorDatabaseRepositoryReplicationExt  {
         }
 
         val initContext = InitialContext()
-        remoteRepDb = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "jdbc:sqlite:build/tmp/repdbremote_$dbTimeStamp.sqlite",
+        remoteRepDb = DatabaseBuilder.databaseBuilder( RepDb::class, "jdbc:sqlite:build/tmp/repdbremote_$dbTimeStamp.sqlite",
                 attachmentDir = remoteAttachmentDir)
             .build().also {
                 it.clearAllTables()
             }
 
-        localRepDb = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "jdbc:sqlite:build/tmp/repdblocal_$dbTimeStamp.sqlite",
+        localRepDb = DatabaseBuilder.databaseBuilder( RepDb::class, "jdbc:sqlite:build/tmp/repdblocal_$dbTimeStamp.sqlite",
             attachmentDir = temporaryFolder.newFolder("attachments-local1"))
             .build().also {
                 it.clearAllTables()
@@ -151,7 +151,7 @@ class TestDoorDatabaseRepositoryReplicationExt  {
 
     //Setup a second local copy (e.g. simulate a second client)
     private fun setupLocalDb2() {
-        localRepDb2 = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "jdbc:sqlite:build/tmp/repdblocal2_$dbTimeStamp.sqlite",
+        localRepDb2 = DatabaseBuilder.databaseBuilder( RepDb::class, "jdbc:sqlite:build/tmp/repdblocal2_$dbTimeStamp.sqlite",
                 attachmentDir = temporaryFolder.newFolder("attachments-local2"))
             .build().also {
                 it.clearAllTables()

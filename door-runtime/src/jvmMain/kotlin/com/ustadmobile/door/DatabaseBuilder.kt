@@ -31,7 +31,6 @@ import org.sqlite.SQLiteDataSource
 
 @Suppress("unused") //This is used as an API
 class DatabaseBuilder<T: RoomDatabase> internal constructor(
-    private var context: Any,
     private var dbClass: KClass<T>,
     private var dbUrl: String,
     private var dbUsername: String?,
@@ -47,7 +46,6 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
 
     companion object {
         fun <T : RoomDatabase> databaseBuilder(
-            context: Any,
             dbClass: KClass<T>,
             dbUrl: String,
             dbUsername: String? = null,
@@ -55,7 +53,7 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
             attachmentDir: File? = null,
             attachmentFilters: List<AttachmentFilter> = listOf(),
             queryTimeout: Int = PreparedStatementConfig.STATEMENT_DEFAULT_TIMEOUT_SECS,
-        ): DatabaseBuilder<T> = DatabaseBuilder(context, dbClass, dbUrl, dbUsername, dbPassword, attachmentDir,
+        ): DatabaseBuilder<T> = DatabaseBuilder(dbClass, dbUrl, dbUsername, dbPassword, attachmentDir,
             attachmentFilters, queryTimeout)
     }
 

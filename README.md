@@ -123,10 +123,15 @@ Then create the database. Database creation is platform-specific, so it's best t
 
 ```
 JVM: 
-//Make sure a JDBC DataSource is bound to: 
-// java:/comp/env/jdbc/mydatabase
-// This will be updated to allow the direct use of a JDBC URL
-val myDatabase = DatabaseBuilder.databaseBuilder(MyDatabase::class, "mydatabase").build()
+//Use an SQLite JDBC URL 
+val sqliteDatabase = DatabaseBuilder.databaseBuilder(MyDatabase::class, "jdbc:sqlite:path/to/file.sqlite").build()
+
+//Use a Postgres JDBC URL
+val postgresDatabase = DatabaseBuilder.databaseBuilder(MyDatabase::class, "jdbc:postgres:///mydbname", 
+  dbUsername = "pguser", dbPassword = "secret").build()
+
+//Use a JNDI DataSource (e.g. using within an application server etc)
+val jndiDatabase = DatabaseBuilder.databaseBuilder(MyDatabase::class, "java:/comp/env/jdbc/myDB")
 
 Android:
 val myDatabase = DatabaseBuilder.databaseBuilder(context, MyDatabase::class, "mydatabase").build()

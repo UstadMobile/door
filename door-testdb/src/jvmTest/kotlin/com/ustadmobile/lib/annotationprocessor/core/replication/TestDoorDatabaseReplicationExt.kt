@@ -25,7 +25,7 @@ class TestDoorDatabaseReplicationExt {
 
     @Before
     fun setup() {
-        db = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "jdbc:sqlite:build/tmp/repdb.sqlite").build()
+        db = DatabaseBuilder.databaseBuilder( RepDb::class, "jdbc:sqlite:build/tmp/repdb.sqlite").build()
             .apply {
                 clearAllTables()
             }

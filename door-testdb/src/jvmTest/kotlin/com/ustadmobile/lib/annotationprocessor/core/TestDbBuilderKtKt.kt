@@ -23,7 +23,7 @@ class TestDbBuilderKtKt {
 
     @Before
     fun setup() {
-        exampleDb2 = DatabaseBuilder.databaseBuilder(Any(), ExampleDatabase2::class,
+        exampleDb2 = DatabaseBuilder.databaseBuilder( ExampleDatabase2::class,
             "jdbc:sqlite::memory:").build()
         exampleDb2.clearAllTables()
     }

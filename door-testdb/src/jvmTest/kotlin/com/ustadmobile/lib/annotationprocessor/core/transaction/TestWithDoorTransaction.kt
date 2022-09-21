@@ -64,7 +64,7 @@ class TestWithDoorTransaction {
         }
 
 
-        db = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "java:/comp/env/jdbc/RepDbSpy$dbIndexToBind").build()
+        db = DatabaseBuilder.databaseBuilder( RepDb::class, "java:/comp/env/jdbc/RepDbSpy$dbIndexToBind").build()
             .apply {
                 clearAllTables()
             }

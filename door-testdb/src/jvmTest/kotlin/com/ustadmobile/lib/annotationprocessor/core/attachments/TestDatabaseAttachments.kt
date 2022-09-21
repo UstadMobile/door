@@ -39,7 +39,7 @@ class TestDatabaseAttachments {
     @Before
     fun setup() {
         nodeId = Random.nextLong()
-        repDb = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "jdbc:sqlite::memory:",
+        repDb = DatabaseBuilder.databaseBuilder( RepDb::class, "jdbc:sqlite::memory:",
                 attachmentDir = temporaryFolder.newFolder("attachments"))
             .build().also {
                 it.clearAllTablesAndResetNodeId(nodeId)

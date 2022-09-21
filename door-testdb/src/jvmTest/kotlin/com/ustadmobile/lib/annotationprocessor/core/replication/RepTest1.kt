@@ -19,7 +19,7 @@ class RepTest1 {
 
     @Test
     fun givenKnownRemoteNode_whenReplicatableEntityInserted_thenShouldInsertTrackerAndFirePendingNotificationEvent() {
-        val db = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "jdbc:sqlite:build/tmp/repdb.sqlite").build()
+        val db = DatabaseBuilder.databaseBuilder(RepDb::class, "jdbc:sqlite:build/tmp/repdb.sqlite").build()
             .apply {
                 clearAllTables()
             }
@@ -52,7 +52,7 @@ class RepTest1 {
 
     @Test
     fun givenModificationMadeBeforeChangeListenerAdded_whenChangeListenerAdded_thenShouldGetPendingNotification() {
-        val db = DatabaseBuilder.databaseBuilder(Any(), RepDb::class, "jdbc:sqlite:build/tmp/repdb.sqlite").build()
+        val db = DatabaseBuilder.databaseBuilder( RepDb::class, "jdbc:sqlite:build/tmp/repdb.sqlite").build()
             .apply {
                 clearAllTables()
             }
