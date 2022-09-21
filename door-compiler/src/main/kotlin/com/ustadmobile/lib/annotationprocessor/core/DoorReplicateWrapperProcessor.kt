@@ -362,7 +362,7 @@ class DoorReplicateWrapperProcessor(
         val target = environment.doorTarget(resolver)
 
         resolver.getDatabaseSymbolsToProcess().forEach { dbClassDecl ->
-            if(dbClassDecl.dbHasReplicateWrapper()) {
+            if(dbClassDecl.dbHasReplicationEntities()) {
                 FileSpec.builder(dbClassDecl.packageName.asString(),
                     "${dbClassDecl.simpleName.asString()}${DoorDatabaseReplicateWrapper.SUFFIX}")
                     .addDbWrapperTypeSpec(dbClassDecl, resolver, target)

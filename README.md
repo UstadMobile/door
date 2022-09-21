@@ -8,7 +8,7 @@
 Door is a Kotlin Symbol Processor that builds on [Room](https://developer.android.com/training/data-storage/room) and makes
 it possible to use Room databases, DAOs and entities with Kotlin Multiplatform (using [expect/actual](https://kotlinlang.org/docs/multiplatform-connect-to-apis.html)).
 
-Just put Database, DAO, and entity classes in your Kotlin Multiplatform common code and add the ```expect``` keyword to
+Just put your Database, DAOs, and entity classes in your Kotlin Multiplatform common code and add the ```expect``` keyword to
 DAO and Database classes. 
 Door will generate actuals for each platform automatically!
 
@@ -28,41 +28,15 @@ Door contains an experimental [replication/sync](README-REPLICATION.md) engine t
 
 
 ## Getting started
-Just create your Database and DAOs in Kotlin multiplatform common code:
-
-Database:
-```
-import com.ustadmobile.door.room.RoomDatabase
-import com.ustadmobile.door.annotations.DoorDatabase
-
-@DoorDatabase(version = 1, 
-  entities = [ MyEntity::class, AnotherEntity::class])
-expect abstract class MyDatabase: RoomDatabase {
-     
-     val myEntityDao: MyEntityDao
-     
-     val anotherEntityDao: AnotherEntityDao 
-}
-```
-
-DAO:
-```
-import com.ustadmobile.door.annotations.DoorDao
-
-@DoorDao
-expect abstract class MyEntityDao {
-     
-     @Query("SELECT * FROM MyEntity WHERE id = :id")
-     fun myQuery(id: Int): MyEntity?
-     
-}
-```
 
 Then add Gradle dependencies:
 ```
 //Add jitpack repository if you don't already have it
 buildscript {
     repositories {
+        mavenCentral()
+        google()
+        
         maven {
            url 'https://jitpack.io/'
         }
@@ -71,6 +45,8 @@ buildscript {
 
 plugins {
     id "org.jetbrains.kotlin.multiplatform"
+    id "com.android.library"
+    
     //Add Kotlin Symbol Processing Plugin
     id "com.google.devtools.ksp"
 }
@@ -109,6 +85,36 @@ dependencies {
     kspJs "com.github.UstadMobile.door:door-compiler:$version_door"
     kspAndroid "com.github.UstadMobile.door:door-compiler:$version_door"
     kspAndroid "androidx.room:room-compiler:$version_android_room"
+}
+```
+
+Now create your Database and DAOs in Kotlin multiplatform common code:
+
+Database:
+```
+import com.ustadmobile.door.room.RoomDatabase
+import com.ustadmobile.door.annotations.DoorDatabase
+
+@DoorDatabase(version = 1, 
+  entities = [ MyEntity::class, AnotherEntity::class])
+expect abstract class MyDatabase: RoomDatabase {
+     
+     val myEntityDao: MyEntityDao
+     
+     val anotherEntityDao: AnotherEntityDao 
+}
+```
+
+DAO:
+```
+import com.ustadmobile.door.annotations.DoorDao
+
+@DoorDao
+expect abstract class MyEntityDao {
+     
+     @Query("SELECT * FROM MyEntity WHERE id = :id")
+     fun myQuery(id: Int): MyEntity?
+     
 }
 ```
 

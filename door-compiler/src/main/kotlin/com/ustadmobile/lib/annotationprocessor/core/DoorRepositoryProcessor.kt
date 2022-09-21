@@ -453,7 +453,7 @@ class DoorRepositoryProcessor(
                 it.parentDeclaration as? KSClassDeclaration
             }
 
-        val daoSymbols = resolver.getDaoSymbolsToProcess()
+        val daoSymbols = resolver.getDaoSymbolsToProcess().filter { it.hasAnnotation(Repository::class) }
 
         val target = environment.doorTarget(resolver)
 

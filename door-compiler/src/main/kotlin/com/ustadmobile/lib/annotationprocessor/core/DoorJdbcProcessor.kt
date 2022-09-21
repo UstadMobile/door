@@ -132,7 +132,7 @@ private fun FileSpec.Builder.addDatabaseMetadataType(
         .addProperty(PropertySpec.builder("hasReadOnlyWrapper", Boolean::class)
             .addModifiers(KModifier.OVERRIDE)
             .getter(FunSpec.getterBuilder()
-                .addCode("return %L\n", dbKSClass.dbHasReplicateWrapper())
+                .addCode("return %L\n", dbKSClass.dbHasReplicationEntities())
                 .build())
             .build())
         .addProperty(PropertySpec.builder("hasAttachments", Boolean::class)
@@ -208,7 +208,7 @@ private fun FileSpec.Builder.addJsImplementationsClassesObject(
             .addModifiers(KModifier.OVERRIDE)
             .initializer(CodeBlock.builder()
                 .apply {
-                    if(dbKSClass.dbHasReplicateWrapper()) {
+                    if(dbKSClass.dbHasReplicationEntities()) {
                         add("%T::class", dbKSClass.toClassNameWithSuffix(DoorDatabaseReplicateWrapper.SUFFIX))
                     }else {
                         add("null")
@@ -514,9 +514,13 @@ fun FileSpec.Builder.addJdbcDbImplType(
                 .beginControlFlow("lazy")
                 .beginControlFlow("if(this == %M)",
                     MemberName("com.ustadmobile.door.ext", "rootDatabase"))
-                .add("%T(this, %T(this), %T)\n", ReplicationNotificationDispatcher::class,
-                    dbKSClass.toClassNameWithSuffix(DoorJdbcProcessor.SUFFIX_REP_RUN_ON_CHANGE_RUNNER),
-                        GlobalScope::class)
+                .add("%T(this, ", ReplicationNotificationDispatcher::class)
+                .applyIf(dbKSClass.dbHasRunOnChangeTriggers()) {
+                    add("%T(this), ", dbKSClass.toClassNameWithSuffix(DoorJdbcProcessor.SUFFIX_REP_RUN_ON_CHANGE_RUNNER))
+                }.applyIf(!dbKSClass.dbHasRunOnChangeTriggers()) {
+                    add("null, ")
+                }
+                .add("%T)\n", GlobalScope::class)
                 .nextControlFlow("else")
                 .add("rootDatabase.%M\n",
                     MemberName("com.ustadmobile.door.ext", "replicationNotificationDispatcher"))
@@ -1546,10 +1550,11 @@ class DoorJdbcProcessor(
                 .build()
                 .writeTo(environment.codeGenerator, false)
 
-            FileSpec.builder(dbKSClass.packageName.asString(), dbKSClass.simpleName.asString() + SUFFIX_REP_RUN_ON_CHANGE_RUNNER)
-                .addReplicationRunOnChangeRunnerType(dbKSClass)
-                .build()
-                .writeTo(environment.codeGenerator, false)
+            FileSpec.takeIf { dbKSClass.dbHasRunOnChangeTriggers() }
+                ?.builder(dbKSClass.packageName.asString(), dbKSClass.simpleName.asString() + SUFFIX_REP_RUN_ON_CHANGE_RUNNER)
+                ?.addReplicationRunOnChangeRunnerType(dbKSClass)
+                ?.build()
+                ?.writeTo(environment.codeGenerator, false)
 
             if(target in JDBC_TARGETS) {
                 FileSpec.builder(dbKSClass.packageName.asString(), dbKSClass.simpleName.asString() + SUFFIX_JDBC_KT2)

@@ -13,7 +13,6 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
-import com.squareup.kotlinpoet.ksp.addOriginatingKSFile
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.writeTo
@@ -48,7 +47,6 @@ import io.ktor.http.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 import org.kodein.di.DI
-import kotlin.math.log
 
 fun CodeBlock.Builder.addNanoHttpdResponse(varName: String, addNonNullOperator: Boolean = false,
                                            applyToResponseCodeBlock: CodeBlock? = null)
@@ -517,7 +515,7 @@ fun FileSpec.Builder.addDbKtorRouteFunction(
 
                 add("val _typeToken: %T<%T> = %M()\n", org.kodein.type.TypeToken::class.java,
                     dbClassDeclaration.toClassName(), DI_ERASED_MEMBER)
-                if(dbClassDeclaration.dbHasReplicateWrapper()) {
+                if(dbClassDeclaration.dbHasReplicationEntities()) {
                     add("%M(_typeToken, %T::class, json)\n",
                         MemberName("com.ustadmobile.door.replication", "doorReplicationRoute"),
                         dbClassDeclaration.toClassName())

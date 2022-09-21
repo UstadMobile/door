@@ -1,5 +1,5 @@
 group 'com.github.UstadMobile.door'
-version '0.0.62i'
+version '0.0.62j'
 
 ext.localProperties = new Properties()
 

@@ -66,7 +66,12 @@ class DoorAndroidReplicationCallbackProcessor(
 ) : SymbolProcessor {
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        resolver.getDatabaseSymbolsToProcess().forEach { dbKSClassDecl ->
+        if(environment.doorTarget(resolver) != DoorTarget.ANDROID)
+            return emptyList()
+
+        resolver.getDatabaseSymbolsToProcess()
+                .filter { it.dbHasReplicationEntities() }
+                .forEach { dbKSClassDecl ->
             FileSpec.builder(dbKSClassDecl.packageName.asString(),
                 dbKSClassDecl.simpleName.asString() + SUFFIX_ANDROID_REPLICATION_CALLBACK)
                 .addAndroidReplicationCallbackType(dbKSClassDecl)

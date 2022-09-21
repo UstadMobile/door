@@ -24,7 +24,7 @@ class ReplicationNotificationDispatcher(
     /**
      * The generated DbName_ReplicationRunOnChangeRunner
      */
-    private val replicationRunOnChangeRunner: ReplicationRunOnChangeRunner,
+    private val replicationRunOnChangeRunner: ReplicationRunOnChangeRunner?,
 
     private val coroutineScope: CoroutineScope,
 
@@ -69,7 +69,7 @@ class ReplicationNotificationDispatcher(
 
     override fun onNewDoorNode(newNodeId: Long, auth: String) {
         coroutineScope.launch {
-            val tablesChanged = replicationRunOnChangeRunner.runOnNewNode(newNodeId)
+            val tablesChanged = replicationRunOnChangeRunner?.runOnNewNode(newNodeId) ?: return@launch
             Napier.d("ReplicationNotificationDispatcher for [$db] - onNewDoorNode nodeId $newNodeId " +
                     "check for pending replications on table(s): ${tablesChanged.joinToString()}", tag = DoorTag.LOG_TAG)
             findAndSendPendingReplicationNotifications(tablesChanged.toSet())
@@ -80,7 +80,7 @@ class ReplicationNotificationDispatcher(
         val changedTables = event.flatten().toSet()
         Napier.d("ReplicationNotificationDispatcher for [$db]: processing changes to ${changedTables.joinToString()}",
             tag = DoorTag.LOG_TAG)
-        val replicationsToCheck = replicationRunOnChangeRunner.runReplicationRunOnChange(changedTables)
+        val replicationsToCheck = replicationRunOnChangeRunner?.runReplicationRunOnChange(changedTables) ?: return
         Napier.d("ReplicationNotificationDispatcher: findPendingReplications for ${replicationsToCheck.joinToString()}",
             tag = DoorTag.LOG_TAG)
         findAndSendPendingReplicationNotifications(replicationsToCheck)

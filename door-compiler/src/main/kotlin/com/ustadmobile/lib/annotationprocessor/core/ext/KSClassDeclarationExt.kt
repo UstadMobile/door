@@ -47,16 +47,36 @@ fun KSClassDeclaration.allDbEntities(): List<KSClassDeclaration> {
     }
 }
 
-/**
- * Indicates whether or not this database should have a read only wrapper generated. The ReadOnlyWrapper should be
- * be generated for databses that have repositories and replicated entities.
- *
- */
-fun KSClassDeclaration.dbHasReplicateWrapper() : Boolean {
-    val hasRepos = dbEnclosedDaos().any { it.hasAnnotation(Repository::class) }
-    val hasReplicatedEntities = allDbEntities().any { it.hasAnnotation(ReplicateEntity::class) }
-    return hasRepos && hasReplicatedEntities
+fun KSClassDeclaration.allDbDaos(): List<KSClassDeclaration> {
+    return allDbClassDaoGetters().mapNotNull {
+        it.propertyOrReturnType()?.resolve()?.declaration as? KSClassDeclaration
+    }
 }
+
+
+/**
+ * Where the receiver KSClassDeclaration is the KSClassDeclaration for a database, this will determine if any
+ * entities have the @ReplicateEntity annotation.
+ *
+ * This is useful to indicate whether or not replication-related code should be generated for this database.
+ *
+ * @receiver KSClassDeclaration for a database
+ * @return True if any entity for this database has the @ReplicateEntity annotation, false otherwise
+ */
+fun KSClassDeclaration.dbHasReplicationEntities() : Boolean {
+    return allDbEntities().any { it.hasAnnotation(ReplicateEntity::class) }
+}
+
+/**
+ * Determines if this database has any DAOs that contain RunOnChange or RunOnNewNode triggers. This determines
+ * if the DAO should have a ReplicationRunOnChange_Runner generated.
+ */
+fun KSClassDeclaration.dbHasRunOnChangeTriggers() = allDbDaos().any {
+    it.getAllFunctions().any {
+        it.hasAnyAnnotation(ReplicationRunOnChange::class, ReplicationRunOnNewNode::class)
+    }
+}
+
 
 fun KSClassDeclaration.allDbClassDaoGetters(): List<KSDeclaration> {
     return getAllFunctions().filter {
