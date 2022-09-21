@@ -32,6 +32,8 @@ expect interface PreparedStatement : Statement {
 
     fun setArray(index: Int, array: com.ustadmobile.door.jdbc.Array)
 
+    fun setNull(parameterIndex: Int, sqlType: Int)
+
     fun executeUpdate(): Int
 
     fun executeQuery(): ResultSet

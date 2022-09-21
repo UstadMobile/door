@@ -13,6 +13,8 @@ abstract class PreparedStatementArrayProxyCommon(
 
     private val queryTypes = mutableMapOf<Int, Int>()
 
+    private val nullSqlTypes = mutableMapOf<Int, Int>()
+
     protected var stmtQueryTimeout: Int = -1
 
     /**
@@ -117,6 +119,13 @@ abstract class PreparedStatementArrayProxyCommon(
         queryTypes[index] = ARR_PROXY_SET_OBJECT
     }
 
+
+    override fun setNull(parameterIndex: Int, sqlType: Int) {
+        queryParams[parameterIndex] = null
+        queryTypes[parameterIndex] = PROXY_SET_NULL
+        nullSqlTypes[parameterIndex] = sqlType
+    }
+
     override fun setQueryTimeout(seconds: Int) {
         stmtQueryTimeout = seconds
     }
@@ -156,7 +165,10 @@ abstract class PreparedStatementArrayProxyCommon(
             stmt.takeIf { stmtQueryTimeout > 0 }?.setQueryTimeout(stmtQueryTimeout)
             for (paramIndex in paramValues.keys) {
                 val value = paramValues[paramIndex]
-                when (paramTypes[paramIndex]) {
+                val paramType = paramTypes[paramIndex] ?: 0
+                when(paramType)  {
+                    PROXY_SET_NULL -> stmt.setNull(paramIndex, nullSqlTypes[paramIndex] ?: 0)
+
                     TypesKmp.INTEGER -> stmt.setInt(paramIndex, value as Int)
 
                     TypesKmp.BOOLEAN -> stmt.setBoolean(paramIndex, value as Boolean)
@@ -214,6 +226,9 @@ abstract class PreparedStatementArrayProxyCommon(
     companion object {
 
         const val ARR_PROXY_SET_OBJECT = -5000
+
+        const val PROXY_SET_NULL = -5001
+
 
     }
 

@@ -14,7 +14,7 @@ fun PreparedStatement.setDefaultParamValue(
 ) {
     val builtIns = resolver.builtIns
     when {
-        paramType.isMarkedNullable -> setObject(index, null)
+        paramType.isMarkedNullable -> setNull(index, paramType.toSqlTypeInt(dbType, resolver))
         paramType == builtIns.booleanType -> setBoolean(index, false)
         paramType == builtIns.byteType -> setByte(index, 0)
         paramType == builtIns.shortType -> setShort(index, 0)

@@ -217,4 +217,14 @@ class TestDbBuilderKt {
     }
 
 
+    @Test
+    fun givenQueryWithNullPrimitiveParam_whenQueried_thenShouldGetResult() {
+        exampleDb2.exampleDao2().insertAndReturnId(ExampleEntity2().apply {
+            name = "Lenny"
+            rewardsCardNumber = null
+        })
+
+        Assert.assertEquals(exampleDb2.exampleDao2().findWithNullableInt(null)?.name,
+            "Lenny")
+    }
 }

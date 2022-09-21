@@ -40,4 +40,6 @@ actual interface PreparedStatement : Statement {
 
     actual fun executeQuery(): ResultSet
 
+    actual fun setNull(parameterIndex: Int, sqlType: Int)
+
 }

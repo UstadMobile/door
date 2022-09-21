@@ -67,6 +67,11 @@ class SQLitePreparedStatementJs(
         }
     }
 
+
+    override fun setNull(parameterIndex: Int, sqlType: Int) {
+        params[parameterIndex - 1] = null
+    }
+
     override fun setArray(index: Int, array: com.ustadmobile.door.jdbc.Array) {
         throw SQLException("SQLite does not support arrays")
     }

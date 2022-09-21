@@ -8,12 +8,10 @@ import io.ktor.http.*
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.google.devtools.ksp.symbol.KSType
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.MEMBERNAME_CLIENT_SET_BODY
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.MEMBERNAME_ENCODED_PATH
-import com.ustadmobile.lib.annotationprocessor.core.ext.entityPrimaryKeyProps
-import com.ustadmobile.lib.annotationprocessor.core.ext.entityTableName
-import com.ustadmobile.lib.annotationprocessor.core.ext.getAnnotation
-import com.ustadmobile.lib.annotationprocessor.core.ext.toCreateTableSql
+import com.ustadmobile.lib.annotationprocessor.core.ext.*
 
 /**
  * Generate a delegation style function call, e.g.
@@ -24,7 +22,7 @@ import com.ustadmobile.lib.annotationprocessor.core.ext.toCreateTableSql
  */
 fun CodeBlock.Builder.addDelegateFunctionCall(varName: String, funSpec: FunSpec) : CodeBlock.Builder {
     return add("$varName.${funSpec.name}(")
-            .add(funSpec.parameters.filter { !isContinuationParam(it.type)}.joinToString { it.name })
+            .add(funSpec.parameters.joinToString { it.name })
             .add(")")
 }
 
@@ -283,3 +281,70 @@ fun CodeBlock.Builder.addGenerateAttachmentTriggerPostgres(
 
     return this
 }
+
+enum class PreparedStatementOp() {
+    GET, SET;
+
+    override fun toString() = if(this == GET) {
+        "get"
+    }else {
+        "set"
+    }
+}
+
+/**
+ * Generate code that will get a value back from the ResultSet of the desired type
+ * e.g. getInt, getString, etc. or generate code that will set a parameter on a preparedstatement
+ * e.g. setInt, setString etc.
+ *
+ * @param type the property type that is being used
+ * @param operation GET or SET
+ * @param resolver KSP resolver
+ *
+ * @return CodeBlock with the correct get/set call. This does not include brackets. It will use extension
+ * functions to handle nullable fields as required.
+ */
+fun CodeBlock.Builder.addGetResultOrSetQueryParamCall(
+    type: KSType,
+    operation: PreparedStatementOp,
+    resolver: Resolver
+): CodeBlock.Builder {
+    val builtIns = resolver.builtIns
+    val extPkgName = "com.ustadmobile.door.jdbc.ext"
+    when {
+        type == builtIns.intType -> add("${operation}Int")
+        type == builtIns.intType.makeNullable() -> add("%M",
+            MemberName(extPkgName, "${operation}IntNullable"))
+        type == builtIns.shortType -> add("${operation}Short")
+        type == builtIns.shortType.makeNullable() -> MemberName
+        type == builtIns.byteType -> add("getByte")
+        type == builtIns.byteType.makeNullable() -> add("%M",
+            MemberName(extPkgName, "${operation}ByteNullable"))
+        type == builtIns.longType -> add("${operation}Long")
+        type == builtIns.longType.makeNullable() -> add("%M",
+            MemberName(extPkgName, "${operation}LongNullable"))
+        type == builtIns.floatType -> add("${operation}Float")
+        type == builtIns.floatType.makeNullable() -> add("%M",
+            MemberName(extPkgName,"${operation}Float"))
+        type == builtIns.doubleType -> add("${operation}Double")
+        type == builtIns.doubleType.makeNullable() -> add("%M",
+            MemberName(extPkgName, "${operation}Double"))
+        type == builtIns.booleanType -> add("${operation}Boolean")
+        type == builtIns.booleanType.makeNullable() -> add("%M",
+            MemberName(extPkgName, "${operation}Boolean"))
+        type.equalsIgnoreNullable(builtIns.stringType) -> add("${operation}String")
+        type == builtIns.arrayType -> add("${operation}Array")
+        (type.declaration as? KSClassDeclaration)?.isListDeclaration() == true -> add("${operation}Array")
+        else -> add("ERR_UNKNOWN_TYPE /* $type */")
+    }
+
+    return this
+}
+
+/**
+ * Create a PreparedStatement set param call for the given variable type
+ */
+fun CodeBlock.Builder.addPreparedStatementSetCall(
+    type: KSType,
+    resolver: Resolver
+) = addGetResultOrSetQueryParamCall(type, PreparedStatementOp.SET, resolver)

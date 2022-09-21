@@ -172,4 +172,13 @@ abstract class ExampleDao2 {
 
     @Query("SELECT someNumber FROM ExampleEntity2 WHERE someNumber > :greaterThan LIMIT 1")
     abstract suspend fun findSingleNullablePrimitiveAsync(greaterThan: Int): Int?
+
+    @Query("""
+        SELECT ExampleEntity2.* FROM ExampleEntity2
+         WHERE (CASE
+                WHEN :rewardsNum IS NULL THEN (ExampleEntity2.rewardsCardNumber IS NULL)
+                ELSE (ExampleEntity2.rewardsCardNumber = :rewardsNum) 
+                END)
+    """)
+    abstract fun findWithNullableInt(rewardsNum: Int?): ExampleEntity2?
 }

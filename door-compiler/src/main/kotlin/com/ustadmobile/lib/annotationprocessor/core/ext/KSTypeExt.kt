@@ -7,6 +7,7 @@ import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.CodeBlock
 import com.ustadmobile.door.DoorDbType
+import com.ustadmobile.door.jdbc.TypesKmp
 import kotlinx.coroutines.flow.Flow
 
 fun KSType.unwrapComponentTypeIfListOrArray(
@@ -77,7 +78,7 @@ private fun Resolver.sqliteRealTypes(): List<KSType> {
     return listOf(builtIns.floatType, builtIns.doubleType).flatMap { listOf(it, it.makeNullable()) }
 }
 
-private fun KSType.equalsIgnoreNullable(otherType: KSType) : Boolean {
+fun KSType.equalsIgnoreNullable(otherType: KSType) : Boolean {
     return this == otherType || this == otherType.makeNullable()
 }
 
@@ -100,6 +101,27 @@ fun KSType.toSqlType(
         else -> "INVALID UNSUPPORTED TYPE"
     }
 }
+
+fun KSType.toSqlTypeInt(
+    dbType: Int,
+    resolver: Resolver
+): Int {
+    val builtIns = resolver.builtIns
+    return when {
+        this.equalsIgnoreNullable(builtIns.stringType) -> TypesKmp.LONGVARCHAR
+        dbType == DoorDbType.SQLITE && this in resolver.sqliteIntegerTypes() -> TypesKmp.INTEGER
+        dbType == DoorDbType.SQLITE && this in resolver.sqliteRealTypes() -> TypesKmp.REAL
+        this.equalsIgnoreNullable(builtIns.booleanType) -> TypesKmp.BOOLEAN
+        this.equalsIgnoreNullable(builtIns.byteType) -> TypesKmp.SMALLINT
+        this.equalsIgnoreNullable(builtIns.shortType) -> TypesKmp.SMALLINT
+        this.equalsIgnoreNullable(builtIns.intType) -> TypesKmp.INTEGER
+        this.equalsIgnoreNullable(builtIns.longType) -> TypesKmp.BIGINT
+        this.equalsIgnoreNullable(builtIns.floatType) -> TypesKmp.FLOAT
+        this.equalsIgnoreNullable(builtIns.doubleType) -> TypesKmp.DOUBLE
+        else -> 0
+    }
+}
+
 
 fun KSType.defaultTypeValueCode(
     resolver: Resolver
@@ -141,24 +163,6 @@ fun KSType.defaultSqlQueryVal(
     }
 }
 
-
-fun KSType.preparedStatementSetterGetterTypeName(
-    resolver: Resolver
-): String {
-    val builtIns = resolver.builtIns
-    return when {
-        this.equalsIgnoreNullable(builtIns.intType) -> "Int"
-        this.equalsIgnoreNullable(builtIns.byteType) -> "Byte"
-        this.equalsIgnoreNullable(builtIns.longType) -> "Long"
-        this.equalsIgnoreNullable(builtIns.floatType) -> "Float"
-        this.equalsIgnoreNullable(builtIns.doubleType) -> "Double"
-        this.equalsIgnoreNullable(builtIns.booleanType) -> "Boolean"
-        this.equalsIgnoreNullable(builtIns.stringType) -> "String"
-        this == builtIns.arrayType -> "Array"
-        (this.declaration as? KSClassDeclaration)?.isListDeclaration() == true -> "Array"
-        else -> "ERR_UNKNOWN_TYPE"
-    }
-}
 
 fun KSType.isArrayType(): Boolean {
     return (declaration as? KSClassDeclaration)?.isArrayDeclaration() == true

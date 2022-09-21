@@ -1,6 +1,7 @@
 package com.ustadmobile.door.ext
 
 import com.ustadmobile.door.jdbc.PreparedStatement
+import com.ustadmobile.door.jdbc.ResultSet
 import com.ustadmobile.door.jdbc.TypesKmp
 import kotlinx.serialization.json.*
 

@@ -75,10 +75,6 @@ internal fun TypeName.javaToKotlinType(): TypeName = if (this is ParameterizedTy
     else ClassName.bestGuess(className)
 }
 
-
-fun isContinuationParam(paramTypeName: TypeName) = paramTypeName is ParameterizedTypeName &&
-        paramTypeName.rawType.canonicalName == "kotlin.coroutines.Continuation"
-
 /**
  * Remove <out T>
  */
@@ -982,8 +978,9 @@ fun TypeSpec.Builder.addDaoJdbcEntityInsertAdapter(
                             add("stmt.setObject(%L, null)\n", index + 1)
                             nextControlFlow("else")
                         }
-                        add("stmt.set${field.type.resolve().preparedStatementSetterGetterTypeName(resolver)}(%L, entity.%L)\n",
-                            index + 1, field.simpleName.asString())
+                        add("stmt.")
+                        addPreparedStatementSetCall(field.type.resolve(), resolver)
+                        add("(%L, entity.%L)\n", index + 1, field.simpleName.asString())
                         if(field.isEntityAutoGeneratePrimaryKey) {
                             endControlFlow()
                         }
@@ -1102,11 +1099,13 @@ fun TypeSpec.Builder.addDaoUpdateFunction(
             .apply {
                 var fieldIndex = 1
                 nonPkFields.forEach {
-                    add("_stmt.set${it.type.resolve().preparedStatementSetterGetterTypeName(resolver)}")
+                    add("_stmt.")
+                    addPreparedStatementSetCall(it.type.resolve(), resolver)
                     add("(%L, %L)\n", fieldIndex++, "$entityVarName.${it.simpleName.asString()}")
                 }
                 pkProps.forEach { pkEl ->
-                    add("_stmt.set${pkEl.type.resolve().preparedStatementSetterGetterTypeName(resolver)}")
+                    add("_stmt.")
+                    addPreparedStatementSetCall(pkEl.type.resolve(), resolver)
                     add("(%L, %L)\n", fieldIndex++, "$entityVarName.${pkEl.simpleName.asString()}")
                 }
             }
@@ -1169,8 +1168,9 @@ fun TypeSpec.Builder.addDaoDeleteFunction(
             }
             .apply {
                 pkEls.forEachIndexed { index, pkProp ->
-                    add("_stmt.set${pkProp.type.resolve().preparedStatementSetterGetterTypeName(resolver)}(%L, %L)\n",
-                        index + 1, "$entityVarName.${pkProp.simpleName.asString()}")
+                    add("_stmt.")
+                    addPreparedStatementSetCall(pkProp.type.resolve(), resolver)
+                    add("(%L, %L)\n",index + 1, "$entityVarName.${pkProp.simpleName.asString()}")
                 }
             }
             .apply {
@@ -1212,7 +1212,6 @@ fun TypeSpec.Builder.addDaoQueryFunction(
         ksValueParameter.name!!.asString() to daoFun.parameterTypes[index]!!
     }.toMap()
 
-    //funSpec.parameters.map { it.name to it.type }.toMap()
     val querySql = daoFunDecl.getAnnotation(Query::class)?.value
     val resultType = daoFun.returnType?.unwrapResultType(resolver) ?: resolver.builtIns.unitType
 
@@ -1355,7 +1354,9 @@ fun CodeBlock.Builder.addMapResultRowCode(
     }
 
     if(resultComponentType in resolver.querySingularTypes()){
-        add("$resultVarName.get${resultComponentType.preparedStatementSetterGetterTypeName(resolver)}(1)\n")
+        add("$resultVarName.")
+        addGetResultOrSetQueryParamCall(resultComponentType, PreparedStatementOp.GET, resolver)
+        add("(1)\n")
     }else {
         fun addResultSetTmpVals(entityType: KSClassDeclaration, checkAllNull: Boolean) {
             if(checkAllNull) {
@@ -1364,8 +1365,9 @@ fun CodeBlock.Builder.addMapResultRowCode(
 
             val allResultSetCols = entityType.getAllColumnProperties(resolver)
             allResultSetCols.forEach { prop ->
-                add("val _tmp_${prop.entityPropColumnName} = $resultVarName.get${prop.type.resolve().preparedStatementSetterGetterTypeName(resolver)}(%S)\n",
-                    prop.entityPropColumnName)
+                add("val _tmp_${prop.entityPropColumnName} = $resultVarName.")
+                addGetResultOrSetQueryParamCall(prop.type.resolve(), PreparedStatementOp.GET, resolver)
+                add("(%S)\n", prop.entityPropColumnName)
                 if(checkAllNull)
                     add("if($resultVarName.wasNull()) _tmp_${entityType.entityTableName}_nullCount++\n")
             }
@@ -1471,8 +1473,9 @@ fun CodeBlock.Builder.addSetPreparedStatementParams(
                 MemberName("com.ustadmobile.door.ext", "createArrayOrProxyArrayOf"),
                 arrayTypeName, paramVarName)
         }else {
-            add("$statementVarName.set${paramType.preparedStatementSetterGetterTypeName(resolver)}(${index + 1}, " +
-                    "${paramVarName})\n")
+            add("$statementVarName.")
+            addPreparedStatementSetCall(paramType, resolver)
+            add("(${index + 1},${paramVarName})\n")
         }
     }
 

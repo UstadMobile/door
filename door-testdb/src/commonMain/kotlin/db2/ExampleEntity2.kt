@@ -13,7 +13,9 @@ open class ExampleEntity2(
         var name: String? = "",
         @ColumnInfo(index = true)
         var someNumber: Long = 0L,
-        var checked: Boolean = false,) {
+        var checked: Boolean = false,
+        var rewardsCardNumber: Int? = null,
+) {
 
 
         override fun equals(other: Any?): Boolean {

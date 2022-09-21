@@ -325,8 +325,7 @@ fun CodeBlock.Builder.addHttpServerPassToDaoCodeBlock(
     var paramOutCount = 0
     daoMethod.parameters.forEachIndexed {index, param ->
         val paramTypeName = param.type.javaToKotlinType()
-        if(isContinuationParam(paramTypeName))
-            return@forEachIndexed
+
 
         if(paramOutCount > 0)
             callCodeBlock.add(",")
