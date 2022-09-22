@@ -6,7 +6,13 @@
 ![JS](https://img.shields.io/badge/platform-js-orange)
 
 Door is a Kotlin Symbol Processor that builds on [Room](https://developer.android.com/training/data-storage/room) and makes
-it possible to use Room databases, DAOs and entities with Kotlin Multiplatform (using [expect/actual](https://kotlinlang.org/docs/multiplatform-connect-to-apis.html)).
+it possible to use Room databases, DAOs and entities with Kotlin Multiplatform (using [expect/actual](https://kotlinlang.org/docs/multiplatform-connect-to-apis.html)). 
+On Android Door uses a simple expect/actual system where the actual implementation is provided by Room itself. On JVM
+and Javascript Door provides equivalent functionality, with support for:
+ * Synchronous and suspended queries
+ * RawQuery
+ * LiveData, Flow, and DataSource.Factory return types
+ * Embedded entities
 
 Just put your Database, DAOs, and entity classes in your Kotlin Multiplatform common code and add the ```expect``` keyword to
 DAO and Database classes. 
@@ -88,7 +94,7 @@ dependencies {
 }
 ```
 
-Now create your Database and DAOs in Kotlin multiplatform common code:
+Now create your database, DAOs, and entities in Kotlin multiplatform common code:
 
 Database:
 ```
@@ -118,37 +124,57 @@ expect abstract class MyEntityDao {
 }
 ```
 
+Entity:
+```
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity
+class MyEntity() {
+    @PrimaryKey(autoGenerate = true)
+    var id: Long = 0
+    
+    var name: String? = null
+    
+    var rewardsCardNumber: Int = 0
+}
+```
+
 Then create the database. Database creation is platform-specific, so it's best to use multiplatform dependency injection
 (such as KodeIN-DI) or create your own expect-actual function.
 
+JVM:
 ```
-JVM: 
-//Use an SQLite JDBC URL 
+//Option 1: Use an SQLite JDBC URL 
 val sqliteDatabase = DatabaseBuilder.databaseBuilder(MyDatabase::class, "jdbc:sqlite:path/to/file.sqlite").build()
 
-//Use a Postgres JDBC URL
+//Option 2: Use a Postgres JDBC URL
 val postgresDatabase = DatabaseBuilder.databaseBuilder(MyDatabase::class, "jdbc:postgres:///mydbname", 
   dbUsername = "pguser", dbPassword = "secret").build()
 
-//Use a JNDI DataSource (e.g. using within an application server etc)
+//Option 3: Use a JNDI DataSource (e.g. using within an application server etc)
 val jndiDatabase = DatabaseBuilder.databaseBuilder(MyDatabase::class, "java:/comp/env/jdbc/myDB")
-
+```
 Android:
+```
 val myDatabase = DatabaseBuilder.databaseBuilder(context, MyDatabase::class, "mydatabase").build()
+```
 
 Javascript 
+```
 //Note: build() is a suspended function on Javascript
 //MyDatabase2JsImplementations is a generated class that needs to be given as an argument
 //sqliteJsWorkerUrl should be a URL to the SQLite.js worker - see https://sql.js.org/#/?id=downloadingusing
 val builderOptions = DatabaseBuilderOptions(
   MyDatabase::class, MyDatabase2JsImplementations, "sqlite:my_indexdb_name",sqliteJsWorkerUrl)
 val myDatabase = DatabaseBuilder.databaseBuilder(builderOptions).build() 
-
 ```
 
 Limitations:
 * Because we are using expect/actual, no function body can be added (better to use extension functions).
 * No support for choosing entity constructors. Door requires and will always choose the no args constructor.
+* No support for Room @Relation annotation or Multimap return types
+* No support for TypeConverter
 
 ## Debugging
 Use Gradle in debug mode e.g.:
