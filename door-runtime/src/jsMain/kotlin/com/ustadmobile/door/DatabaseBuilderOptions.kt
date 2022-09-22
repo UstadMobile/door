@@ -7,7 +7,7 @@ import kotlin.reflect.KClass
 data class DatabaseBuilderOptions<T : RoomDatabase>(
     var dbClass: KClass<T>,
     var dbImplClasses: DoorJsImplClasses<T>,
-    var dbName: String = dbClass.simpleName!!,
+    var dbUrl: String = "indexeddb:${dbClass.simpleName!!}",
 
     /**
      * Path to SQL.JS web worker

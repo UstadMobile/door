@@ -12,6 +12,7 @@ import com.ustadmobile.door.migration.DoorMigrationAsync
 import com.ustadmobile.door.migration.DoorMigrationStatementList
 import com.ustadmobile.door.migration.DoorMigrationSync
 import com.ustadmobile.door.sqljsjdbc.*
+import com.ustadmobile.door.sqljsjdbc.SQLiteDatasourceJs.Companion.PROTOCOL_SQLITE_PREFIX
 import com.ustadmobile.door.util.DoorJsImplClasses
 import io.github.aakira.napier.Napier
 import org.w3c.dom.Worker
@@ -26,12 +27,16 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
     private val migrationList = mutableListOf<DoorMigration>()
 
     suspend fun build(): T {
-        val dataSource = SQLiteDatasourceJs(builderOptions.dbName, Worker(builderOptions.webWorkerPath))
+        if(!builderOptions.dbUrl.startsWith(PROTOCOL_SQLITE_PREFIX))
+            throw IllegalArgumentException("Door/JS: Only SQLite is supported on JS! dbUrl must be in the form of sqlite:indexeddb_name")
+
+        val indexeddbStoreName = builderOptions.dbUrl.substringAfter(PROTOCOL_SQLITE_PREFIX)
+        val dataSource = SQLiteDatasourceJs(indexeddbStoreName, Worker(builderOptions.webWorkerPath))
         register(builderOptions.dbImplClasses)
 
         val dbImpl = builderOptions.dbImplClasses.dbImplKClass.js.createInstance(null, dataSource,
-            builderOptions.dbName, listOf<AttachmentFilter>(), builderOptions.jdbcQueryTimeout, DoorDbType.SQLITE) as T
-        val exists = IndexedDb.checkIfExists(builderOptions.dbName)
+            builderOptions.dbUrl, listOf<AttachmentFilter>(), builderOptions.jdbcQueryTimeout, DoorDbType.SQLITE) as T
+        val exists = IndexedDb.checkIfExists(indexeddbStoreName)
         val connection = dataSource.getConnection()
         val sqlDatabase = DoorSqlDatabaseConnectionImpl(connection)
 
@@ -89,7 +94,7 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
                 }
             }
         }else{
-            Napier.i("DatabaseBuilderJs: Creating database ${builderOptions.dbName}\n")
+            Napier.i("DatabaseBuilderJs: Creating database ${builderOptions.dbUrl}\n")
             connection.execSqlAsync(*dbImpl.createAllTables().toTypedArray())
             Napier.d("DatabaseBuilderJs: Running onCreate callbacks...\n")
             callbacks.forEach {
@@ -132,7 +137,7 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
             dbImpl
         }
 
-        Napier.d("Built ${builderOptions.dbName}\n")
+        Napier.d("Built ${builderOptions.dbUrl}\n")
 
         return dbWrappedIfNeeded
     }

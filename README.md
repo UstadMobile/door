@@ -19,12 +19,12 @@ implementation (the same implementation if you had used Room itself).
 queries using JDBC and return results.
 * **Javascript** Door supports SQLite in the browser through SQLite.JS. Door will generate the entire implementation for
 you to run the queries and return results. Only asynchronous operations are supported (suspended functions, LiveData, 
-and DataSource.Factory)
+and DataSource.Factory). The database can be saved to indexeddb.
 
 No support for iOS/Native (yet - pull request would be welcome. Happy to help support anyone who would like to work on 
 this).
 
-Door contains an experimental [replication/sync](README-REPLICATION.md) engine that can be used to sync 
+Door contains an experimental [replication/sync](README-REPLICATION.md) engine that can be used to selectively sync instances. 
 
 
 ## Getting started
@@ -138,8 +138,10 @@ val myDatabase = DatabaseBuilder.databaseBuilder(context, MyDatabase::class, "my
 
 Javascript 
 //Note: build() is a suspended function on Javascript
+//MyDatabase2JsImplementations is a generated class that needs to be given as an argument
+//sqliteJsWorkerUrl should be a URL to the SQLite.js worker - see https://sql.js.org/#/?id=downloadingusing
 val builderOptions = DatabaseBuilderOptions(
-  MyDatabase::class, MyDatabase2JsImplementations, "my_indexdb_name",workerBlobUrl)
+  MyDatabase::class, MyDatabase2JsImplementations, "sqlite:my_indexdb_name",sqliteJsWorkerUrl)
 val myDatabase = DatabaseBuilder.databaseBuilder(builderOptions).build() 
 
 ```

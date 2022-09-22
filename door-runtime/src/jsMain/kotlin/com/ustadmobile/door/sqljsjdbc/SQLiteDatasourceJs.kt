@@ -254,5 +254,8 @@ class SQLiteDatasourceJs(
 
     companion object {
         var idCounter = 0
+
+        val PROTOCOL_SQLITE_PREFIX = "sqlite:"
+
     }
 }
