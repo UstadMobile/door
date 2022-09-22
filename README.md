@@ -35,7 +35,9 @@ Door contains an experimental [replication/sync](README-REPLICATION.md) engine t
 
 ## Getting started
 
-Then add Gradle dependencies:
+Very basic example repo: [https://github.com/UstadMobile/door-example](https://github.com/UstadMobile/door-example)
+
+1. Add Gradle dependencies:
 ```
 //Add jitpack repository if you don't already have it
 buildscript {
@@ -94,7 +96,7 @@ dependencies {
 }
 ```
 
-Now create your database, DAOs, and entities in Kotlin multiplatform common code:
+2. Now create your database, DAOs, and entities in Kotlin multiplatform common code:
 
 Database:
 ```
@@ -140,7 +142,7 @@ class MyEntity() {
 }
 ```
 
-Then create the database. Database creation is platform-specific, so it's best to use multiplatform dependency injection
+3. Create and use the database in your code. Database creation is platform-specific, so it's best to use multiplatform dependency injection
 (such as KodeIN-DI) or create your own expect-actual function.
 
 JVM:
