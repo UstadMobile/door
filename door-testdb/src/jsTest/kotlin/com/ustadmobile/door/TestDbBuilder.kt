@@ -152,7 +152,7 @@ class TestDbBuilder {
     fun givenRunInTransactionUsed_whenInserted_thenCanBeRetrieved() = GlobalScope.promise {
         openRepoDb()
 
-        repDb.withDoorTransactionAsync(RepDb::class) { txDb ->
+        repDb.withDoorTransactionAsync { txDb ->
             val repEntity = RepEntity().apply {
                 reNumField = 42
                 rePrimaryKey = txDb.repDao.insertAsync(this)
@@ -167,8 +167,8 @@ class TestDbBuilder {
     fun givenNestedRunInTransactionUsed_whenInserted_thenCanBeRetrieved() = GlobalScope.promise {
         Napier.base(DebugAntilog())
         openRepoDb()
-        repDb.withDoorTransactionAsync(RepDb::class) { txDb1 ->
-            txDb1.withDoorTransactionAsync(RepDb::class) { txDb2 ->
+        repDb.withDoorTransactionAsync { txDb1 ->
+            txDb1.withDoorTransactionAsync { txDb2 ->
                 Napier.i("==Attempting to insert on tx2\n")
 
                 val existingInDb = txDb2.repDao.findAllAsync()

@@ -32,7 +32,7 @@ suspend fun RoomDatabase.findZombieAttachments(): List<ZombieAttachmentData> {
 }
 
 suspend fun RoomDatabase.deleteZombieAttachmentData(zaUids: List<Int>) {
-    withDoorTransactionAsync(RoomDatabase::class) { txDb ->
+    withDoorTransactionAsync { txDb ->
         txDb.prepareAndUseStatementAsync("""
             DELETE FROM ZombieAttachmentData
                   WHERE zaUid = ?

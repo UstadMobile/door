@@ -4,6 +4,7 @@ import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.*
 import com.ustadmobile.door.jdbc.SQLException
 import com.ustadmobile.door.room.RoomJdbcImpl
+import com.ustadmobile.door.util.TransactionMode
 import io.github.aakira.napier.Napier
 import kotlin.reflect.KClass
 
@@ -20,7 +21,7 @@ actual fun RoomDatabase.dbSchemaVersion(): Int = this.dbVersion
  * Run a transaction within a suspend coroutine context. Not really implemented at the moment.
  */
 actual suspend fun <T: RoomDatabase, R> T.withDoorTransactionAsync(
-    dbKClass: KClass<out T>,
+    transactionMode: TransactionMode,
     block: suspend (T) -> R
 ) : R {
     return (this.rootDatabase as RoomJdbcImpl).jdbcImplHelper.useConnectionAsync {
@@ -28,7 +29,10 @@ actual suspend fun <T: RoomDatabase, R> T.withDoorTransactionAsync(
     }
 }
 
-actual fun <T: RoomDatabase, R> T.withDoorTransaction(dbKClass: KClass<T>, block: (T) -> R) : R {
+actual fun <T: RoomDatabase, R> T.withDoorTransaction(
+    transactionMode: TransactionMode,
+    block: (T) -> R
+) : R {
     throw SQLException("withDoorTransaction non-async not support on Javascript!")
 }
 

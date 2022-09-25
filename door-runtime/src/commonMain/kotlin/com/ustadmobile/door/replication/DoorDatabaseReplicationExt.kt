@@ -10,7 +10,6 @@ import com.ustadmobile.door.jdbc.ext.useResults
 import com.ustadmobile.door.replication.ReplicationEntityMetaData.Companion.KEY_PRIMARY_KEY
 import com.ustadmobile.door.replication.ReplicationEntityMetaData.Companion.KEY_VERSION_ID
 import kotlinx.serialization.json.*
-import kotlin.reflect.KClass
 
 /**
  * Get a list of the replication trackers that are pending for the given remoteNode and given tableId and return as a
@@ -38,8 +37,7 @@ suspend fun RoomDatabase.findPendingReplicationTrackers(
  *
  * @return list of pending replication tracker
  */
-suspend fun <T: RoomDatabase> RoomDatabase.checkPendingReplicationTrackers(
-    dbKClass: KClass<out T>,
+suspend fun RoomDatabase.checkPendingReplicationTrackers(
     dbMetaData: DoorDatabaseMetadata<*>,
     pendingReplications: JsonArray,
     tableId: Int
@@ -49,7 +47,7 @@ suspend fun <T: RoomDatabase> RoomDatabase.checkPendingReplicationTrackers(
     val pendingReplicationObjects = pendingReplications.map { it as JsonObject }
 
     val alreadyUpdatedEntities = mutableLinkedListOf<JsonObject>()
-    withDoorTransactionAsync(dbKClass) { transactionDb ->
+    withDoorTransactionAsync { transactionDb ->
         transactionDb.prepareAndUseStatementAsync(repEntityMetaData.findAlreadyUpToDateEntitiesSql) { stmt ->
             pendingReplicationObjects.forEach { pendingRep ->
                 stmt.setJsonPrimitive(1, repEntityMetaData.entityPrimaryKeyFieldType,
@@ -77,8 +75,7 @@ suspend fun <T: RoomDatabase> RoomDatabase.checkPendingReplicationTrackers(
  * @param processedReplicateTrackers a JSON array of trackers that should be marked as processed e.g.
  *  [ {primaryKey : 123, versionId: 456 }.. ]
  */
-suspend fun <T: RoomDatabase> RoomDatabase.markReplicateTrackersAsProcessed(
-    dbKClass: KClass<out T>,
+suspend fun RoomDatabase.markReplicateTrackersAsProcessed(
     dbMetaData: DoorDatabaseMetadata<*>,
     processedReplicateTrackers: JsonArray,
     remoteNodeId: Long,
@@ -88,7 +85,7 @@ suspend fun <T: RoomDatabase> RoomDatabase.markReplicateTrackersAsProcessed(
 
     val processedReplicateTrackersObjects = processedReplicateTrackers.map { it as JsonObject }
 
-    withDoorTransactionAsync(dbKClass) { transactionDb ->
+    withDoorTransactionAsync { transactionDb ->
         transactionDb.prepareAndUseStatementAsync(repEntityMetaData.updateSetTrackerProcessedSql(transactionDb.dbType())) { stmt ->
             processedReplicateTrackersObjects.forEach { replicateTracker ->
                 stmt.setJsonPrimitive(1, repEntityMetaData.entityPrimaryKeyFieldType,
@@ -128,7 +125,6 @@ suspend fun RoomDatabase.findPendingReplications(
 
 suspend fun RoomDatabase.insertReplicationsIntoReceiveView(
     dbMetaData: DoorDatabaseMetadata<*>,
-    dbKClass: KClass<out RoomDatabase>,
     @Suppress("UNUSED_PARAMETER") //This is reserved for future usage (e.g. to set when doing the insert to help with permission checking)
     remoteNodeId: Long,
     tableId: Int,
@@ -140,7 +136,7 @@ suspend fun RoomDatabase.insertReplicationsIntoReceiveView(
     val repEntityMetaData = dbMetaData.replicateEntities[tableId] ?: throw IllegalArgumentException("No such table: $tableId")
     val receivedObjects = receivedEntities.map { it as JsonObject }
 
-    return withDoorTransactionAsync(dbKClass) { transactionDb ->
+    return withDoorTransactionAsync { transactionDb ->
         transactionDb.prepareAndUseStatementAsync(repEntityMetaData.insertIntoReceiveViewSql) { insertStmt ->
             transactionDb.prepareAndUseStatementAsync(repEntityMetaData.insertOrUpdateTrackerSql(dbType())) { updateTrackerStmt ->
                 receivedObjects.forEach { receivedObject ->

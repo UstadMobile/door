@@ -4,6 +4,7 @@ import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.*
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
 import com.ustadmobile.door.room.RoomJdbcImpl
+import com.ustadmobile.door.util.TransactionMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -13,13 +14,19 @@ actual fun RoomDatabase.dbType(): Int = (this.rootDatabase as RoomJdbcImpl).jdbc
 
 actual fun RoomDatabase.dbSchemaVersion(): Int = this.dbVersion
 
-actual suspend fun <T: RoomDatabase, R> T.withDoorTransactionAsync(dbKClass: KClass<out T>, block: suspend (T) -> R): R {
+actual suspend fun <T: RoomDatabase, R> T.withDoorTransactionAsync(
+    transactionMode: TransactionMode,
+    block: suspend (T) -> R
+): R {
     return (this.rootDatabase as RoomJdbcImpl).jdbcImplHelper.useConnectionAsync {
         block(this)
     }
 }
 
-actual fun <T: RoomDatabase, R> T.withDoorTransaction(dbKClass: KClass<T>, block: (T) -> R): R {
+actual fun <T: RoomDatabase, R> T.withDoorTransaction(
+    transactionMode: TransactionMode,
+    block: (T) -> R
+): R {
     return (this.rootDatabase as RoomJdbcImpl).jdbcImplHelper.useConnection {
         block(this)
     }

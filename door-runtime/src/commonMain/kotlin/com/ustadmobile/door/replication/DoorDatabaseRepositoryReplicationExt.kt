@@ -34,7 +34,6 @@ suspend fun DoorDatabaseRepository.sendPendingReplications(
     //should return a result object of some kind
     Napier.d("$this : tableId $tableId : sendPendingReplications - start", tag = DoorTag.LOG_TAG)
     val dbMetaData = (this as RoomDatabase)::class.doorDatabaseMetadata()
-    val dbKClass = dbMetaData.dbClass
 
     val repEntityMetaData = dbMetaData.requireReplicateEntityMetaData(tableId)
 
@@ -62,7 +61,7 @@ suspend fun DoorDatabaseRepository.sendPendingReplications(
 
         Napier.d("$this : tableId $tableId : sendPendingReplications - marking " +
                 "${alreadyUpdatedTrackersJsonArr.size} pending trackers as already processed", tag = DoorTag.LOG_TAG)
-        db.markReplicateTrackersAsProcessed(dbKClass, dbMetaData, alreadyUpdatedTrackersJsonArr, remoteNodeId, tableId)
+        db.markReplicateTrackersAsProcessed(dbMetaData, alreadyUpdatedTrackersJsonArr, remoteNodeId, tableId)
 
         offset += (pendingReplicationTrackers.size - min(alreadyUpdatedTrackersJsonArr.size, repEntityMetaData.batchSize))
     }while(pendingReplicationTrackers.size == repEntityMetaData.batchSize)
@@ -100,7 +99,8 @@ suspend fun DoorDatabaseRepository.sendPendingReplications(
 
         Napier.d("$this : tableId $tableId : sendPendingReplications - marking " +
                 "${pendingReplicationToSend.size} entities as processed", tag = DoorTag.LOG_TAG)
-        db.markReplicateTrackersAsProcessed(dbKClass, dbMetaData, pendingReplicationsProcessed,
+        db.markReplicateTrackersAsProcessed(
+            dbMetaData, pendingReplicationsProcessed,
             remoteNodeId, tableId)
     }while(pendingReplicationsProcessed.size == repEntityMetaData.batchSize)
     Napier.d("$this : tableId $tableId : sendPendingReplications - done", tag = DoorTag.LOG_TAG)
@@ -132,7 +132,6 @@ suspend fun DoorDatabaseRepository.fetchPendingReplications(
 ) {
     Napier.d("$this : tableId $tableId : fetchPendingReplications - start", tag = DoorTag.LOG_TAG)
     val dbMetaData = (this as RoomDatabase)::class.doorDatabaseMetadata()
-    val dbKClass = dbMetaData.dbClass
 
     val repEntityMetaData = dbMetaData.requireReplicateEntityMetaData(tableId)
 
@@ -159,7 +158,8 @@ suspend fun DoorDatabaseRepository.fetchPendingReplications(
         Napier.d("$this : tableId $tableId : fetchPendingReplications - received pending trackers - " +
                 "${remotePendingTrackersJsonArray.size} trackers from remote", tag = DoorTag.LOG_TAG)
 
-        val alreadyUpdatedTrackers = db.checkPendingReplicationTrackers(dbKClass, dbMetaData,
+        val alreadyUpdatedTrackers = db.checkPendingReplicationTrackers(
+            dbMetaData,
             remotePendingTrackersJsonArray, tableId)
 
         Napier.d("$this : tableId $tableId : fetchPendingReplications - check already updated - " +
@@ -209,7 +209,7 @@ suspend fun DoorDatabaseRepository.fetchPendingReplications(
             })
         }
 
-        db.insertReplicationsIntoReceiveView(dbMetaData, dbKClass, remoteNodeId, tableId, pendingReplicationsJson)
+        db.insertReplicationsIntoReceiveView(dbMetaData, remoteNodeId, tableId, pendingReplicationsJson)
         Napier.d("$this : tableId $tableId : fetchPendingReplications - received - " +
                 "${pendingReplicationsJson.size} entities inserted into receive view", tag = DoorTag.LOG_TAG)
         db.incomingReplicationListenerHelper.fireIncomingReplicationEvent(

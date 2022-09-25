@@ -98,7 +98,7 @@ class TestWithDoorTransaction {
 
     @Test
     fun givenTransactionStarted_whenMultipleChangesOccur_commitWillBeCalledOnce() {
-        db.withDoorTransaction(RepDb::class) { txDb ->
+        db.withDoorTransaction { txDb ->
             val entity = RepEntity().apply {
                 reNumField = 50
                 rePrimaryKey = txDb.repDao.insert(this)
@@ -115,7 +115,7 @@ class TestWithDoorTransaction {
 
     @Test
     fun givenTransactionStarted_whenMultipleChangesOccurAsync_commitWillBeCalledOnce() = runBlocking {
-        db.withDoorTransactionAsync(RepDb::class) { txDb ->
+        db.withDoorTransactionAsync { txDb ->
             val entity = RepEntity().apply {
                 reNumField = 50
                 rePrimaryKey = txDb.repDao.insertAsync(this)
@@ -132,8 +132,8 @@ class TestWithDoorTransaction {
 
     @Test
     fun givenTransactionStarted_whenNestedTranslationOccurs_commitWillBeCalledOnce() {
-        db.withDoorTransaction(RepDb::class) { txDb ->
-            txDb.withDoorTransaction(RepDb::class) { txDbNested ->
+        db.withDoorTransaction { txDb ->
+            txDb.withDoorTransaction { txDbNested ->
                 val entity = RepEntity().apply {
                     reNumField = 50
                     rePrimaryKey = txDbNested.repDao.insert(this)
@@ -150,7 +150,7 @@ class TestWithDoorTransaction {
     @Test
     fun givenTransactionStarted_whenExceptionThrown_thenConnectionShouldClose() {
         try {
-            db.withDoorTransaction(RepDb::class) {
+            db.withDoorTransaction {
                 throw Exception("Exception in transaction!")
             }
         }catch(e: Exception) {
@@ -167,7 +167,7 @@ class TestWithDoorTransaction {
     fun givenTransactionStartedAsync_whenExceptionThrown_thenConnectionShouldRollbackAndClose() {
         runBlocking {
             try {
-                db.withDoorTransactionAsync(RepDb::class) {
+                db.withDoorTransactionAsync {
                     throw Exception("Exception in transaction!")
                 }
             }catch (e: Exception) {

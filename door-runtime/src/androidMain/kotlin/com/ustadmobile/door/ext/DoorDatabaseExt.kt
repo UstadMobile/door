@@ -17,6 +17,7 @@ import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KClass
 import com.ustadmobile.door.attachments.requireAttachmentStorageUri
+import com.ustadmobile.door.util.TransactionMode
 
 actual fun RoomDatabase.dbType(): Int = DoorDbType.SQLITE
 
@@ -24,13 +25,19 @@ actual fun RoomDatabase.dbSchemaVersion(): Int {
     return this::class.doorDatabaseMetadata().version
 }
 
-actual suspend fun <T: RoomDatabase, R> T.withDoorTransactionAsync(dbKClass: KClass<out T>, block: suspend (T) -> R) : R{
+actual suspend fun <T: RoomDatabase, R> T.withDoorTransactionAsync(
+    transactionMode: TransactionMode,
+    block: suspend (T) -> R
+) : R{
     return rootDatabase.withTransaction {
         block(this)
     }
 }
 
-actual fun <T: RoomDatabase, R> T.withDoorTransaction(dbKClass: KClass<T>, block: (T) -> R) : R {
+actual fun <T: RoomDatabase, R> T.withDoorTransaction(
+    transactionMode: TransactionMode,
+    block: (T) -> R
+) : R {
     return runInTransaction(Callable {
         block(this)
     })

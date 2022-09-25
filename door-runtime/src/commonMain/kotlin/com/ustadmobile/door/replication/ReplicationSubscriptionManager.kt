@@ -196,7 +196,7 @@ class ReplicationSubscriptionManager(
      */
     private suspend fun initReplicationStatus() {
         val remoteNodeIdVal = remoteNodeId.value
-        repository.db.withDoorTransactionAsync(dbKClass) { transactionDb ->
+        repository.db.withDoorTransactionAsync { transactionDb ->
             transactionDb.prepareAndUseStatementAsync("""
                 INSERT INTO ReplicationStatus (tableId, priority, nodeId, lastRemoteChangeTime, lastFetchReplicationCompleteTime, lastLocalChangeTime, lastSendReplicationCompleteTime)
                 SELECT ? AS tableId, ? as priority, ? AS nodeId, ? AS lastRemoteChangeTime, ? AS lastFetchReplicationCompleteTime, ? AS lastLocalChangeTime, ? AS lastSendReplicationCompleteTime
@@ -289,7 +289,7 @@ class ReplicationSubscriptionManager(
 
                 var newNode = false
 
-                repository.db.withDoorTransactionAsync(repository.db::class.doorDatabaseMetadata().dbClass) { transactDb ->
+                repository.db.withDoorTransactionAsync { transactDb ->
                     if(!transactDb.selectDoorNodeExists(remoteNodeIdLong)) {
                         newNode = true
                         transactDb.insertNewDoorNode(DoorNode().also {
@@ -322,7 +322,7 @@ class ReplicationSubscriptionManager(
                 initCompletable.await()
                 Napier.d("$logPrefix invalidate table ids: ${tableIdsToInvalidate.joinToString()}")
                 val timeNow = systemTimeInMillis()
-                repository.db.withDoorTransactionAsync(dbKClass) { transactionDb ->
+                repository.db.withDoorTransactionAsync { transactionDb ->
                     transactionDb.prepareAndUseStatementAsync(
                         """
                     UPDATE ReplicationStatus 
@@ -347,7 +347,7 @@ class ReplicationSubscriptionManager(
     //Should be called when a local change is pending for outgoing replication
     override fun onReplicationPending(event: ReplicationPendingEvent) {
         coroutineScope.launch {
-            repository.db.withDoorTransactionAsync(dbKClass) { transactionDb ->
+            repository.db.withDoorTransactionAsync { transactionDb ->
                 transactionDb.prepareAndUseStatementAsync(
                     """
                     UPDATE ReplicationStatus 

@@ -44,7 +44,7 @@ class PrimaryKeyTest {
         val dbPkManager = db.doorPrimaryKeyManager
         lateinit var transactionPkManager: DoorPrimaryKeyManager
 
-        db.withDoorTransaction(RepDb::class) { transactionDb ->
+        db.withDoorTransaction { transactionDb ->
             transactionPkManager = transactionDb.doorPrimaryKeyManager
             transactionDb.repDao.insert(RepEntity().apply {
                 this.reNumField = 100

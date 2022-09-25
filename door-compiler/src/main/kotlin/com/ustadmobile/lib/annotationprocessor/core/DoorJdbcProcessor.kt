@@ -352,9 +352,8 @@ private fun FileSpec.Builder.addReplicationRunOnChangeRunnerType(
             .addCode(CodeBlock.builder()
                 .apply {
                     add("val _checkPendingNotifications = mutableSetOf<String>()\n")
-                    beginControlFlow("_db.%M(%T::class)",
-                        MemberName("com.ustadmobile.door.ext", "withDoorTransactionAsync"),
-                        dbKSClass.toClassName())
+                    beginControlFlow("_db.%M",
+                        MemberName("com.ustadmobile.door.ext", "withDoorTransactionAsync"))
                     add("_transactionDb ->\n")
                     allReplicateEntities.forEach { repEntity ->
                         beginControlFlow("if(%S in tableNames)", repEntity.simpleName.asString())
@@ -374,9 +373,8 @@ private fun FileSpec.Builder.addReplicationRunOnChangeRunnerType(
             .addCode(CodeBlock.builder()
                 .apply {
                     val entitiesChanged = mutableSetOf<String>()
-                    beginControlFlow("_db.%M(%T::class)",
-                        MemberName("com.ustadmobile.door.ext", "withDoorTransactionAsync"),
-                        dbKSClass.toClassName())
+                    beginControlFlow("_db.%M",
+                        MemberName("com.ustadmobile.door.ext", "withDoorTransactionAsync"))
                     add("_transactionDb -> \n")
                     add("var fnTimeCounter = 0L\n")
                     daosWithRunOnNewNode.forEach { dao ->

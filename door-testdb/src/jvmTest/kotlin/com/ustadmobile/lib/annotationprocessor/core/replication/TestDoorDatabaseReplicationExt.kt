@@ -93,7 +93,7 @@ class TestDoorDatabaseReplicationExt {
         ))
 
         val alreadyUpdatedResult = runBlocking {
-            db.checkPendingReplicationTrackers(RepDb::class,
+            db.checkPendingReplicationTrackers(
                 RepDb::class.doorDatabaseMetadata(),
                 pendingReplicationJson, RepEntity.TABLE_ID)
         }
@@ -147,7 +147,8 @@ class TestDoorDatabaseReplicationExt {
         val numRepTrackersProcessedBefore = getPendingTrackerCount()
 
         runBlocking {
-            db.markReplicateTrackersAsProcessed(RepDb::class, RepDb::class.doorDatabaseMetadata(),
+            db.markReplicateTrackersAsProcessed(
+                RepDb::class.doorDatabaseMetadata(),
                 JsonArray(listOf(
                     JsonObject(mapOf(KEY_PRIMARY_KEY to JsonPrimitive(repEntity1.rePrimaryKey),
                         KEY_VERSION_ID to JsonPrimitive(repEntity1.reLastChangeTime))),
@@ -226,7 +227,7 @@ class TestDoorDatabaseReplicationExt {
             trackerJsonObj.map { it.key to it.value }.toMap())
 
         runBlocking {
-            db.insertReplicationsIntoReceiveView(RepDb::class.doorDatabaseMetadata(), RepDb::class,
+            db.insertReplicationsIntoReceiveView(RepDb::class.doorDatabaseMetadata(),
                 100, RepEntity.TABLE_ID, JsonArray(listOf(combinedJsonObj))
             )
         }

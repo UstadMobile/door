@@ -6,6 +6,7 @@ import kotlin.reflect.KClass
 import com.ustadmobile.door.jdbc.*
 import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
 import com.ustadmobile.door.util.NodeIdAuthCache
+import com.ustadmobile.door.util.TransactionMode
 
 
 /**
@@ -31,7 +32,10 @@ expect fun RoomDatabase.dbSchemaVersion(): Int
  * the given transaction.
  *
  */
-expect suspend fun <T: RoomDatabase, R> T.withDoorTransactionAsync(dbKClass: KClass<out T>, block: suspend (T) -> R) : R
+expect suspend fun <T: RoomDatabase, R> T.withDoorTransactionAsync(
+    transactionMode: TransactionMode = TransactionMode.READ_WRITE,
+    block: suspend (T) -> R
+) : R
 
 /**
  * Execute the given block as part of a transaction. E.g.
@@ -47,7 +51,10 @@ expect suspend fun <T: RoomDatabase, R> T.withDoorTransactionAsync(dbKClass: KCl
  * the given transaction.
  *
  */
-expect fun <T: RoomDatabase, R> T.withDoorTransaction(dbKClass: KClass<T>, block: (T) -> R) : R
+expect fun <T: RoomDatabase, R> T.withDoorTransaction(
+    transactionMode: TransactionMode = TransactionMode.READ_WRITE,
+    block: (T) -> R
+) : R
 
 
 /**

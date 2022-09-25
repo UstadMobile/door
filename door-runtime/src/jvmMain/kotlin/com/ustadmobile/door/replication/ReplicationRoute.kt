@@ -54,7 +54,7 @@ fun <T: RoomDatabase> Route.doorReplicationRoute(
 
                 val pendingEntitiesStr = call.receiveText()
                 val pendingEntitiesJsonArr = jsonSerializer.decodeFromString(JsonArray.serializer(), pendingEntitiesStr)
-                val alreadyReceivedTrackers = db.checkPendingReplicationTrackers(dbKClass,
+                val alreadyReceivedTrackers = db.checkPendingReplicationTrackers(
                     dbMetaData, pendingEntitiesJsonArr, tableId)
 
                 call.respondText(contentType = ContentType.Application.Json.withUtf8Charset(),
@@ -81,7 +81,7 @@ fun <T: RoomDatabase> Route.doorReplicationRoute(
                 val receivedEntitiesStr = call.receiveText()
                 val receivedEntitiesJsonArr = jsonSerializer.decodeFromString(JsonArray.serializer(),
                     receivedEntitiesStr)
-                db.insertReplicationsIntoReceiveView(dbMetaData, dbKClass, remoteNodeId.first, tableId,
+                db.insertReplicationsIntoReceiveView(dbMetaData, remoteNodeId.first, tableId,
                     receivedEntitiesJsonArr)
                 call.respondText(text = "", status = HttpStatusCode.NoContent)
                 Napier.d("Replication: $ENDPOINT_RECEIVE_ENTITIES table $tableId : finished " +
@@ -110,7 +110,8 @@ fun <T: RoomDatabase> Route.doorReplicationRoute(
                 val trackersJson = jsonSerializer.decodeFromString(JsonArray.serializer(), trackersStr)
                 val (remoteNodeId, _) = requireRemoteNodeIdAndAuth()
 
-                db.markReplicateTrackersAsProcessed(dbMetaData.dbClass, dbMetaData, trackersJson,
+                db.markReplicateTrackersAsProcessed(
+                    dbMetaData, trackersJson,
                     remoteNodeId, tableId)
                 call.respondText(text = "", status = HttpStatusCode.NoContent)
                 Napier.d("Replication $ENDPOINT_MARK_REPLICATE_TRACKERS_AS_PROCESSED tableId : $tableId : " +
