@@ -317,7 +317,7 @@ fun CodeBlock.Builder.addGetResultOrSetQueryParamCall(
             MemberName(extPkgName, "${operation}IntNullable"))
         type == builtIns.shortType -> add("${operation}Short")
         type == builtIns.shortType.makeNullable() -> MemberName
-        type == builtIns.byteType -> add("getByte")
+        type == builtIns.byteType -> add("${operation}Byte")
         type == builtIns.byteType.makeNullable() -> add("%M",
             MemberName(extPkgName, "${operation}ByteNullable"))
         type == builtIns.longType -> add("${operation}Long")
