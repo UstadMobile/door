@@ -490,18 +490,6 @@ fun FileSpec.Builder.addJdbcDbImplType(
         .addProperty(PropertySpec.builder("jdbcQueryTimeout", Int::class, KModifier.OVERRIDE)
             .initializer("jdbcQueryTimeout")
             .build())
-        .addProperty(PropertySpec.builder("transactionDepthCounter", TransactionDepthCounter::class)
-            .addModifiers(KModifier.OVERRIDE)
-            .initializer("%T()\n", TransactionDepthCounter::class)
-            .build())
-        .applyIf(target == DoorTarget.JS) {
-            addProperty(PropertySpec.builder("isInTransaction", Boolean::class,
-                KModifier.OVERRIDE)
-                .getter(FunSpec.getterBuilder()
-                    .addCode("return false\n")
-                    .build())
-                .build())
-        }
         .addProperty(PropertySpec.builder("realReplicationNotificationDispatcher",
             ReplicationNotificationDispatcher::class)
             .addModifiers(KModifier.OVERRIDE)
@@ -554,10 +542,6 @@ fun FileSpec.Builder.addJdbcDbImplType(
             KModifier.OVERRIDE)
             .delegate(CodeBlock.builder()
                 .beginControlFlow("lazy")
-                .beginControlFlow("if(isInTransaction)")
-                .add("throw %T(%S)\n", ClassName("kotlin", "IllegalStateException"),
-                    "doorPrimaryKeyManager must be used on root database ONLY, not transaction wrapper!")
-                .endControlFlow()
                 .add("%T(%T::class.%M().replicateEntities.keys)\n", DoorPrimaryKeyManager::class,
                     dbKSClass.toClassName(), MemberName("com.ustadmobile.door.ext", "doorDatabaseMetadata"))
                 .endControlFlow()
