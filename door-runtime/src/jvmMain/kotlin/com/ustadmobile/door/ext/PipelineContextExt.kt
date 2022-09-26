@@ -17,7 +17,7 @@ import org.kodein.type.TypeToken
  *
  * This is used by generated code in Ktor routes.
  */
-@Suppress("UNCHECKED_CAST")
+@Suppress("UNCHECKED_CAST", "unused")
 fun <T: RoomDatabase> PipelineContext<Unit, ApplicationCall>.unwrappedDbOnCall(typeToken: TypeToken<T>, tag: Int = DoorTag.TAG_DB): T{
     val db = closestDI().on(call).direct.Instance(typeToken, tag = tag)
     return if(db is DoorDatabaseReplicateWrapper) {
@@ -31,6 +31,7 @@ fun <T: RoomDatabase> PipelineContext<Unit, ApplicationCall>.unwrappedDbOnCall(t
  * Convenience function to get the remote node id (e.g. the node that is making the http
  * request) and the node auth. Throws an exception if this does not exist
  */
+@Suppress("unused")
 fun PipelineContext<Unit, ApplicationCall>.requireRemoteNodeIdAndAuth(): Pair<Long, String> {
     val header = context.request.header(DoorConstants.HEADER_NODE)
         ?: context.request.queryParameters[DoorConstants.HEADER_NODE]

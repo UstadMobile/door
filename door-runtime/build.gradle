@@ -160,6 +160,7 @@ kotlin {
                 implementation "io.ktor:ktor-client-okhttp:$version_ktor"
                 implementation "io.ktor:ktor-client-gson:$version_ktor"
                 implementation "io.ktor:ktor-server-test-host:$version_ktor"
+                implementation "com.google.code.gson:gson:$version_gson"
             }
         }
         jsMain {
