@@ -62,7 +62,7 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
         val dataSource = when {
             dbUrl.startsWith("jdbc:") -> {
                 val jdbcUrlType = dbUrl.substringAfter("jdbc:").substringBefore(":")
-                if(jdbcUrlType != "postgres" && jdbcUrlType != "sqlite") {
+                if(jdbcUrlType != "postgresql" && jdbcUrlType != "sqlite") {
                     throw IllegalArgumentException("Invalid database type: $jdbcUrlType " +
                             "- only postgres and sqlite are supported")
                 }
