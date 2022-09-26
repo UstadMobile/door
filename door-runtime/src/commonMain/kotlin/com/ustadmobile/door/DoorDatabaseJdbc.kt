@@ -30,13 +30,6 @@ interface DoorDatabaseJdbc {
     val doorJdbcSourceDatabase: RoomDatabase?
 
     /**
-     * If the database instance is being used as a transaction wrapper, and a transaction is ongoing, this will
-     * be true. False otherwise (eg. for the root database itself).
-     */
-    val isInTransaction: Boolean
-        get() = transactionDepthCounter.transactionDepth > 0
-
-    /**
      * If this database is the root database, e.g. doorJdbcSourceDatabase == null, then it will hold a primary key
      * manager
      */
@@ -56,8 +49,6 @@ interface DoorDatabaseJdbc {
     val realNodeIdAuthCache: NodeIdAuthCache
 
     val realIncomingReplicationListenerHelper: IncomingReplicationListenerHelper
-
-    val transactionDepthCounter: TransactionDepthCounter
 
     val realAttachmentStorageUri: DoorUri?
 

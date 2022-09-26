@@ -58,7 +58,7 @@ actual fun <R> RoomDatabase.prepareAndUseStatement(
 actual val RoomDatabase.sourceDatabase: RoomDatabase?
     get() {
         return when {
-            (this is DoorDatabaseJdbc && !isInTransaction) -> null
+            this is DoorDatabaseJdbc -> null
             (this is DoorDatabaseRepository) -> this.db
             (this is DoorDatabaseReplicateWrapper) -> this.realDatabase
             else -> throw IllegalStateException("SourceDatabase : Not a recognized implementation: ${this::class}")
