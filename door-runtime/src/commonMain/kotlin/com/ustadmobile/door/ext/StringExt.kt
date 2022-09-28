@@ -38,3 +38,10 @@ fun String.adjustQueryWithSelectInParam(jdbcDbType: Int): String {
         this
     }
 }
+
+fun String.requireSuffix(suffix: String): String = if(!endsWith(suffix)) {
+    this + suffix
+}else {
+    this
+}
+

@@ -85,9 +85,33 @@ class HttpSqlRouteTest {
             Assert.assertEquals("Value returned from http matches value inserted into database",
                 "HelloHttp", reString)
         }
+    }
 
 
+    @Test
+    fun givenOpenDatabase_whenUpdated_thenShouldTakeEffectOnDb() = testHttpSqlApplication<RepDb> { testContext ->
+        val repEntity = RepEntity().apply {
+            rePrimaryKey = 41L
+            reNumField = 50
+        }
+        testContext.db.repDao.insert(repEntity)
 
+        runBlocking {
+            val connectionInfo: HttpSqlConnectionInfo = testContext.client.get("/open").body()
+            val updateResultText = testContext.client.post(
+                "/statementUpdate?connectionId=${connectionInfo.connectionId}"
+            ) {
+                setBody("UPDATE RepEntity SET reNumField = reNumField + 10 WHERE rePrimaryKey = 41")
+            }.bodyAsText()
+
+            val updatesJson = testContext.json.decodeFromString(JsonObject.serializer(), updateResultText)
+            val numUpdates = updatesJson["updates"]?.jsonPrimitive?.int ?: 0
+            Assert.assertTrue("Response indicates one updated performed",  numUpdates >= 1)
+
+            val entityInDbUpdated = testContext.db.repDao.findByUid(repEntity.rePrimaryKey)
+            Assert.assertEquals("Entity was updated in DB", 60,
+                entityInDbUpdated?.reNumField ?: -1)
+        }
     }
 
 }

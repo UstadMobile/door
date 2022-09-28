@@ -14,10 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import io.ktor.server.request.receiveText
 import com.ustadmobile.door.ext.rowsToJsonArray
 import com.ustadmobile.door.jdbc.ext.columnTypeMap
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.*
 
 
 fun Route.HttpSql(
@@ -71,7 +68,6 @@ fun Route.HttpSql(
         return connection() ?: throw IllegalStateException("No connection for call")
     }
 
-
     getWithAuthCheck("open") {
         val connectionId = connectionIdAtomic.incrementAndGet()
         val connection = (db.rootDatabase as DoorDatabaseJdbc).dataSource.connection
@@ -103,8 +99,18 @@ fun Route.HttpSql(
             text = json.encodeToString(JsonObject.serializer(), resultObject))
     }
 
-    get("statementUpdate") {
+    postWithAuthCheck("statementUpdate") {
+        val querySql = call.receiveText()
+        val numUpdates = call.requireConnection().createStatement().use {
+            it.executeUpdate(querySql)
+        }
 
+        val resultObject = buildJsonObject {
+            put("updates", JsonPrimitive(numUpdates))
+        }
+
+        call.respondText(contentType =  ContentType.Application.Json,
+            text = json.encodeToString(JsonObject.serializer(), resultObject))
     }
 
 
