@@ -115,6 +115,7 @@ kotlin {
                 implementation "org.apache.commons:commons-dbcp2:$version_apache_commons_dbcp2"
                 implementation "org.xerial:sqlite-jdbc:$version_sqlite_jdbc"
                 implementation "org.postgresql:postgresql:$version_postgres_jdbc"
+                implementation "io.ktor:ktor-server-test-host:$version_ktor"
             }
         }
 

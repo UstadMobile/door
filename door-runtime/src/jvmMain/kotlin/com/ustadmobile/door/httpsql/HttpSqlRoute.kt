@@ -1,6 +1,7 @@
 package com.ustadmobile.door.httpsql
 
 import com.ustadmobile.door.DoorDatabaseJdbc
+import com.ustadmobile.door.ext.rootDatabase
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.room.RoomDatabase
 import io.ktor.http.*
@@ -10,14 +11,19 @@ import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
 import kotlinx.coroutines.*
 import java.util.concurrent.atomic.AtomicInteger
+import io.ktor.server.request.receiveText
+import com.ustadmobile.door.ext.rowsToJsonArray
+import com.ustadmobile.door.jdbc.ext.columnTypeMap
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 
-data class HttpSqlConnectionInfo(val connectionId: Int){
-
-}
 
 fun Route.HttpSql(
     db: RoomDatabase,
-    authChecker: (ApplicationCall) -> Boolean
+    authChecker: (ApplicationCall) -> Boolean,
+    json: Json,
 ) {
 
 
@@ -30,39 +36,78 @@ fun Route.HttpSql(
 
     val connectionHandles = mutableMapOf<Int, ConnectionHandle>()
 
-    fun Route.getWithAuthCheck(
+    fun Route.routeWithAuthCheck(
         path: String,
+        httpMethod: HttpMethod,
         body: PipelineInterceptor<Unit, ApplicationCall>
-    ) = get(path) {
-        if(authChecker(call)) {
-            body.invoke(this, Unit)
-        }else {
-            call.respond(HttpStatusCode.Unauthorized)
+    ) : Route {
+        return route(path, httpMethod) {
+            handle {
+                if(authChecker(call)) {
+                    body.invoke(this, Unit)
+                }else {
+                    call.respond(HttpStatusCode.Unauthorized)
+                }
+            }
         }
     }
 
+    fun Route.getWithAuthCheck(
+        path: String,
+        body: PipelineInterceptor<Unit, ApplicationCall>
+    ) = routeWithAuthCheck(path, HttpMethod.Get, body)
+
+    fun Route.postWithAuthCheck(
+        path: String,
+        body: PipelineInterceptor<Unit, ApplicationCall>
+    ) = routeWithAuthCheck(path, HttpMethod.Post, body)
+
+    fun ApplicationCall.connection(): Connection? {
+        val connectionId = request.queryParameters["connectionId"]?.toInt() ?: 0
+        return connectionHandles[connectionId]?.connection
+    }
+
+    fun ApplicationCall.requireConnection(): Connection {
+        return connection() ?: throw IllegalStateException("No connection for call")
+    }
+
+
     getWithAuthCheck("open") {
         val connectionId = connectionIdAtomic.incrementAndGet()
-        val connection = (db as DoorDatabaseJdbc).dataSource.connection
+        val connection = (db.rootDatabase as DoorDatabaseJdbc).dataSource.connection
         connectionHandles[connectionId] = ConnectionHandle(connection, connectionId)
         call.respond(HttpSqlConnectionInfo(connectionId))
     }
 
     getWithAuthCheck("close") {
-        val connectionId = call.request.queryParameters["connectionId"]?.toInt() ?: 0
-        connectionHandles[connectionId]?.connection?.apply {
+        call.connection()?.apply {
             commit()
             close()
         }
+        connectionHandles.remove(call.request.queryParameters["connectionId"]?.toInt() ?: 0)
     }
 
-    get("query") {
+    postWithAuthCheck("statementQuery") {
+        val querySql = call.receiveText()
+        val resultJsonArray = call.requireConnection().createStatement().use { stmt ->
+            stmt.executeQuery(querySql).use { result ->
+                result.rowsToJsonArray(result.columnTypeMap())
+            }
+        }
+
+        val resultObject = buildJsonObject {
+            put("rows", resultJsonArray)
+        }
+
+        call.respondText(contentType = ContentType.Application.Json,
+            text = json.encodeToString(JsonObject.serializer(), resultObject))
+    }
+
+    get("statementUpdate") {
 
     }
 
-    get("update") {
 
-    }
 
     //Server sent events - invalidations
 }

@@ -10,7 +10,6 @@ import io.ktor.server.config.*
 import io.ktor.server.testing.*
 import org.junit.Test
 import org.mockito.kotlin.mock
-import io.ktor.server.application.install
 import io.ktor.server.routing.routing
 import io.ktor.serialization.gson.gson
 import io.ktor.http.ContentType
@@ -18,14 +17,24 @@ import io.ktor.serialization.gson.GsonConverter
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert
 import org.mockito.kotlin.verify
+import io.ktor.client.HttpClient
+import io.ktor.server.application.install
+import kotlinx.serialization.json.Json
 
 
 class HttpSqlRouteTest {
 
-    @Test
-    fun givenOpenDatabase_whenQueried_shouldReturnResult() {
 
-        val openedConnections = mutableListOf<Connection>()
+    class HttpSqlTestContext(
+        val openedConnections: MutableList<Connection>,
+        val client: HttpClient,
+        val mockDataSource: DataSource,
+    )
+
+    private fun testHttpSqlApplication(
+        testBlock: TestApplicationBuilder.(HttpSqlTestContext) -> Unit
+    ) {
+        val openedConnections =  mutableListOf<Connection>()
 
         val mockDatasource = mock<DataSource>() {
             on { connection }.thenAnswer {
@@ -38,6 +47,7 @@ class HttpSqlRouteTest {
             on { (this as DoorDatabaseJdbc).dataSource }.thenReturn(mockDatasource)
         }
 
+        val json = Json { encodeDefaults = true }
 
         testApplication {
             environment {
@@ -46,7 +56,7 @@ class HttpSqlRouteTest {
 
             application {
                 routing {
-                    HttpSql(mockDb, { true })
+                    HttpSql(mockDb, { true }, json)
                 }
                 install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) {
                     gson {
@@ -62,19 +72,26 @@ class HttpSqlRouteTest {
                 }
             }
 
-            val connectionInfo: HttpSqlConnectionInfo = runBlocking {
-                client.get("/open").body()
-            }
-
-            runBlocking {
-                client.get("/close?connectionId=${connectionInfo.connectionId}")
-            }
-
-            Assert.assertTrue(connectionInfo.connectionId != 0)
-            verify(mockDatasource).connection
-            verify(openedConnections.first()).close()
+            testBlock(HttpSqlTestContext(openedConnections, client, mockDatasource))
 
         }
     }
+
+    @Test
+    fun givenOpenDatabase_whenQueried_shouldReturnResult() = testHttpSqlApplication { testContext ->
+        val client = testContext.client
+        val connectionInfo: HttpSqlConnectionInfo = runBlocking {
+            client.get("/open").body()
+        }
+
+        runBlocking {
+            client.get("/close?connectionId=${connectionInfo.connectionId}")
+        }
+
+        Assert.assertTrue(connectionInfo.connectionId != 0)
+        verify(testContext.mockDataSource).connection
+        verify(testContext.openedConnections.first()).close()
+    }
+
 
 }
