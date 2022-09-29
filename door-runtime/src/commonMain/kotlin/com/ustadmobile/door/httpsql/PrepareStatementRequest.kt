@@ -3,4 +3,5 @@ package com.ustadmobile.door.httpsql
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class HttpSqlConnectionInfo(val connectionId: Int)
+class PrepareStatementRequest(val sql: String, val generatedKeys: Int) {
+}

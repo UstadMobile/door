@@ -8,6 +8,12 @@ import org.junit.Test
 import repdb.RepDb
 import com.ustadmobile.door.httpsql.HttpSql
 import com.ustadmobile.door.httpsql.HttpSqlConnectionInfo
+import com.ustadmobile.door.httpsql.HttpSqlPaths.KEY_ROWS
+import com.ustadmobile.door.httpsql.HttpSqlPaths.KEY_UPDATES
+import com.ustadmobile.door.httpsql.HttpSqlPaths.PARAM_CONNECTION_ID
+import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_CONNECTION_OPEN
+import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_STATEMENT_QUERY
+import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_STATEMENT_UPDATE
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -24,7 +30,7 @@ import org.junit.Assert
 import repdb.RepEntity
 
 
-class HttpSqlRouteTest {
+class HttpSqlRouteIntegrationTest {
 
     class HttpSqlTestContext(val db: RepDb, val client: HttpClient, val json: Json)
 
@@ -44,7 +50,7 @@ class HttpSqlRouteTest {
 
             application {
                 routing {
-                    HttpSql(db, {true}, json)
+                    HttpSql({ db }, {true}, json)
                 }
 
                 install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) {
@@ -73,15 +79,15 @@ class HttpSqlRouteTest {
         }
         testContext.db.repDao.insert(repEntity)
         runBlocking {
-            val connectionInfo: HttpSqlConnectionInfo = testContext.client.get("/open").body()
+            val connectionInfo: HttpSqlConnectionInfo = testContext.client.get("/$PATH_CONNECTION_OPEN").body()
             val queryResultText = testContext.client.post(
-                "/statementQuery?connectionId=${connectionInfo.connectionId}"
+                "/$PATH_STATEMENT_QUERY?$PARAM_CONNECTION_ID=${connectionInfo.connectionId}"
             ){
                 setBody("SELECT reString FROM RepEntity LIMIT 1")
             }.bodyAsText()
 
             val queryResult = testContext.json.decodeFromString(JsonObject.serializer(), queryResultText)
-            val reString = queryResult["rows"]?.jsonArray?.get(0)?.jsonObject?.get("reString")?.jsonPrimitive?.content
+            val reString = queryResult[KEY_ROWS]?.jsonArray?.get(0)?.jsonObject?.get("reString")?.jsonPrimitive?.content
             Assert.assertEquals("Value returned from http matches value inserted into database",
                 "HelloHttp", reString)
         }
@@ -97,15 +103,15 @@ class HttpSqlRouteTest {
         testContext.db.repDao.insert(repEntity)
 
         runBlocking {
-            val connectionInfo: HttpSqlConnectionInfo = testContext.client.get("/open").body()
+            val connectionInfo: HttpSqlConnectionInfo = testContext.client.get("/$PATH_CONNECTION_OPEN").body()
             val updateResultText = testContext.client.post(
-                "/statementUpdate?connectionId=${connectionInfo.connectionId}"
+                "/$PATH_STATEMENT_UPDATE?$PARAM_CONNECTION_ID=${connectionInfo.connectionId}"
             ) {
                 setBody("UPDATE RepEntity SET reNumField = reNumField + 10 WHERE rePrimaryKey = 41")
             }.bodyAsText()
 
             val updatesJson = testContext.json.decodeFromString(JsonObject.serializer(), updateResultText)
-            val numUpdates = updatesJson["updates"]?.jsonPrimitive?.int ?: 0
+            val numUpdates = updatesJson[KEY_UPDATES]?.jsonPrimitive?.int ?: 0
             Assert.assertTrue("Response indicates one updated performed",  numUpdates >= 1)
 
             val entityInDbUpdated = testContext.db.repDao.findByUid(repEntity.rePrimaryKey)

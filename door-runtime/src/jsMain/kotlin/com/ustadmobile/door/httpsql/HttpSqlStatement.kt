@@ -1,9 +1,18 @@
 package com.ustadmobile.door.httpsql
 
+import com.ustadmobile.door.httpsql.HttpSqlPaths.KEY_UPDATES
+import com.ustadmobile.door.httpsql.HttpSqlPaths.PARAM_CONNECTION_ID
+import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_STATEMENT_UPDATE
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.ResultSet
 import com.ustadmobile.door.jdbc.SQLException
 import com.ustadmobile.door.jdbc.Statement
+import io.ktor.client.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonPrimitive
 
 class HttpSqlStatement(
     private val connection: HttpSqlConnection
@@ -14,7 +23,13 @@ class HttpSqlStatement(
     }
 
     override suspend fun executeUpdateAsyncJs(sql: String): Int {
-        TODO("Not yet implemented")
+        val bodyText = connection.httpClient.post("${connection.endpointUrl}$PATH_STATEMENT_UPDATE?" +
+                "$PARAM_CONNECTION_ID=${connection.httpSqlConnectionInfo.connectionId}") {
+            setBody(sql)
+        }.bodyAsText()
+
+        val bodyJson = connection.json.decodeFromString(JsonObject.serializer(), bodyText)
+        return bodyJson[KEY_UPDATES]?.jsonPrimitive?.int ?: throw SQLException("Could not determine num rows updated")
     }
 
     override fun close() {

@@ -3,10 +3,18 @@ package com.ustadmobile.door.httpsql
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DatabaseMetadata
 import com.ustadmobile.door.jdbc.PreparedStatement
+import io.ktor.client.*
+import kotlinx.serialization.json.Json
+
 
 class HttpSqlConnection(
-    val endpointUrl: String,
-    val httpSqlConnectionInfo: HttpSqlConnectionInfo
+    /**
+     * The endpoint url, which MUST end with a /
+     */
+    internal val endpointUrl: String,
+    internal val httpSqlConnectionInfo: HttpSqlConnectionInfo,
+    internal val httpClient: HttpClient,
+    internal val json: Json,
 ): Connection{
 
     private var closed = false

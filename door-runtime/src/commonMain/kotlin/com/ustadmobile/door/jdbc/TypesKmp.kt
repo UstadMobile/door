@@ -19,6 +19,8 @@ object TypesKmp {
 
     val SMALLINT = 5
 
+    val TINYINT = -6
+
     val LONGVARCHAR = -1
 
     val ARRAY = 2003
