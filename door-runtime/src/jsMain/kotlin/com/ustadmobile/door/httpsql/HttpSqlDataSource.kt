@@ -1,7 +1,5 @@
 package com.ustadmobile.door.httpsql
 
-import com.ustadmobile.door.ext.requireSuffix
-import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_CONNECTION_OPEN
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.jdbc.DataSourceAsync
@@ -17,16 +15,14 @@ class HttpSqlDataSource(
     private val json: Json,
 ) : DataSource, DataSourceAsync {
 
-    private val url = url.requireSuffix("/")
+    private val url = url.removeSuffix("/")
 
     override fun getConnection(): Connection {
         throw SQLException("HttpSqlDataSource: connection must be opened async")
     }
 
     override suspend fun getConnectionAsync(): Connection {
-        val destUrl = "$url/$PATH_CONNECTION_OPEN"
-        println("Attempt to connect to $destUrl")
-        val connectionInfo = httpClient.get("$url/$PATH_CONNECTION_OPEN").body<HttpSqlConnectionInfo>()
+        val connectionInfo = httpClient.get("$url/connection/open").body<HttpSqlConnectionInfo>()
         return HttpSqlConnection(url, connectionInfo, httpClient, json)
     }
 }

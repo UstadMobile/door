@@ -23,8 +23,9 @@ class HttpSqlStatement(
     }
 
     override suspend fun executeUpdateAsyncJs(sql: String): Int {
-        val bodyText = connection.httpClient.post("${connection.endpointUrl}$PATH_STATEMENT_UPDATE?" +
-                "$PARAM_CONNECTION_ID=${connection.httpSqlConnectionInfo.connectionId}") {
+        val bodyText = connection.httpClient.post("${connection.endpointUrl}/connection" +
+                "/${connection.httpSqlConnectionInfo.connectionId}/statement/update"
+        ) {
             setBody(sql)
         }.bodyAsText()
 

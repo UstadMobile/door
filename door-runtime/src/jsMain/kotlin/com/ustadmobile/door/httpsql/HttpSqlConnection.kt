@@ -9,7 +9,7 @@ import kotlinx.serialization.json.Json
 
 class HttpSqlConnection(
     /**
-     * The endpoint url, which MUST end with a /
+     * The endpoint url, which MUST NOT have a trailing /
      */
     internal val endpointUrl: String,
     internal val httpSqlConnectionInfo: HttpSqlConnectionInfo,

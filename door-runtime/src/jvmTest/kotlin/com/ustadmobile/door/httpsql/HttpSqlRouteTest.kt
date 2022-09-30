@@ -112,11 +112,11 @@ class HttpSqlRouteTest {
     fun givenOpenDatabase_whenQueried_shouldReturnResult() = testHttpSqlApplication { testContext ->
         val client = testContext.client
         val connectionInfo: HttpSqlConnectionInfo = runBlocking {
-            client.get("/$PATH_CONNECTION_OPEN").body()
+            client.get("/connection/open").body()
         }
 
         runBlocking {
-            client.get("/$PATH_CONNECTION_CLOSE?$PARAM_CONNECTION_ID=${connectionInfo.connectionId}")
+            client.get("/connection/${connectionInfo.connectionId}/close")
         }
 
         Assert.assertTrue(connectionInfo.connectionId != 0)
@@ -125,7 +125,11 @@ class HttpSqlRouteTest {
     }
 
 
-    class PreparedStatementCtx(val sql: String, val response: PrepareStatementResponse)
+    class PreparedStatementCtx(
+        val sql: String,
+        val connectionInfo: HttpSqlConnectionInfo,
+        val response: PrepareStatementResponse,
+    )
 
     private fun testPreparedStatement(
         sql: String = """
@@ -136,20 +140,20 @@ class HttpSqlRouteTest {
     ) = testHttpSqlApplication { testContext ->
         val client = testContext.client
         val connectionInfo: HttpSqlConnectionInfo = runBlocking {
-            client.get("/$PATH_CONNECTION_OPEN").body()
+            client.get("/connection/open").body()
         }
 
         val preparedStatementResponse: PrepareStatementResponse = runBlocking {
-            client.post("/$PATH_PREPARE_STATEMENT?$PARAM_CONNECTION_ID=${connectionInfo.connectionId}") {
+            client.post("/connection/${connectionInfo.connectionId}/preparedStatement/create") {
                 setBody(PrepareStatementRequest(sql, PreparedStatement.NO_GENERATED_KEYS))
                 contentType(ContentType.Application.Json)
             }.body()
         }
 
-        block(testContext, PreparedStatementCtx(sql, preparedStatementResponse))
+        block(testContext, PreparedStatementCtx(sql, connectionInfo, preparedStatementResponse))
 
         runBlocking {
-            client.get("/$PATH_PREPARED_STATEMENT_CLOSE?$PARAM_PREPAREDSTATEMENT_ID=${preparedStatementResponse.preparedStatementId}")
+            client.get("/connection/${connectionInfo.connectionId}/preparedStatement/${preparedStatementResponse.preparedStatementId}/close")
                 .bodyAsText()
         }
 
@@ -177,7 +181,8 @@ class HttpSqlRouteTest {
         val client = testContext.client
 
         runBlocking {
-            client.post("/$PATH_PREPARED_STATEMENT_QUERY?$PARAM_PREPAREDSTATEMENT_ID=${preparedStatementCtx.response.preparedStatementId}") {
+            client.post("/connection/${preparedStatementCtx.connectionInfo.connectionId}/preparedStatement/" +
+                    "${preparedStatementCtx.response.preparedStatementId}/query") {
                 setBody(PreparedStatementExecRequest(preparedStatementParamList))
                 contentType(ContentType.Application.Json)
             }
@@ -194,7 +199,8 @@ class HttpSqlRouteTest {
         val client = testContext.client
 
         runBlocking {
-            client.post("/$PATH_PREPARED_STATEMENT_UPDATE?$PARAM_PREPAREDSTATEMENT_ID=${preparedStatementCtx.response.preparedStatementId}") {
+            client.post("/connection/${preparedStatementCtx.connectionInfo.connectionId}/preparedStatement/" +
+                    "${preparedStatementCtx.response.preparedStatementId}/update") {
                 setBody(PreparedStatementExecRequest(preparedStatementParamList))
                 contentType(ContentType.Application.Json)
             }

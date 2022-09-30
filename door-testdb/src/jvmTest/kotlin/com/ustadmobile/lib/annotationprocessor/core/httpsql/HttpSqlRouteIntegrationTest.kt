@@ -36,8 +36,8 @@ class HttpSqlRouteIntegrationTest {
 
     class HttpSqlTestContext(val db: RepDb, val client: HttpClient, val json: Json) {
         suspend fun openPreparedStatement(sql: String) : PrepareStatementResponse{
-            val connectionInfo: HttpSqlConnectionInfo = client.get("/$PATH_CONNECTION_OPEN").body()
-            return client.post("/$PATH_PREPARE_STATEMENT?$PARAM_CONNECTION_ID=${connectionInfo.connectionId}") {
+            val connectionInfo: HttpSqlConnectionInfo = client.get("/connection/open").body()
+            return client.post("/connection/${connectionInfo.connectionId}/preparedStatement/create") {
                 setBody(PrepareStatementRequest(sql = sql, generatedKeys = PreparedStatement.NO_GENERATED_KEYS))
                 contentType(ContentType.Application.Json)
             }.body()
@@ -89,9 +89,9 @@ class HttpSqlRouteIntegrationTest {
         }
         testContext.db.repDao.insert(repEntity)
         runBlocking {
-            val connectionInfo: HttpSqlConnectionInfo = testContext.client.get("/$PATH_CONNECTION_OPEN").body()
+            val connectionInfo: HttpSqlConnectionInfo = testContext.client.get("/connection/open").body()
             val queryResultText = testContext.client.post(
-                "/$PATH_STATEMENT_QUERY?$PARAM_CONNECTION_ID=${connectionInfo.connectionId}"
+                "/connection/${connectionInfo.connectionId}/statement/query"
             ){
                 setBody("SELECT reString FROM RepEntity LIMIT 1")
             }.bodyAsText()
@@ -113,9 +113,9 @@ class HttpSqlRouteIntegrationTest {
         testContext.db.repDao.insert(repEntity)
 
         runBlocking {
-            val connectionInfo: HttpSqlConnectionInfo = testContext.client.get("/$PATH_CONNECTION_OPEN").body()
+            val connectionInfo: HttpSqlConnectionInfo = testContext.client.get("/connection/open").body()
             val updateResultText = testContext.client.post(
-                "/$PATH_STATEMENT_UPDATE?$PARAM_CONNECTION_ID=${connectionInfo.connectionId}"
+                "/connection/${connectionInfo.connectionId}/statement/update"
             ) {
                 setBody("UPDATE RepEntity SET reNumField = reNumField + 10 WHERE rePrimaryKey = 41")
             }.bodyAsText()
@@ -140,8 +140,8 @@ class HttpSqlRouteIntegrationTest {
 
         runBlocking {
             val prepStatementResponse = testContext.openPreparedStatement("SELECT * FROM RepEntity WHERE reNumField < ?")
-            val queryBodyStr = testContext.client.post("/${HttpSqlPaths.PATH_PREPARED_STATEMENT_QUERY}?" +
-                    "${HttpSqlPaths.PARAM_PREPAREDSTATEMENT_ID}=${prepStatementResponse.preparedStatementId}"
+            val queryBodyStr = testContext.client.post("/connection/${prepStatementResponse.connectionId}" +
+                    "/preparedStatement/${prepStatementResponse.preparedStatementId}/query"
             ) {
                 setBody(PreparedStatementExecRequest(listOf(PreparedStatementParam(1, listOf("100"), TypesKmp.INTEGER))))
                 contentType(ContentType.Application.Json)
@@ -164,8 +164,8 @@ class HttpSqlRouteIntegrationTest {
 
         runBlocking {
             val prepStatementResponse = testContext.openPreparedStatement("UPDATE RepEntity SET reNumField = ?")
-            val respBodyStr = testContext.client.post("/${HttpSqlPaths.PATH_PREPARED_STATEMENT_UPDATE}?" +
-                    "${HttpSqlPaths.PARAM_PREPAREDSTATEMENT_ID}=${prepStatementResponse.preparedStatementId}") {
+            val respBodyStr = testContext.client.post("/connection/${prepStatementResponse.connectionId}" +
+                    "/preparedStatement/${prepStatementResponse.preparedStatementId}/update") {
                 setBody(PreparedStatementExecRequest(listOf(PreparedStatementParam(1, listOf("60"), TypesKmp.INTEGER))))
                 contentType(ContentType.Application.Json)
             }.bodyAsText()

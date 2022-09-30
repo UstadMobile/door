@@ -84,7 +84,7 @@ fun Route.HttpSql(
     ) = routeWithAuthCheck(path, HttpMethod.Post, body)
 
     fun ApplicationCall.connection(): Connection? {
-        val connectionId = request.queryParameters["connectionId"]?.toInt() ?: 0
+        val connectionId = parameters["connectionId"]?.toInt() ?: 0
         return connectionHandles[connectionId]?.connection
     }
 
@@ -93,7 +93,7 @@ fun Route.HttpSql(
     }
 
     fun ApplicationCall.preparedStatement(): PreparedStatement? {
-        return preparedStatementHandles[(request.queryParameters[PARAM_PREPAREDSTATEMENT_ID]?.toInt() ?: 0)]?.preparedStatement
+        return preparedStatementHandles[(parameters[PARAM_PREPAREDSTATEMENT_ID]?.toInt() ?: 0)]?.preparedStatement
     }
 
     fun ApplicationCall.requirePreparedStatement(): PreparedStatement {
@@ -104,7 +104,7 @@ fun Route.HttpSql(
         call.respondText("Door HttpSQL endpoint")
     }
 
-    getWithAuthCheck(PATH_CONNECTION_OPEN) {
+    getWithAuthCheck("connection/open") {
         val connectionId = connectionIdAtomic.incrementAndGet()
         val db = databaseProvider.databaseForCall(call)
         val connection = (db.rootDatabase as DoorDatabaseJdbc).dataSource.connection
@@ -112,7 +112,7 @@ fun Route.HttpSql(
         call.respond(HttpSqlConnectionInfo(connectionId))
     }
 
-    getWithAuthCheck(PATH_CONNECTION_CLOSE) {
+    getWithAuthCheck("connection/{connectionId}/close") {
         call.connection()?.apply {
             commit()
             close()
@@ -120,7 +120,7 @@ fun Route.HttpSql(
         connectionHandles.remove(call.request.queryParameters[PARAM_CONNECTION_ID]?.toInt() ?: 0)
     }
 
-    postWithAuthCheck(PATH_STATEMENT_QUERY) {
+    postWithAuthCheck("connection/{connectionId}/statement/query") {
         val querySql = call.receiveText()
         val resultJsonArray = call.requireConnection().createStatement().use { stmt ->
             stmt.executeQuery(querySql).use { result ->
@@ -136,7 +136,7 @@ fun Route.HttpSql(
             text = json.encodeToString(JsonObject.serializer(), resultObject))
     }
 
-    postWithAuthCheck("statementUpdate") {
+    postWithAuthCheck("connection/{connectionId}/statement/update") {
         val querySql = call.receiveText()
         val numUpdates = call.requireConnection().createStatement().use {
             it.executeUpdate(querySql)
@@ -150,17 +150,17 @@ fun Route.HttpSql(
             text = json.encodeToString(JsonObject.serializer(), resultObject))
     }
 
-    postWithAuthCheck(PATH_PREPARE_STATEMENT) {
+    postWithAuthCheck("connection/{connectionId}/preparedStatement/create") {
         val connection = call.requireConnection()
         val preparedStatementRequest : PrepareStatementRequest = call.receive()
         val preparedStatement = connection.prepareStatement(preparedStatementRequest.sql,
             preparedStatementRequest.generatedKeys)
         val preparedStatementId = preparedStatementIdAtomic.incrementAndGet()
         preparedStatementHandles[preparedStatementId] = PreparedStatementHandle(preparedStatement, preparedStatementId)
-        call.respond(PrepareStatementResponse(preparedStatementId))
+        call.respond(PrepareStatementResponse(preparedStatementId, call.parameters[PARAM_CONNECTION_ID]?.toInt()?: -1))
     }
 
-    getWithAuthCheck(PATH_PREPARED_STATEMENT_CLOSE) {
+    getWithAuthCheck("connection/{connectionId}/preparedStatement/{preparedStatementId}/close") {
         val preparedStatementId = call.request.queryParameters[PARAM_PREPAREDSTATEMENT_ID]?.toInt() ?: 0
         call.preparedStatement()?.also {
             it.close()
@@ -168,7 +168,7 @@ fun Route.HttpSql(
         }
     }
 
-    postWithAuthCheck(PATH_PREPARED_STATEMENT_QUERY) {
+    postWithAuthCheck("connection/{connectionId}/preparedStatement/{preparedStatementId}/query") {
         val preparedStatement = call.requirePreparedStatement()
         val execRequest: PreparedStatementExecRequest = call.receive()
         execRequest.params.forEach {
@@ -184,7 +184,7 @@ fun Route.HttpSql(
             resultJsonObject))
     }
 
-    postWithAuthCheck(PATH_PREPARED_STATEMENT_UPDATE) {
+    postWithAuthCheck("connection/{connectionId}/preparedStatement/{preparedStatementId}/update") {
         val preparedStatement = call.requirePreparedStatement()
         val execRequest: PreparedStatementExecRequest = call.receive()
         execRequest.params.forEach {
