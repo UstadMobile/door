@@ -1,26 +1,28 @@
 package com.ustadmobile.lib.annotationprocessor.core.httpsql
 
 import com.ustadmobile.door.DatabaseBuilder
+import com.ustadmobile.door.httpsql.*
 import com.ustadmobile.door.room.RoomDatabase
 import io.ktor.server.config.*
 import io.ktor.server.testing.*
 import org.junit.Test
 import repdb.RepDb
-import com.ustadmobile.door.httpsql.HttpSql
-import com.ustadmobile.door.httpsql.HttpSqlConnectionInfo
 import com.ustadmobile.door.httpsql.HttpSqlPaths.KEY_ROWS
 import com.ustadmobile.door.httpsql.HttpSqlPaths.KEY_UPDATES
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PARAM_CONNECTION_ID
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_CONNECTION_OPEN
+import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_PREPARE_STATEMENT
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_STATEMENT_QUERY
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_STATEMENT_UPDATE
+import com.ustadmobile.door.jdbc.PreparedStatement
+import com.ustadmobile.door.jdbc.TypesKmp
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
+import io.ktor.http.*
 import io.ktor.serialization.gson.gson
 import io.ktor.server.application.install
-import io.ktor.http.ContentType
 import io.ktor.serialization.gson.GsonConverter
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.runBlocking
@@ -32,7 +34,15 @@ import repdb.RepEntity
 
 class HttpSqlRouteIntegrationTest {
 
-    class HttpSqlTestContext(val db: RepDb, val client: HttpClient, val json: Json)
+    class HttpSqlTestContext(val db: RepDb, val client: HttpClient, val json: Json) {
+        suspend fun openPreparedStatement(sql: String) : PrepareStatementResponse{
+            val connectionInfo: HttpSqlConnectionInfo = client.get("/$PATH_CONNECTION_OPEN").body()
+            return client.post("/$PATH_PREPARE_STATEMENT?$PARAM_CONNECTION_ID=${connectionInfo.connectionId}") {
+                setBody(PrepareStatementRequest(sql = sql, generatedKeys = PreparedStatement.NO_GENERATED_KEYS))
+                contentType(ContentType.Application.Json)
+            }.body()
+        }
+    }
 
     private fun <T: RoomDatabase> testHttpSqlApplication(
         testBlock: TestApplicationBuilder.(HttpSqlTestContext) -> Unit,
@@ -117,6 +127,54 @@ class HttpSqlRouteIntegrationTest {
             val entityInDbUpdated = testContext.db.repDao.findByUid(repEntity.rePrimaryKey)
             Assert.assertEquals("Entity was updated in DB", 60,
                 entityInDbUpdated?.reNumField ?: -1)
+        }
+    }
+
+    @Test
+    fun givenOpenDatabase_whenPreparedStatementCreatedThenQueryExecuted_thenShouldReturnResult() = testHttpSqlApplication<RepDb> { testContext ->
+        val repEntity = RepEntity().apply {
+            rePrimaryKey = 41L
+            reNumField = 50
+        }
+        testContext.db.repDao.insert(repEntity)
+
+        runBlocking {
+            val prepStatementResponse = testContext.openPreparedStatement("SELECT * FROM RepEntity WHERE reNumField < ?")
+            val queryBodyStr = testContext.client.post("/${HttpSqlPaths.PATH_PREPARED_STATEMENT_QUERY}?" +
+                    "${HttpSqlPaths.PARAM_PREPAREDSTATEMENT_ID}=${prepStatementResponse.preparedStatementId}"
+            ) {
+                setBody(PreparedStatementExecRequest(listOf(PreparedStatementParam(1, listOf("100"), TypesKmp.INTEGER))))
+                contentType(ContentType.Application.Json)
+            }.bodyAsText()
+            val queryJsonResponse = testContext.json.decodeFromString(JsonObject.serializer(), queryBodyStr)
+            val resultArray = queryJsonResponse[KEY_ROWS]?.jsonArray
+            Assert.assertEquals("Got one row", 1, resultArray?.size ?: 0)
+            Assert.assertEquals("Got result back",
+                41L, resultArray!!.first().jsonObject["rePrimaryKey"]!!.jsonPrimitive.long)
+        }
+    }
+
+    @Test
+    fun givenOpenDatabase_whenPreparedStatementCreatedThenUpdateExecuted_shouldTakeEffect() = testHttpSqlApplication<RepDb> { testContext ->
+        val repEntity = RepEntity().apply {
+            rePrimaryKey = 41L
+            reNumField = 50
+        }
+        testContext.db.repDao.insert(repEntity)
+
+        runBlocking {
+            val prepStatementResponse = testContext.openPreparedStatement("UPDATE RepEntity SET reNumField = ?")
+            val respBodyStr = testContext.client.post("/${HttpSqlPaths.PATH_PREPARED_STATEMENT_UPDATE}?" +
+                    "${HttpSqlPaths.PARAM_PREPAREDSTATEMENT_ID}=${prepStatementResponse.preparedStatementId}") {
+                setBody(PreparedStatementExecRequest(listOf(PreparedStatementParam(1, listOf("60"), TypesKmp.INTEGER))))
+                contentType(ContentType.Application.Json)
+            }.bodyAsText()
+            val queryJsonResp = testContext.json.decodeFromString(JsonObject.serializer(), respBodyStr)
+
+            val repEntityInDb = testContext.db.repDao.findByUid(41L)
+            Assert.assertEquals("RepEntity was updated", 60, repEntityInDb?.reNumField ?: -1)
+            val numUpdates = queryJsonResp[KEY_UPDATES]?.jsonPrimitive?.int ?: 0
+            Assert.assertTrue("Query response returns num rows updated", numUpdates > 0)
         }
     }
 

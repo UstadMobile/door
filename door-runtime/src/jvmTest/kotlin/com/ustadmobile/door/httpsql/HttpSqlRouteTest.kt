@@ -5,6 +5,7 @@ import com.ustadmobile.door.httpsql.HttpSqlPaths.PARAM_CONNECTION_ID
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PARAM_PREPAREDSTATEMENT_ID
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_CONNECTION_CLOSE
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_CONNECTION_OPEN
+import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_PREPARED_STATEMENT_CLOSE
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_PREPARED_STATEMENT_QUERY
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_PREPARED_STATEMENT_UPDATE
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_PREPARE_STATEMENT
@@ -23,6 +24,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert
 import org.mockito.kotlin.verify
 import io.ktor.client.HttpClient
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.application.install
 import kotlinx.serialization.json.Json
@@ -145,6 +147,13 @@ class HttpSqlRouteTest {
         }
 
         block(testContext, PreparedStatementCtx(sql, preparedStatementResponse))
+
+        runBlocking {
+            client.get("/$PATH_PREPARED_STATEMENT_CLOSE?$PARAM_PREPAREDSTATEMENT_ID=${preparedStatementResponse.preparedStatementId}")
+                .bodyAsText()
+        }
+
+        verify(testContext.preparedStatements.last()).close()
     }
 
     val preparedStatementParamList = listOf(PreparedStatementParam(1, listOf("0"), TypesKmp.INTEGER),

@@ -18,6 +18,7 @@ import com.ustadmobile.door.httpsql.HttpSqlPaths.PARAM_CONNECTION_ID
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PARAM_PREPAREDSTATEMENT_ID
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_CONNECTION_CLOSE
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_CONNECTION_OPEN
+import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_PREPARED_STATEMENT_CLOSE
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_PREPARED_STATEMENT_QUERY
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_PREPARED_STATEMENT_UPDATE
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_PREPARE_STATEMENT
@@ -91,10 +92,12 @@ fun Route.HttpSql(
         return connection() ?: throw IllegalStateException("No connection for call")
     }
 
+    fun ApplicationCall.preparedStatement(): PreparedStatement? {
+        return preparedStatementHandles[(request.queryParameters[PARAM_PREPAREDSTATEMENT_ID]?.toInt() ?: 0)]?.preparedStatement
+    }
 
     fun ApplicationCall.requirePreparedStatement(): PreparedStatement {
-        return preparedStatementHandles[(request.queryParameters[PARAM_PREPAREDSTATEMENT_ID]?.toInt() ?: 0)]?.preparedStatement
-            ?: throw SQLException("Could not find preparedStatement")
+        return preparedStatement() ?: throw SQLException("Could not find preparedStatement")
     }
 
     get("/") {
@@ -155,6 +158,14 @@ fun Route.HttpSql(
         val preparedStatementId = preparedStatementIdAtomic.incrementAndGet()
         preparedStatementHandles[preparedStatementId] = PreparedStatementHandle(preparedStatement, preparedStatementId)
         call.respond(PrepareStatementResponse(preparedStatementId))
+    }
+
+    getWithAuthCheck(PATH_PREPARED_STATEMENT_CLOSE) {
+        val preparedStatementId = call.request.queryParameters[PARAM_PREPAREDSTATEMENT_ID]?.toInt() ?: 0
+        call.preparedStatement()?.also {
+            it.close()
+            preparedStatementHandles.remove(preparedStatementId)
+        }
     }
 
     postWithAuthCheck(PATH_PREPARED_STATEMENT_QUERY) {
