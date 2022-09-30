@@ -3,12 +3,6 @@ package com.ustadmobile.door.httpsql
 import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PARAM_CONNECTION_ID
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PARAM_PREPAREDSTATEMENT_ID
-import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_CONNECTION_CLOSE
-import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_CONNECTION_OPEN
-import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_PREPARED_STATEMENT_CLOSE
-import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_PREPARED_STATEMENT_QUERY
-import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_PREPARED_STATEMENT_UPDATE
-import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_PREPARE_STATEMENT
 import com.ustadmobile.door.jdbc.*
 import com.ustadmobile.door.room.RoomDatabase
 import io.ktor.client.call.*

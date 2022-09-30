@@ -13,16 +13,8 @@ import kotlinx.coroutines.*
 import java.util.concurrent.atomic.AtomicInteger
 import com.ustadmobile.door.ext.rowsToJsonArray
 import com.ustadmobile.door.httpsql.HttpSqlPaths.KEY_ROWS
-import com.ustadmobile.door.httpsql.HttpSqlPaths.KEY_UPDATES
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PARAM_CONNECTION_ID
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PARAM_PREPAREDSTATEMENT_ID
-import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_CONNECTION_CLOSE
-import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_CONNECTION_OPEN
-import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_PREPARED_STATEMENT_CLOSE
-import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_PREPARED_STATEMENT_QUERY
-import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_PREPARED_STATEMENT_UPDATE
-import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_PREPARE_STATEMENT
-import com.ustadmobile.door.httpsql.HttpSqlPaths.PATH_STATEMENT_QUERY
 import com.ustadmobile.door.jdbc.PreparedStatement
 import com.ustadmobile.door.jdbc.SQLException
 import com.ustadmobile.door.jdbc.ext.columnTypeMap
@@ -141,13 +133,7 @@ fun Route.HttpSql(
         val numUpdates = call.requireConnection().createStatement().use {
             it.executeUpdate(querySql)
         }
-
-        val resultObject = buildJsonObject {
-            put(KEY_UPDATES, JsonPrimitive(numUpdates))
-        }
-
-        call.respondText(contentType =  ContentType.Application.Json,
-            text = json.encodeToString(JsonObject.serializer(), resultObject))
+        call.respond(HttpSqlUpdateResult(numUpdates))
     }
 
     postWithAuthCheck("connection/{connectionId}/preparedStatement/create") {
@@ -192,13 +178,7 @@ fun Route.HttpSql(
         }
 
         val numUpdates = preparedStatement.executeUpdate()
-
-        val resultObject = buildJsonObject {
-            put(KEY_UPDATES, JsonPrimitive(numUpdates))
-        }
-
-        call.respondText(contentType =  ContentType.Application.Json,
-            text = json.encodeToString(JsonObject.serializer(), resultObject))
+        call.respond(HttpSqlUpdateResult(numUpdates))
     }
 
 
