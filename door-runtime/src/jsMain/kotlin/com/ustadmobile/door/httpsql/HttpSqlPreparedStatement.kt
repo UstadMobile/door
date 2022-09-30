@@ -4,15 +4,19 @@ import com.ustadmobile.door.jdbc.*
 import com.ustadmobile.door.jdbc.types.BigDecimal
 import com.ustadmobile.door.jdbc.types.Date
 import com.ustadmobile.door.jdbc.types.Time
+import io.ktor.client.call.*
 import io.ktor.client.request.*
-import io.ktor.util.reflect.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
 
 class HttpSqlPreparedStatement(
     private val connection: HttpSqlConnection,
     private val preparedStatementId: Int,
-) : HttpSqlStatement(connection), PreparedStatement {
+) : HttpSqlStatement(connection), PreparedStatement, AsyncCloseable {
 
     private val paramValues: MutableMap<Int, PreparedStatementParam> = mutableMapOf()
+
+    private var closed = false
 
     override fun setBoolean(index: Int, value: Boolean) {
         paramValues[index] = PreparedStatementParam(index, listOf(value.toString()), TypesKmp.BOOLEAN)
@@ -75,12 +79,13 @@ class HttpSqlPreparedStatement(
     }
 
     override suspend fun executeUpdateAsync(): Int {
-        val result = connection.httpClient.post("${connection.endpointUrl}/connection" +
+        val result: HttpSqlUpdateResult = connection.httpClient.post("${connection.endpointUrl}/connection" +
                 "/${connection.httpSqlConnectionInfo.connectionId}/preparedStatement/${preparedStatementId}/update"
         ) {
             setBody(PreparedStatementExecRequest(paramValues.values.toList()))
-        }
-        TODO()
+            contentType(ContentType.Application.Json)
+        }.body()
+        return result.updates
     }
 
     override suspend fun executeQueryAsyncInt(): ResultSet {
@@ -92,16 +97,22 @@ class HttpSqlPreparedStatement(
     }
 
     override fun setNull(parameterIndex: Int, sqlType: Int) {
-        TODO("Not yet implemented")
+        paramValues[parameterIndex] = PreparedStatementParam(parameterIndex, listOf(null), sqlType)
     }
 
     override fun close() {
-        TODO("Not yet implemented")
+        throw SQLException("Synchronous close not supported on HttpSqlPreparedStatement")
     }
 
-    override fun isClosed(): Boolean {
-        TODO("Not yet implemented")
+    override suspend fun closeAsync() {
+        connection.httpClient.get("${connection.endpointUrl}/connection" +
+                "/${connection.httpSqlConnectionInfo.connectionId}/preparedStatement/${preparedStatementId}/close"
+        ) {
+
+        }.discardRemaining()
     }
+
+    override fun isClosed() = closed
 
     override fun getConnection() = connection
 

@@ -1,5 +1,6 @@
 package com.ustadmobile.door.httpsql
 
+import com.ustadmobile.door.jdbc.AsyncConnection
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.jdbc.DataSourceAsync
 import com.ustadmobile.door.util.systemTimeInMillis
@@ -49,6 +50,23 @@ class HttpSqlIntegrationTest {
                 "INSERT INTO RepEntity(reLastChangedBy, reLastChangeTime, reNumField, reString, reBoolean) " +
                         "VALUES(0, 0, 42, 'Hello', 1)")
             assertTrue(numChanges > 0, "Ran query with changes implemented")
+        }
+    }
+
+    @Test
+    fun givenPreparedStatementCreated_whenPreparedStatementCreated_thenShouldExecuteUpdate() = GlobalScope.promise {
+        httpDataSourceTest {
+            val connection = dataSource.getConnectionAsync() as AsyncConnection
+            val preparedStatement = connection.prepareStatementAsync(
+                "INSERT INTO RepEntity(reLastChangedBy, reLastChangeTime, reNumField, reString, reBoolean) " +
+                        "VALUES(?, ?, ?, ?, ?)")
+            preparedStatement.setLong(1, 0)
+            preparedStatement.setLong(2, 0)
+            preparedStatement.setInt(3, 50)
+            preparedStatement.setString(4, "Hello")
+            preparedStatement.setBoolean(5, false)
+            val numUpdates = preparedStatement.executeUpdateAsync()
+            assertTrue(numUpdates > 0, "Ran query with changes implemented")
         }
     }
 
