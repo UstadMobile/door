@@ -2,6 +2,8 @@ package com.ustadmobile.door.httpsql
 
 import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.ext.rootDatabase
+import com.ustadmobile.door.httpsql.HttpSqlPaths.KEY_EXEC_UPDATE_NUM_ROWS_CHANGED
+import com.ustadmobile.door.httpsql.HttpSqlPaths.KEY_EXEC_UPDATE_GENERATED_KEYS
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.room.RoomDatabase
 import io.ktor.http.*
@@ -11,13 +13,14 @@ import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
 import kotlinx.coroutines.*
 import java.util.concurrent.atomic.AtomicInteger
-import com.ustadmobile.door.ext.rowsToJsonArray
-import com.ustadmobile.door.httpsql.HttpSqlPaths.KEY_ROWS
+import com.ustadmobile.door.httpsql.HttpSqlPaths.KEY_RESULT_ROWS
+import com.ustadmobile.door.httpsql.HttpSqlPaths.PARAM_AUTOCOMMIT
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PARAM_CONNECTION_ID
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PARAM_PREPAREDSTATEMENT_ID
 import com.ustadmobile.door.jdbc.PreparedStatement
 import com.ustadmobile.door.jdbc.SQLException
-import com.ustadmobile.door.jdbc.ext.columnTypeMap
+import com.ustadmobile.door.jdbc.StatementConstantsKmp.RETURN_GENERATED_KEYS
+import com.ustadmobile.door.jdbc.ext.toHttpSqlResultSetJsonObject
 import com.ustadmobile.door.ktor.DatabaseProvider
 import io.ktor.server.request.*
 import kotlinx.serialization.json.*
@@ -38,7 +41,8 @@ fun Route.HttpSql(
 
     class PreparedStatementHandle(
         val preparedStatement: PreparedStatement,
-        val preparedStatementId: Int
+        val generatedKeys: Int,
+        val preparedStatementId: Int,
     )
 
     val connectionIdAtomic = AtomicInteger()
@@ -92,6 +96,10 @@ fun Route.HttpSql(
         return preparedStatement() ?: throw SQLException("Could not find preparedStatement")
     }
 
+    fun ApplicationCall.preparedStatementGeneratedKeys(): Int {
+        return preparedStatementHandles[(parameters[PARAM_PREPAREDSTATEMENT_ID]?.toInt() ?: 0)]?.generatedKeys ?: -1
+    }
+
     get("/") {
         call.respondText("Door HttpSQL endpoint")
     }
@@ -106,10 +114,10 @@ fun Route.HttpSql(
 
     getWithAuthCheck("connection/{connectionId}/close") {
         call.connection()?.apply {
-            commit()
             close()
         }
         connectionHandles.remove(call.request.queryParameters[PARAM_CONNECTION_ID]?.toInt() ?: 0)
+        call.respond(HttpStatusCode.NoContent, "")
     }
 
     postWithAuthCheck("connection/{connectionId}/statement/query") {
@@ -121,7 +129,7 @@ fun Route.HttpSql(
         }
 
         val resultObject = buildJsonObject {
-            put(KEY_ROWS, resultJsonArray)
+            put(KEY_RESULT_ROWS, resultJsonArray)
         }
 
         call.respondText(contentType = ContentType.Application.Json,
@@ -130,10 +138,17 @@ fun Route.HttpSql(
 
     postWithAuthCheck("connection/{connectionId}/statement/update") {
         val querySql = call.receiveText()
+
+
         val numUpdates = call.requireConnection().createStatement().use {
             it.executeUpdate(querySql)
         }
-        call.respond(HttpSqlUpdateResult(numUpdates))
+        val updateJsonResponse = buildJsonObject {
+            put(KEY_EXEC_UPDATE_NUM_ROWS_CHANGED, JsonPrimitive(numUpdates))
+        }
+
+        call.respondText(contentType = ContentType.Application.Json,
+            text = json.encodeToString(JsonObject.serializer(), updateJsonResponse))
     }
 
     postWithAuthCheck("connection/{connectionId}/preparedStatement/create") {
@@ -142,7 +157,8 @@ fun Route.HttpSql(
         val preparedStatement = connection.prepareStatement(preparedStatementRequest.sql,
             preparedStatementRequest.generatedKeys)
         val preparedStatementId = preparedStatementIdAtomic.incrementAndGet()
-        preparedStatementHandles[preparedStatementId] = PreparedStatementHandle(preparedStatement, preparedStatementId)
+        preparedStatementHandles[preparedStatementId] = PreparedStatementHandle(preparedStatement,
+            preparedStatementRequest.generatedKeys, preparedStatementId)
         call.respond(PrepareStatementResponse(preparedStatementId, call.parameters[PARAM_CONNECTION_ID]?.toInt()?: -1))
     }
 
@@ -152,7 +168,23 @@ fun Route.HttpSql(
             it.close()
             preparedStatementHandles.remove(preparedStatementId)
         }
+        call.respond(HttpStatusCode.NoContent, "")
     }
+
+    getWithAuthCheck("connection/{connectionId}/setAutoCommit") {
+        val connection = call.requireConnection()
+        val commit = call.request.queryParameters[PARAM_AUTOCOMMIT]?.toBoolean() ?: false
+        connection.autoCommit = commit
+        call.respond(HttpStatusCode.NoContent, "")
+    }
+
+    getWithAuthCheck("connection/{connectionId}/commit") {
+        val connection = call.requireConnection()
+        connection.commit()
+        call.respond(HttpStatusCode.NoContent, "")
+    }
+
+
 
     postWithAuthCheck("connection/{connectionId}/preparedStatement/{preparedStatementId}/query") {
         val preparedStatement = call.requirePreparedStatement()
@@ -161,13 +193,10 @@ fun Route.HttpSql(
             preparedStatement.setPreparedStatementParam(it)
         }
 
-        val results = preparedStatement.executeQuery().use { it.toJsonArray() }
-        val resultJsonObject = buildJsonObject {
-            put(KEY_ROWS, results)
-        }
+        val results = preparedStatement.executeQuery().use { it.toHttpSqlResultSetJsonObject() }
 
         call.respondText(contentType = ContentType.Application.Json, text = json.encodeToString(JsonObject.serializer(),
-            resultJsonObject))
+            results))
     }
 
     postWithAuthCheck("connection/{connectionId}/preparedStatement/{preparedStatementId}/update") {
@@ -178,7 +207,18 @@ fun Route.HttpSql(
         }
 
         val numUpdates = preparedStatement.executeUpdate()
-        call.respond(HttpSqlUpdateResult(numUpdates))
+
+        val updateJsonResponse = buildJsonObject {
+            put(KEY_EXEC_UPDATE_NUM_ROWS_CHANGED, JsonPrimitive(numUpdates))
+
+            if(call.preparedStatementGeneratedKeys() == RETURN_GENERATED_KEYS) {
+                put(KEY_EXEC_UPDATE_GENERATED_KEYS,
+                    preparedStatement.generatedKeys.use { it.toHttpSqlResultSetJsonObject() })
+            }
+        }
+
+        call.respondText(contentType = ContentType.Application.Json,
+            text = json.encodeToString(JsonObject.serializer(), updateJsonResponse))
     }
 
 

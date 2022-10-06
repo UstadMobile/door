@@ -16,6 +16,8 @@ class HttpSqlDataSource(
 ) : DataSource, DataSourceAsync {
 
     private val url = url.removeSuffix("/")
+        .replaceFirst("httpsql://", "http://")
+        .replaceFirst("httpsqls://", "https://")
 
     override fun getConnection(): Connection {
         throw SQLException("HttpSqlDataSource: connection must be opened async")
@@ -24,5 +26,10 @@ class HttpSqlDataSource(
     override suspend fun getConnectionAsync(): Connection {
         val connectionInfo = httpClient.get("$url/connection/open").body<HttpSqlConnectionInfo>()
         return HttpSqlConnection(url, connectionInfo, httpClient, json)
+    }
+
+    companion object {
+
+        const val PROTOCOL_HTTPSQL_PREFIX = "httpsql:"
     }
 }

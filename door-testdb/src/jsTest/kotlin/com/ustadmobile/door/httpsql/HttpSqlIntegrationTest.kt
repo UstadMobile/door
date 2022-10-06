@@ -1,8 +1,9 @@
 package com.ustadmobile.door.httpsql
 
 import com.ustadmobile.door.jdbc.AsyncConnection
-import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.jdbc.DataSourceAsync
+import com.ustadmobile.door.jdbc.ext.executeUpdateAsync
+import com.ustadmobile.door.jdbc.ext.useStatementAsync
 import com.ustadmobile.door.util.systemTimeInMillis
 import io.ktor.client.*
 import io.ktor.client.engine.js.*
@@ -34,6 +35,11 @@ class HttpSqlIntegrationTest {
         val httpDataSource = HttpSqlDataSource("http://localhost:8098/httpsql/", httpClient, json)
 
         try {
+            val asyncConnection = httpDataSource.getConnectionAsync() as AsyncConnection
+            asyncConnection.createStatement().useStatementAsync {
+                it.executeUpdateAsync("DELETE FROM RepEntity")
+            }
+
             testBlock(HttpSqlIntegrationTestContext(httpDataSource, json, httpClient))
         }finally {
             httpClient.close()
@@ -45,7 +51,6 @@ class HttpSqlIntegrationTest {
         httpDataSourceTest {
             val connection = dataSource.getConnectionAsync()
             assertNotNull(connection, "Opened connection with server")
-            val timeNow = systemTimeInMillis()
             val numChanges = connection.createStatement().executeUpdateAsyncJs(
                 "INSERT INTO RepEntity(reLastChangedBy, reLastChangeTime, reNumField, reString, reBoolean) " +
                         "VALUES(0, 0, 42, 'Hello', 1)")
@@ -54,7 +59,7 @@ class HttpSqlIntegrationTest {
     }
 
     @Test
-    fun givenPreparedStatementCreated_whenPreparedStatementCreated_thenShouldExecuteUpdate() = GlobalScope.promise {
+    fun givenPreparedStatementCreated_whenExecuteUpdated_thenChangeShouldTakeEffect() = GlobalScope.promise {
         httpDataSourceTest {
             val connection = dataSource.getConnectionAsync() as AsyncConnection
             val preparedStatement = connection.prepareStatementAsync(
@@ -67,6 +72,25 @@ class HttpSqlIntegrationTest {
             preparedStatement.setBoolean(5, false)
             val numUpdates = preparedStatement.executeUpdateAsync()
             assertTrue(numUpdates > 0, "Ran query with changes implemented")
+        }
+    }
+
+    @Test
+    fun givenPreparedStatementCreated_whenQueryExecuted_thenShouldReturnResult() = GlobalScope.promise {
+        httpDataSourceTest {
+            val connection = dataSource.getConnectionAsync() as AsyncConnection
+            connection.createStatement().useStatementAsync {
+                it.executeUpdateAsync("INSERT INTO RepEntity(reLastChangedBy, reLastChangeTime, reNumField, reString, reBoolean) " +
+                        "VALUES (0, 0, 100, 'test', 0)")
+            }
+
+            val preparedStatement = connection.prepareStatementAsync(
+                "SELECT * FROM RepEntity WHERE reNumField > ?"
+            )
+            preparedStatement.setInt(1, 50)
+            val results = preparedStatement.executeQueryAsyncInt()
+            assertTrue(results.next())
+            assertEquals(100, results.getInt("reNumField"))
         }
     }
 

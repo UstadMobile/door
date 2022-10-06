@@ -4,20 +4,10 @@ import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.util.DoorJsImplClasses
 import kotlin.reflect.KClass
 
-data class DatabaseBuilderOptions<T : RoomDatabase>(
+sealed class DatabaseBuilderOptions<T : RoomDatabase>(
     var dbClass: KClass<T>,
     var dbImplClasses: DoorJsImplClasses<T>,
     var dbUrl: String = "indexeddb:${dbClass.simpleName!!}",
 
-    /**
-     * Path to SQL.JS web worker
-     */
-    var webWorkerPath: String,
-
-    /**
-     * Delay time before saving the database to indexed database
-     */
-    val saveToIndexedDbDelayTime: Long = 200,
-
-    var jdbcQueryTimeout: Int = 10
+    var jdbcQueryTimeout: Int = 10,
 )

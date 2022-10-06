@@ -1,5 +1,6 @@
 package com.ustadmobile.door.httpsql
 
+import com.ustadmobile.door.ext.bodyAsJsonObject
 import com.ustadmobile.door.jdbc.*
 import com.ustadmobile.door.jdbc.types.BigDecimal
 import com.ustadmobile.door.jdbc.types.Date
@@ -8,15 +9,24 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 class HttpSqlPreparedStatement(
     private val connection: HttpSqlConnection,
     private val preparedStatementId: Int,
+    private val generatedKeys: Int,
 ) : HttpSqlStatement(connection), PreparedStatement, AsyncCloseable {
 
     private val paramValues: MutableMap<Int, PreparedStatementParam> = mutableMapOf()
 
     private var closed = false
+
+    private var timeout: Int = 30
+
+    private var generatedKeysResults: ResultSet? = null
 
     override fun setBoolean(index: Int, value: Boolean) {
         paramValues[index] = PreparedStatementParam(index, listOf(value.toString()), TypesKmp.BOOLEAN)
@@ -71,7 +81,7 @@ class HttpSqlPreparedStatement(
     }
 
     override fun setArray(index: Int, array: Array) {
-        TODO("Not yet implemented")
+        TODO("setArray: Not yet implemented")
     }
 
     override fun executeUpdate(): Int {
@@ -79,21 +89,35 @@ class HttpSqlPreparedStatement(
     }
 
     override suspend fun executeUpdateAsync(): Int {
-        val result: HttpSqlUpdateResult = connection.httpClient.post("${connection.endpointUrl}/connection" +
+        val result = connection.httpClient.post("${connection.endpointUrl}/connection" +
                 "/${connection.httpSqlConnectionInfo.connectionId}/preparedStatement/${preparedStatementId}/update"
         ) {
             setBody(PreparedStatementExecRequest(paramValues.values.toList()))
             contentType(ContentType.Application.Json)
-        }.body()
-        return result.updates
+        }.bodyAsJsonObject(connection.json)
+
+        generatedKeysResults = if(generatedKeys == StatementConstantsKmp.RETURN_GENERATED_KEYS) {
+            HttpSqlResultSet(result[HttpSqlPaths.KEY_EXEC_UPDATE_GENERATED_KEYS]?.jsonObject
+                ?: throw IllegalArgumentException("executeUpdateAsync: No ResultSet even though return generated keys set"))
+        } else {
+            null
+        }
+
+        return result[HttpSqlPaths.KEY_EXEC_UPDATE_NUM_ROWS_CHANGED]?.jsonPrimitive?.int ?: 0
     }
 
     override suspend fun executeQueryAsyncInt(): ResultSet {
-        TODO("Not yet implemented")
+        val jsonResultObject = connection.httpClient.post("${connection.endpointUrl}/connection" +
+                "/${connection.httpSqlConnectionInfo.connectionId}/preparedStatement/${preparedStatementId}/query"
+        ) {
+            setBody(PreparedStatementExecRequest(paramValues.values.toList()))
+            contentType(ContentType.Application.Json)
+        }.bodyAsJsonObject(connection.json)
+        return HttpSqlResultSet(jsonResultObject)
     }
 
     override fun executeQuery(): ResultSet {
-        TODO("Not yet implemented")
+        throw SQLException("executeQuery synchronous NOT SUPPORTED by HttpSql")
     }
 
     override fun setNull(parameterIndex: Int, sqlType: Int) {
@@ -117,10 +141,10 @@ class HttpSqlPreparedStatement(
     override fun getConnection() = connection
 
     override fun getGeneratedKeys(): ResultSet {
-        TODO("Not yet implemented")
+        return generatedKeysResults ?: throw SQLException("No generated keys")
     }
 
     override fun setQueryTimeout(seconds: Int) {
-        TODO("Not yet implemented")
+        timeout = seconds
     }
 }

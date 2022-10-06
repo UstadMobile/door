@@ -16,4 +16,8 @@ expect fun Connection.prepareStatement(
     stmtConfig: PreparedStatementConfig
 ): PreparedStatement
 
+expect suspend fun Connection.prepareStatementAsyncOrFallback(
+    db: RoomDatabase,
+    stmtConfig: PreparedStatementConfig,
+): PreparedStatement
 

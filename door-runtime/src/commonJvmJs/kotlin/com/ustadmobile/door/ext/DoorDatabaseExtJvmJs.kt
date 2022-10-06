@@ -17,7 +17,7 @@ actual suspend fun <R> RoomDatabase.prepareAndUseStatementAsync(
 ) : R {
     try {
         return (this.rootDatabase as RoomJdbcImpl).jdbcImplHelper.useConnectionAsync { connection ->
-            connection.prepareStatement(this, stmtConfig).useStatementAsync { stmt: PreparedStatement ->
+            connection.prepareStatementAsyncOrFallback(this, stmtConfig).useStatementAsync { stmt: PreparedStatement ->
                 stmt.setQueryTimeout((rootDatabase as DoorDatabaseJdbc).jdbcQueryTimeout)
                 val blockStartTime = systemTimeInMillis()
                 return@useConnectionAsync block(stmt).also {
@@ -28,7 +28,7 @@ actual suspend fun <R> RoomDatabase.prepareAndUseStatementAsync(
             }
         }
     }catch(e: Exception) {
-        Napier.e("prepareAndUseStatement: Exception running SQL: '${stmtConfig.sqlToUse(this.dbType())}' on DB $this", e, tag = DoorTag.LOG_TAG)
+        Napier.e("prepareAndUseStatementAsync: Exception running SQL: '${stmtConfig.sqlToUse(this.dbType())}' on DB $this exception = $e", e, tag = DoorTag.LOG_TAG)
         throw e
     }
 }
@@ -50,7 +50,7 @@ actual fun <R> RoomDatabase.prepareAndUseStatement(
             }
         }
     }catch(e: Exception) {
-        Napier.e("prepareAndUseStatement: Exception running SQL: '${stmtConfig.sqlToUse(this.dbType())}' on DB $this", e, tag = DoorTag.LOG_TAG)
+        Napier.e("prepareAndUseStatement: Exception running SQL: '${stmtConfig.sqlToUse(this.dbType())}' on DB $this exception=$e", e, tag = DoorTag.LOG_TAG)
         throw e
     }
 }

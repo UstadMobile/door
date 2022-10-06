@@ -32,7 +32,6 @@ import com.ustadmobile.door.util.DeleteZombieAttachmentsListener
 import kotlinx.coroutines.GlobalScope
 import kotlin.reflect.KClass
 import com.ustadmobile.door.util.NodeIdAuthCache
-import com.ustadmobile.door.util.TransactionDepthCounter
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.MEMBERNAME_EXEC_UPDATE_ASYNC
 import com.ustadmobile.lib.annotationprocessor.core.DoorJdbcProcessor.Companion.SUFFIX_JDBC_KT2
 import com.ustadmobile.lib.annotationprocessor.core.DoorJdbcProcessor.Companion.SUFFIX_JS_IMPLEMENTATION_CLASSES
@@ -452,9 +451,9 @@ fun FileSpec.Builder.addJdbcDbImplType(
         .addProperty(PropertySpec.builder("dataSource", AbstractDbProcessor.CLASSNAME_DATASOURCE, KModifier.OVERRIDE)
             .initializer("dataSource")
             .build())
-        .addProperty(PropertySpec.builder("jdbcImplHelper", RoomDatabaseJdbcImplHelper::class, KModifier.OVERRIDE)
+        .addProperty(PropertySpec.builder("jdbcImplHelper", RoomDatabaseRootImplHelper::class, KModifier.OVERRIDE)
             .initializer("%T(dataSource, this, this::class.%M().allTables, %T(*this::class.%M().allTables.toTypedArray()), jdbcDbType)\n",
-                RoomDatabaseJdbcImplHelper::class,
+                RoomDatabaseRootImplHelper::class,
                 MemberName("com.ustadmobile.door.ext", "doorDatabaseMetadata"),
                 InvalidationTracker::class,
                 MemberName("com.ustadmobile.door.ext", "doorDatabaseMetadata"),

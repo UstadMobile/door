@@ -10,18 +10,17 @@ import com.ustadmobile.door.jdbc.ext.mutableLinkedListOf
 import com.ustadmobile.door.util.TransactionMode
 import com.ustadmobile.door.util.systemTimeInMillis
 import io.github.aakira.napier.Napier
-import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 
-actual class RoomDatabaseJdbcImplHelper actual constructor(
+actual class RoomDatabaseRootImplHelper actual constructor(
     dataSource: DataSource,
     db: RoomDatabase,
     tableNames: List<String>,
     invalidationTracker: InvalidationTracker,
     dbType: Int,
-) : RoomDatabaseJdbcImplHelperCommon(dataSource, db, tableNames, invalidationTracker, dbType) {
+) : RoomDatabaseRootImplHelperCommon(dataSource, db, tableNames, invalidationTracker, dbType) {
 
     inner class PendingTransaction(val connection: Connection)
 

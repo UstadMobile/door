@@ -2,7 +2,7 @@ package com.ustadmobile.door.ext
 
 import com.ustadmobile.door.jdbc.ResultSet
 import com.ustadmobile.door.jdbc.TypesKmp
-import com.ustadmobile.door.jdbc.ext.mapRows
+import com.ustadmobile.door.jdbc.ext.*
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -18,15 +18,37 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 fun ResultSet.getJsonPrimitive(colName: String, colType: Int) : JsonPrimitive{
     return when(colType) {
-        TypesKmp.SMALLINT -> JsonPrimitive(getShort(colName))
-        TypesKmp.INTEGER -> JsonPrimitive(getInt(colName))
-        TypesKmp.BIGINT -> JsonPrimitive(getLong(colName))
-        TypesKmp.REAL -> JsonPrimitive(getFloat(colName))
-        TypesKmp.FLOAT -> JsonPrimitive(getFloat(colName))
-        TypesKmp.DOUBLE -> JsonPrimitive(getDouble(colName))
+        TypesKmp.SMALLINT -> JsonPrimitive(getShortNullable(colName))
+        TypesKmp.INTEGER -> JsonPrimitive(getIntNullable(colName))
+        TypesKmp.BIGINT -> JsonPrimitive(getLongNullable(colName))
+        TypesKmp.REAL -> JsonPrimitive(getFloatNullable(colName))
+        TypesKmp.FLOAT -> JsonPrimitive(getFloatNullable(colName))
+        TypesKmp.DOUBLE -> JsonPrimitive(getDoubleNullable(colName))
         TypesKmp.VARCHAR -> JsonPrimitive(getString(colName))
         TypesKmp.LONGVARCHAR -> JsonPrimitive(getString(colName))
-        TypesKmp.BOOLEAN -> JsonPrimitive(getBoolean(colName))
+        TypesKmp.BOOLEAN -> JsonPrimitive(getBooleanNullable(colName))
+        else -> throw IllegalArgumentException("Unsupported type: $colType")
+    }
+}
+
+/**
+ * Get a column value from teh ResultSet as a JsonPrimitive
+ * @param columnIndex index in the ResultSet
+ * @param colType Int representing the column type expected as per TypesKmp
+ *
+ * @return JsonPrimitive representing the column value
+ */
+fun ResultSet.getJsonPrimitive(columnIndex: Int, colType: Int) : JsonPrimitive {
+    return when(colType) {
+        TypesKmp.SMALLINT -> JsonPrimitive(getShortNullable(columnIndex))
+        TypesKmp.INTEGER -> JsonPrimitive(getIntNullable(columnIndex))
+        TypesKmp.BIGINT -> JsonPrimitive(getLongNullable(columnIndex))
+        TypesKmp.REAL -> JsonPrimitive(getFloatNullable(columnIndex))
+        TypesKmp.FLOAT -> JsonPrimitive(getFloatNullable(columnIndex))
+        TypesKmp.DOUBLE -> JsonPrimitive(getDoubleNullable(columnIndex))
+        TypesKmp.VARCHAR -> JsonPrimitive(getString(columnIndex))
+        TypesKmp.LONGVARCHAR -> JsonPrimitive(getString(columnIndex))
+        TypesKmp.BOOLEAN -> JsonPrimitive(getBooleanNullable(columnIndex))
         else -> throw IllegalArgumentException("Unsupported type: $colType")
     }
 }

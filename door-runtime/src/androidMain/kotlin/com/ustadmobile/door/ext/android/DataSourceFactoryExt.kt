@@ -1,4 +1,4 @@
-package com.ustadmobile.door.ext
+package com.ustadmobile.door.ext.android
 
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LiveData

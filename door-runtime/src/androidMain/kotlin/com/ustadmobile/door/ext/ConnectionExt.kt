@@ -15,3 +15,13 @@ actual fun Connection.prepareStatement(
         else -> TODO("prepareStatement(db, stmtConfig): list params on Android unsupported!")
     }
 }
+
+actual suspend fun Connection.prepareStatementAsyncOrFallback(
+    db: RoomDatabase,
+    stmtConfig: PreparedStatementConfig,
+): PreparedStatement {
+    return when {
+        !stmtConfig.hasListParams -> prepareStatementAsyncOrFallback(stmtConfig.sql, stmtConfig.generatedKeys)
+        else -> TODO("prepareStatement(db, stmtConfig): list params on Android unsupported!")
+    }
+}

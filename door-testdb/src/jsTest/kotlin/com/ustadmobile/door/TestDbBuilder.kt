@@ -37,8 +37,9 @@ class TestDbBuilder {
         """.trimIndent()) as Promise<dynamic>).await()
         val data = (res.blob() as Promise<dynamic>).await()
         val workerBlobUrl = URL.createObjectURL(data as Blob)
-        val builderOptions = DatabaseBuilderOptions(
-            ExampleDatabase2::class, ExampleDatabase2JsImplementations, "sqlite:jsDb_${systemTimeInMillis()}",workerBlobUrl)
+        val builderOptions = DatabaseBuilderOptionsSqliteJs(
+            ExampleDatabase2::class, ExampleDatabase2JsImplementations, "sqlite:jsDb_${systemTimeInMillis()}",
+                webWorkerPath = workerBlobUrl)
         exampleDb2 = DatabaseBuilder.databaseBuilder<ExampleDatabase2>(builderOptions).build().also {
             it.clearAllTablesAsync()
         }
@@ -52,8 +53,9 @@ class TestDbBuilder {
         val workerBlobUrl = URL.createObjectURL(data as Blob)
 
         repNodeId = Random.nextLong(0, Long.MAX_VALUE)
-        val builderOptions = DatabaseBuilderOptions(
-            RepDb::class, RepDbJsImplementations, "sqlite:resDb_${systemTimeInMillis()}", workerBlobUrl)
+        val builderOptions = DatabaseBuilderOptionsSqliteJs(
+            RepDb::class, RepDbJsImplementations, "sqlite:resDb_${systemTimeInMillis()}",
+                webWorkerPath = workerBlobUrl)
         repDb = DatabaseBuilder.databaseBuilder(builderOptions)
             .addCallback(SyncNodeIdCallback(repNodeId))
             .build()

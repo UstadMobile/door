@@ -1,6 +1,7 @@
 package com.ustadmobile.door.room
 
 import com.ustadmobile.door.ext.concurrentSafeListOf
+import com.ustadmobile.door.ext.prepareStatementAsyncOrFallback
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.ext.*
 
@@ -69,7 +70,7 @@ actual open class InvalidationTracker(
     }
 
     suspend fun findChangedTablesOnConnectionAsync(connection: Connection): List<String> {
-        val changedTables = connection.prepareStatement(FIND_CHANGED_TABLES_SQL).useStatementAsync {stmt ->
+        val changedTables = connection.prepareStatementAsyncOrFallback(FIND_CHANGED_TABLES_SQL).useStatementAsync {stmt ->
             stmt.executeQueryAsyncKmp().useResults { results ->
                 results.mapRows {
                     tableNames[it.getInt(1)]
@@ -77,7 +78,7 @@ actual open class InvalidationTracker(
             }
         }
 
-        connection.prepareStatement(RESET_CHANGED_TABLES_SQL).useStatement { stmt ->
+        connection.prepareStatementAsyncOrFallback(RESET_CHANGED_TABLES_SQL).useStatement { stmt ->
             stmt.executeUpdateAsyncKmp()
         }
 

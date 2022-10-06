@@ -1,6 +1,7 @@
 package com.ustadmobile.door.httpsql
 
 import com.ustadmobile.door.DoorDatabaseJdbc
+import com.ustadmobile.door.httpsql.HttpSqlPaths.PARAM_AUTOCOMMIT
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PARAM_CONNECTION_ID
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PARAM_PREPAREDSTATEMENT_ID
 import com.ustadmobile.door.jdbc.*
@@ -205,6 +206,23 @@ class HttpSqlRouteTest {
         verify(preparedStatement).executeUpdate()
         preparedStatement.verifyParamListSet()
     }
+
+    @Test
+    fun givenOpenConnection_whenAutoCommitSetRequestedThenCommitCalled_thenShouldSetAutoCommitAndThenCallCommit() = testHttpSqlApplication { httpSqlTestContext ->
+        val client = httpSqlTestContext.client
+
+        runBlocking {
+            val connectionInfo: HttpSqlConnectionInfo = client.get("/connection/open").body()
+            client.get("/connection/${connectionInfo.connectionId}/setAutoCommit?$PARAM_AUTOCOMMIT=false")
+                .discardRemaining()
+            client.get("/connection/${connectionInfo.connectionId}/commit").discardRemaining()
+        }
+
+        verify(httpSqlTestContext.openedConnections.first()).autoCommit = false
+        verify(httpSqlTestContext.openedConnections.first()).commit()
+    }
+
+
 
 
 }

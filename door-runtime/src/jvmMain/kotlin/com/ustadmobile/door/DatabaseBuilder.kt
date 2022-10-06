@@ -79,6 +79,7 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                             maxLifetime = Long.MAX_VALUE
                         }
 
+                        isAutoCommit = true
                         dataSource = SQLiteDataSource(SQLiteConfig().apply {
                             setJournalMode(SQLiteConfig.JournalMode.WAL)
                             setBusyTimeout(30000)
@@ -90,6 +91,7 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                     })
                 }else {
                     HikariDataSource().apply {
+                        isAutoCommit = true
                         jdbcUrl = dbUrl
                         dbUsername?.also { username = it }
                         dbPassword?.also { password = it }

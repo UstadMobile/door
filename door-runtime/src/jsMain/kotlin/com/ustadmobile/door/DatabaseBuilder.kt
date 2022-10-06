@@ -4,7 +4,11 @@ import com.ustadmobile.door.room.InvalidationTracker
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.*
+import com.ustadmobile.door.httpsql.HttpSqlDataSource
+import com.ustadmobile.door.httpsql.HttpSqlDataSource.Companion.PROTOCOL_HTTPSQL_PREFIX
 import com.ustadmobile.door.jdbc.Connection
+import com.ustadmobile.door.jdbc.PreparedStatement
+import com.ustadmobile.door.jdbc.ResultSet
 import com.ustadmobile.door.jdbc.SQLException
 import com.ustadmobile.door.jdbc.ext.useStatementAsync
 import com.ustadmobile.door.migration.DoorMigration
@@ -27,17 +31,26 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
     private val migrationList = mutableListOf<DoorMigration>()
 
     suspend fun build(): T {
-        if(!builderOptions.dbUrl.startsWith(PROTOCOL_SQLITE_PREFIX))
-            throw IllegalArgumentException("Door/JS: Only SQLite is supported on JS! dbUrl must be in the form of sqlite:indexeddb_name")
+        val dataSource = when {
+            builderOptions.dbUrl.startsWith(PROTOCOL_SQLITE_PREFIX) && builderOptions is DatabaseBuilderOptionsSqliteJs -> {
+                val indexeddbStoreName = builderOptions.dbUrl.substringAfter(PROTOCOL_SQLITE_PREFIX)
+                SQLiteDatasourceJs(indexeddbStoreName, Worker(builderOptions.webWorkerPath))
+            }
+            builderOptions.dbUrl.startsWith(PROTOCOL_HTTPSQL_PREFIX) && builderOptions is DatabaseBuilderOptionsHttpSql-> {
+                HttpSqlDataSource(builderOptions.dbUrl, builderOptions.httpClient, builderOptions.json)
+            }
+            else -> {
+                throw IllegalArgumentException("Door/JS: Only SQLite or HTTPSQL is supported on JS! dbUrl must be in the " +
+                        "form of sqlite:indexeddb_name or httpsql://")
+            }
+        }
 
-        val indexeddbStoreName = builderOptions.dbUrl.substringAfter(PROTOCOL_SQLITE_PREFIX)
-        val dataSource = SQLiteDatasourceJs(indexeddbStoreName, Worker(builderOptions.webWorkerPath))
         register(builderOptions.dbImplClasses)
 
         val dbImpl = builderOptions.dbImplClasses.dbImplKClass.js.createInstance(null, dataSource,
             builderOptions.dbUrl, listOf<AttachmentFilter>(), builderOptions.jdbcQueryTimeout, DoorDbType.SQLITE) as T
-        val exists = IndexedDb.checkIfExists(indexeddbStoreName)
-        val connection = dataSource.getConnection()
+
+        val connection = dataSource.getConnectionAsyncOrFallback()
         val sqlDatabase = DoorSqlDatabaseConnectionImpl(connection)
 
         suspend fun Connection.execSqlAsync(vararg sqlStmts: String) {
@@ -46,90 +59,100 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
             }
         }
 
+        val dbMetaData = lookupImplementations(builderOptions.dbClass).metadata
 
-        if(exists){
-            Napier.d("DatabaseBuilderJs: database exists... loading\n", tag = DoorTag.LOG_TAG)
-            dataSource.loadDbFromIndexedDb()
-            var sqlCon = null as SQLiteConnectionJs?
-            var stmt = null as SQLitePreparedStatementJs?
-            var resultSet = null as SQLiteResultSet?
+        /*
+         * When using HTTPSQL - the other side is responsible for migrations etc.
+         */
+        if(!builderOptions.dbUrl.startsWith(PROTOCOL_HTTPSQL_PREFIX)) {
+            val exists = IndexedDb.checkIfExists(builderOptions.dbUrl.substringAfter(PROTOCOL_SQLITE_PREFIX))
+            if(exists){
+                Napier.d("DatabaseBuilderJs: database exists... loading\n", tag = DoorTag.LOG_TAG)
+                (dataSource as SQLiteDatasourceJs).loadDbFromIndexedDb()
+                var sqlCon = null as Connection?
+                var stmt = null as PreparedStatement?
+                var resultSet = null as ResultSet?
 
-            var currentDbVersion = -1
-            try {
-                sqlCon = dataSource.getConnection() as SQLiteConnectionJs
-                stmt = SQLitePreparedStatementJs(sqlCon,"SELECT dbVersion FROM _doorwayinfo")
-                resultSet = stmt.executeQueryAsyncInt() as SQLiteResultSet
-                if(resultSet.next())
-                    currentDbVersion = resultSet.getInt(1)
-            }catch(exception: SQLException) {
-                throw exception
-            }finally {
-                resultSet?.close()
-                stmt?.close()
-                sqlCon?.close()
-            }
+                var currentDbVersion = -1
+                try {
+                    sqlCon = dataSource.getConnectionAsyncOrFallback()
+                    stmt = sqlCon.prepareStatementAsyncOrFallback("SELECT dbVersion FROM _doorwayinfo")
+                    resultSet = stmt.executeQueryAsyncInt()
+                    if(resultSet.next())
+                        currentDbVersion = resultSet.getInt(1)
+                }catch(exception: SQLException) {
+                    throw exception
+                }finally {
+                    resultSet?.close()
+                    stmt?.close()
+                    sqlCon?.close()
+                }
 
-            Napier.d("DatabaseBuilderJs: Found current db version = $currentDbVersion\n", tag = DoorTag.LOG_TAG)
-            while(currentDbVersion < dbImpl.dbVersion) {
-                val nextMigration = migrationList.filter {
-                    it.startVersion == currentDbVersion && it !is DoorMigrationSync
-                }.maxByOrNull { it.endVersion }
+                Napier.d("DatabaseBuilderJs: Found current db version = $currentDbVersion\n", tag = DoorTag.LOG_TAG)
+                while(currentDbVersion < dbImpl.dbVersion) {
+                    val nextMigration = migrationList.filter {
+                        it.startVersion == currentDbVersion && it !is DoorMigrationSync
+                    }.maxByOrNull { it.endVersion }
 
-                if(nextMigration != null) {
-                    Napier.d("DatabaseBuilderJs: Attempting to upgrade from ${nextMigration.startVersion} to " +
-                            "${nextMigration.endVersion}\n", tag = DoorTag.LOG_TAG)
-                    when(nextMigration) {
-                        is DoorMigrationAsync -> nextMigration.migrateFn(sqlDatabase)
-                        is DoorMigrationStatementList -> connection.execSqlAsync(
-                            *nextMigration.migrateStmts(sqlDatabase).toTypedArray())
-                        else -> throw IllegalArgumentException("Cannot use DataMigrationSync on JS")
+                    if(nextMigration != null) {
+                        Napier.d("DatabaseBuilderJs: Attempting to upgrade from ${nextMigration.startVersion} to " +
+                                "${nextMigration.endVersion}\n", tag = DoorTag.LOG_TAG)
+                        when(nextMigration) {
+                            is DoorMigrationAsync -> nextMigration.migrateFn(sqlDatabase)
+                            is DoorMigrationStatementList -> connection.execSqlAsync(
+                                *nextMigration.migrateStmts(sqlDatabase).toTypedArray())
+                            else -> throw IllegalArgumentException("Cannot use DataMigrationSync on JS")
+                        }
+
+                        currentDbVersion = nextMigration.endVersion
+                        connection.execSqlAsync("UPDATE _doorwayinfo SET dbVersion = $currentDbVersion")
+                        Napier.d("DatabaseBuilderJs: migrated up to $currentDbVersion", tag = DoorTag.LOG_TAG)
+                    }else {
+                        throw IllegalStateException("Need to migrate to version " +
+                                "${dbImpl.dbVersion} from $currentDbVersion - could not find next migration")
                     }
-
-                    currentDbVersion = nextMigration.endVersion
-                    connection.execSqlAsync("UPDATE _doorwayinfo SET dbVersion = $currentDbVersion")
-                    Napier.d("DatabaseBuilderJs: migrated up to $currentDbVersion", tag = DoorTag.LOG_TAG)
-                }else {
-                    throw IllegalStateException("Need to migrate to version " +
-                            "${dbImpl.dbVersion} from $currentDbVersion - could not find next migration")
+                }
+            }else{
+                Napier.i("DatabaseBuilderJs: Creating database ${builderOptions.dbUrl}\n")
+                connection.execSqlAsync(*dbImpl.createAllTables().toTypedArray())
+                Napier.d("DatabaseBuilderJs: Running onCreate callbacks...\n")
+                callbacks.forEach {
+                    when(it) {
+                        is DoorDatabaseCallbackSync -> throw NotSupportedException("Cannot use sync callback on JS")
+                        is DoorDatabaseCallbackStatementList -> {
+                            Napier.d("DatabaseBuilderJs: Running onCreate callback: ${it::class.simpleName}")
+                            connection.execSqlAsync(*it.onCreate(sqlDatabase).toTypedArray())
+                        }
+                    }
                 }
             }
-        }else{
-            Napier.i("DatabaseBuilderJs: Creating database ${builderOptions.dbUrl}\n")
-            connection.execSqlAsync(*dbImpl.createAllTables().toTypedArray())
-            Napier.d("DatabaseBuilderJs: Running onCreate callbacks...\n")
+
+            Napier.d("DatabaseBuilderJs: Running onOpen callbacks...\n")
+            //Run onOpen callbacks
             callbacks.forEach {
                 when(it) {
-                    is DoorDatabaseCallbackSync -> throw NotSupportedException("Cannot use sync callback on JS")
                     is DoorDatabaseCallbackStatementList -> {
-                        Napier.d("DatabaseBuilderJs: Running onCreate callback: ${it::class.simpleName}")
-                        connection.execSqlAsync(*it.onCreate(sqlDatabase).toTypedArray())
+                        connection.execSqlAsync(*it.onOpen(sqlDatabase).toTypedArray())
                     }
+                    else -> throw IllegalArgumentException("Cannot use sync callback on JS")
                 }
+            }
+
+            Napier.d("DatabaseBuilderJs: Setting up trigger SQL\n")
+
+            connection.execSqlAsync(
+                *InvalidationTracker.generateCreateTriggersSql(dbMetaData.allTables, temporary = false).toTypedArray())
+
+            Napier.d("DatabaseBuilderJs: Setting up change listener\n")
+
+            if(builderOptions is DatabaseBuilderOptionsSqliteJs) {
+                SaveToIndexedDbChangeListener(dbImpl, dataSource as SQLiteDatasourceJs, dbMetaData.replicateTableNames,
+                    builderOptions.saveToIndexedDbDelayTime)
             }
         }
 
-        Napier.d("DatabaseBuilderJs: Running onOpen callbacks...\n")
-        //Run onOpen callbacks
-        callbacks.forEach {
-            when(it) {
-                is DoorDatabaseCallbackStatementList -> {
-                    connection.execSqlAsync(*it.onOpen(sqlDatabase).toTypedArray())
-                }
-                else -> throw IllegalArgumentException("Cannot use sync callback on JS")
-            }
-        }
 
-        Napier.d("DatabaseBuilderJs: Setting up trigger SQL\n")
-        val dbMetaData = lookupImplementations(builderOptions.dbClass).metadata
-        connection.execSqlAsync(
-            *InvalidationTracker.generateCreateTriggersSql(dbMetaData.allTables, temporary = false).toTypedArray())
-
-        Napier.d("DatabaseBuilderJs: Setting up change listener\n")
-
-        SaveToIndexedDbChangeListener(dbImpl, dataSource, dbMetaData.replicateTableNames,
-            builderOptions.saveToIndexedDbDelayTime)
-
-        connection.close()
+        connection.closeAsyncOrFallback()
 
         val dbWrappedIfNeeded = if(dbMetaData.hasReadOnlyWrapper) {
             dbImpl.wrap(builderOptions.dbClass)
