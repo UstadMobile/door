@@ -1,9 +1,7 @@
 package com.ustadmobile.door.httpsql
 
-import com.ustadmobile.door.DoorDatabaseJdbc
+import com.ustadmobile.door.DoorRootDatabase
 import com.ustadmobile.door.httpsql.HttpSqlPaths.PARAM_AUTOCOMMIT
-import com.ustadmobile.door.httpsql.HttpSqlPaths.PARAM_CONNECTION_ID
-import com.ustadmobile.door.httpsql.HttpSqlPaths.PARAM_PREPAREDSTATEMENT_ID
 import com.ustadmobile.door.jdbc.*
 import com.ustadmobile.door.room.RoomDatabase
 import io.ktor.client.call.*
@@ -69,8 +67,8 @@ class HttpSqlRouteTest {
                 }
             }
         }
-        val mockDb = mock<RoomDatabase>(extraInterfaces = arrayOf(DoorDatabaseJdbc::class)) {
-            on { (this as DoorDatabaseJdbc).dataSource }.thenReturn(mockDatasource)
+        val mockDb = mock<RoomDatabase>(extraInterfaces = arrayOf(DoorRootDatabase::class)) {
+            on { (this as DoorRootDatabase).dataSource }.thenReturn(mockDatasource)
         }
 
         val json = Json { encodeDefaults = true }

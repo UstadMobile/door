@@ -1,10 +1,9 @@
 package com.ustadmobile.door.util
 
 import com.ustadmobile.door.room.RoomDatabase
-import com.ustadmobile.door.DoorDatabaseJdbc
+import com.ustadmobile.door.DoorRootDatabase
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.doorDatabaseMetadata
-import com.ustadmobile.door.jdbc.Connection
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.*
 import org.postgresql.jdbc.PgConnection
@@ -19,7 +18,7 @@ import kotlin.coroutines.coroutineContext
  * by a background job which uses LISTEN to pickup the table change notifications.
  */
 class PostgresChangeTracker(
-    private val jdbcDatabase: DoorDatabaseJdbc
+    private val jdbcDatabase: DoorRootDatabase
 ) : Closeable{
 
     private val job: Job = GlobalScope.launch { monitorNotifications() }
@@ -41,7 +40,7 @@ class PostgresChangeTracker(
                         val notifications = pgConnection.notifications
                         if(notifications.isNotEmpty()) {
                             val tablesChanged = notifications.map { it.parameter }
-                            (jdbcDatabase as RoomDatabase).getInvalidationTracker().onTablesInvalidated(tablesChanged.toSet())
+                            //(jdbcDatabase as RoomDatabase).getInvalidationTracker().onTablesInvalidated(tablesChanged.toSet())
                         }
                         delay(20)
                     }

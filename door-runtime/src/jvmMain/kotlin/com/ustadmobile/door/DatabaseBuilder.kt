@@ -14,7 +14,6 @@ import com.ustadmobile.door.util.PostgresChangeTracker
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.lang.IllegalStateException
-import java.sql.Connection
 import java.sql.ResultSet
 import java.sql.SQLException
 import java.sql.Statement
@@ -23,6 +22,8 @@ import javax.sql.DataSource
 import kotlin.reflect.KClass
 import com.ustadmobile.door.jdbc.ext.useResults
 import com.ustadmobile.door.jdbc.ext.mapRows
+import com.ustadmobile.door.room.InvalidationTracker
+import com.ustadmobile.door.room.SqliteInvalidationTracker
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import org.sqlite.SQLiteConfig
@@ -113,13 +114,18 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
             val dbType = DoorDbType.typeIntFromProductName(connection.metaData?.databaseProductName ?: "")
 
             val dbImplClass = Class.forName("${dbClass.java.canonicalName}_JdbcKt") as Class<T>
+            val tableNamesArr = dbClass.doorDatabaseMetadata().allTables.toTypedArray()
+            val invalidationTracker = if(dbType == DoorDbType.SQLITE) {
+                SqliteInvalidationTracker(tableNamesArr, setupTriggersBeforeConnection = true)
+            }else {
+                InvalidationTracker(*tableNamesArr)
+            }
 
             val doorDb = dbImplClass.getConstructor(RoomDatabase::class.java, DataSource::class.java,
                 String::class.java, File::class.java, List::class.java, Int::class.javaPrimitiveType,
-                Int::class.javaPrimitiveType)
+                Int::class.javaPrimitiveType, InvalidationTracker::class.java)
                 .newInstance(null, dataSource, dbUrl, attachmentDir, attachmentFilters, queryTimeout,
-                    dbType)
-
+                    dbType, invalidationTracker)
 
             val sqlDatabase = DoorSqlDatabaseConnectionImpl(connection)
 
@@ -190,7 +196,7 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
             }
 
             if(doorDb.dbType() == DoorDbType.POSTGRES) {
-                val postgresChangeTracker = PostgresChangeTracker(doorDb as DoorDatabaseJdbc)
+                val postgresChangeTracker = PostgresChangeTracker(doorDb as DoorRootDatabase)
                 postgresChangeTracker.setupTriggers()
             }
 

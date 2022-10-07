@@ -1,6 +1,6 @@
 package com.ustadmobile.door.httpsql
 
-import com.ustadmobile.door.DoorDatabaseJdbc
+import com.ustadmobile.door.DoorRootDatabase
 import com.ustadmobile.door.ext.rootDatabase
 import com.ustadmobile.door.httpsql.HttpSqlPaths.KEY_EXEC_UPDATE_NUM_ROWS_CHANGED
 import com.ustadmobile.door.httpsql.HttpSqlPaths.KEY_EXEC_UPDATE_GENERATED_KEYS
@@ -107,7 +107,7 @@ fun Route.HttpSql(
     getWithAuthCheck("connection/open") {
         val connectionId = connectionIdAtomic.incrementAndGet()
         val db = databaseProvider.databaseForCall(call)
-        val connection = (db.rootDatabase as DoorDatabaseJdbc).dataSource.connection
+        val connection = (db.rootDatabase as DoorRootDatabase).dataSource.connection
         connectionHandles[connectionId] = ConnectionHandle(connection, connectionId)
         call.respond(HttpSqlConnectionInfo(connectionId))
     }

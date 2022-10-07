@@ -1,8 +1,7 @@
 package com.ustadmobile.door.attachments
 
 import com.ustadmobile.door.room.RoomDatabase
-import com.ustadmobile.door.DoorDatabaseJdbc
-import com.ustadmobile.door.DoorDatabaseRepository
+import com.ustadmobile.door.DoorRootDatabase
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.DOOR_ATTACHMENT_URI_PREFIX
 import com.ustadmobile.door.DoorUri
 import com.ustadmobile.door.ext.*
@@ -57,9 +56,9 @@ actual suspend fun RoomDatabase.retrieveAttachment(attachmentUri: String): DoorU
 }
 
 actual val RoomDatabase.attachmentsStorageUri: DoorUri?
-    get() = (rootDatabase as DoorDatabaseJdbc).realAttachmentStorageUri
+    get() = (rootDatabase as DoorRootDatabase).realAttachmentStorageUri
 
 actual val RoomDatabase.attachmentFilters: List<AttachmentFilter>
-    get() = (rootDatabase as DoorDatabaseJdbc).realAttachmentFilters
+    get() = (rootDatabase as DoorRootDatabase).realAttachmentFilters
 
 

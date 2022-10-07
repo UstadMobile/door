@@ -1,12 +1,12 @@
 package com.ustadmobile.door.room
 
-import com.ustadmobile.door.DoorDatabaseJdbc
+import com.ustadmobile.door.DoorRootDatabase
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.ext.concurrentSafeMapOf
 import com.ustadmobile.door.ext.rootDatabase
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
-import com.ustadmobile.door.jdbc.ext.mutableLinkedListOf
+import com.ustadmobile.door.util.InvalidationTrackerTransactionListener
 import com.ustadmobile.door.util.TransactionMode
 import com.ustadmobile.door.util.systemTimeInMillis
 import io.github.aakira.napier.Napier
@@ -24,12 +24,6 @@ actual class RoomDatabaseRootImplHelper actual constructor(
 
     inner class PendingTransaction(val connection: Connection)
 
-    override suspend fun Connection.setupSqliteTriggersAsync() {
-        invalidationTracker.setupSqliteTriggersAsync(this)
-    }
-
-    //Switch this to using concurrentSafeMap
-    //Synchronous mode pending transactions
     private val pendingTransactionThreadMap = concurrentSafeMapOf<Long, PendingTransaction>()
 
     @Suppress("UNUSED_PARAMETER") //Reserved for future usage
@@ -42,20 +36,16 @@ actual class RoomDatabaseRootImplHelper actual constructor(
         val transaction = PendingTransaction(dataSource.connection)
         transaction.connection.autoCommit = false
         pendingTransactionThreadMap[threadId] = transaction
+        val invalidationTrackerListener = invalidationTracker as? InvalidationTrackerTransactionListener
         return try {
-            if(dbType == DoorDbType.SQLITE) {
-                invalidationTracker.setupSqliteTriggers(transaction.connection)
-            }
+            invalidationTrackerListener?.beforeTransactionBlock(transaction.connection)
 
-            val changedTables = mutableLinkedListOf<String>()
             block(transaction.connection).also {
-                if(dbType == DoorDbType.SQLITE) {
-                    changedTables.addAll(invalidationTracker.findChangedTablesOnConnection(transaction.connection))
-                }
+                invalidationTrackerListener?.afterTransactionBlock(transaction.connection)
 
                 transaction.connection.commit()
 
-                invalidationTracker.takeIf { changedTables.isNotEmpty() }?.onTablesInvalidated(changedTables.toSet())
+                invalidationTrackerListener?.afterTransactionCommitted(transaction.connection)
             }
         }catch(e: Exception) {
             Napier.e("useConnection: ERROR", e)
@@ -80,7 +70,7 @@ actual class RoomDatabaseRootImplHelper actual constructor(
     ): R {
         val threadId = Thread.currentThread().id
         val threadPendingTransaction = pendingTransactionThreadMap[threadId]
-        val dbQueryTimeoutMs = ((db.rootDatabase as DoorDatabaseJdbc).jdbcQueryTimeout * 1000).toLong()
+        val dbQueryTimeoutMs = ((db.rootDatabase as DoorRootDatabase).jdbcQueryTimeout * 1000).toLong()
 
         return if(threadPendingTransaction != null) {
             try {

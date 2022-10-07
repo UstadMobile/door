@@ -1,7 +1,7 @@
 package com.ustadmobile.door.attachments
 
 import com.ustadmobile.door.room.RoomDatabase
-import com.ustadmobile.door.DoorDatabaseJdbc
+import com.ustadmobile.door.DoorRootDatabase
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.VirtualHostScope
 import com.ustadmobile.door.ext.*
@@ -64,8 +64,8 @@ class DoorDatabaseAttachmentRouteTest {
 
     @Before
     fun setup() {
-        mockDb =  mock(extraInterfaces = arrayOf(DoorDatabaseJdbc::class)) {
-            on { (this as DoorDatabaseJdbc).realAttachmentStorageUri }
+        mockDb =  mock(extraInterfaces = arrayOf(DoorRootDatabase::class)) {
+            on { (this as DoorRootDatabase).realAttachmentStorageUri }
                 .thenReturn(temporaryFolder.newFolder().toDoorUri())
         }
 

@@ -41,8 +41,8 @@ private suspend fun openRepoDb() {
     val data = (res.blob() as Promise<dynamic>).await()
     val workerBlobUrl = URL.createObjectURL(data as Blob)
 
-    val builderOptions = DatabaseBuilderOptions(
-        RepDb::class, RepDbJsImplementations, "resDb", workerBlobUrl)
+    val builderOptions = DatabaseBuilderOptionsSqliteJs(
+        RepDb::class, RepDbJsImplementations, "sqlite:resDb", webWorkerPath = workerBlobUrl)
     httpClient = HttpClient(Js) { }
 
     Napier.d("Creating db and repo")
@@ -50,7 +50,7 @@ private suspend fun openRepoDb() {
         it.clearAllTablesAsync()
     }
     Napier.d("Created db")
-    Napier.d("Db name = ${(repDb.rootDatabase as DoorDatabaseJdbc).dbName}\n")
+    Napier.d("Db name = ${(repDb.rootDatabase as DoorRootDatabase).dbName}\n")
     Napier.d("Replicate wrapper name = ${(repDb as DoorDatabaseReplicateWrapper).dbName}\n")
     Napier.d("repDb toString = $repDb\n")
     val nodeId = Random.nextLong(0, Long.MAX_VALUE)

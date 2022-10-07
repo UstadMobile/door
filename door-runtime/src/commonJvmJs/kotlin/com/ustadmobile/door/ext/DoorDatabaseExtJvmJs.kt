@@ -18,7 +18,7 @@ actual suspend fun <R> RoomDatabase.prepareAndUseStatementAsync(
     try {
         return (this.rootDatabase as RoomJdbcImpl).jdbcImplHelper.useConnectionAsync { connection ->
             connection.prepareStatementAsyncOrFallback(this, stmtConfig).useStatementAsync { stmt: PreparedStatement ->
-                stmt.setQueryTimeout((rootDatabase as DoorDatabaseJdbc).jdbcQueryTimeout)
+                stmt.setQueryTimeout((rootDatabase as DoorRootDatabase).jdbcQueryTimeout)
                 val blockStartTime = systemTimeInMillis()
                 return@useConnectionAsync block(stmt).also {
                     val blockTime = systemTimeInMillis() - blockStartTime
@@ -40,7 +40,7 @@ actual fun <R> RoomDatabase.prepareAndUseStatement(
     try {
         return (this.rootDatabase as RoomJdbcImpl).jdbcImplHelper.useConnection { connection ->
             connection.prepareStatement(this, stmtConfig).useStatement { stmt: PreparedStatement ->
-                stmt.setQueryTimeout((rootDatabase as DoorDatabaseJdbc).jdbcQueryTimeout)
+                stmt.setQueryTimeout((rootDatabase as DoorRootDatabase).jdbcQueryTimeout)
                 val blockStartTime = systemTimeInMillis()
                 return@useConnection block(stmt).also {
                     val blockTime = systemTimeInMillis() - blockStartTime
@@ -58,7 +58,7 @@ actual fun <R> RoomDatabase.prepareAndUseStatement(
 actual val RoomDatabase.sourceDatabase: RoomDatabase?
     get() {
         return when {
-            this is DoorDatabaseJdbc -> null
+            this is DoorRootDatabase -> null
             (this is DoorDatabaseRepository) -> this.db
             (this is DoorDatabaseReplicateWrapper) -> this.realDatabase
             else -> throw IllegalStateException("SourceDatabase : Not a recognized implementation: ${this::class}")
@@ -66,39 +66,39 @@ actual val RoomDatabase.sourceDatabase: RoomDatabase?
     }
 
 actual val RoomDatabase.doorPrimaryKeyManager: DoorPrimaryKeyManager
-    get() = (rootDatabase as DoorDatabaseJdbc).realPrimaryKeyManager
+    get() = (rootDatabase as DoorRootDatabase).realPrimaryKeyManager
 
 actual val RoomDatabase.replicationNotificationDispatcher: ReplicationNotificationDispatcher
-    get() = if(this is DoorDatabaseJdbc) {
+    get() = if(this is DoorRootDatabase) {
         this.realReplicationNotificationDispatcher
     }else {
         this.rootDatabase.replicationNotificationDispatcher
     }
 
 actual val RoomDatabase.nodeIdAuthCache: NodeIdAuthCache
-    get() = if(this is DoorDatabaseJdbc) {
+    get() = if(this is DoorRootDatabase) {
         this.realNodeIdAuthCache
     }else {
         this.rootDatabase.nodeIdAuthCache
     }
 
 actual fun RoomDatabase.addIncomingReplicationListener(incomingReplicationListener: IncomingReplicationListener) {
-    val rootDb = this.rootDatabase as DoorDatabaseJdbc
+    val rootDb = this.rootDatabase as DoorRootDatabase
     rootDb.realIncomingReplicationListenerHelper.addIncomingReplicationListener(incomingReplicationListener)
 }
 
 actual fun RoomDatabase.removeIncomingReplicationListener(incomingReplicationListener: IncomingReplicationListener) {
-    val rootDb = this.rootDatabase as DoorDatabaseJdbc
+    val rootDb = this.rootDatabase as DoorRootDatabase
     rootDb.realIncomingReplicationListenerHelper.removeIncomingReplicationListener(incomingReplicationListener)
 }
 
 actual val RoomDatabase.incomingReplicationListenerHelper: IncomingReplicationListenerHelper
-    get() = (this.rootDatabase as DoorDatabaseJdbc).realIncomingReplicationListenerHelper
+    get() = (this.rootDatabase as DoorRootDatabase).realIncomingReplicationListenerHelper
 
 actual val RoomDatabase.rootTransactionDatabase: RoomDatabase
     get() {
         var db = this
-        while(db !is DoorDatabaseJdbc) {
+        while(db !is DoorRootDatabase) {
             db = db.sourceDatabase
                 ?: throw IllegalStateException("rootTransactionDatabase: cannot find DoorDatabaseJdbc through sourceDatabase")
         }

@@ -12,8 +12,6 @@ import org.junit.Test
 
 import org.junit.rules.TemporaryFolder
 import java.io.File
-import java.net.URI
-import java.nio.file.Paths
 
 class DoorDatabaseAttachmentExtTest {
 
@@ -30,8 +28,8 @@ class DoorDatabaseAttachmentExtTest {
         attachmentPath = tempDir.newFile().absolutePath
         this::class.java.getResourceAsStream("/test-resources/cat-pic0.jpg")!!.writeToFile(File(attachmentPath))
 
-        db = mock(extraInterfaces = arrayOf(DoorDatabaseJdbc::class)) {
-            on { (this as DoorDatabaseJdbc).realAttachmentStorageUri}.thenReturn(tempDir.newFolder().toDoorUri())
+        db = mock(extraInterfaces = arrayOf(DoorRootDatabase::class)) {
+            on { (this as DoorRootDatabase).realAttachmentStorageUri}.thenReturn(tempDir.newFolder().toDoorUri())
         }
     }
 

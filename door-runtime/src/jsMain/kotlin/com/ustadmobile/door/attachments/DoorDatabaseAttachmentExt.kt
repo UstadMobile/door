@@ -3,7 +3,7 @@ package com.ustadmobile.door.attachments
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.DoorConstants.HEADER_DBVERSION
 import com.ustadmobile.door.DoorConstants.HEADER_NODE
-import com.ustadmobile.door.DoorDatabaseJdbc
+import com.ustadmobile.door.DoorRootDatabase
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.DoorUri
 import com.ustadmobile.door.ext.*
@@ -42,7 +42,7 @@ actual suspend fun RoomDatabase.storeAttachment(entityWithAttachment: EntityWith
     entityWithAttachment.attachmentMd5 = blobMd5
     entityWithAttachment.attachmentSize = blob.size.toInt()
 
-    val dbName = (rootDatabase as DoorDatabaseJdbc).dbName
+    val dbName = (rootDatabase as DoorRootDatabase).dbName
     IndexedDb.storeBlob(dbName, ATTACHMENT_STORE_NAME, entityWithAttachment.tableNameAndMd5Path, blob)
     entityWithAttachment.attachmentUri = entityWithAttachment.makeAttachmentUriFromTableNameAndMd5()
     URL.revokeObjectURL(attachmentUri)
@@ -56,7 +56,7 @@ actual suspend fun RoomDatabase.storeAttachment(entityWithAttachment: EntityWith
  */
 actual suspend fun RoomDatabase.retrieveAttachment(attachmentUri: String): DoorUri {
     val indexedDbKey = attachmentUri.substringAfter(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX)
-    val dbName = (rootDatabase as DoorDatabaseJdbc).dbName
+    val dbName = (rootDatabase as DoorRootDatabase).dbName
     val blob = IndexedDb.retrieveBlob(dbName, ATTACHMENT_STORE_NAME, indexedDbKey)
     val url = blob?.let { URL.createObjectURL(it) }
         ?: throw IllegalArgumentException("Attachment $attachmentUri not found in db!")
@@ -80,7 +80,7 @@ actual suspend fun DoorDatabaseRepository.uploadAttachment(entityWithAttachment:
         ?: throw IllegalArgumentException("uploadAttachment: Entity attachment must not be null")
 
     val indexedDbKey = attachmentUri.substringAfter(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX)
-    val dbName = ((this as RoomDatabase).rootDatabase as DoorDatabaseJdbc).dbName
+    val dbName = ((this as RoomDatabase).rootDatabase as DoorRootDatabase).dbName
     val blob = IndexedDb.retrieveBlob(dbName, ATTACHMENT_STORE_NAME, indexedDbKey)
         ?: throw IllegalStateException("No blob found for $attachmentUri")
     val params = "md5=${encodeURIComponent(attachmentMd5)}&uri=${encodeURIComponent(attachmentUri)}"
@@ -100,7 +100,7 @@ actual suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<E
     try {
         val headers = json(HEADER_DBVERSION to db.dbSchemaVersion().toString(),
             HEADER_NODE to "${config.nodeId}/${config.auth}")
-        val dbName = ((this as RoomDatabase).rootDatabase as DoorDatabaseJdbc).dbName
+        val dbName = ((this as RoomDatabase).rootDatabase as DoorRootDatabase).dbName
 
         val entitiesWithAttachmentData = entityList.mapNotNull { it.attachmentUri }
         if(entitiesWithAttachmentData.isEmpty())
@@ -121,7 +121,7 @@ actual suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<E
 }
 
 actual val RoomDatabase.attachmentsStorageUri: DoorUri?
-    get() = (rootDatabase as DoorDatabaseJdbc).realAttachmentStorageUri
+    get() = (rootDatabase as DoorRootDatabase).realAttachmentStorageUri
 
 actual val RoomDatabase.attachmentFilters: List<AttachmentFilter>
-    get() = (rootDatabase as DoorDatabaseJdbc).realAttachmentFilters
+    get() = (rootDatabase as DoorRootDatabase).realAttachmentFilters

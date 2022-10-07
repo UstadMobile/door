@@ -1,7 +1,5 @@
 package com.ustadmobile.door
 
-import com.ustadmobile.door.room.InvalidationTracker
-import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.httpsql.HttpSqlDataSource
@@ -15,6 +13,8 @@ import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.migration.DoorMigrationAsync
 import com.ustadmobile.door.migration.DoorMigrationStatementList
 import com.ustadmobile.door.migration.DoorMigrationSync
+import com.ustadmobile.door.room.*
+import com.ustadmobile.door.room.SqliteInvalidationTrackerJs
 import com.ustadmobile.door.sqljsjdbc.*
 import com.ustadmobile.door.sqljsjdbc.SQLiteDatasourceJs.Companion.PROTOCOL_SQLITE_PREFIX
 import com.ustadmobile.door.util.DoorJsImplClasses
@@ -46,11 +46,19 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
         }
 
         register(builderOptions.dbImplClasses)
+        val tableNames = builderOptions.dbClass.doorDatabaseMetadata().allTables.toTypedArray()
+
+        val invalidationTracker = when(builderOptions) {
+            is DatabaseBuilderOptionsSqliteJs -> SqliteInvalidationTrackerJs(tableNames)
+            is DatabaseBuilderOptionsHttpSql -> HttpSqlJsInvalidationTracker()
+        }
 
         val dbImpl = builderOptions.dbImplClasses.dbImplKClass.js.createInstance(null, dataSource,
-            builderOptions.dbUrl, listOf<AttachmentFilter>(), builderOptions.jdbcQueryTimeout, DoorDbType.SQLITE) as T
+            builderOptions.dbUrl, listOf<AttachmentFilter>(), builderOptions.jdbcQueryTimeout, DoorDbType.SQLITE,
+            invalidationTracker) as T
 
         val connection = dataSource.getConnectionAsyncOrFallback()
+
         val sqlDatabase = DoorSqlDatabaseConnectionImpl(connection)
 
         suspend fun Connection.execSqlAsync(vararg sqlStmts: String) {
@@ -138,12 +146,7 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
                 }
             }
 
-            Napier.d("DatabaseBuilderJs: Setting up trigger SQL\n")
-
-            connection.execSqlAsync(
-                *InvalidationTracker.generateCreateTriggersSql(dbMetaData.allTables, temporary = false).toTypedArray())
-
-            Napier.d("DatabaseBuilderJs: Setting up change listener\n")
+            Napier.d("DatabaseBuilderJs: Setting up save listener\n")
 
             if(builderOptions is DatabaseBuilderOptionsSqliteJs) {
                 SaveToIndexedDbChangeListener(dbImpl, dataSource as SQLiteDatasourceJs, dbMetaData.replicateTableNames,
@@ -153,6 +156,10 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
 
 
         connection.closeAsyncOrFallback()
+
+        if(invalidationTracker is InvalidationTrackerAsyncInit) {
+            invalidationTracker.init(connection)
+        }
 
         val dbWrappedIfNeeded = if(dbMetaData.hasReadOnlyWrapper) {
             dbImpl.wrap(builderOptions.dbClass)

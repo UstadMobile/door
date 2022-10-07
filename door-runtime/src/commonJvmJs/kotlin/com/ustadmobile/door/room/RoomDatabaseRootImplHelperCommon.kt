@@ -1,10 +1,10 @@
 package com.ustadmobile.door.room
 
-import com.ustadmobile.door.DoorDatabaseJdbc
+import com.ustadmobile.door.DoorRootDatabase
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.*
-import com.ustadmobile.door.jdbc.ext.mutableLinkedListOf
+import com.ustadmobile.door.util.InvalidationTrackerTransactionListener
 import com.ustadmobile.door.util.TransactionMode
 import com.ustadmobile.door.util.systemTimeInMillis
 import io.github.aakira.napier.Napier
@@ -35,48 +35,32 @@ abstract class RoomDatabaseRootImplHelperCommon(
         val transactionId: Int = 0,
     ) : CoroutineContext.Element
 
-    /**
-     * Setup triggers (if needed) for SQLite change tracking. On JVM (where multiple connections can operate run at
-     * the same time
-     */
-    abstract suspend fun Connection.setupSqliteTriggersAsync()
 
     @Suppress("UNUSED_PARAMETER") //Reserved for future use
     private suspend fun <R> useNewConnectionAsyncInternal(
         transactionMode: TransactionMode,
         block: suspend (Connection) -> R,
     ): R {
-
-        val connection = if(dataSource is DataSourceAsync) {
-            dataSource.getConnectionAsync()
-        }else {
-            dataSource.getConnection()
-        }
-
+        val connection = dataSource.getConnectionAsyncOrFallback()
         connection.setAutoCommitAsyncOrFallback(false)
 
         val transactionId = transactionIdAtomic.incrementAndGet()
         val transactionStartTime = systemTimeInMillis()
-        val changedTables = mutableLinkedListOf<String>()
+        val invalidationTrackerListener = invalidationTracker as? InvalidationTrackerTransactionListener
 
         return try {
-//            if(dbType == DoorDbType.SQLITE) {
-//                connection.setupSqliteTriggersAsync()
-//            }
-
+            invalidationTrackerListener?.beforeAsyncTransasctionBlock(connection)
             val transactionElement = TransactionElement(Key, connection, transactionId)
             openTransactions[transactionId] = transactionElement
             val result = withContext(transactionElement) {
                 block(transactionElement.connection)
             }
 
-//            if(dbType == DoorDbType.SQLITE) {
-//                changedTables.addAll(invalidationTracker.findChangedTablesOnConnectionAsync(connection))
-//            }
+            invalidationTrackerListener?.afterAsyncTransactionBlock(connection)
 
             connection.commitAsyncOrFallback()
 
-            invalidationTracker.takeIf { changedTables.isNotEmpty() }?.onTablesInvalidated(changedTables.toSet())
+            invalidationTrackerListener?.afterTransactionCommittedAsync(connection)
 
             result
         }catch(t: Throwable) {
@@ -105,7 +89,7 @@ abstract class RoomDatabaseRootImplHelperCommon(
         block: suspend (Connection) -> R
     ): R {
         val transactionContext = coroutineContext[Key]
-        val dbQueryTimeoutMs = ((db.rootDatabase as DoorDatabaseJdbc).jdbcQueryTimeout * 1000).toLong()
+        val dbQueryTimeoutMs = ((db.rootDatabase as DoorRootDatabase).jdbcQueryTimeout * 1000).toLong()
 
         return if(transactionContext != null) {
             //continue using existing connection for the transaction

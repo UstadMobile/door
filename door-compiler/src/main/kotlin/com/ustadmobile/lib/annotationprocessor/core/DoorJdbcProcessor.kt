@@ -434,7 +434,7 @@ fun FileSpec.Builder.addJdbcDbImplType(
     addType(TypeSpec.classBuilder(dbKSClass.toClassNameWithSuffix(SUFFIX_JDBC_KT2))
         .addOriginatingKSClasses(listOf(dbKSClass))
         .superclass(dbKSClass.toClassName())
-        .addSuperinterface(DoorDatabaseJdbc::class)
+        .addSuperinterface(DoorRootDatabase::class)
         .addSuperinterface(RoomJdbcImpl::class)
         .primaryConstructor(FunSpec.constructorBuilder()
             .addParameter("doorJdbcSourceDatabase", RoomDatabase::class.asTypeName().copy(nullable = true))
@@ -446,18 +446,16 @@ fun FileSpec.Builder.addJdbcDbImplType(
             .addParameter("realAttachmentFilters", List::class.parameterizedBy(AttachmentFilter::class))
             .addParameter("jdbcQueryTimeout", Int::class)
             .addParameter("jdbcDbType", Int::class)
+            .addParameter("invalidationTracker", InvalidationTracker::class)
             .build())
         .addDbVersionProperty(dbKSClass)
         .addProperty(PropertySpec.builder("dataSource", AbstractDbProcessor.CLASSNAME_DATASOURCE, KModifier.OVERRIDE)
             .initializer("dataSource")
             .build())
         .addProperty(PropertySpec.builder("jdbcImplHelper", RoomDatabaseRootImplHelper::class, KModifier.OVERRIDE)
-            .initializer("%T(dataSource, this, this::class.%M().allTables, %T(*this::class.%M().allTables.toTypedArray()), jdbcDbType)\n",
+            .initializer("%T(dataSource, this, this::class.%M().allTables, invalidationTracker, jdbcDbType)\n",
                 RoomDatabaseRootImplHelper::class,
-                MemberName("com.ustadmobile.door.ext", "doorDatabaseMetadata"),
-                InvalidationTracker::class,
-                MemberName("com.ustadmobile.door.ext", "doorDatabaseMetadata"),
-                )
+                MemberName("com.ustadmobile.door.ext", "doorDatabaseMetadata"))
             .build())
         .applyIf(target == DoorTarget.JVM) {
             addProperty(PropertySpec.builder("realAttachmentStorageUri",

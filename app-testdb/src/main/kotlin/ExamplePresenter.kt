@@ -11,7 +11,7 @@ import kotlinx.coroutines.launch
 
 class ExamplePresenter<V :  ExampleView> (private val view: V, private val lifecycleOwner: LifecycleOwner): LifecycleObserver {
 
-    private var database: ExampleDatabase2? = null;
+    private var database: ExampleDatabase2? = null
 
     private val observer = ObserverFnWrapper<List<ExampleEntity2>>{
         view.list = it.sortedByDescending { data -> data.uid }
@@ -24,9 +24,10 @@ class ExamplePresenter<V :  ExampleView> (private val view: V, private val lifec
 
     fun onCreate(){
         GlobalScope.launch {
-            val builderOptions = DatabaseBuilderOptions(
+            val builderOptions = DatabaseBuilderOptionsSqliteJs(
                 ExampleDatabase2::class,
-                ExampleDatabase2JsImplementations, "jsDb1","./worker.sql-asm.js")
+                ExampleDatabase2JsImplementations, "sqlite:jsDb1",10,
+                "./worker.sql-asm.js")
 
             database =  DatabaseBuilder.databaseBuilder<ExampleDatabase2>(builderOptions).build()
 

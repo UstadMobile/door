@@ -13,10 +13,10 @@ import com.ustadmobile.door.util.DoorInvalidationTracker
 /**
  * This interface is implemented by all generated JDBC implementations of a database.
  */
-interface DoorDatabaseJdbc {
+interface DoorRootDatabase {
 
     /**
-     * The JNDI DataSource which will be used to open connections.
+     * The DataSource which will be used to open connections.
      */
     val dataSource: DataSource
 

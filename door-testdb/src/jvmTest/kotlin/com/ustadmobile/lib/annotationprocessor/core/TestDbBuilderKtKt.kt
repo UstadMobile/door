@@ -33,11 +33,9 @@ class TestDbBuilderKtKt {
         runBlocking {
             val liveData = exampleDb2.exampleDao2().findByMinUidLive()
             val channel = Channel<List<ExampleEntity2>?>(1)
-            val observerFn = object : Observer<List<ExampleEntity2>?> {
-                override fun onChanged(t: List<ExampleEntity2>?) {
-                    if(t?.size == 1) {
-                        channel.trySend(t)
-                    }
+            val observerFn = Observer<List<ExampleEntity2>?> { t ->
+                if(t?.size == 1) {
+                    channel.trySend(t)
                 }
             }
 

@@ -17,9 +17,6 @@ actual class RoomDatabaseRootImplHelper actual constructor(
     dbType: Int,
 ) : RoomDatabaseRootImplHelperCommon(dataSource, db, tableNames, invalidationTracker, dbType) {
 
-    override suspend fun Connection.setupSqliteTriggersAsync() {
-        //do nothing - this should already be done by the database builder
-    }
 
     actual fun <R> useConnection(
         transactionMode: TransactionMode,
