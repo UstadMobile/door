@@ -1,3 +1,5 @@
+@file:Suppress("UnusedImport")
+
 package com.ustadmobile.door.httpsql
 
 import com.ustadmobile.door.DoorRootDatabase
