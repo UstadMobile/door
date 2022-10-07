@@ -84,6 +84,7 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                             setBusyTimeout(30000)
                             setSynchronous(SQLiteConfig.SynchronousMode.OFF)
                             enableRecursiveTriggers(true)
+                            isAutoCommit = true
                         }).apply {
                             url = dbUrl
                         }
@@ -93,6 +94,7 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                         jdbcUrl = dbUrl
                         dbUsername?.also { username = it }
                         dbPassword?.also { password = it }
+                        isAutoCommit = true
                     }
                 }
             }
