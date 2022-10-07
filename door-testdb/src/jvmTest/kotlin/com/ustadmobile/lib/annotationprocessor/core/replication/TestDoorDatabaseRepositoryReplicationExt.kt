@@ -93,7 +93,6 @@ class TestDoorDatabaseRepositoryReplicationExt  {
             }
         }
 
-        val initContext = InitialContext()
         remoteRepDb = DatabaseBuilder.databaseBuilder( RepDb::class, "jdbc:sqlite:build/tmp/repdbremote_$dbTimeStamp.sqlite",
                 attachmentDir = remoteAttachmentDir)
             .build().also {
@@ -169,6 +168,14 @@ class TestDoorDatabaseRepositoryReplicationExt  {
     @After
     fun tearDown() {
         remoteServer.stop(1000, 1000)
+        localRepDbRepo.close()
+        if(this::localRepDb2Repo.isInitialized)
+            localRepDb2Repo.close()
+
+        localRepDb.close()
+        remoteRepDb.close()
+        if(this::localRepDb2.isInitialized)
+            localRepDb2.close()
     }
 
     /**

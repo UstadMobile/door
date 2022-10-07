@@ -10,7 +10,6 @@ import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.migration.DoorMigrationAsync
 import com.ustadmobile.door.migration.DoorMigrationStatementList
 import com.ustadmobile.door.migration.DoorMigrationSync
-import com.ustadmobile.door.util.PostgresChangeTracker
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.lang.IllegalStateException
@@ -23,7 +22,9 @@ import kotlin.reflect.KClass
 import com.ustadmobile.door.jdbc.ext.useResults
 import com.ustadmobile.door.jdbc.ext.mapRows
 import com.ustadmobile.door.room.InvalidationTracker
+import com.ustadmobile.door.room.PostgresInvalidationTracker
 import com.ustadmobile.door.room.SqliteInvalidationTracker
+import com.ustadmobile.door.util.InvalidationTrackerDbBuiltListener
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import org.sqlite.SQLiteConfig
@@ -118,14 +119,14 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
             val invalidationTracker = if(dbType == DoorDbType.SQLITE) {
                 SqliteInvalidationTracker(tableNamesArr, setupTriggersBeforeConnection = true)
             }else {
-                InvalidationTracker(*tableNamesArr)
+                PostgresInvalidationTracker(dataSource, *tableNamesArr)
             }
 
             val doorDb = dbImplClass.getConstructor(RoomDatabase::class.java, DataSource::class.java,
                 String::class.java, File::class.java, List::class.java, Int::class.javaPrimitiveType,
-                Int::class.javaPrimitiveType, InvalidationTracker::class.java)
+                Int::class.javaPrimitiveType, InvalidationTracker::class.java, Boolean::class.javaPrimitiveType)
                 .newInstance(null, dataSource, dbUrl, attachmentDir, attachmentFilters, queryTimeout,
-                    dbType, invalidationTracker)
+                    dbType, invalidationTracker, dbUrl.startsWith("jdbc:"))
 
             val sqlDatabase = DoorSqlDatabaseConnectionImpl(connection)
 
@@ -186,6 +187,8 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                 }
             }
 
+            runBlocking { (invalidationTracker as? InvalidationTrackerDbBuiltListener)?.onDatabaseBuilt(connection) }
+
             callbacks.forEach {
                 when(it) {
                     is DoorDatabaseCallbackSync -> it.onOpen(sqlDatabase)
@@ -193,11 +196,6 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                         doorDb.execSQLBatch(*it.onOpen(sqlDatabase).toTypedArray())
                     }
                 }
-            }
-
-            if(doorDb.dbType() == DoorDbType.POSTGRES) {
-                val postgresChangeTracker = PostgresChangeTracker(doorDb as DoorRootDatabase)
-                postgresChangeTracker.setupTriggers()
             }
 
             return if(doorDb::class.doorDatabaseMetadata().hasReadOnlyWrapper) {

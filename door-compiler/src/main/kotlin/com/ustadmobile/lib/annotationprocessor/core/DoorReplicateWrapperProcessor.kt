@@ -286,6 +286,10 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
             .applyIf(target != DoorTarget.ANDROID) {
                 addOverrideGetInvalidationTracker("_db")
             }
+            .addFunction(FunSpec.builder("close")
+                .addModifiers(KModifier.OVERRIDE)
+                .addCode("_db.close()\n")
+                .build())
 
             .build()
     )

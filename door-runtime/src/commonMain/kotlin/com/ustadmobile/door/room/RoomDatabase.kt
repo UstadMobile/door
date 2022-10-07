@@ -6,4 +6,6 @@ expect abstract class RoomDatabase() {
 
     open fun getInvalidationTracker(): InvalidationTracker
 
+    open fun close()
+
 }

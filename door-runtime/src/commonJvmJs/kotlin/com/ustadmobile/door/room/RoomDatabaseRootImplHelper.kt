@@ -16,6 +16,7 @@ expect class RoomDatabaseRootImplHelper(
     tableNames: List<String>,
     invalidationTracker: InvalidationTracker,
     dbType: Int,
+    closeDataSourceOnClose: Boolean
 ) : RoomDatabaseRootImplHelperCommon {
 
     fun <R> useConnection(

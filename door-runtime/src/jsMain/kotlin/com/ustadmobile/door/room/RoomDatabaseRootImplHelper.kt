@@ -15,7 +15,8 @@ actual class RoomDatabaseRootImplHelper actual constructor(
     tableNames: List<String>,
     invalidationTracker: InvalidationTracker,
     dbType: Int,
-) : RoomDatabaseRootImplHelperCommon(dataSource, db, tableNames, invalidationTracker, dbType) {
+    closeDataSourceOnClose: Boolean,
+) : RoomDatabaseRootImplHelperCommon(dataSource, db, tableNames, invalidationTracker, dbType, closeDataSourceOnClose) {
 
 
     actual fun <R> useConnection(

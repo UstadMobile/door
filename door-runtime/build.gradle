@@ -78,7 +78,7 @@ kotlin {
                 implementation "io.github.aakira:napier:$version_napier"
                 implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
                 implementation "org.kodein.di:kodein-di:$version_kodein_di"
-
+                implementation "org.jetbrains.kotlinx:atomicfu:$version_atomicfu"
             }
         }
 

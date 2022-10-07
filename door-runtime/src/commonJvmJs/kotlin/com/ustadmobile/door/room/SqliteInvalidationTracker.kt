@@ -21,7 +21,7 @@ internal open class SqliteInvalidationTracker(
 
     private val pendingChangesByConnection: MutableMap<Connection, MutableList<String>> = mutableMapOf()
 
-    private val observers = concurrentSafeListOf<InvalidationTrackerObserver>()
+
 
     override fun beforeTransactionBlock(connection: Connection) {
         if(setupTriggersBeforeConnection) {
@@ -42,15 +42,10 @@ internal open class SqliteInvalidationTracker(
     protected suspend fun setupTriggersAsync(connection: Connection, temporary: Boolean = false) {
         connection.createStatement().useStatementAsync { stmt ->
             val statementList = generateCreateTriggersSql(tableNames, temporary)
-            Napier.d("setupTriggersAsync: got ${statementList.size} statements to run\n")
             statementList.forEach { sql ->
-                Napier.d("setupTriggersAsync: run $sql\n")
                 stmt.executeUpdateAsync(sql)
-                Napier.d("setupTriggersAsync: ran $sql\n")
             }
-            Napier.d("setupTriggersAsync: done running statements\n")
         }
-        Napier.d("setupTriggersAsync: statement used\n")
     }
 
     override fun afterTransactionBlock(connection: Connection) {
@@ -69,19 +64,6 @@ internal open class SqliteInvalidationTracker(
         pendingChangesByConnection.getOrPut(connection) { mutableListOf() }.addAll(changedTables)
     }
 
-    private suspend fun findChangedTables(connection: Connection) : List<String>{
-        return connection.prepareStatementAsyncOrFallback(FIND_CHANGED_TABLES_SQL).useStatementAsync { stmt ->
-            stmt.executeQueryAsyncKmp().useResults { results ->
-                results.mapRows {
-                    tableNames[it.getInt(1)]
-                }.also {
-                    println("changedtables: =$it\n")
-                    jsDebug()
-                }
-            }
-        }
-    }
-
     override suspend fun afterAsyncTransactionBlock(connection: Connection) {
         //This is a strange syntax: using a more conventional val changeTables = ... fails to work on JS for absolutely
         // no apparent reason - and results in the list of tables being undefined.
@@ -97,16 +79,6 @@ internal open class SqliteInvalidationTracker(
 
         connection.prepareStatementAsyncOrFallback(RESET_CHANGED_TABLES_SQL).useStatementAsync { stmt ->
             stmt.executeUpdateAsyncKmp()
-        }
-    }
-
-    private fun fireChanges(changedTables: Set<String>) {
-        val affectedObservers = observers.filter { observer ->
-            observer.tables.any { changedTables.contains(it) }
-        }
-
-        affectedObservers.forEach {
-            it.onInvalidated(changedTables)
         }
     }
 

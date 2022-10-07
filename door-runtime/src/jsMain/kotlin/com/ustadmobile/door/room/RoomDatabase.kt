@@ -29,6 +29,8 @@ actual abstract class RoomDatabase actual constructor() {
         }
     }
 
+    actual open fun close() {
+    }
 
 
 }

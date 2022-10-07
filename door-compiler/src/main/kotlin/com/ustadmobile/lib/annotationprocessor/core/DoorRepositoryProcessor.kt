@@ -130,6 +130,10 @@ fun FileSpec.Builder.addDbRepoType(
         .applyIf(target == DoorTarget.JS) {
             addThrowExceptionOverride("clearAllTablesAsync", suspended = true)
         }
+        .addFunction(FunSpec.builder("close")
+            .addModifiers(KModifier.OVERRIDE)
+            .addCode("replicationSubscriptionManager?.close()\n")
+            .build())
         .addRepositoryHelperDelegateCalls("_repositoryHelper")
         .applyIf(target != DoorTarget.ANDROID) {
             addFunction(FunSpec.builder("createAllTables")

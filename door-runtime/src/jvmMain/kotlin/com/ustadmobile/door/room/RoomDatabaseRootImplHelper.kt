@@ -20,7 +20,8 @@ actual class RoomDatabaseRootImplHelper actual constructor(
     tableNames: List<String>,
     invalidationTracker: InvalidationTracker,
     dbType: Int,
-) : RoomDatabaseRootImplHelperCommon(dataSource, db, tableNames, invalidationTracker, dbType) {
+    closeDataSourceOnClose: Boolean,
+) : RoomDatabaseRootImplHelperCommon(dataSource, db, tableNames, invalidationTracker, dbType, closeDataSourceOnClose) {
 
     inner class PendingTransaction(val connection: Connection)
 
@@ -93,5 +94,12 @@ actual class RoomDatabaseRootImplHelper actual constructor(
     }
 
     actual fun <R> useConnection(block: (Connection) -> R) = useConnection(TransactionMode.READ_WRITE, block)
+
+    override fun close() {
+        pendingTransactionThreadMap.forEach {
+            it.value.connection.close()
+        }
+        super.close()
+    }
 
 }

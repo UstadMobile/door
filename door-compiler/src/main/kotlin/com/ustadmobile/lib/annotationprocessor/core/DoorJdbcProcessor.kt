@@ -447,13 +447,14 @@ fun FileSpec.Builder.addJdbcDbImplType(
             .addParameter("jdbcQueryTimeout", Int::class)
             .addParameter("jdbcDbType", Int::class)
             .addParameter("invalidationTracker", InvalidationTracker::class)
+            .addParameter("closeDataSourceOnClose", Boolean::class)
             .build())
         .addDbVersionProperty(dbKSClass)
         .addProperty(PropertySpec.builder("dataSource", AbstractDbProcessor.CLASSNAME_DATASOURCE, KModifier.OVERRIDE)
             .initializer("dataSource")
             .build())
         .addProperty(PropertySpec.builder("jdbcImplHelper", RoomDatabaseRootImplHelper::class, KModifier.OVERRIDE)
-            .initializer("%T(dataSource, this, this::class.%M().allTables, invalidationTracker, jdbcDbType)\n",
+            .initializer("%T(dataSource, this, this::class.%M().allTables, invalidationTracker, jdbcDbType, closeDataSourceOnClose)\n",
                 RoomDatabaseRootImplHelper::class,
                 MemberName("com.ustadmobile.door.ext", "doorDatabaseMetadata"))
             .build())
@@ -546,6 +547,10 @@ fun FileSpec.Builder.addJdbcDbImplType(
             .build())
         .addCreateAllTablesFunction(dbKSClass, resolver)
         .addClearAllTablesFunction(dbKSClass, target)
+        .addFunction(FunSpec.builder("close")
+            .addModifiers(KModifier.OVERRIDE)
+            .addCode("jdbcImplHelper.close()\n")
+            .build())
         .addFunction(FunSpec.builder("getInvalidationTracker")
             .addModifiers(KModifier.OVERRIDE)
             .returns(InvalidationTracker::class)

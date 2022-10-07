@@ -20,7 +20,12 @@ abstract class RoomDatabaseRootImplHelperCommon(
     protected val db: RoomDatabase,
     private val tableNames: List<String>,
     val invalidationTracker: InvalidationTracker,
-    val dbType: Int = DoorDbType.SQLITE
+    val dbType: Int,
+    /**
+     * If the DataSource was created just for this database (e.g. when we use a JDBC URL or on Javascript). This is false
+     * when using a JNDI datasource (e.g. one that is managed by a J2EE container such as Tomcat etc).
+     */
+    private val closeDataSourceOnClose: Boolean
 ) {
 
     private val transactionIdAtomic = atomic(0)
@@ -112,6 +117,18 @@ abstract class RoomDatabaseRootImplHelperCommon(
     suspend fun <R> useConnectionAsync(
         block: suspend (Connection) -> R
     ) = useConnectionAsync(TransactionMode.READ_WRITE, block)
+
+    open fun close() {
+        openTransactions.values.forEach {
+            try {
+                it.connection.close()
+            }catch(e: Exception) {
+                Napier.w("WARNING: closing database: Exception attempting to close connection ${it.connection}")
+            }
+        }
+
+        dataSource.takeIf { closeDataSourceOnClose }?.closeIfCloseable()
+    }
 
     companion object Key : CoroutineContext.Key<TransactionElement>
 
