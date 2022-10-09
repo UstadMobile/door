@@ -3,9 +3,9 @@ package com.ustadmobile.door
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.DoorConstants.DBINFO_TABLENAME
 import com.ustadmobile.door.attachments.AttachmentFilter
-import com.ustadmobile.door.ext.dbType
+import com.ustadmobile.door.attachments.FileAttachmentStorage
 import com.ustadmobile.door.ext.doorDatabaseMetadata
-import com.ustadmobile.door.ext.wrap
+import com.ustadmobile.door.ext.wrapDoorDatabase
 import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.migration.DoorMigrationAsync
 import com.ustadmobile.door.migration.DoorMigrationStatementList
@@ -199,7 +199,7 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
             }
 
             return if(doorDb::class.doorDatabaseMetadata().hasReadOnlyWrapper) {
-                doorDb.wrap(dbClass)
+                doorDb.wrapDoorDatabase(dbClass, attachmentDir?.let { FileAttachmentStorage(it) })
             }else {
                 doorDb
             }

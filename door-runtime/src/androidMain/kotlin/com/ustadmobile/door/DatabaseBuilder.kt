@@ -8,13 +8,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.execSqlBatch
 import com.ustadmobile.door.ext.isWrappable
-import com.ustadmobile.door.ext.wrap
+import com.ustadmobile.door.ext.wrapDoorDatabase
 import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.util.DeleteZombieAttachmentsListener
 import com.ustadmobile.door.util.DoorAndroidRoomHelper
-import io.github.aakira.napier.Napier
 import java.io.File
-import java.util.concurrent.Executors
 
 @Suppress("UNCHECKED_CAST", "unused") //This is used as an API
 class DatabaseBuilder<T: RoomDatabase>(
@@ -55,7 +53,7 @@ class DatabaseBuilder<T: RoomDatabase>(
         DoorAndroidRoomHelper.createAndRegisterHelper(db, appContext, attachmentsDir, attachmentFilters,
             DeleteZombieAttachmentsListener(db))
         return if(db.isWrappable(dbClass)) {
-            db.wrap(dbClass)
+            db.wrapDoorDatabase(dbClass)
         }else {
             db
         }

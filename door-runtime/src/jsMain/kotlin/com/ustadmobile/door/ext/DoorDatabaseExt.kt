@@ -2,6 +2,7 @@ package com.ustadmobile.door.ext
 
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.*
+import com.ustadmobile.door.attachments.AttachmentStorage
 import com.ustadmobile.door.jdbc.SQLException
 import com.ustadmobile.door.room.RoomJdbcImpl
 import com.ustadmobile.door.util.TransactionMode
@@ -62,18 +63,21 @@ actual fun <T : RoomDatabase> KClass<T>.doorDatabaseMetadata(): DoorDatabaseMeta
     return DatabaseBuilder.lookupImplementations(this).metadata
 }
 
-actual fun <T : RoomDatabase> T.wrap(dbClass: KClass<T>): T {
+actual fun <T : RoomDatabase> T.wrapDoorDatabase(
+    dbClass: KClass<T>,
+    attachmentStorage: AttachmentStorage?
+): T {
     val jsImplClasses = DatabaseBuilder.lookupImplementations(dbClass)
     val rootDb = rootDatabase
     val wrapperKClass = jsImplClasses.replicateWrapperImplClass
         ?: throw IllegalArgumentException("$this has no replicate wrapper")
-    val wrapperImpl = wrapperKClass.js.createInstance(rootDb)
+    val wrapperImpl = wrapperKClass.js.createInstance(rootDb, attachmentStorage)
     return wrapperImpl as T
 }
 
 @Suppress("UNCHECKED_CAST")
-actual fun <T : RoomDatabase> T.unwrap(dbClass: KClass<T>): T {
-    return (this as? DoorDatabaseReplicateWrapper)?.realDatabase as? T
+actual fun <T : RoomDatabase> T.unwrapDoorDatabase(dbClass: KClass<T>): T {
+    return (this as? DoorDatabaseWrapper)?.realDatabase as? T
         ?: throw IllegalArgumentException("$this is not a replicate wrapper!")
 }
 
@@ -81,8 +85,8 @@ actual inline fun <reified T : RoomDatabase> T.asRepository(repositoryConfig: Re
     val dbClass = T::class
     val repoClass = DatabaseBuilder.lookupImplementations(dbClass).repositoryImplClass
         ?: throw IllegalArgumentException("Database ${dbClass.simpleName} does not have a repository!")
-    val dbUnwrapped = if(this is DoorDatabaseReplicateWrapper) {
-        this.unwrap(dbClass)
+    val dbUnwrapped = if(this is DoorDatabaseWrapper) {
+        this.unwrapDoorDatabase(dbClass)
     }else {
         this
     }

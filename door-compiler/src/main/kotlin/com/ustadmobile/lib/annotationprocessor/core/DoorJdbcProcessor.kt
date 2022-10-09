@@ -204,7 +204,7 @@ private fun FileSpec.Builder.addJsImplementationsClassesObject(
             .initializer(CodeBlock.builder()
                 .apply {
                     if(dbKSClass.dbHasReplicationEntities()) {
-                        add("%T::class", dbKSClass.toClassNameWithSuffix(DoorDatabaseReplicateWrapper.SUFFIX))
+                        add("%T::class", dbKSClass.toClassNameWithSuffix(DoorDatabaseWrapper.SUFFIX))
                     }else {
                         add("null")
                     }
@@ -508,13 +508,6 @@ fun FileSpec.Builder.addJdbcDbImplType(
                 .endControlFlow()
                 .endControlFlow()
                 .build())
-            .build())
-        .addProperty(PropertySpec.builder("_deleteZombieAttachmentsListener",
-            DeleteZombieAttachmentsListener::class.asTypeName().copy(nullable = true))
-            .addModifiers(KModifier.PRIVATE)
-            .initializer("if(this == %M) { %T(this) } else { null }",
-                MemberName("com.ustadmobile.door.ext", "rootDatabase"),
-                DeleteZombieAttachmentsListener::class)
             .build())
         .addProperty(PropertySpec.builder("realIncomingReplicationListenerHelper",
             IncomingReplicationListenerHelper::class)

@@ -14,45 +14,11 @@ import java.net.URI
 import java.nio.file.Paths
 
 actual suspend fun RoomDatabase.storeAttachment(entityWithAttachment: EntityWithAttachment) {
-    val attachmentUri = entityWithAttachment.attachmentUri
-    val attachmentDirVal = requireAttachmentStorageUri().toFile()
-
-    if(attachmentUri?.startsWith(DOOR_ATTACHMENT_URI_PREFIX) == true)
-        //do nothing - attachment is already stored
-        return
-
-    if(attachmentUri == null) {
-        entityWithAttachment.attachmentMd5 = null
-        entityWithAttachment.attachmentSize = 0
-        return
-    }
-
-
-    withContext(Dispatchers.IO) {
-        val srcFile = Paths.get(URI(attachmentUri)).toFile()
-        attachmentDirVal.takeIf { !it.exists() }?.mkdirs()
-
-        val tmpDestFile = File(attachmentDirVal, "${systemTimeInMillis()}.tmp")
-        val md5 = srcFile.copyAndGetMd5(tmpDestFile)
-
-        val md5HexStr = md5.toHexString()
-        entityWithAttachment.attachmentMd5 = md5.toHexString()
-        val finalDestFile = File(attachmentDirVal, entityWithAttachment.tableNameAndMd5Path)
-        finalDestFile.parentFile.takeIf { !it.exists() }?.mkdirs()
-
-        if(!tmpDestFile.renameTo(finalDestFile)) {
-            throw IOException("Could not move attachment $md5HexStr to it's final file!")
-        }
-
-        entityWithAttachment.attachmentSize = tmpDestFile.length().toInt()
-        entityWithAttachment.attachmentUri = entityWithAttachment.makeAttachmentUriFromTableNameAndMd5()
-    }
+    requireAttachmentStorage().storeAttachment(entityWithAttachment)
 }
 
 actual suspend fun RoomDatabase.retrieveAttachment(attachmentUri: String): DoorUri {
-    val attachmentDirVal = requireAttachmentStorageUri().toFile()
-    val file = File(attachmentDirVal, attachmentUri.substringAfter(DOOR_ATTACHMENT_URI_PREFIX))
-    return DoorUri(file.toURI())
+    return requireAttachmentStorage().retrieveAttachment(attachmentUri)
 }
 
 actual val RoomDatabase.attachmentsStorageUri: DoorUri?

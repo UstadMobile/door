@@ -2,7 +2,7 @@ package com.ustadmobile.door.ext
 
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.DoorConstants
-import com.ustadmobile.door.DoorDatabaseReplicateWrapper
+import com.ustadmobile.door.DoorDatabaseWrapper
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.util.pipeline.*
@@ -20,7 +20,7 @@ import org.kodein.type.TypeToken
 @Suppress("UNCHECKED_CAST", "unused")
 fun <T: RoomDatabase> PipelineContext<Unit, ApplicationCall>.unwrappedDbOnCall(typeToken: TypeToken<T>, tag: Int = DoorTag.TAG_DB): T{
     val db = closestDI().on(call).direct.Instance(typeToken, tag = tag)
-    return if(db is DoorDatabaseReplicateWrapper) {
+    return if(db is DoorDatabaseWrapper) {
         db.realDatabase as T
     }else {
         db

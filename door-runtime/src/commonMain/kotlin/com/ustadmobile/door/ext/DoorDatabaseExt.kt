@@ -2,6 +2,7 @@ package com.ustadmobile.door.ext
 
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.*
+import com.ustadmobile.door.attachments.AttachmentStorage
 import kotlin.reflect.KClass
 import com.ustadmobile.door.jdbc.*
 import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
@@ -104,9 +105,22 @@ expect val RoomDatabase.doorPrimaryKeyManager: DoorPrimaryKeyManager
  */
 expect inline fun <reified  T: RoomDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T
 
-expect fun <T: RoomDatabase> T.wrap(dbClass: KClass<T>): T
+/**
+ * Wrap a database with an implementation of DoorDatabaseWrapper
+ *
+ * @see com.ustadmobile.door.DoorDatabaseWrapper
+ */
+expect fun <T: RoomDatabase> T.wrapDoorDatabase(
+    dbClass: KClass<T>,
+    attachmentStorage: AttachmentStorage?
+): T
 
-expect fun <T: RoomDatabase> T.unwrap(dbClass: KClass<T>): T
+/**
+ * If this is a DoorDatabaseWrapper, then unwrap it
+ */
+expect fun <T: RoomDatabase> T.unwrapDoorDatabase(
+    dbClass: KClass<T>
+): T
 
 /**
  * The Replication Notification Dispatcher will listen for changes to the database and run functions annotated with

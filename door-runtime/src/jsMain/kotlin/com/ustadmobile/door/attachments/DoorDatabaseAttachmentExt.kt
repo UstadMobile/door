@@ -33,19 +33,8 @@ import kotlin.js.json
  *
  */
 actual suspend fun RoomDatabase.storeAttachment(entityWithAttachment: EntityWithAttachment) {
-    val attachmentUri = entityWithAttachment.attachmentUri
-    if(attachmentUri == null || attachmentUri.startsWith(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX))
-        return
+    requireAttachmentStorage().storeAttachment(entityWithAttachment)
 
-    val blob = window.fetch(entityWithAttachment.attachmentUri).await().blob().await()
-    val blobMd5 = blob.md5()
-    entityWithAttachment.attachmentMd5 = blobMd5
-    entityWithAttachment.attachmentSize = blob.size.toInt()
-
-    val dbName = (rootDatabase as DoorRootDatabase).dbName
-    IndexedDb.storeBlob(dbName, ATTACHMENT_STORE_NAME, entityWithAttachment.tableNameAndMd5Path, blob)
-    entityWithAttachment.attachmentUri = entityWithAttachment.makeAttachmentUriFromTableNameAndMd5()
-    URL.revokeObjectURL(attachmentUri)
 }
 
 /**
@@ -55,12 +44,7 @@ actual suspend fun RoomDatabase.storeAttachment(entityWithAttachment: EntityWith
  *
  */
 actual suspend fun RoomDatabase.retrieveAttachment(attachmentUri: String): DoorUri {
-    val indexedDbKey = attachmentUri.substringAfter(DoorDatabaseRepository.DOOR_ATTACHMENT_URI_PREFIX)
-    val dbName = (rootDatabase as DoorRootDatabase).dbName
-    val blob = IndexedDb.retrieveBlob(dbName, ATTACHMENT_STORE_NAME, indexedDbKey)
-    val url = blob?.let { URL.createObjectURL(it) }
-        ?: throw IllegalArgumentException("Attachment $attachmentUri not found in db!")
-    return DoorUri(URL(url))
+    return requireAttachmentStorage().retrieveAttachment(attachmentUri)
 }
 
 /**

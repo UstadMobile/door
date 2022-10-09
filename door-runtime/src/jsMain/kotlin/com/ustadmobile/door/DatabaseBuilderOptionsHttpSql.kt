@@ -14,5 +14,5 @@ class DatabaseBuilderOptionsHttpSql<T: RoomDatabase>(
     val httpClient: HttpClient,
     val json: Json,
 ): DatabaseBuilderOptions<T>(
-    dbClass, dbImplClasses, dbUrl, jdbcQueryTimeout
+    dbClass, dbImplClasses, dbUrl, jdbcQueryTimeout, attachmentStorage = null,
 )

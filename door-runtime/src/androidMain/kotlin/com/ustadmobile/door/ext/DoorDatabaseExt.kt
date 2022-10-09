@@ -7,6 +7,7 @@ import com.ustadmobile.door.*
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.DOOR_ATTACHMENT_URI_PREFIX
 import com.ustadmobile.door.jdbc.PreparedStatement
 import com.ustadmobile.door.PreparedStatementConfig
+import com.ustadmobile.door.attachments.AttachmentStorage
 import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
 import com.ustadmobile.door.roomjdbc.ConnectionRoomJdbc
 import com.ustadmobile.door.util.DoorAndroidRoomHelper
@@ -126,7 +127,7 @@ actual val RoomDatabase.sourceDatabase: RoomDatabase?
     get() {
         return when {
             (this is DoorDatabaseRepository) -> this.db
-            (this is DoorDatabaseReplicateWrapper) -> this.realDatabase
+            (this is DoorDatabaseWrapper) -> this.realDatabase
             else -> null
         }
     }
@@ -152,8 +153,8 @@ actual val RoomDatabase.doorPrimaryKeyManager : DoorPrimaryKeyManager
 //succeed
 @Suppress("UNCHECKED_CAST")
 actual inline fun <reified  T: RoomDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T {
-    val dbUnwrapped = if(this is DoorDatabaseReplicateWrapper) {
-        this.unwrap(T::class)
+    val dbUnwrapped = if(this is DoorDatabaseWrapper) {
+        this.unwrapDoorDatabase(T::class)
     }else {
         this
     }
@@ -169,26 +170,22 @@ actual inline fun <reified  T: RoomDatabase> T.asRepository(repositoryConfig: Re
 @Suppress("unused")
 fun <T: RoomDatabase> RoomDatabase.isWrappable(dbClass: KClass<T>): Boolean {
     try {
-        Class.forName("${dbClass.qualifiedName}${DoorDatabaseReplicateWrapper.SUFFIX}")
+        Class.forName("${dbClass.qualifiedName}${DoorDatabaseWrapper.SUFFIX}")
         return true
     }catch(e: Exception) {
         return false
     }
 }
 
-/**
- * Wrap a database with replication support. The wrapper manages setting primary keys, (if an entity has a field
- * annotated with @LastChangedTime) setting the last changed time as the version id, and storing attachment data.
- */
 @Suppress("UNCHECKED_CAST")
-actual fun <T: RoomDatabase> T.wrap(dbClass: KClass<T>) : T {
-    val wrapperClass = Class.forName("${dbClass.qualifiedName}${DoorDatabaseReplicateWrapper.SUFFIX}") as Class<T>
-    return wrapperClass.getConstructor(dbClass.java).newInstance(this)
+actual fun <T: RoomDatabase> T.wrapDoorDatabase(dbClass: KClass<T>, attachmentStorage: AttachmentStorage?) : T {
+    val wrapperClass = Class.forName("${dbClass.qualifiedName}${DoorDatabaseWrapper.SUFFIX}") as Class<T>
+    return wrapperClass.getConstructor(dbClass.java, AttachmentStorage::class.java).newInstance(this, attachmentStorage)
 }
 
 @Suppress("UNCHECKED_CAST")
-actual fun <T: RoomDatabase> T.unwrap(dbClass: KClass<T>): T {
-    if(this is DoorDatabaseReplicateWrapper) {
+actual fun <T: RoomDatabase> T.unwrapDoorDatabase(dbClass: KClass<T>): T {
+    if(this is DoorDatabaseWrapper) {
         return this.realDatabase as T
     }else {
         return this

@@ -2,6 +2,8 @@ package com.ustadmobile.door.ext
 
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.*
+import com.ustadmobile.door.attachments.AttachmentStorage
+import com.ustadmobile.door.attachments.attachmentStorage
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
 import com.ustadmobile.door.room.RoomJdbcImpl
 import com.ustadmobile.door.util.TransactionMode
@@ -32,37 +34,6 @@ actual fun <T: RoomDatabase, R> T.withDoorTransaction(
     }
 }
 
-/**
- * Where the receiver database is the transaction database created by
- * createTransactionDataSourceAndDb this is used by generated code to create a
- * new repository with the same repository config linked to the transaction
- * database.
- *
- * This is used by generated code
- *
- * @receiver transaction database created by createTransactionDataSourceAndDb
- * @param originalRepo the repository from which the repo config will be copied
- * @param dbKClass the KClass representing the database itself
- * @param repoImplKClass the KClass representing the generated repository implementation
- */
-@Suppress("unused")
-fun <T: RoomDatabase> T.wrapDbAsRepositoryForTransaction(
-    originalRepo: T,
-    dbKClass: KClass<T>,
-    repoImplKClass: KClass<T>,
-) : T {
-    val wrappedDb = if(this::class.doorDatabaseMetadata().hasReadOnlyWrapper) {
-        this.wrap(dbKClass)
-    }else {
-        this
-    }
-
-    val repoConfig = (originalRepo as DoorDatabaseRepository).config
-    return repoImplKClass.java.getConstructor(
-        dbKClass.java, dbKClass.java, RepositoryConfig::class.java, Boolean::class.javaPrimitiveType
-    ).newInstance(wrappedDb, this, repoConfig, false) as T
-}
-
 actual fun RoomDatabase.execSqlBatch(vararg sqlStatements: String) {
     rootDatabase.execSQLBatch(*sqlStatements)
 }
@@ -90,8 +61,8 @@ actual inline fun <reified  T: RoomDatabase> T.asRepository(repositoryConfig: Re
     val dbClass = T::class
     val repoImplClass = Class.forName("${dbClass.qualifiedName}_Repo") as Class<T>
 
-    val dbUnwrapped = if(this is DoorDatabaseReplicateWrapper) {
-        this.unwrap(dbClass)
+    val dbUnwrapped = if(this is DoorDatabaseWrapper) {
+        this.unwrapDoorDatabase(dbClass)
     }else {
         this
     }
@@ -114,13 +85,16 @@ private val KClass<*>.qualifiedNameBeforeLastUnderscore: String?
  * the repo.
  */
 @Suppress("UNCHECKED_CAST")
-actual fun <T: RoomDatabase> T.wrap(dbClass: KClass<T>) : T {
-    val wrapperClass = Class.forName("${dbClass.qualifiedNameBeforeLastUnderscore}${DoorDatabaseReplicateWrapper.SUFFIX}") as Class<T>
-    return wrapperClass.getConstructor(dbClass.java).newInstance(this)
+actual fun <T: RoomDatabase> T.wrapDoorDatabase(
+    dbClass: KClass<T>,
+    attachmentStorage: AttachmentStorage?,
+) : T {
+    val wrapperClass = Class.forName("${dbClass.qualifiedNameBeforeLastUnderscore}${DoorDatabaseWrapper.SUFFIX}") as Class<T>
+    return wrapperClass.getConstructor(dbClass.java, AttachmentStorage::class.java).newInstance(this, attachmentStorage)
 }
 
 @Suppress("UNCHECKED_CAST")
-actual fun <T: RoomDatabase> T.unwrap(dbClass: KClass<T>): T {
-    return (this as DoorDatabaseReplicateWrapper).realDatabase as T
+actual fun <T: RoomDatabase> T.unwrapDoorDatabase(dbClass: KClass<T>): T {
+    return (this as DoorDatabaseWrapper).realDatabase as T
 }
 

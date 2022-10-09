@@ -15,7 +15,7 @@ class SymbolProcessorWrapper(
 
     private val jdbcProcessor = DoorJdbcProcessor(environment)
 
-    private val processors = listOf(DoorReplicateWrapperProcessor(environment), DoorHttpServerProcessor(environment),
+    private val processors = listOf(DoorWrapperProcessor(environment), DoorHttpServerProcessor(environment),
         DoorRepositoryProcessor(environment), jdbcProcessor, DoorExpectTypeAliasProcessor(environment),
         DoorAndroidReplicationCallbackProcessor(environment))
 

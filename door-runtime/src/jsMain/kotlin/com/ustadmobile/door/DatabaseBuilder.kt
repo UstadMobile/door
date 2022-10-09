@@ -1,6 +1,7 @@
 package com.ustadmobile.door
 
 import com.ustadmobile.door.attachments.AttachmentFilter
+import com.ustadmobile.door.attachments.IndexedDbAttachmentStorage
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.httpsql.HttpSqlDataSource
 import com.ustadmobile.door.httpsql.HttpSqlDataSource.Companion.PROTOCOL_HTTPSQL_PREFIX
@@ -157,14 +158,12 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
 
         connection.closeAsyncOrFallback()
 
-        if(invalidationTracker is InvalidationTrackerAsyncInit) {
-            withTimeout(5000){
-                invalidationTracker.init(connection)
-            }
+        withTimeout(5000){
+            (invalidationTracker as? InvalidationTrackerAsyncInit)?.init(connection)
         }
 
         val dbWrappedIfNeeded = if(dbMetaData.hasReadOnlyWrapper) {
-            dbImpl.wrap(builderOptions.dbClass)
+            dbImpl.wrapDoorDatabase(builderOptions.dbClass, builderOptions.attachmentStorage)
         }else {
             dbImpl
         }

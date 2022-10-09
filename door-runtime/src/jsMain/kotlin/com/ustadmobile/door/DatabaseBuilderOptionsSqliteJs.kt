@@ -1,5 +1,6 @@
 package com.ustadmobile.door
 
+import com.ustadmobile.door.attachments.IndexedDbAttachmentStorage
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.util.DoorJsImplClasses
 import kotlin.reflect.KClass
@@ -19,6 +20,6 @@ class DatabaseBuilderOptionsSqliteJs<T: RoomDatabase>(
      */
     val saveToIndexedDbDelayTime: Long = 200,
 ): DatabaseBuilderOptions<T>(
-    dbClass, dbImplClasses, dbUrl, jdbcQueryTimeout
+    dbClass, dbImplClasses, dbUrl, jdbcQueryTimeout, IndexedDbAttachmentStorage(dbUrl),
 ) {
 }

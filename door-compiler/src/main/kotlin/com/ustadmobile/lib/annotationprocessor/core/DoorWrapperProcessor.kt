@@ -13,9 +13,11 @@ import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.writeTo
-import com.ustadmobile.door.DoorDatabaseReplicateWrapper
+import com.ustadmobile.door.DoorDatabaseWrapper
 import com.ustadmobile.door.annotation.LastChangedTime
 import com.ustadmobile.door.annotation.ReplicateEntity
+import com.ustadmobile.door.attachments.AttachmentStorage
+import com.ustadmobile.door.util.DeleteZombieAttachmentsListener
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
 
 /**
@@ -32,12 +34,12 @@ fun TypeSpec.Builder.addDbDaoWrapperPropOrGetter(
     if(daoClassDeclaration?.daoHasReplicateEntityWriteFunctions(resolver) != true) {
         addDaoPropOrGetterDelegate(daoPropOrGetterDecl, "_db.")
     }else {
-        val wrapperClassName = daoClassDeclaration.toClassNameWithSuffix(DoorDatabaseReplicateWrapper.SUFFIX)
+        val wrapperClassName = daoClassDeclaration.toClassNameWithSuffix(DoorDatabaseWrapper.SUFFIX)
 
         addProperty(PropertySpec.builder("_${daoClassDeclaration.simpleName.asString()}",
             daoClassDeclaration.toClassName()).delegate(
             CodeBlock.builder().beginControlFlow("lazy ")
-                .add("%T(_db, _db.${daoPropOrGetterDecl.toPropertyOrEmptyFunctionCaller()})\n",
+                .add("%T(_db, _db.${daoPropOrGetterDecl.toPropertyOrEmptyFunctionCaller()}, attachmentStorage)\n",
                     wrapperClassName)
                 .endControlFlow()
                 .build())
@@ -128,8 +130,9 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(
 
                         beginAttachmentStorageFlow(overridingFunction)
 
-                        add("_db.%M(%L.%M())\n",
-                            MemberName("com.ustadmobile.door.attachments", "storeAttachment"),
+                        add("(_attachmentStorage ?: throw %T(%S)).storeAttachment(%L.%M())\n",
+                            ClassName("kotlin", "IllegalStateException"),
+                            "No attachment storage",
                             if(isList) "it" else entityParam?.name,
                             MemberName(entityComponentClassDecl.packageName.asString(), "asEntityWithAttachment"))
 
@@ -225,7 +228,7 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
 ): FileSpec.Builder {
     val dbClassName = dbClassDecl.toClassName()
     addType(
-        TypeSpec.classBuilder("${dbClassDecl.simpleName.asString()}${DoorDatabaseReplicateWrapper.SUFFIX}")
+        TypeSpec.classBuilder("${dbClassDecl.simpleName.asString()}${DoorDatabaseWrapper.SUFFIX}")
             .addOriginatingKsFileOrThrow(dbClassDecl.containingFile)
             .addOriginatingKSClasses(dbClassDecl.allDbEntities())
             .addOriginatingKSClasses(dbClassDecl.dbEnclosedDaos())
@@ -233,12 +236,23 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
                 .addMember("%S, %S", "REDUNDANT_PROJECTION", "ClassName")
                 .build())
             .superclass(dbClassName)
-            .addSuperinterface(DoorDatabaseReplicateWrapper::class.asClassName())
+            .addSuperinterface(DoorDatabaseWrapper::class.asClassName())
             .primaryConstructor(FunSpec.constructorBuilder()
                 .addParameter("_db", dbClassName)
+                .addParameter("attachmentStorage", AttachmentStorage::class.asClassName().copy(true))
                 .build())
             .addProperty(PropertySpec.builder("_db", dbClassName, KModifier.PRIVATE)
                 .initializer("_db").build())
+            .addProperty(PropertySpec.builder("attachmentStorage",
+                    AttachmentStorage::class.asClassName().copy(true), KModifier.OVERRIDE)
+                    .initializer("attachmentStorage")
+                .build())
+            .addProperty(PropertySpec.builder("_deleteZombieAttachmentsListener",
+                DeleteZombieAttachmentsListener::class.asTypeName().copy(nullable = true))
+                .addModifiers(KModifier.PRIVATE)
+                .initializer("%T(this)\n", DeleteZombieAttachmentsListener::class)
+                .build())
+
             .applyIf(target == DoorTarget.JS || target == DoorTarget.JVM) {
                 addDbVersionProperty(dbClassDecl)
                 addFunction(FunSpec.builder("createAllTables")
@@ -303,13 +317,14 @@ fun FileSpec.Builder.addDaoWrapperTypeSpec(
     target: DoorTarget,
     logger: KSPLogger,
 ): FileSpec.Builder {
-    addType(TypeSpec.classBuilder(daoClassDeclaration.toClassNameWithSuffix(DoorDatabaseReplicateWrapper.SUFFIX))
+    addType(TypeSpec.classBuilder(daoClassDeclaration.toClassNameWithSuffix(DoorDatabaseWrapper.SUFFIX))
         .addSuperClassOrInterface(daoClassDeclaration)
         .addOriginatingKSClass(daoClassDeclaration)
         .addOriginatingKSClasses(daoClassDeclaration.allDaoEntities(resolver))
         .primaryConstructor(FunSpec.constructorBuilder()
             .addParameter("_db", RoomDatabase::class)
             .addParameter("_dao", daoClassDeclaration.toClassName())
+            .addParameter("_attachmentStorage", AttachmentStorage::class.asClassName().copy(true))
             .build())
         .addProperty(PropertySpec.builder("_db", RoomDatabase::class,
             KModifier.PRIVATE)
@@ -318,6 +333,10 @@ fun FileSpec.Builder.addDaoWrapperTypeSpec(
         .addProperty(PropertySpec.builder("_dao", daoClassDeclaration.toClassName(),
             KModifier.PRIVATE)
             .initializer("_dao")
+            .build())
+        .addProperty(PropertySpec.builder("_attachmentStorage", AttachmentStorage::class.asClassName().copy(true),
+            KModifier.PRIVATE)
+            .initializer("_attachmentStorage")
             .build())
         .apply {
             daoClassDeclaration.getAllDaoFunctionsIncSuperTypesToGenerate().forEach { daoFunDeclaration ->
@@ -358,7 +377,7 @@ private fun KSFunctionDeclaration.isDaoReplicateEntityWriteFunction(
     }
 }
 
-class DoorReplicateWrapperProcessor(
+class DoorWrapperProcessor(
     private val environment: SymbolProcessorEnvironment,
 ) : SymbolProcessor{
 
@@ -368,7 +387,7 @@ class DoorReplicateWrapperProcessor(
         resolver.getDatabaseSymbolsToProcess().forEach { dbClassDecl ->
             if(dbClassDecl.dbHasReplicationEntities()) {
                 FileSpec.builder(dbClassDecl.packageName.asString(),
-                    "${dbClassDecl.simpleName.asString()}${DoorDatabaseReplicateWrapper.SUFFIX}")
+                    "${dbClassDecl.simpleName.asString()}${DoorDatabaseWrapper.SUFFIX}")
                     .addDbWrapperTypeSpec(dbClassDecl, resolver, target)
                     .build()
                     .writeTo(environment.codeGenerator, false)
@@ -378,7 +397,7 @@ class DoorReplicateWrapperProcessor(
         resolver.getDaoSymbolsToProcess().forEach { daoClassDec ->
             if(daoClassDec.daoHasReplicateEntityWriteFunctions(resolver)) {
                 FileSpec.builder(daoClassDec.packageName.asString(),
-                    "${daoClassDec.simpleName.asString()}${DoorDatabaseReplicateWrapper.SUFFIX}")
+                    "${daoClassDec.simpleName.asString()}${DoorDatabaseWrapper.SUFFIX}")
                     .addDaoWrapperTypeSpec(daoClassDec, resolver, target, environment.logger)
                     .build()
                     .writeTo(environment.codeGenerator, false)

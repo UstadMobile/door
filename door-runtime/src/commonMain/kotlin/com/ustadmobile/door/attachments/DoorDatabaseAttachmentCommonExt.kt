@@ -1,5 +1,7 @@
 package com.ustadmobile.door.attachments
 
+import com.ustadmobile.door.DoorDatabaseRepository
+import com.ustadmobile.door.DoorDatabaseWrapper
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.DoorUri
 import com.ustadmobile.door.entities.ZombieAttachmentData
@@ -46,3 +48,13 @@ suspend fun RoomDatabase.deleteZombieAttachmentData(zaUids: List<Int>) {
     }
 }
 
+val RoomDatabase.attachmentStorage: AttachmentStorage?
+    get() {
+        val doorWrapper = (this as? DoorDatabaseWrapper)
+            ?: ((this as? DoorDatabaseRepository)?.db as? DoorDatabaseWrapper)
+            ?: throw IllegalArgumentException("attachmentStorage: Must only be called using the DoorWrapper or Repository!")
+        return doorWrapper.attachmentStorage
+    }
+
+fun RoomDatabase.requireAttachmentStorage() = attachmentStorage
+    ?: throw IllegalStateException("No attachment storage for database")

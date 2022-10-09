@@ -60,7 +60,7 @@ actual val RoomDatabase.sourceDatabase: RoomDatabase?
         return when {
             this is DoorRootDatabase -> null
             (this is DoorDatabaseRepository) -> this.db
-            (this is DoorDatabaseReplicateWrapper) -> this.realDatabase
+            (this is DoorDatabaseWrapper) -> this.realDatabase
             else -> throw IllegalStateException("SourceDatabase : Not a recognized implementation: ${this::class}")
         }
     }
