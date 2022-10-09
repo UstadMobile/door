@@ -1,6 +1,8 @@
 package com.ustadmobile.door.room
 
+import com.ustadmobile.door.ext.rootDatabase
 import com.ustadmobile.door.jdbc.ext.useStatementAsync
+import io.ktor.utils.io.core.*
 import kotlinx.coroutines.Runnable
 
 actual abstract class RoomDatabase actual constructor() {
@@ -30,6 +32,9 @@ actual abstract class RoomDatabase actual constructor() {
     }
 
     actual open fun close() {
+        if(this == rootDatabase) {
+            (getInvalidationTracker() as? Closeable)?.close()
+        }
     }
 
 

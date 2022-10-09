@@ -1,6 +1,8 @@
 package com.ustadmobile.door.httpsql
 
 import com.ustadmobile.door.DoorRootDatabase
+import com.ustadmobile.door.ext.DoorTag
+import com.ustadmobile.door.ext.doorDatabaseMetadata
 import com.ustadmobile.door.ext.rootDatabase
 import com.ustadmobile.door.httpsql.HttpSqlPaths.KEY_EXEC_UPDATE_NUM_ROWS_CHANGED
 import com.ustadmobile.door.httpsql.HttpSqlPaths.KEY_EXEC_UPDATE_GENERATED_KEYS
@@ -25,6 +27,10 @@ import com.ustadmobile.door.ktor.DatabaseProvider
 import io.ktor.server.request.*
 import kotlinx.serialization.json.*
 import com.ustadmobile.door.jdbc.ext.toJsonArray
+import com.ustadmobile.door.room.InvalidationTrackerObserver
+import com.ustadmobile.door.util.InvalidationTrackerTransactionListener
+import io.github.aakira.napier.Napier
+import kotlinx.coroutines.channels.Channel
 
 
 fun Route.HttpSql(
@@ -107,14 +113,21 @@ fun Route.HttpSql(
     getWithAuthCheck("connection/open") {
         val connectionId = connectionIdAtomic.incrementAndGet()
         val db = databaseProvider.databaseForCall(call)
+        val invalidationTrackerListener = db.getInvalidationTracker() as? InvalidationTrackerTransactionListener
         val connection = (db.rootDatabase as DoorRootDatabase).dataSource.connection
+        invalidationTrackerListener?.beforeTransactionBlock(connection)
         connectionHandles[connectionId] = ConnectionHandle(connection, connectionId)
         call.respond(HttpSqlConnectionInfo(connectionId))
     }
 
     getWithAuthCheck("connection/{connectionId}/close") {
+        val invalidationTracker = databaseProvider.databaseForCall(call).getInvalidationTracker()
+
+        val invalidationTrackerListener = invalidationTracker as? InvalidationTrackerTransactionListener
         call.connection()?.apply {
+            invalidationTrackerListener?.afterTransactionBlock(this)
             close()
+            invalidationTrackerListener?.afterTransactionCommitted(this)
         }
         connectionHandles.remove(call.request.queryParameters[PARAM_CONNECTION_ID]?.toInt() ?: 0)
         call.respond(HttpStatusCode.NoContent, "")
@@ -222,6 +235,40 @@ fun Route.HttpSql(
     }
 
 
+    @Suppress("BlockingMethodInNonBlockingContext")
+    get("invalidations") {
+        val db: RoomDatabase = databaseProvider.databaseForCall(call)
+        val invalidationTracker = db.getInvalidationTracker()
+        val tableNamesList = db::class.doorDatabaseMetadata().allTables
 
-    //Server sent events - invalidations
+        val channel = Channel<Set<String>>(capacity = Channel.UNLIMITED)
+        val invalidationObserver = object: InvalidationTrackerObserver(tableNamesList.toTypedArray()) {
+            override fun onInvalidated(tables: Set<String>) {
+                channel.trySend(tables)
+            }
+        }
+
+
+        Napier.d("HttpSqlRoute: setting up invalidation SSE", tag = DoorTag.LOG_TAG)
+        try {
+            channel.send(emptySet())
+            invalidationTracker.addObserver(invalidationObserver)
+            call.response.header("Cache-Control", "no-cache")
+            call.respondTextWriter(contentType = ContentType.Text.EventStream) {
+                flush()
+                for(changeTables in channel) {
+                    Napier.d("HttpSqlRoute: Sending invalidation: ${changeTables.joinToString()}",
+                        tag = DoorTag.LOG_TAG)
+                    write("data: ${changeTables.joinToString()}\n\n")
+                    flush()
+                    Napier.d("HttpSqlRoute: Sent invalidation: ${changeTables.joinToString()}",
+                        tag = DoorTag.LOG_TAG)
+                }
+            }
+        }finally {
+            invalidationTracker.removeObserver(invalidationObserver)
+            channel.close()
+            Napier.d("HttpSqlRoute: invalidations SSE closed")
+        }
+    }
 }

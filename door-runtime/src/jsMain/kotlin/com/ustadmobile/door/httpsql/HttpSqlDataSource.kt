@@ -15,7 +15,7 @@ class HttpSqlDataSource(
     private val json: Json,
 ) : DataSource, DataSourceAsync {
 
-    private val url = url.removeSuffix("/")
+    internal val url = url.removeSuffix("/")
         .replaceFirst("httpsql://", "http://")
         .replaceFirst("httpsqls://", "https://")
 

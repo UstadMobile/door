@@ -90,7 +90,7 @@ class PostgresInvalidationTracker(
 
 
     override fun close() {
-        job.cancel()
+        runBlocking { job.cancelAndJoin() }
     }
 
     companion object {

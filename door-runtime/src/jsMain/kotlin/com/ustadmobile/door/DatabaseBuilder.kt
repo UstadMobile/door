@@ -4,10 +4,8 @@ import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.httpsql.HttpSqlDataSource
 import com.ustadmobile.door.httpsql.HttpSqlDataSource.Companion.PROTOCOL_HTTPSQL_PREFIX
-import com.ustadmobile.door.jdbc.Connection
-import com.ustadmobile.door.jdbc.PreparedStatement
-import com.ustadmobile.door.jdbc.ResultSet
-import com.ustadmobile.door.jdbc.SQLException
+import com.ustadmobile.door.httpsql.HttpSqlInvalidationTracker
+import com.ustadmobile.door.jdbc.*
 import com.ustadmobile.door.jdbc.ext.useStatementAsync
 import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.migration.DoorMigrationAsync
@@ -19,6 +17,7 @@ import com.ustadmobile.door.sqljsjdbc.*
 import com.ustadmobile.door.sqljsjdbc.SQLiteDatasourceJs.Companion.PROTOCOL_SQLITE_PREFIX
 import com.ustadmobile.door.util.DoorJsImplClasses
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.withTimeout
 import org.w3c.dom.Worker
 import kotlin.reflect.KClass
 
@@ -48,9 +47,10 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
         register(builderOptions.dbImplClasses)
         val tableNames = builderOptions.dbClass.doorDatabaseMetadata().allTables.toTypedArray()
 
-        val invalidationTracker = when(builderOptions) {
-            is DatabaseBuilderOptionsSqliteJs -> SqliteInvalidationTrackerJs(tableNames)
-            is DatabaseBuilderOptionsHttpSql -> HttpSqlJsInvalidationTracker()
+        val invalidationTracker = when(dataSource) {
+            is SQLiteDatasourceJs -> SqliteInvalidationTrackerJs(tableNames)
+            is HttpSqlDataSource -> HttpSqlInvalidationTracker(dataSource.url)
+            else -> throw IllegalArgumentException("Cannot make InvalidationTracker for unsupported DataSource: $dataSource")
         }
 
         val dbImpl = builderOptions.dbImplClasses.dbImplKClass.js.createInstance(null, dataSource,
@@ -158,7 +158,9 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
         connection.closeAsyncOrFallback()
 
         if(invalidationTracker is InvalidationTrackerAsyncInit) {
-            invalidationTracker.init(connection)
+            withTimeout(5000){
+                invalidationTracker.init(connection)
+            }
         }
 
         val dbWrappedIfNeeded = if(dbMetaData.hasReadOnlyWrapper) {

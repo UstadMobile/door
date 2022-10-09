@@ -23,8 +23,9 @@ import org.kodein.di.*
 import org.kodein.di.ktor.closestDI
 import org.kodein.di.ktor.di
 import java.nio.file.Files
-import javax.naming.InitialContext
 
+
+@Suppress("unused") //This is specified using application.conf
 fun Application.doorTestDbApplication() {
 
     Napier.base(DebugAntilog())
@@ -62,10 +63,6 @@ fun Application.doorTestDbApplication() {
             DatabaseBuilder.databaseBuilder(RepDb::class, "jdbc:sqlite:build/tmp/$dbHostName.sqlite", attachmentDir = attachmentDir)
                 .build().also {
                     it.clearAllTables()
-                    it.repDao.insert(RepEntity().apply {
-                        this.rePrimaryKey = 42
-                        this.reString = "Hello World"
-                    })
                 }
         }
 
