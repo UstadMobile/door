@@ -1,10 +1,12 @@
 package com.ustadmobile.door
 
+import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.room.InvalidationTrackerObserver
 import com.ustadmobile.door.room.RoomDatabase
 import kotlinx.coroutines.GlobalScope
 import com.ustadmobile.door.sqljsjdbc.SQLiteDatasourceJs
 import com.ustadmobile.door.util.DoorEventCollator
+import io.github.aakira.napier.Napier
 
 /**
  * This class is used to listen for all database changes and persist database to the indexedDB
@@ -19,6 +21,7 @@ class SaveToIndexedDbChangeListener(
     private val changeListenerRequest: InvalidationTrackerObserver
 
     private val eventCollator = DoorEventCollator<List<String>>(maxWaitTime, GlobalScope) {
+        Napier.d("Save database $database to indexedDb", tag = DoorTag.LOG_TAG)
         datasource.saveDatabaseToIndexedDb()
     }
 
@@ -28,6 +31,7 @@ class SaveToIndexedDbChangeListener(
                 eventCollator.receiveEvent(tables.toList())
             }
         }
+        database.getInvalidationTracker().addObserver(changeListenerRequest)
     }
 
 }

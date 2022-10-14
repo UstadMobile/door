@@ -42,7 +42,7 @@ private suspend fun openRepoDb() {
     val workerBlobUrl = URL.createObjectURL(data as Blob)
 
     val builderOptions = DatabaseBuilderOptions(
-        RepDb::class, RepDbJsImplementations, "resDb", workerBlobUrl)
+        RepDb::class, RepDbJsImplementations, "sqlite:resDb", workerBlobUrl)
     httpClient = HttpClient(Js) { }
 
     Napier.d("Creating db and repo")

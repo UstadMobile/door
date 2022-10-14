@@ -48,7 +48,7 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
 
 
         if(exists){
-            Napier.d("DatabaseBuilderJs: database exists... loading\n", tag = DoorTag.LOG_TAG)
+            Napier.i("DatabaseBuilderJs: database ${builderOptions.dbUrl} exists... loading\n", tag = DoorTag.LOG_TAG)
             dataSource.loadDbFromIndexedDb()
             var sqlCon = null as SQLiteConnectionJs?
             var stmt = null as SQLitePreparedStatementJs?
@@ -94,21 +94,22 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
                 }
             }
         }else{
-            Napier.i("DatabaseBuilderJs: Creating database ${builderOptions.dbUrl}\n")
+            Napier.i("DatabaseBuilderJs: Creating database ${builderOptions.dbUrl}\n", tag = DoorTag.LOG_TAG)
             connection.execSqlAsync(*dbImpl.createAllTables().toTypedArray())
-            Napier.d("DatabaseBuilderJs: Running onCreate callbacks...\n")
+            Napier.d("DatabaseBuilderJs: Running onCreate callbacks...\n", tag = DoorTag.LOG_TAG)
             callbacks.forEach {
                 when(it) {
                     is DoorDatabaseCallbackSync -> throw NotSupportedException("Cannot use sync callback on JS")
                     is DoorDatabaseCallbackStatementList -> {
-                        Napier.d("DatabaseBuilderJs: Running onCreate callback: ${it::class.simpleName}")
+                        Napier.d("DatabaseBuilderJs: Running onCreate callback: ${it::class.simpleName}",
+                            tag = DoorTag.LOG_TAG)
                         connection.execSqlAsync(*it.onCreate(sqlDatabase).toTypedArray())
                     }
                 }
             }
         }
 
-        Napier.d("DatabaseBuilderJs: Running onOpen callbacks...\n")
+        Napier.d("DatabaseBuilderJs: Running onOpen callbacks...\n", tag = DoorTag.LOG_TAG)
         //Run onOpen callbacks
         callbacks.forEach {
             when(it) {
@@ -119,12 +120,12 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
             }
         }
 
-        Napier.d("DatabaseBuilderJs: Setting up trigger SQL\n")
+        Napier.d("DatabaseBuilderJs: Setting up trigger SQL\n", tag = DoorTag.LOG_TAG)
         val dbMetaData = lookupImplementations(builderOptions.dbClass).metadata
         connection.execSqlAsync(
             *InvalidationTracker.generateCreateTriggersSql(dbMetaData.allTables, temporary = false).toTypedArray())
 
-        Napier.d("DatabaseBuilderJs: Setting up change listener\n")
+        Napier.d("DatabaseBuilderJs: Setting up change listener\n", tag = DoorTag.LOG_TAG)
 
         SaveToIndexedDbChangeListener(dbImpl, dataSource, dbMetaData.replicateTableNames,
             builderOptions.saveToIndexedDbDelayTime)
@@ -137,7 +138,7 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
             dbImpl
         }
 
-        Napier.d("Built ${builderOptions.dbUrl}\n")
+        Napier.i("Built database for: ${builderOptions.dbUrl}\n", tag = DoorTag.LOG_TAG)
 
         return dbWrappedIfNeeded
     }
