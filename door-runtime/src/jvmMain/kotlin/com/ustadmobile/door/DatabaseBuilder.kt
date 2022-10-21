@@ -121,7 +121,7 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                     dbType)
 
 
-            val sqlDatabase = DoorSqlDatabaseConnectionImpl(connection)
+            val sqlDatabase = DoorSqlDatabaseConnectionImpl(connection, dbType)
 
             val tableNames: List<String> = connection.metaData.getTables(null, null, "%", arrayOf("TABLE")).useResults { tableResult ->
                 tableResult.mapRows { it.getString("TABLE_NAME") ?: "" }
@@ -139,7 +139,7 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                     when(it) {
                         is DoorDatabaseCallbackSync -> it.onCreate(sqlDatabase)
                         is DoorDatabaseCallbackStatementList -> {
-                            doorDb.execSQLBatch(*it.onCreate(sqlDatabase).toTypedArray())
+                            sqlDatabase.execSQLBatch(it.onCreate(sqlDatabase).toTypedArray())
                         }
                     }
                 }
@@ -184,7 +184,7 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                 when(it) {
                     is DoorDatabaseCallbackSync -> it.onOpen(sqlDatabase)
                     is DoorDatabaseCallbackStatementList -> {
-                        doorDb.execSQLBatch(*it.onOpen(sqlDatabase).toTypedArray())
+                        sqlDatabase.execSQLBatch(it.onOpen(sqlDatabase).toTypedArray())
                     }
                 }
             }

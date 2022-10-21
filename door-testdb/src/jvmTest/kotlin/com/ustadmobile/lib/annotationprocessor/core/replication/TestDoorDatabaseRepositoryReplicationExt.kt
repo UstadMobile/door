@@ -93,17 +93,18 @@ class TestDoorDatabaseRepositoryReplicationExt  {
             }
         }
 
-        val initContext = InitialContext()
         remoteRepDb = DatabaseBuilder.databaseBuilder( RepDb::class, "jdbc:sqlite:build/tmp/repdbremote_$dbTimeStamp.sqlite",
                 attachmentDir = remoteAttachmentDir)
+            .addCallback(SyncNodeIdCallback(REMOTE_NODE_ID))
             .build().also {
-                it.clearAllTables()
+                it.clearAllTablesAndResetNodeId(REMOTE_NODE_ID)
             }
 
         localRepDb = DatabaseBuilder.databaseBuilder( RepDb::class, "jdbc:sqlite:build/tmp/repdblocal_$dbTimeStamp.sqlite",
             attachmentDir = temporaryFolder.newFolder("attachments-local1"))
+            .addCallback(SyncNodeIdCallback(LOCAL_NODE_ID))
             .build().also {
-                it.clearAllTables()
+                it.clearAllTablesAndResetNodeId(LOCAL_NODE_ID)
             }
 
         remoteVirtualHostScope = VirtualHostScope()

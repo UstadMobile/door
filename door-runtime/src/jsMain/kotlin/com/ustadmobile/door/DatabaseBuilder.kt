@@ -38,7 +38,7 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
             builderOptions.dbUrl, listOf<AttachmentFilter>(), builderOptions.jdbcQueryTimeout, DoorDbType.SQLITE) as T
         val exists = IndexedDb.checkIfExists(indexeddbStoreName)
         val connection = dataSource.getConnection()
-        val sqlDatabase = DoorSqlDatabaseConnectionImpl(connection)
+        val sqlDatabase = DoorSqlDatabaseConnectionImpl(connection, DoorDbType.SQLITE)
 
         suspend fun Connection.execSqlAsync(vararg sqlStmts: String) {
             createStatement().useStatementAsync { stmt ->

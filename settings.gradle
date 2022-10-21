@@ -1,3 +1,11 @@
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+        google()
+    }
+}
+
 rootProject.name = 'door'
 include 'door-runtime'
 include 'door-compiler'

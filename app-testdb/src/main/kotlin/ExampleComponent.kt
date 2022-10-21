@@ -155,7 +155,7 @@ class ExampleComponent(mProps: PropsWithChildren): RComponent<PropsWithChildren,
         styledH6 {
             attrs.text("$data")
             css {
-                flex(flexGrow= flex, flexBasis = FlexBasis.auto)
+                //flex(flexGrow= flex, flexBasis = FlexBasis.auto)
                 fontSize = LinearDimension("1.9em")
             }
         }

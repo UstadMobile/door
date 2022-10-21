@@ -7,12 +7,12 @@ plugins {
 }
 
 android {
-    compileSdkVersion 32
+    compileSdkVersion rootProject.ext.version_android_compile_sdk
 
     defaultConfig {
         applicationId "com.ustadmobile.door.testandroid"
         minSdkVersion 21
-        targetSdkVersion 32
+        targetSdkVersion rootProject.ext.version_android_target_sdk
         versionCode 1
         versionName "1.0"
 

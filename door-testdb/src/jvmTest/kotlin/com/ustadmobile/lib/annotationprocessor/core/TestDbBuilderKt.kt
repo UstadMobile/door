@@ -1,6 +1,9 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
 import com.ustadmobile.door.DatabaseBuilder
+import com.ustadmobile.door.DoorDatabaseCallback
+import com.ustadmobile.door.DoorDatabaseCallbackStatementList
+import com.ustadmobile.door.DoorSqlDatabase
 import db2.ExampleDatabase2
 import db2.ExampleEntity2
 import db2.ExampleLinkEntity
@@ -25,7 +28,17 @@ class TestDbBuilderKt {
 
     @Before
     fun openAndClearDb() {
-        exampleDb2 = DatabaseBuilder.databaseBuilder( ExampleDatabase2::class, "jdbc:sqlite::memory:").build()
+        exampleDb2 = DatabaseBuilder.databaseBuilder( ExampleDatabase2::class, "jdbc:sqlite::memory:")
+            .addCallback(object: DoorDatabaseCallbackStatementList {
+                override fun onOpen(db: DoorSqlDatabase): List<String> {
+                    return listOf()
+                }
+
+                override fun onCreate(db: DoorSqlDatabase): List<String> {
+                    return listOf("UPDATE ExampleEntity2 SET someNumber = someNumber + 1")
+                }
+            })
+            .build()
         exampleDb2.clearAllTables()
     }
 

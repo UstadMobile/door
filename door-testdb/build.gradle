@@ -10,18 +10,13 @@ plugins {
 group rootProject.group
 version rootProject.version
 
-repositories {
-    mavenCentral()
-    mavenLocal()
-}
-
 
 android {
-    compileSdkVersion 32
+    compileSdkVersion rootProject.ext.version_android_compile_sdk
     sourceSets.main.manifest.srcFile('src/androidMain/AndroidManifest.xml')
     defaultConfig {
         minSdkVersion 21
-        targetSdkVersion 32
+        targetSdkVersion rootProject.ext.version_android_target_sdk
     }
 
     compileOptions {
