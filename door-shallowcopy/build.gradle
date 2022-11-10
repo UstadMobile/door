@@ -1,0 +1,60 @@
+
+plugins {
+    id 'org.jetbrains.kotlin.jvm'
+    id 'kotlinx-atomicfu'
+    id 'org.jetbrains.kotlin.plugin.serialization'
+    id 'maven-publish'
+}
+
+group rootProject.group
+version rootProject.version
+
+
+repositories {
+    mavenCentral()
+}
+
+sourceCompatibility = "1.8"
+targetCompatibility = "1.8"
+
+compileKotlin{
+    kotlinOptions.jvmTarget = "1.8"
+    kotlinOptions {
+        freeCompilerArgs += "-Xopt-in=com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview"
+    }
+}
+
+compileTestKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+    kotlinOptions {
+        freeCompilerArgs += "-Xopt-in=com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview"
+    }
+}
+
+
+dependencies {
+    implementation project(":door-runtime")
+    implementation "com.squareup:kotlinpoet:$version_kotlinpoet"
+    implementation "com.squareup:kotlinpoet-ksp:$version_kotlinpoet"
+    implementation "com.squareup:kotlinpoet-metadata:$version_kotlinpoet"
+    implementation "com.google.devtools.ksp:symbol-processing-api:$version_kotlin-$ksp_version"
+
+    implementation "org.jetbrains.kotlin:kotlin-stdlib"
+}
+
+publishing {
+
+    publications {
+        maven(MavenPublication) {
+            artifactId = project.name
+
+            from components.java
+        }
+    }
+
+    repositories {
+        maven {
+            url rootProject.ext.localProperties["repo.dir"]
+        }
+    }
+}

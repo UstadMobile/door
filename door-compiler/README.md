@@ -4,11 +4,6 @@ Run a task that runs the annotation processor (e.g. door-testdb:jvmJar) and add 
 --no-daemon -Dorg.gradle.debug=true . Then attach the debugger (In IntelliJ: Run, edit configurations,
 Add Remote JVM Debug with port 5005)
 
-KAPT:
-```
-./gradlew --no-daemon -Dorg.gradle.debug=true build door-testdb:jvmJar
-```
-
 KSP:
 ```
 ./gradlew -Dorg.gradle.debug=true -Dkotlin.compiler.execution.strategy=in-process door-testdb:jvmJar

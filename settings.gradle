@@ -14,4 +14,5 @@ include 'app-testdb'
 include ':test-app-android'
 include 'door-testdb-server'
 include 'door-annotations'
+include 'door-shallowcopy'
 
