@@ -66,7 +66,7 @@ class ShallowCopyProcessor(
 
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        val classesToCopy = resolver.getSymbolsWithAnnotation("com.ustadmobile.door.annotation.ShallowCopy")
+        val classesToCopy = resolver.getSymbolsWithAnnotation("com.ustadmobile.door.annotation.ShallowCopyable")
             .filterIsInstance<KSClassDeclaration>()
 
         classesToCopy.forEach {  classDecl ->
