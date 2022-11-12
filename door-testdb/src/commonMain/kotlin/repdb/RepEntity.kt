@@ -8,7 +8,6 @@ import kotlinx.serialization.Serializable
 import repdb.RepEntity.Companion.TABLE_ID
 
 @Serializable
-@ShallowCopyable
 @Entity
 @ReplicateEntity(tableId = TABLE_ID, tracker = RepEntityTracker::class)
 @Triggers(arrayOf(

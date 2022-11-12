@@ -23,6 +23,6 @@ package com.ustadmobile.door.annotation
  *
  * @param functionName
  */
-@Target(AnnotationTarget.CLASS)
+@Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.BINARY)
-annotation class ShallowCopyable(val functionName: String = "shallowCopy")
+annotation class ShallowCopy()

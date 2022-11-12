@@ -65,8 +65,6 @@ kotlin {
 
     sourceSets {
         commonMain {
-            kotlin.srcDir("build/generated/ksp/metadata/commonMain/kotlin")
-            
             dependencies {
                 implementation kotlin('stdlib-common')
                 implementation project(":door-runtime")
@@ -153,8 +151,10 @@ ksp {
 
 dependencies {
     kspJvm project(":door-compiler")
+    kspJvm project(":door-shallowcopy")
     kspJs project(":door-compiler")
-    kspCommonMainMetadata project(":door-shallowcopy")
+    kspJs project(":door-shallowcopy")
     kspAndroid project(":door-compiler")
     kspAndroid "androidx.room:room-compiler:$version_android_room"
+    kspAndroid project(":door-shallowcopy")
 }

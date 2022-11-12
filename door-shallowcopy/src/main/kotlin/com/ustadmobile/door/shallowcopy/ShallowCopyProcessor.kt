@@ -1,33 +1,33 @@
 package com.ustadmobile.door.shallowcopy
 
-import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.getAllSuperTypes
-import com.google.devtools.ksp.getAnnotationsByType
+import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.squareup.kotlinpoet.CodeBlock
-import com.squareup.kotlinpoet.FileSpec
-import com.squareup.kotlinpoet.FunSpec
-import com.squareup.kotlinpoet.ParameterSpec
+import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ksp.toClassName
-import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.writeTo
 import com.squareup.kotlinpoet.ksp.addOriginatingKSFile
-import com.ustadmobile.door.annotation.ShallowCopyable
 
 
-@OptIn(KspExperimental::class)
 fun FileSpec.Builder.addShallowCopyFunction(
-    classDecl: KSClassDeclaration,
+    funDeclaration: KSFunctionDeclaration,
+    logger: KSPLogger
 ): FileSpec.Builder{
+    val classDecl = funDeclaration.extensionReceiver?.resolve()?.declaration as? KSClassDeclaration
+    if(classDecl == null){
+        logger.error("@ShallowCopy function: cannot resolve receiver type", funDeclaration)
+        return this
+    }
+
     val classProps = classDecl.getAllProperties()
-    val annotation = classDecl.getAnnotationsByType(ShallowCopyable::class).first()
 
     addFunction(
-        FunSpec.builder(annotation.functionName)
+        FunSpec.builder(funDeclaration.simpleName.asString())
             .apply {
                 classDecl.containingFile?.also { addOriginatingKSFile(it) }
                 classDecl.getAllSuperTypes().forEach {
@@ -36,20 +36,12 @@ fun FileSpec.Builder.addShallowCopyFunction(
             }
             .receiver(classDecl.toClassName())
             .returns(classDecl.toClassName())
-            .apply {
-                classProps.filter { it.isMutable }.forEach { prop ->
-                    addParameter(
-                        ParameterSpec.builder(prop.simpleName.asString(), prop.type.toTypeName())
-                            .defaultValue(CodeBlock.of("this.${prop.simpleName.asString()}"))
-                        .build()
-                    )
-                }
-            }
+            .addModifiers(KModifier.ACTUAL)
             .addCode(CodeBlock.builder()
-                .beginControlFlow("return %T().apply", classDecl.toClassName())
+                .beginControlFlow("return %T().also", classDecl.toClassName())
                 .apply {
                     classProps.filter { it.isMutable }.forEach { prop ->
-                        add("this.${prop.simpleName.asString()} = ${prop.simpleName.asString()}\n")
+                        add("it.${prop.simpleName.asString()} = this.${prop.simpleName.asString()}\n")
                     }
                 }
                 .endControlFlow()
@@ -66,12 +58,14 @@ class ShallowCopyProcessor(
 
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        val classesToCopy = resolver.getSymbolsWithAnnotation("com.ustadmobile.door.annotation.ShallowCopyable")
-            .filterIsInstance<KSClassDeclaration>()
+        val shallowCopyFunctions = resolver.getSymbolsWithAnnotation("com.ustadmobile.door.annotation.ShallowCopy")
+            .filterIsInstance<KSFunctionDeclaration>()
 
-        classesToCopy.forEach {  classDecl ->
-            FileSpec.builder(classDecl.packageName.asString(), "${classDecl.simpleName.asString()}ShallowCopy")
-                .addShallowCopyFunction(classDecl)
+        shallowCopyFunctions.forEach {  funDeclaration ->
+            val receiveClassDecl = funDeclaration.extensionReceiver?.resolve()?.declaration as? KSClassDeclaration
+
+            FileSpec.builder(funDeclaration.packageName.asString(), "${receiveClassDecl?.simpleName?.asString()}ShallowCopy")
+                .addShallowCopyFunction(funDeclaration, environment.logger)
                 .build()
                 .writeTo(environment.codeGenerator, false)
         }
