@@ -26,6 +26,8 @@ fun FileSpec.Builder.addShallowCopyFunction(
 
     val classProps = classDecl.getAllProperties()
 
+    val hasBlockParam = funDeclaration.parameters.isNotEmpty()
+
     addFunction(
         FunSpec.builder(funDeclaration.simpleName.asString())
             .apply {
@@ -37,12 +39,21 @@ fun FileSpec.Builder.addShallowCopyFunction(
             .receiver(classDecl.toClassName())
             .returns(classDecl.toClassName())
             .addModifiers(KModifier.ACTUAL)
+            .apply {
+                if(hasBlockParam) {
+                    addParameter("block", LambdaTypeName.get(receiver = classDecl.toClassName(),
+                        parameters = emptyList(), returnType = UNIT))
+                }
+            }
             .addCode(CodeBlock.builder()
                 .beginControlFlow("return %T().also", classDecl.toClassName())
                 .apply {
                     classProps.filter { it.isMutable }.forEach { prop ->
                         add("it.${prop.simpleName.asString()} = this.${prop.simpleName.asString()}\n")
                     }
+
+                    if(hasBlockParam)
+                        add("block(it)\n")
                 }
                 .endControlFlow()
                 .build())
