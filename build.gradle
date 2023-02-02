@@ -27,7 +27,7 @@ plugins {
 
 
 group 'com.github.UstadMobile.door'
-version '0.0.63l'
+version '0.0.63m'
 
 ext.localProperties = new Properties()
 
