@@ -32,7 +32,6 @@ import com.ustadmobile.door.util.DeleteZombieAttachmentsListener
 import kotlinx.coroutines.GlobalScope
 import kotlin.reflect.KClass
 import com.ustadmobile.door.util.NodeIdAuthCache
-import com.ustadmobile.door.util.TransactionDepthCounter
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.MEMBERNAME_EXEC_UPDATE_ASYNC
 import com.ustadmobile.lib.annotationprocessor.core.DoorJdbcProcessor.Companion.SUFFIX_JDBC_KT2
 import com.ustadmobile.lib.annotationprocessor.core.DoorJdbcProcessor.Companion.SUFFIX_JS_IMPLEMENTATION_CLASSES
@@ -1210,6 +1209,9 @@ fun TypeSpec.Builder.addDaoQueryFunction(
         .removeAbstractModifier()
         .removeAnnotations()
         .addModifiers(KModifier.OVERRIDE)
+        .applyIf(daoFun.returnType?.isPagingSource() == true) {
+            addCode("TODO(%S)", "Not yet supported on JVM/JS")
+        }
         .applyIf(daoFun.returnType?.isDataSourceFactory() == true) {
             val resultComponentType = resultType.unwrapComponentTypeIfListOrArray(resolver)
             val dataSourceQueryVarsMap = queryVarsMap + mapOf("_offset" to resolver.builtIns.intType,
@@ -1279,7 +1281,7 @@ fun TypeSpec.Builder.addDaoQueryFunction(
                 .addJdbcQueryCode(daoFunDecl, daoDecl, queryVarsMap, resolver)
                 .endControlFlow()
                 .build())
-        }.applyIf(daoFun.returnType?.isDataSourceFactoryOrLiveDataOrFlow() != true) {
+        }.applyIf(daoFun.returnType?.isPagingSourceOrDataSourceFactoryOrLiveDataOrFlow() != true) {
             if(daoFun.hasReturnType(resolver))
                 addCode("return ")
             addCode(CodeBlock.builder()

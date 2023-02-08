@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Update
 import com.ustadmobile.door.annotation.*
 import com.ustadmobile.door.entities.DoorNode
+import com.ustadmobile.door.paging.PagingSource
 import kotlinx.coroutines.flow.Flow
 
 @DoorDao
@@ -171,5 +172,12 @@ expect interface RepDao: RepDaoInterface<RepEntity> {
         SELECT * FROM RepEntity
     """)
     fun findAllAsFlow(): Flow<List<RepEntity>>
+
+
+    @Query("""
+        SELECT * FROM RepEntity
+    """)
+    fun findAllPaged(): PagingSource<Int, RepEntity>
+
 
 }

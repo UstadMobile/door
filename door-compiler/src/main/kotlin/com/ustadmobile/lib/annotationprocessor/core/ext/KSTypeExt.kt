@@ -178,9 +178,11 @@ fun KSType.isIntArray(): Boolean {
 
 fun KSType.isDataSourceFactory() = declaration.isDataSourceFactory()
 
+fun KSType.isPagingSource() = declaration.isPagingSource()
+
 fun KSType.isLiveData() = declaration.isLiveData()
 
-fun KSType.isDataSourceFactoryOrLiveDataOrFlow() = declaration.isDataSourceFactoryOrLiveDataOrFlow()
+fun KSType.isPagingSourceOrDataSourceFactoryOrLiveDataOrFlow() = declaration.isPagingSourceOrDataSourceFactoryOrLiveDataOrFlow()
 
 fun KSType.isFlow() = declaration.isFlow()
 
