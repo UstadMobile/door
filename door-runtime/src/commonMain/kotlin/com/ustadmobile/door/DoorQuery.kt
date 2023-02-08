@@ -2,8 +2,8 @@ package com.ustadmobile.door
 
 expect interface DoorQuery {
 
-    fun getSql(): String
+    val sql: String
 
-    fun getArgCount(): Int
+    val argCount: Int
 
 }

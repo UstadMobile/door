@@ -549,10 +549,13 @@ fun FileSpec.Builder.addJdbcDbImplType(
             .build())
         .addCreateAllTablesFunction(dbKSClass, resolver)
         .addClearAllTablesFunction(dbKSClass, target)
-        .addFunction(FunSpec.builder("getInvalidationTracker")
-            .addModifiers(KModifier.OVERRIDE)
-            .returns(InvalidationTracker::class)
-            .addCode("return jdbcImplHelper.invalidationTracker\n")
+        .addProperty(PropertySpec.builder("invalidationTracker", InvalidationTracker::class,
+                    KModifier.OVERRIDE)
+            .getter(FunSpec
+                .getterBuilder()
+                .addCode("return jdbcImplHelper.invalidationTracker\n")
+                .build()
+            )
             .build())
         .apply {
             dbKSClass.allDbClassDaoGetters().forEach { daoGetterOrProp ->
@@ -1225,7 +1228,7 @@ fun TypeSpec.Builder.addDaoQueryFunction(
                                 .applyIf(rawQueryParamName != null) {
                                     add("val $rawQueryParamName = $rawQueryParamName.%M(\n",
                                         MemberName("com.ustadmobile.door.ext", "copyWithExtraParams"))
-                                    add("sql = \"SELECT * FROM (\${$rawQueryParamName.getSql()}) LIMIT ? OFFSET ?\",\n")
+                                    add("sql = \"SELECT * FROM (\${$rawQueryParamName.sql}) LIMIT ? OFFSET ?\",\n")
                                     add("extraParams = arrayOf(_limit, _offset))\n")
                                 }
                                 .add("return ")
@@ -1244,7 +1247,7 @@ fun TypeSpec.Builder.addDaoQueryFunction(
                                 .applyIf(rawQueryParamName != null) {
                                     add("val $rawQueryParamName = $rawQueryParamName.%M(\n",
                                         MemberName("com.ustadmobile.door.ext", "copy"))
-                                    add("sql = \"SELECT COUNT(*) FROM (\${$rawQueryParamName.getSql()})\")\n")
+                                    add("sql = \"SELECT COUNT(*) FROM (\${$rawQueryParamName.sql})\")\n")
                                 }
                                 .add("return ")
                                 .beginControlFlow("%T(_db, listOf(%L)) ",
@@ -1424,7 +1427,7 @@ fun CodeBlock.Builder.addPreparedStatementConfig(
 
         add(")")
     }else {
-        add("%T($rawQueryVarName.getSql(), hasListParams = $rawQueryVarName.%M())\n",
+        add("%T($rawQueryVarName.sql, hasListParams = $rawQueryVarName.%M())\n",
             PreparedStatementConfig::class, MemberName("com.ustadmobile.door.ext", "hasListOrArrayParams"))
     }
     return this

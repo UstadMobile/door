@@ -7,9 +7,8 @@ actual abstract class RoomDatabase actual constructor() {
 
     actual abstract fun clearAllTables()
 
-    actual open fun getInvalidationTracker(): InvalidationTracker {
-        TODO("getInvalidationTracker: maybe override this in the generated version")
-    }
+    actual open val invalidationTracker: InvalidationTracker
+        get() = TODO("getInvalidationTracker: maybe override this in the generated version")
 
     abstract fun createAllTables(): List<String>
 

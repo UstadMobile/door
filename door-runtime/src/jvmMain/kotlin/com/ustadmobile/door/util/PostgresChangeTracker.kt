@@ -41,7 +41,7 @@ class PostgresChangeTracker(
                         val notifications = pgConnection.notifications
                         if(notifications.isNotEmpty()) {
                             val tablesChanged = notifications.map { it.parameter }
-                            (jdbcDatabase as RoomDatabase).getInvalidationTracker().onTablesInvalidated(tablesChanged.toSet())
+                            (jdbcDatabase as RoomDatabase).invalidationTracker.onTablesInvalidated(tablesChanged.toSet())
                         }
                         delay(20)
                     }

@@ -134,7 +134,7 @@ class TestDbBuilder {
 
         val completableDeferred = CompletableDeferred<Boolean>()
 
-        repDb.getInvalidationTracker().addObserver(object: InvalidationTrackerObserver(arrayOf("RepEntity")) {
+        repDb.invalidationTracker.addObserver(object: InvalidationTrackerObserver(arrayOf("RepEntity")) {
             override fun onInvalidated(tables: Set<String>) {
                 if("RepEntity" in tables)
                     completableDeferred.complete(true)

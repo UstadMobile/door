@@ -78,7 +78,7 @@ class TestWithDoorTransaction {
         }
 
         invalidationObserver = spy(realInvalidationObserver)
-        db.getInvalidationTracker().addObserver(invalidationObserver)
+        db.invalidationTracker.addObserver(invalidationObserver)
     }
 
     private fun assertInvocationCounts() {

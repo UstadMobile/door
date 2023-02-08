@@ -35,6 +35,7 @@ android {
             consumerProguardFiles 'proguard-rules.pro'
         }
     }
+    namespace 'com.ustadmobile.door.testdb'
 }
 
 kotlin {

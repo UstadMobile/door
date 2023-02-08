@@ -6,9 +6,9 @@ import com.ustadmobile.door.jdbc.PreparedStatement
 
 actual interface DoorQuery {
 
-    actual fun getSql(): String
+    actual val sql: String
 
-    actual fun getArgCount(): Int
+    actual val argCount: Int
 
     val values: Array<out Any?>?
 

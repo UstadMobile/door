@@ -4,6 +4,6 @@ expect abstract class RoomDatabase() {
 
     abstract fun clearAllTables()
 
-    open fun getInvalidationTracker(): InvalidationTracker
+    open val invalidationTracker: InvalidationTracker
 
 }

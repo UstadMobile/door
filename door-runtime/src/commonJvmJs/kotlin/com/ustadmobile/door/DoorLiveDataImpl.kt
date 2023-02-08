@@ -20,13 +20,13 @@ class LiveDataImpl<T : Any?>(
 
     override fun onActive() {
         super.onActive()
-        db.getInvalidationTracker().addObserver(observer)
+        db.invalidationTracker.addObserver(observer)
         update()
     }
 
     override fun onInactive() {
         super.onInactive()
-        db.getInvalidationTracker().removeObserver(observer)
+        db.invalidationTracker.removeObserver(observer)
     }
 
     internal fun update() {

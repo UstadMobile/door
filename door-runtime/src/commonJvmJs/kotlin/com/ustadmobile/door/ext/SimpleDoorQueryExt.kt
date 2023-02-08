@@ -4,7 +4,7 @@ import com.ustadmobile.door.DoorQuery
 import com.ustadmobile.door.SimpleDoorQuery
 
 fun DoorQuery.copyWithExtraParams(
-    sql: String = getSql(),
+    sql: String = this.sql,
     extraParams: Array<out Any?> = arrayOf()
 ) : DoorQuery {
     val existingParams: Array<out Any?> = (this as? SimpleDoorQuery)?.values

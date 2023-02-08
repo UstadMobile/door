@@ -8,7 +8,7 @@ import java.util.concurrent.atomic.AtomicInteger
 /**
  * This is a PagedList.boundaryCallback that automatically calls a given LoadHelper to load more data.
  */
-class RepositoryBoundaryCallback<T>(val loadHelper: RepositoryLoadHelper<List<T>>): PagedList.BoundaryCallback<T>() {
+class RepositoryBoundaryCallback<T : Any>(val loadHelper: RepositoryLoadHelper<List<T>>): PagedList.BoundaryCallback<T>() {
 
     val loadCount = AtomicInteger()
 

@@ -280,11 +280,11 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
                 .build())
             .applyIf(target == DoorTarget.ANDROID) {
                 addRoomDatabaseCreateOpenHelperFunction()
-                addRoomCreateInvalidationTrackerFunction()
-                addOverrideGetRoomInvalidationTracker("_db")
+                addRoomCreateInvalidationTrackerFunction("_db")
+                addOverrideInvalidationTracker("_db")
             }
             .applyIf(target != DoorTarget.ANDROID) {
-                addOverrideGetInvalidationTracker("_db")
+                addOverrideInvalidationTracker("_db")
             }
 
             .build()

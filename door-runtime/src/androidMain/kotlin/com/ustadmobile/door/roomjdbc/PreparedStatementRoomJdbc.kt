@@ -43,7 +43,7 @@ class PreparedStatementRoomJdbc(
         numArgs = max(numArgs, paramCount)
     }
 
-    override fun getSql(): String = querySql
+    override val sql: String = querySql
 
     override fun bindTo(statement: SupportSQLiteProgram) {
         for(index in 0 until numArgs) {
@@ -52,8 +52,9 @@ class PreparedStatementRoomJdbc(
                 LONG -> statement.bindLong(index + 1, boundLongs[index]!!)
                 DOUBLE -> statement.bindDouble(index + 1, boundDoubles[index]!!)
                 STRING -> {
-                    if(boundStrings[index] != null) {
-                        statement.bindString(index + 1, boundStrings[index])
+                    val bindString = boundStrings[index]
+                    if(bindString != null) {
+                        statement.bindString(index + 1, bindString)
                     }else {
                         statement.bindNull(index + 1)
                     }
@@ -67,7 +68,7 @@ class PreparedStatementRoomJdbc(
             compiledStmt.close()
     }
 
-    override fun getArgCount(): Int = numArgs
+    override val argCount: Int = numArgs
 
     override fun executeQuery(): ResultSet {
         return ResultSetRoomJdbc(roomConnection.roomDb.query(this), this)

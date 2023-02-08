@@ -30,7 +30,7 @@ fun <T> RoomDatabase.doorFlow(
         }
     }
 
-    getInvalidationTracker().addObserver(invalidationTrackerObserver)
+    invalidationTracker.addObserver(invalidationTrackerObserver)
     invalidationEventChannel.trySend(true)
 
     try {

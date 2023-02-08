@@ -39,7 +39,7 @@ class ReplicationNotificationDispatcher(
     private val eventCollator = DoorEventCollator(200, coroutineScope, this::onDispatch)
 
     init {
-        db.getInvalidationTracker().addObserver(this)
+        db.invalidationTracker.addObserver(this)
         coroutineScope.launch {
             val pendingChangeLogs = db.findDistinctPendingChangeLogs()
             Napier.d("ReplicationNotificationDispatcher for [$db] startup: found ${pendingChangeLogs.size} ChangeLogs to" +

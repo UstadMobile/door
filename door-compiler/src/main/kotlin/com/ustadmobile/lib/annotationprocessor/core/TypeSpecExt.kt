@@ -120,35 +120,24 @@ fun TypeSpec.Builder.addRoomDatabaseCreateOpenHelperFunction() : TypeSpec.Builde
  * Add an override for the room database createInvalidationTracker which is required for any
  * child class of the database on Android
  */
-fun TypeSpec.Builder.addRoomCreateInvalidationTrackerFunction() : TypeSpec.Builder {
+fun TypeSpec.Builder.addRoomCreateInvalidationTrackerFunction(realDbVarName: String) : TypeSpec.Builder {
     addFunction(FunSpec.builder("createInvalidationTracker")
             .returns(ClassName("androidx.room", "InvalidationTracker"))
             .addModifiers(KModifier.OVERRIDE, KModifier.PROTECTED)
-            .addCode("return %T.createDummyInvalidationTracker(this)\n",
-                    ClassName("com.ustadmobile.door","DummyInvalidationTracker"))
+            .addCode("return $realDbVarName.invalidationTracker\n")
             .build())
 
     return this
 }
 
-/**
- * If code actually wants to use the invalidation tracker, it should use the real database invalidation tracker, not
- * a dummy.
- */
-fun TypeSpec.Builder.addOverrideGetRoomInvalidationTracker(realDbVarName: String) : TypeSpec.Builder {
-    addFunction(FunSpec.builder("getInvalidationTracker")
-        .returns(ClassName("androidx.room", "InvalidationTracker"))
-        .addModifiers(KModifier.OVERRIDE)
-        .addCode("return $realDbVarName.getInvalidationTracker()\n")
-        .build())
-    return this
-}
-
-fun TypeSpec.Builder.addOverrideGetInvalidationTracker(realDbVarName: String) : TypeSpec.Builder {
-    addFunction(FunSpec.builder("getInvalidationTracker")
-        .returns(InvalidationTracker::class)
-        .addModifiers(KModifier.OVERRIDE)
-        .addCode("return $realDbVarName.getInvalidationTracker()\n")
+fun TypeSpec.Builder.addOverrideInvalidationTracker(realDbVarName: String) : TypeSpec.Builder {
+    addProperty(PropertySpec.builder("invalidationTracker", InvalidationTracker::class,
+            KModifier.OVERRIDE)
+        .getter(FunSpec
+            .getterBuilder()
+            .addCode("return $realDbVarName.invalidationTracker\n")
+            .build()
+        )
         .build())
 
     return this

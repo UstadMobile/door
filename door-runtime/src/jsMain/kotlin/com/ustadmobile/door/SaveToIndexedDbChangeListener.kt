@@ -31,7 +31,7 @@ class SaveToIndexedDbChangeListener(
                 eventCollator.receiveEvent(tables.toList())
             }
         }
-        database.getInvalidationTracker().addObserver(changeListenerRequest)
+        database.invalidationTracker.addObserver(changeListenerRequest)
     }
 
 }

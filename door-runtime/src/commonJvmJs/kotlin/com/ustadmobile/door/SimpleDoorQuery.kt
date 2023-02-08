@@ -7,14 +7,13 @@ import com.ustadmobile.door.jdbc.PreparedStatement
 import com.ustadmobile.door.ext.isArray
 import kotlin.reflect.KClass
 
-actual class SimpleDoorQuery actual constructor(private val sql: String, override val values: Array<out Any?>?) : DoorQuery {
+actual class SimpleDoorQuery actual constructor(
+    override val sql: String,
+    override val values: Array<out Any?>?
+) : DoorQuery {
 
-
-    override fun getSql() = sql
-
-    override fun getArgCount(): Int {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-    }
+    override val argCount: Int
+        get() = TODO("Not yet implemented")
 
 
     //Cast is here to be clear about jdbc array vs. normal array

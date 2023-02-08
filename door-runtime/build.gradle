@@ -38,6 +38,7 @@ android {
             consumerProguardFiles 'proguard-rules.pro'
         }
     }
+    namespace 'com.ustadmobile.door.runtime'
 }
 
 kotlin {

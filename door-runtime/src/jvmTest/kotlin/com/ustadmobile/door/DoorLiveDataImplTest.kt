@@ -20,7 +20,7 @@ class LiveDataImplTest {
         val mockInvalidationTracker = mock<InvalidationTracker>()
         val mockDb = mock<RoomDatabase> {
             on {
-                getInvalidationTracker()
+                invalidationTracker
             }.thenReturn(mockInvalidationTracker)
         }
 
@@ -44,7 +44,7 @@ class LiveDataImplTest {
     fun givenEmptyLiveData_whenInactive_shouldRemoveChangeListener() {
         val mockInvalidationTracker = mock<InvalidationTracker>()
         val mockDb = mock<RoomDatabase>() {
-            on { getInvalidationTracker() }.thenReturn(mockInvalidationTracker)
+            on { invalidationTracker }.thenReturn(mockInvalidationTracker)
         }
         val fetchFnCount = AtomicInteger()
         val liveDataJdbc = LiveDataImpl<Int>(mockDb, listOf("magic")) {

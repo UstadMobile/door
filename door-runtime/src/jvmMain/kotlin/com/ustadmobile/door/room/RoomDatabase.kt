@@ -14,9 +14,8 @@ actual abstract class RoomDatabase actual constructor() {
 
     abstract val dbVersion: Int
 
-    actual open fun getInvalidationTracker(): InvalidationTracker {
-        TODO("getInvalidationTracker: maybe override this in the generated version")
-    }
+    actual open val invalidationTracker: InvalidationTracker
+        get() = throw IllegalAccessError("getInvalidationTracker: maybe override this in the generated version")
 
     open fun runInTransaction(runnable: Runnable) {
         runnable.run()

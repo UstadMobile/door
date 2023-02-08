@@ -8,6 +8,6 @@ import androidx.paging.DataSource
  */
 interface DoorBoundaryCallbackProvider {
 
-    fun <T> getBoundaryCallback(dataSource: DataSource.Factory<Int, T>): RepositoryBoundaryCallback<T>?
+    fun <T:Any> getBoundaryCallback(dataSource: DataSource.Factory<Int, T>): RepositoryBoundaryCallback<T>?
 
 }

@@ -14,7 +14,7 @@ import com.ustadmobile.door.RepositoryLoadHelper
  * BoundaryCallback so that items are loaded automatically. It will also wrap the live data using
  * the loadHelper so that the LoadHelper can detect if data is being actively observed.
  */
-fun <T> DataSource.Factory<Int, T>.asRepositoryLiveData(dao: Any) : LiveData<PagedList<T>> {
+fun <T:Any> DataSource.Factory<Int, T>.asRepositoryLiveData(dao: Any) : LiveData<PagedList<T>> {
     val boundaryCallback = (dao as? DoorBoundaryCallbackProvider)?.getBoundaryCallback(this)
     val pagedListBuilder = LivePagedListBuilder(this, 20)
 

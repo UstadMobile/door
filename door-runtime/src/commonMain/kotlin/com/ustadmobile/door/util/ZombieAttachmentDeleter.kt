@@ -28,12 +28,12 @@ class DeleteZombieAttachmentsListener(
 
     init {
         if(db::class.doorDatabaseMetadata().hasAttachments) {
-            db.getInvalidationTracker().addObserver(invalidationObserver)
+            db.invalidationTracker.addObserver(invalidationObserver)
         }
     }
 
     fun close() {
-        db.getInvalidationTracker().removeObserver(invalidationObserver)
+        db.invalidationTracker.removeObserver(invalidationObserver)
     }
 
 

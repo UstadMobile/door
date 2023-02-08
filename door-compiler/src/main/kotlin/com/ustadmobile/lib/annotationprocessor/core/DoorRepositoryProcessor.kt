@@ -1,6 +1,5 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import androidx.room.*
 import com.ustadmobile.door.room.*
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
@@ -10,7 +9,6 @@ import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.addOriginatingKSFile
 import com.squareup.kotlinpoet.ksp.toClassName
-import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.writeTo
 import com.ustadmobile.door.*
 import com.ustadmobile.door.annotation.RepoHttpAccessible
@@ -18,8 +16,6 @@ import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.attachments.EntityWithAttachment
 import com.ustadmobile.door.replication.ReplicationSubscriptionManager
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_ILLEGALSTATEEXCEPTION
-import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.BOUNDARY_CALLBACK_CLASSNAME
-import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.DATASOURCEFACTORY_TO_BOUNDARYCALLBACK_VARNAME
 import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER
 import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.SUFFIX_REPOSITORY2
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
@@ -138,12 +134,12 @@ fun FileSpec.Builder.addDbRepoType(
                     ClassName("kotlin", "IllegalStateException"),
                     "Cannot use a repository to createAllTables!")
                 .build())
-            addOverrideGetInvalidationTracker("_db")
+            addOverrideInvalidationTracker("_db")
             addDbVersionProperty(dbKSClassDeclaration)
         }
         .applyIf(target == DoorTarget.ANDROID) {
-            addRoomCreateInvalidationTrackerFunction()
-            addOverrideGetRoomInvalidationTracker("_db")
+            addRoomCreateInvalidationTrackerFunction("_db")
+            addOverrideInvalidationTracker("_db")
             addRoomDatabaseCreateOpenHelperFunction()
         }
         .apply {
