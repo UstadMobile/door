@@ -3,16 +3,13 @@ package com.ustadmobile.door.testandroid
 import android.content.Context
 import androidx.room.InvalidationTracker
 import androidx.room.Room
-import androidx.room.RoomDatabase
 import androidx.test.core.app.ApplicationProvider
-import androidx.test.platform.app.InstrumentationRegistry
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
 import com.ustadmobile.door.roomjdbc.ConnectionRoomJdbc
 import dbonly.VanillaDatabase
 import dbonly.VanillaEntity
 import kotlinx.coroutines.runBlocking
-import org.junit.Assert
 
 import org.junit.Test
 
@@ -84,7 +81,7 @@ class RoomJdbcTest {
         )
 
         runBlocking {
-            db.withDoorTransactionAsync(VanillaDatabase::class) { txDb ->
+            db.withDoorTransactionAsync { txDb ->
                 txDb.prepareAndUseStatementAsync("INSERT INTO VanillaEntity(vanillaUid, vanillaStr, vanillaNum) VALUES(?, ?, ?)") { stmt ->
                     paramsToInsert.forEach {
                         stmt.setLong(1, it.first)
@@ -126,7 +123,7 @@ class RoomJdbcTest {
         )
 
         runBlocking {
-            db.withDoorTransactionAsync(VanillaDatabase::class) { transactDb ->
+            db.withDoorTransactionAsync { transactDb ->
                 transactDb.prepareAndUseStatementAsync("INSERT INTO VanillaEntity(vanillaUid, vanillaStr, vanillaNum) VALUES(?, ?, ?)") { stmt ->
                     paramsToInsert.forEach {
                         stmt.setLong(1, it.first)
@@ -154,8 +151,8 @@ class RoomJdbcTest {
 
         val invalidatedTables = mutableListOf<String>()
 
-        db.getInvalidationTracker().addObserver(object: InvalidationTracker.Observer(arrayOf("VanillaEntity")) {
-            override fun onInvalidated(tables: MutableSet<String>) {
+        db.invalidationTracker.addObserver(object: InvalidationTracker.Observer(arrayOf("VanillaEntity")) {
+            override fun onInvalidated(tables: Set<String>) {
                 invalidatedTables.addAll(tables)
             }
         })
@@ -168,7 +165,7 @@ class RoomJdbcTest {
             Triple(50L, "Belinda", 21)
         )
 
-        db.withDoorTransaction(VanillaDatabase::class) { transactDb ->
+        db.withDoorTransaction { transactDb ->
             transactDb.prepareAndUseStatement("INSERT INTO VanillaEntity(vanillaUid, vanillaStr, vanillaNum) VALUES(?, ?, ?)") { stmt ->
                 paramsToInsert.forEach {
                     stmt.setLong(1, it.first)
@@ -181,7 +178,7 @@ class RoomJdbcTest {
 
 
         Thread.sleep(2000)
-        Assert.assertTrue(invalidatedTables.isNotEmpty())
+        assertTrue(invalidatedTables.isNotEmpty())
     }
 
 }

@@ -79,7 +79,7 @@ class AttachmentStorageTest {
 
         val latch = CountDownLatch(1)
         val invalidationObserver = object: InvalidationTracker.Observer(arrayOf("ZombieAttachmentData")) {
-            override fun onInvalidated(tables: MutableSet<String>) {
+            override fun onInvalidated(tables: Set<String>) {
                 val zombieAttachmentsCount = repDb.prepareAndUseStatement("SELECT COUNT(*) FROM ZombieAttachmentData") { stmt ->
                     stmt.executeQuery().useResults { results ->
                         results.mapRows { result ->
@@ -92,11 +92,11 @@ class AttachmentStorageTest {
                     latch.countDown()
             }
         }
-        repDb.getInvalidationTracker().addObserver(invalidationObserver)
+        repDb.invalidationTracker.addObserver(invalidationObserver)
 
         latch.await(2000, TimeUnit.MILLISECONDS)
 
-        repDb.getInvalidationTracker().removeObserver(invalidationObserver)
+        repDb.invalidationTracker.removeObserver(invalidationObserver)
 
         Assert.assertFalse("Old file attachment was deleted", firstFileUri.toFile().exists())
     }

@@ -95,13 +95,3 @@ actual fun RoomDatabase.removeIncomingReplicationListener(incomingReplicationLis
 actual val RoomDatabase.incomingReplicationListenerHelper: IncomingReplicationListenerHelper
     get() = (this.rootDatabase as DoorDatabaseJdbc).realIncomingReplicationListenerHelper
 
-actual val RoomDatabase.rootTransactionDatabase: RoomDatabase
-    get() {
-        var db = this
-        while(db !is DoorDatabaseJdbc) {
-            db = db.sourceDatabase
-                ?: throw IllegalStateException("rootTransactionDatabase: cannot find DoorDatabaseJdbc through sourceDatabase")
-        }
-
-        return db
-    }

@@ -1,11 +1,11 @@
 
 buildscript {
 
-    ext.kotlin_version = "1.7.20"
-    ext.atomicfu_version = '0.18.4'
+    ext.kotlin_version = "1.8.10"
+    ext.atomicfu_version = '0.19.0'
     ext.version_shadow = "7.1.2"
     ext.gradle_versions_version = "0.42.0"
-    ext.ksp_version = "1.0.7"
+    ext.ksp_version = "1.0.9"
 
     repositories {
         google()
@@ -27,7 +27,7 @@ plugins {
 
 
 group 'com.github.UstadMobile.door'
-version '0.0.63m'
+version '0.0.63n2'
 
 ext.localProperties = new Properties()
 
@@ -54,49 +54,55 @@ if(System.getenv("DOOR_POSTGRES_PASS") != null) {
 
 
 ext {
-    version_kotlin = "1.7.20"
-    version_coroutines = "1.6.3"
-    version_ktor = "2.1.2"
+    version_kotlin = "1.8.10"
+    version_ktor = "2.2.3"
     version_nanohttpd = "2.3.1"
     version_napier = "2.6.1"
     version_atomicfu = '0.18.4'
-    version_sqlite_jdbc = "3.39.3.0"
-    version_kodein_di = "7.15.0"
-    version_kotlin_mockito = "4.0.0"
-    version_mockwebserver = "4.9.3"
+    version_sqlite_jdbc = "3.40.1.0"
+    version_kodein_di = "7.16.0"
+    version_kotlin_mockito = "4.1.0"
+    version_mockwebserver = "4.10.0"
     version_android_room = "2.5.0"
     version_androidx_lifecycle = "2.5.1"
     version_androidx_paging = "3.1.1"
     version_androidx_core = '1.9.0'
     version_kotlinpoet = "1.12.0"
-    version_jsqlparser = "4.0"
-    version_apache_commons_text = "1.9"
-    version_gson = "2.9.1"
+    version_jsqlparser = "4.5"
+    version_apache_commons_text = "1.10.0"
+    version_gson = "2.10.1"
     version_simple_jndi = "0.23.0"
     version_apache_commons_pool2 = "2.11.1"
     version_sqlite_jdbc = "3.36.0.3"
-    version_postgres_jdbc = "42.5.0"
-    version_apache_commons_dbcp2 = "2.8.0"
-    version_logback = "1.2.11"
+    version_postgres_jdbc = "42.5.3"
+    version_apache_commons_dbcp2 = "2.9.0"
+    version_logback = "1.4.5"
     version_okhttp = "4.10.0"
     version_kotlinx_serialization = "1.4.1"
-    version_androidx_test = "1.4.0"
+    version_androidx_test = "1.4.2"
+    version_androidx_test_orchestrator = "1.4.2"
+    version_androidx_test_runner = "1.5.2"
+    version_androidx_test_rules = "1.5.0"
+    version_androidx_test_junit_ext = "1.1.5"
+    version_espresso = "3.5.1"
+
+
     version_kotlinx_metadata = "0.4.2"
     version_hikaricp = "5.0.1"
-    version_junit = "4.13"
-    version_junit_jupiter = "5.8.2"
+    version_junit = "4.13.2"
+    version_junit_jupiter = "5.9.2"
 
     version_android_compile_sdk = 33
     version_android_target_sdk = 33
 
     version_android_junit_runner = "1.4.0"
-    version_android_appcompat = "1.4.2"
-    version_android_material = "1.6.1"
+    version_android_appcompat = "1.6.1"
+    version_android_material = "1.8.0"
     version_android_constraint_layout = "2.1.4"
 
-    version_kotlin_wrappers_bom = "1.0.0-pre.412"
+    version_kotlin_wrappers_bom = "1.0.0-pre.494"
 
-    version_kotlin_extensions = "1.0.1-pre.412"
+    version_kotlin_extensions = "1.0.1-pre.494"
 
     version_npm_sparkmd5 = "^3.0.2"
 
@@ -107,5 +113,19 @@ allprojects {
         google()
         mavenCentral()
 
+    }
+}
+
+
+//Find stable updates only as per https://github.com/ben-manes/gradle-versions-plugin
+def isNonStable = { String version ->
+    def hasPreReleaseKeywords = ["BETA", "ALPHA", "RC"].any { it -> version.toUpperCase().contains(it)}
+    return hasPreReleaseKeywords
+}
+
+// https://github.com/ben-manes/gradle-versions-plugin
+tasks.named("dependencyUpdates").configure {
+    rejectVersionIf {
+        isNonStable(it.candidate.version)
     }
 }

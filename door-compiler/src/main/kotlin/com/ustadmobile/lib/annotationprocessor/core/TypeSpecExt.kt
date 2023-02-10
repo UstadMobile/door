@@ -7,7 +7,6 @@ import com.squareup.kotlinpoet.ksp.toTypeName
 import com.ustadmobile.door.RepositoryConnectivityListener
 import com.ustadmobile.door.annotation.DoorDatabase
 import com.ustadmobile.door.room.InvalidationTracker
-import javax.lang.model.element.TypeElement
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_ILLEGALSTATEEXCEPTION
 import com.ustadmobile.lib.annotationprocessor.core.ext.getAnnotation
 import com.ustadmobile.lib.annotationprocessor.core.ext.propertyOrReturnType
@@ -78,20 +77,6 @@ internal fun TypeSpec.Builder.addRepositoryHelperDelegateCalls(delegatePropName:
     return this
 }
 
-/**
- * Add a property
- */
-fun TypeSpec.Builder.addDbVersionProperty(dbTypeElement: TypeElement): TypeSpec.Builder {
-    addProperty(PropertySpec.builder("dbVersion", INT)
-            .addModifiers(KModifier.OVERRIDE)
-            .getter(FunSpec.getterBuilder()
-                    .addCode("return ${dbTypeElement.getAnnotation(DoorDatabase::class.java).version}")
-                    .build())
-            .build())
-
-    return this
-}
-
 fun TypeSpec.Builder.addDbVersionProperty(dbClassDecl: KSClassDeclaration): TypeSpec.Builder {
     return addProperty(PropertySpec.builder("dbVersion", INT)
         .addModifiers(KModifier.OVERRIDE)
@@ -120,11 +105,12 @@ fun TypeSpec.Builder.addRoomDatabaseCreateOpenHelperFunction() : TypeSpec.Builde
  * Add an override for the room database createInvalidationTracker which is required for any
  * child class of the database on Android
  */
-fun TypeSpec.Builder.addRoomCreateInvalidationTrackerFunction(realDbVarName: String) : TypeSpec.Builder {
+fun TypeSpec.Builder.addRoomCreateInvalidationTrackerFunction() : TypeSpec.Builder {
     addFunction(FunSpec.builder("createInvalidationTracker")
             .returns(ClassName("androidx.room", "InvalidationTracker"))
             .addModifiers(KModifier.OVERRIDE, KModifier.PROTECTED)
-            .addCode("return $realDbVarName.invalidationTracker\n")
+            .addCode("return %M()\n",
+                MemberName("com.ustadmobile.door.util", "makeDummyInvalidationHandler"))
             .build())
 
     return this

@@ -115,7 +115,9 @@ private val KClass<*>.qualifiedNameBeforeLastUnderscore: String?
  */
 @Suppress("UNCHECKED_CAST")
 actual fun <T: RoomDatabase> T.wrap(dbClass: KClass<T>) : T {
-    val wrapperClass = Class.forName("${dbClass.qualifiedNameBeforeLastUnderscore}${DoorDatabaseReplicateWrapper.SUFFIX}") as Class<T>
+    val wrapperClass = Class.forName(
+        "${dbClass.qualifiedNameBeforeLastUnderscore}${DoorDatabaseReplicateWrapper.SUFFIX}"
+    ) as Class<T>
     return wrapperClass.getConstructor(dbClass.java).newInstance(this)
 }
 

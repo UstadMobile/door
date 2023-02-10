@@ -138,7 +138,7 @@ fun FileSpec.Builder.addDbRepoType(
             addDbVersionProperty(dbKSClassDeclaration)
         }
         .applyIf(target == DoorTarget.ANDROID) {
-            addRoomCreateInvalidationTrackerFunction("_db")
+            addRoomCreateInvalidationTrackerFunction()
             addOverrideInvalidationTracker("_db")
             addRoomDatabaseCreateOpenHelperFunction()
         }

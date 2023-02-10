@@ -182,7 +182,9 @@ fun <T: RoomDatabase> RoomDatabase.isWrappable(dbClass: KClass<T>): Boolean {
  */
 @Suppress("UNCHECKED_CAST")
 actual fun <T: RoomDatabase> T.wrap(dbClass: KClass<T>) : T {
-    val wrapperClass = Class.forName("${dbClass.qualifiedName}${DoorDatabaseReplicateWrapper.SUFFIX}") as Class<T>
+    val wrapperClass = Class.forName(
+        "${dbClass.qualifiedName}${DoorDatabaseReplicateWrapper.SUFFIX}"
+    ) as Class<T>
     return wrapperClass.getConstructor(dbClass.java).newInstance(this)
 }
 
@@ -219,7 +221,4 @@ actual fun RoomDatabase.removeIncomingReplicationListener(incomingReplicationLis
 
 actual val RoomDatabase.incomingReplicationListenerHelper: IncomingReplicationListenerHelper
     get() = doorAndroidRoomHelper.incomingReplicationListenerHelper
-
-actual val RoomDatabase.rootTransactionDatabase: RoomDatabase
-    get() = rootDatabase
 

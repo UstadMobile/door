@@ -15,7 +15,7 @@ repositories {
 
 
 android {
-    compileSdkVersion rootProject.ext.version_android_compile_sdk
+    compileSdk rootProject.ext.version_android_compile_sdk
     sourceSets.main.manifest.srcFile('src/androidMain/AndroidManifest.xml')
     defaultConfig {
         minSdkVersion 21
@@ -25,12 +25,6 @@ android {
     compileOptions {
         sourceCompatibility = '1.8'
         targetCompatibility = '1.8'
-    }
-
-    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile) {
-        kotlinOptions {
-            jvmTarget = "1.8"
-        }
     }
 
     buildTypes {
@@ -60,7 +54,9 @@ kotlin {
             testTask {
                 useKarma {
                     useChromeHeadless()
-                    webpackConfig.cssSupport.enabled = true
+                    /* This is not supported from Kotlin 1.8
+                     * webpackConfig.cssSupport.enabled = true
+                     */
                 }
             }
         }

@@ -15,7 +15,9 @@ kotlin {
         binaries.executable()
         browser {
             commonWebpackConfig {
-                cssSupport.enabled = true
+                /* This is not supported from Kotlin 1.8
+                 * webpackConfig.cssSupport.enabled = true
+                 */
             }
         }
     }

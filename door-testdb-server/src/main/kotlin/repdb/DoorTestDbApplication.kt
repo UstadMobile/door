@@ -4,7 +4,6 @@ import com.ustadmobile.door.DatabaseBuilder
 import com.ustadmobile.door.doortestdbserver.VirtualHostScope
 import com.ustadmobile.door.entities.NodeIdAndAuth
 import com.ustadmobile.door.ext.DoorTag
-import com.ustadmobile.door.ext.bindNewSqliteDataSourceIfNotExisting
 import com.ustadmobile.door.ext.nodeIdAuthCache
 import com.ustadmobile.door.ext.sanitizeDbName
 import com.ustadmobile.door.util.NodeIdAuthCache
@@ -20,8 +19,8 @@ import org.kodein.di.*
 import org.kodein.di.ktor.closestDI
 import org.kodein.di.ktor.di
 import java.nio.file.Files
-import javax.naming.InitialContext
 
+@Suppress("unused") //This is specified by the application.conf file as the module to run
 fun Application.doorTestDbApplication() {
 
     Napier.base(DebugAntilog())
@@ -44,8 +43,8 @@ fun Application.doorTestDbApplication() {
     di {
         bind<RepDb>(tag = DoorTag.TAG_DB) with scoped(VirtualHostScope.Default).singleton {
             val dbHostName = context.sanitizeDbName()
-            InitialContext().bindNewSqliteDataSourceIfNotExisting(dbHostName)
-            DatabaseBuilder.databaseBuilder(RepDb::class, dbHostName, attachmentDir = attachmentDir)
+            DatabaseBuilder.databaseBuilder(RepDb::class, "jdbc:sqlite:build/tmp/${dbHostName}.sqlite",
+                    attachmentDir = attachmentDir)
                 .build().also {
                     it.clearAllTables()
                     it.repDao.insert(RepEntity().apply {
