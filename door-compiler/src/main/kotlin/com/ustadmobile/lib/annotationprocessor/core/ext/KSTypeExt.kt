@@ -8,6 +8,7 @@ import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.CodeBlock
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.jdbc.TypesKmp
+import com.ustadmobile.door.paging.PagingSource
 import kotlinx.coroutines.flow.Flow
 
 fun KSType.unwrapComponentTypeIfListOrArray(
@@ -42,11 +43,13 @@ fun KSType.unwrapResultType(
     if (qualifiedName == LiveData::class.qualifiedName) {
         return this.arguments.first().type?.resolve()
             ?: throw IllegalArgumentException("unwrapLiveDataOrDataSourceFactoryResultType: Cannot resolve LiveData type!")
-    } else if (qualifiedName == DataSourceFactory::class.qualifiedName) {
-        val entityTypeRef = arguments.get(1).type ?: throw IllegalArgumentException("Factory has no type argument")
+    } else if (qualifiedName == DataSourceFactory::class.qualifiedName ||
+        qualifiedName == PagingSource::class.qualifiedName
+    ) {
+        val entityTypeRef = arguments.get(1).type ?: throw IllegalArgumentException("PagingSource/Factory has no type argument")
         return resolver.getClassDeclarationByName(resolver.getKSNameFromString("kotlin.collections.List"))
             ?.asType(listOf(resolver.getTypeArgument(entityTypeRef, Variance.INVARIANT)))
-                ?: throw IllegalArgumentException("unwrapLiveDataOrDataSourceFactoryResultType: could not lookup datasource comp type")
+                ?: throw IllegalArgumentException("unwrapLiveDataOrDataSourceFactoryResultType: could not lookup pagingsource comp type")
     }else if(qualifiedName == Flow::class.qualifiedName) {
         return this.arguments.first().type?.resolve()
             ?: throw IllegalArgumentException("unwrapLiveDataOrDataSourceFactoryResultType: Cannot resolve Flow type!")

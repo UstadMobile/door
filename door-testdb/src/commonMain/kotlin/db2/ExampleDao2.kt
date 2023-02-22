@@ -6,8 +6,10 @@ import com.ustadmobile.door.*
 import com.ustadmobile.door.annotation.DoorDao
 import com.ustadmobile.door.annotation.QueryLiveTables
 import com.ustadmobile.door.paging.DataSourceFactory
+import com.ustadmobile.door.paging.PagingSource
 import kotlinx.coroutines.flow.Flow
 
+@Suppress("unused") //Even if functions here are unused, they are still testing that the generated code compiles
 @DoorDao
 abstract class ExampleDao2 {
 
@@ -181,4 +183,23 @@ abstract class ExampleDao2 {
                 END)
     """)
     abstract fun findWithNullableInt(rewardsNum: Int?): ExampleEntity2?
+
+    @Query("""
+        SELECT * 
+          FROM ExampleEntity2
+         WHERE rewardsCardNumber IS NOT NULL
+           AND rewardsCardNumber >= :minNumber 
+      ORDER BY rewardsCardNumber    
+    """)
+    abstract fun findAllWithRewardNumberAsPagingSource(minNumber: Int): PagingSource<Int, ExampleEntity2>
+
+    @Query("""
+        SELECT * 
+          FROM ExampleEntity2
+         WHERE rewardsCardNumber IS NOT NULL
+           AND rewardsCardNumber >= :minNumber 
+      ORDER BY rewardsCardNumber    
+    """)
+    abstract fun findAllWithRewardNumberAsList(minNumber: Int): List<ExampleEntity2>
+
 }

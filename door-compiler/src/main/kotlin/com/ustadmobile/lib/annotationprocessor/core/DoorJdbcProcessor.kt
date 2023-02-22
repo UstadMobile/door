@@ -23,6 +23,7 @@ import com.ustadmobile.door.entities.ChangeLog
 import com.ustadmobile.door.ext.DoorDatabaseMetadata
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
 import com.ustadmobile.door.ext.minifySql
+import com.ustadmobile.door.paging.DoorLimitOffsetPagingSource
 import com.ustadmobile.door.replication.ReplicationRunOnChangeRunner
 import com.ustadmobile.door.replication.ReplicationEntityMetaData
 import com.ustadmobile.door.replication.ReplicationFieldMetaData
@@ -1210,7 +1211,56 @@ fun TypeSpec.Builder.addDaoQueryFunction(
         .removeAnnotations()
         .addModifiers(KModifier.OVERRIDE)
         .applyIf(daoFun.returnType?.isPagingSource() == true) {
-            addCode("TODO(%S)", "Not yet supported on JVM/JS")
+            val resultComponentType = resultType.unwrapComponentTypeIfListOrArray(resolver)
+            val pagingSourceQueryVarsMap = queryVarsMap + mapOf("_offset" to resolver.builtIns.intType,
+                "_limit" to resolver.builtIns.intType)
+            addCode(CodeBlock.builder()
+                .add("return %L\n",
+                    TypeSpec.anonymousClassBuilder()
+                        .addSuperclassConstructorParameter("_db")
+                        .superclass(DoorLimitOffsetPagingSource::class.asClassName()
+                            .parameterizedBy(resultComponentType.toTypeName()))
+                        .addFunction(FunSpec.builder("loadRows")
+                            .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
+                            .returns(List::class.asTypeName().parameterizedBy(resultComponentType.toTypeName()))
+                            .addParameter("_limit", INT)
+                            .addParameter("_offset", INT)
+                            .addCode(CodeBlock.builder()
+                                .applyIf(rawQueryParamName != null) {
+                                    add("val $rawQueryParamName = $rawQueryParamName.%M(\n",
+                                        MemberName("com.ustadmobile.door.ext", "copyWithExtraParams"))
+                                    add("sql = \"SELECT * FROM (\${$rawQueryParamName.sql}) LIMIT ? OFFSET ?\",\n")
+                                    add("extraParams = arrayOf(_limit, _offset))\n")
+                                }
+                                .add("return ")
+                                .addJdbcQueryCode(daoFunDecl, daoDecl, pagingSourceQueryVarsMap, resolver,
+                                    querySql = querySql?.let { "SELECT * FROM ($it) LIMIT :_limit OFFSET :_offset" })
+                                .build()
+                            )
+                            .build()
+                        )
+                        .addFunction(FunSpec.builder("countRows")
+                            .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
+                            .returns(INT)
+                            .addCode(CodeBlock.builder()
+                                .applyIf(rawQueryParamName != null) {
+                                    add("val $rawQueryParamName = $rawQueryParamName.%M(\n",
+                                        MemberName("com.ustadmobile.door.ext", "copy"))
+                                    add("sql = \"SELECT COUNT(*) FROM (\${$rawQueryParamName.sql})\")\n")
+                                }
+                                .add("return ")
+                                .addJdbcQueryCode(daoFunDecl, daoDecl, queryVarsMap, resolver,
+                                    resultType = resolver.builtIns.intType,
+                                    querySql = querySql?.let { "SELECT COUNT(*) FROM ($querySql) " })
+                                .build()
+                            )
+                            .build()
+                        )
+
+                        .build()
+                )
+                .build()
+            )
         }
         .applyIf(daoFun.returnType?.isDataSourceFactory() == true) {
             val resultComponentType = resultType.unwrapComponentTypeIfListOrArray(resolver)

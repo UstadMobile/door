@@ -1,27 +1,25 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
 import com.ustadmobile.door.DatabaseBuilder
-import com.ustadmobile.door.DoorDatabaseCallback
 import com.ustadmobile.door.DoorDatabaseCallbackStatementList
 import com.ustadmobile.door.DoorSqlDatabase
+import com.ustadmobile.door.paging.LoadParams
+import com.ustadmobile.door.paging.LoadResult
+import com.ustadmobile.door.paging.PagingSource
 import db2.ExampleDatabase2
 import db2.ExampleEntity2
 import db2.ExampleLinkEntity
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.cancellable
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.take
 import org.junit.Assert
 import org.junit.Before
-import org.junit.BeforeClass
 
 import org.junit.Test
-import java.io.File
-import java.lang.reflect.Method
-import java.net.URL
-import java.net.URLClassLoader
 
+/**
+ * These tests run basic insert, update, query functions to ensure that generated implementations do what they are
+ * supposed to do.
+ */
 class TestDbBuilderKt {
 
     lateinit var exampleDb2: ExampleDatabase2
@@ -163,13 +161,14 @@ class TestDbBuilderKt {
 
     @Test
     fun givenOneEntry_whenQueriedAsFlowAndNewEntityInserted_shouldEmitFirstValueThenSecond() {
+        val coroutineScope = CoroutineScope(Dispatchers.Default + Job())
         runBlocking {
-            val entity1 = ExampleEntity2().apply {
+            ExampleEntity2().apply {
                 name = "Bob"
                 uid = exampleDb2.exampleDao2().insertAndReturnId(this)
             }
 
-            val flowJob = GlobalScope.async {
+            val flowJob = coroutineScope.async {
                 exampleDb2.exampleDao2().queryAllAsFlow()
             }
 
@@ -192,6 +191,7 @@ class TestDbBuilderKt {
             Assert.assertEquals("Second result had two entities in list", secondEmission.size, 2)
             flowJob.cancelAndJoin()
         }
+        coroutineScope.cancel()
     }
 
     @Test(expected = NullPointerException::class)
@@ -240,4 +240,51 @@ class TestDbBuilderKt {
         Assert.assertEquals(exampleDb2.exampleDao2().findWithNullableInt(null)?.name,
             "Lenny")
     }
+
+    @Test(timeout = 5000)
+    fun givenPagingSourceParameter_whenQueried_pagingSourceShouldReturnPagedRows() {
+        exampleDb2.exampleDao2().insertList(
+            (0 until 500).map {number ->
+                ExampleEntity2().apply {
+                    name = "Customer_$number"
+                    rewardsCardNumber = number
+                }
+            }
+        )
+
+        val minRewardNum = 20
+
+        val allResultsInList = exampleDb2.exampleDao2().findAllWithRewardNumberAsList(minRewardNum)
+
+        val loadSize = 50
+        val pagingSource: PagingSource<Int, ExampleEntity2> = exampleDb2.exampleDao2()
+            .findAllWithRewardNumberAsPagingSource(minRewardNum)
+
+        val allPages = mutableListOf<LoadResult.Page<Int, ExampleEntity2>>()
+        runBlocking {
+            var loadResultPage: LoadResult.Page<Int, ExampleEntity2>? = null
+            while(loadResultPage == null || loadResultPage.nextKey != null) {
+                val loadParams: LoadParams<Int> = loadResultPage?.let { LoadParams.Append(
+                    it.nextKey ?: 0, loadSize, true)
+                } ?: LoadParams.Refresh(null, loadSize, true)
+                loadResultPage = pagingSource.load(loadParams) as LoadResult.Page<Int, ExampleEntity2>
+                allPages += loadResultPage
+            }
+        }
+
+        val page1 = allPages.first()
+        val page2 = allPages[1]
+
+        Assert.assertEquals("Loaded correct number of items", loadSize, page1.data.size)
+        Assert.assertNull("Previous key for first row is null", page1.prevKey)
+        Assert.assertEquals("Initial reward num should match minRewardNumber",
+            minRewardNum, page1.data.first().rewardsCardNumber)
+
+        Assert.assertEquals("Initial reward num in second list should be minRewardNumber + loadSize",
+            minRewardNum + loadSize, page2.data.first().rewardsCardNumber)
+
+        Assert.assertEquals("When combining all pages, this should be the same as getting it all in one list",
+            allResultsInList, allPages.flatMap { it.data })
+    }
+
 }
