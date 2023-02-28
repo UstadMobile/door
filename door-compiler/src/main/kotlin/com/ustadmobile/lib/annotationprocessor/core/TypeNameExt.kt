@@ -4,7 +4,7 @@ import com.ustadmobile.door.lifecycle.LiveData
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.ustadmobile.door.jdbc.TypesKmp
-
+import kotlinx.coroutines.flow.Flow
 /**
  * Map a Kotlin Type to JDBC Types constant
  */
@@ -21,15 +21,23 @@ fun TypeName.toSqlTypesInt() = when {
     else -> throw IllegalArgumentException("Could not get sqlTypeInt for: $this")
 }
 
-internal fun TypeName.isDataSourceFactory(paramTypeFilter: (List<TypeName>) -> Boolean = {true}): Boolean {
+internal fun TypeName.isDataSourceFactory(): Boolean {
     return this is ParameterizedTypeName
             && this.rawType == com.ustadmobile.door.paging.DataSourceFactory::class.asClassName()
-            && paramTypeFilter(this.typeArguments)
+}
+
+internal fun TypeName.isPagingSource(): Boolean {
+    return this is ParameterizedTypeName
+            && this.rawType == com.ustadmobile.door.paging.PagingSource::class.asClassName()
+}
+
+internal fun TypeName.isFlow(): Boolean {
+    return this is ParameterizedTypeName && this.rawType == Flow::class.asClassName()
 }
 
 
-internal fun TypeName.isDataSourceFactoryOrLiveData() = this is ParameterizedTypeName
-        && (this.isDataSourceFactory() ||  this.rawType == LiveData::class.asClassName())
+internal fun TypeName.isAsynchronousReturnType() = this is ParameterizedTypeName
+        && (isDataSourceFactory() || isPagingSource() || isFlow () || this.rawType == LiveData::class.asClassName())
 
 fun TypeName.isListOrArray() = (this is ClassName && this.canonicalName =="kotlin.Array")
         || (this is ParameterizedTypeName && this.rawType == List::class.asClassName())

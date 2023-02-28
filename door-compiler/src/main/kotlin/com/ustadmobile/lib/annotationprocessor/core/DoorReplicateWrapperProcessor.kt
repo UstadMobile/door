@@ -97,7 +97,7 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(
 
     //If running on JS, non-suspended (sync) version is NOT allowed
     val isSyncFunctionOnJs = doorTarget == DoorTarget.JS && !overridingFunction.isSuspended
-            && (overridingFunction.returnType?.isDataSourceFactoryOrLiveData() == false)
+            && (overridingFunction.returnType?.isAsynchronousReturnType() == false)
 
     val entityParam = overridingFunction.parameters.firstOrNull()
     val entityComponentClassDecl: KSClassDeclaration? =
@@ -112,7 +112,7 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(
             .applyIf(isSyncFunctionOnJs) {
                 if(doorTarget == DoorTarget.JS && !overridingFunction.isSuspended) {
                     add("throw %T(%S)\n", ClassName("kotlin", "IllegalStateException"),
-                        "Synchronous db access is NOT possible on Javascript!")
+                        "${daoFunDeclaration.simpleName.asString()}: synchronous db access is NOT possible on Javascript!")
                 }
             }
             .applyIf(!isSyncFunctionOnJs) {
