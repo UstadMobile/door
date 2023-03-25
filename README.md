@@ -184,6 +184,88 @@ Use Gradle in debug mode e.g.:
 ./gradlew --no-daemon -Dorg.gradle.debug=true build
 ```
 
+## Reactive sync/replication
+
+Door makes it easy to sync data between instances efficiently and selectively.
+Each instance has a node id (a random 64-bit integer). All known nodes are stored
+in the table DoorNode.
+
+Any entity being replicated must have an annotated etag field. The etag must change
+when the underlying data changes. If the field is annotated with @LastModifiedTime, 
+Door will automatically set it to the last modified time when @Insert and @Update 
+functions are used.
+
+```
+@ReplicateEntity(tableId = UNIQUE_TABLE_ID)
+@Entity
+class MyEntity {
+    
+    @PrimaryKey(autoIncrement = true)
+    var primaryKey: Long = 0
+    
+    @EtagField
+    @LastModifiedTime
+    var lastChangedTime: Long = 0
+    
+    var name: String? = null
+    
+}
+```
+
+You can define queries that automatically replicate data to the given destination
+
+```
+@ReplicateQuery(rateLimit = 60000) //Run at most once per minute
+@Query("""
+SELECT primaryKey, lastChangedTime, destNode
+  FROM MyEntity
+       JOIN Subscribers ON ...
+ WHERE Subscriber.alertActive     
+""")
+suspend fun sendAlertsToClients()
+```
+
+That's it! Door will automatically detect changes and replicate anything new to the 
+other nodes you specify as per the destNode.
+
+If you have a database that changes a lot and/or complex conditions that determine 
+which data goes where, then you can rate-limit the query as above.
+
+If you need additionally security checks on entities coming from a remote node etc, you can use insert into a view 
+instead of inserting into the table directly. You can then use a trigger (e.g. INSTEAD OF INSERT) to validate data 
+from the remote node. See example.
+
+If you want to manually tell Door to replicate something, you can simply run:
+```
+db.replicate(tableId, destinationNodeId, primaryKey)
+```
+
+You can also create a trigger (e.g. in database open callbacks):
+
+```
+CREATE TRIGGER send_urgent_alert
+AFTER UPDATE ON MyEntity
+BEGIN
+INSERT INTO OutgoingReplication(tableId, primaryKey, destNode) 
+VALUES(MyEntity.TABLE_ID, MyEntity.primaryKey, destinationNodeId)
+END;
+```
+
+## Automatic REST endpoint generation
+
+Door eliminates the need to manually create boilerplate REST endpoints. If entities are marked with @ReplicateEntity, then Door 
+automatically uses the @Etag field as an ETag over http. Just annotate the query as HttpAccessible
+
+```
+@HttpAccessible
+susped fun findEntityByPrimaryKey(primaryKey: Long): MyEntity?
+```
+
+When you use the automatically generated repository, Door will automatically make a http request. If there is changed
+Data, door will insert it (the same as if the data was received via replication). Results that return a list will use a
+hashed etag based on all etags in the list returned.
+
+
 ## Postgres/SQLite query differentiation
 
 Most of the time SQL that works on SQLite works on Postgres, and vice-versa. But not always. Door provides a few 
@@ -223,7 +305,6 @@ Option 2: Use comment hacks:
 """)
 ```
 
-
 ## Android permissions:
 
 * android.permission.ACCESS_NETWORK_STATE - Used to automatically turn replication on and off when a device is 
@@ -240,6 +321,9 @@ used to compile on non-Android targets.
 code
 * [door-testdb](door-testdb/) Contains a few test databases that are used for unit and integration testing. These 
 databases are compiled by the annotation processor, so tests can verify functionality.
+
+
+
 
 ## Known issues
 
