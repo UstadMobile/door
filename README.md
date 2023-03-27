@@ -184,7 +184,7 @@ Use Gradle in debug mode e.g.:
 ./gradlew --no-daemon -Dorg.gradle.debug=true build
 ```
 
-## Reactive sync/replication
+## Reactive sync/replication (in progress)
 
 Door makes it easy to sync data between instances efficiently and selectively.
 Each instance has a node id (a random 64-bit integer). All known nodes are stored
