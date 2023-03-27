@@ -1,8 +1,14 @@
 package com.ustadmobile.door.paging
 
 import androidx.annotation.IntRange
+import com.ustadmobile.door.ext.concurrentSafeListOf
+import kotlinx.atomicfu.atomic
 
 actual abstract class PagingSource<Key: Any, Value: Any> actual constructor(){
+
+    private val invalidationTrackers: MutableList<() -> Unit> = concurrentSafeListOf()
+
+    private val invalid = atomic(false)
 
     /**
      * Loading API for [PagingSource].
@@ -38,6 +44,22 @@ actual abstract class PagingSource<Key: Any, Value: Any> actual constructor(){
      * to allow [load] decide what default key to use.
      */
     actual abstract fun getRefreshKey(state: PagingState<Key, Value>): Key?
+    actual fun registerInvalidatedCallback(onInvalidatedCallback: () -> Unit) {
+        invalidationTrackers += onInvalidatedCallback
+    }
+
+    actual fun unregisterInvalidatedCallback(onInvalidatedCallback: () -> Unit) {
+        invalidationTrackers -= onInvalidatedCallback
+    }
+
+    actual fun invalidate() {
+        if(!invalid.getAndSet(true)) {
+            invalidationTrackers.forEach {
+                it()
+            }
+        }
+    }
+
 }
 
 actual sealed class LoadResult<Key : Any, Value : Any>  {

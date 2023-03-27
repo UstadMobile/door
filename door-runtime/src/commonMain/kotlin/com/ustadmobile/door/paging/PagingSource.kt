@@ -37,6 +37,12 @@ expect abstract class PagingSource<Key: Any, Value: Any>() {
      * to allow [load] decide what default key to use.
      */
     public abstract fun getRefreshKey(state: PagingState<Key, Value>): Key?
+
+    fun registerInvalidatedCallback(onInvalidatedCallback: () -> Unit)
+
+    fun unregisterInvalidatedCallback(onInvalidatedCallback: () -> Unit)
+
+    fun invalidate()
 }
 
 
