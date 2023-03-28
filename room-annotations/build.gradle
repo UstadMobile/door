@@ -36,7 +36,7 @@ android {
             consumerProguardFiles 'proguard-rules.pro'
         }
     }
-    namespace 'com.ustadmobile.door.annotations'
+    namespace 'com.ustadmobile.door.roomannotations'
 }
 
 kotlin {
@@ -54,7 +54,7 @@ kotlin {
         }
     }
 
-    js(BOTH) {
+    js(IR) {
         browser()
     }
 

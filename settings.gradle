@@ -13,6 +13,6 @@ include 'door-testdb'
 include 'app-testdb'
 include ':test-app-android'
 include 'door-testdb-server'
-include 'door-annotations'
+include 'room-annotations'
 include 'door-shallowcopy'
 

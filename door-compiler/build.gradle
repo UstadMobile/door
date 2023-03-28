@@ -31,7 +31,7 @@ compileTestKotlin {
 
 dependencies {
     implementation project(":door-runtime")
-    implementation project(":door-annotations")
+    implementation project(':room-annotations')
     implementation "org.jetbrains.kotlin:kotlin-stdlib"
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
     implementation "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"

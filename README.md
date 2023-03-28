@@ -71,7 +71,7 @@ kotlin {
             dependencies {
                 //Add Door itself
                 implementation "com.github.UstadMobile.door:door-runtime:$version_door"
-                compileOnly "com.github.UstadMobile.door:door-annotations:$version_door"
+                implementation "com.github.UstadMobile.door:room-annotations:$version_door"
             }
         }
         
@@ -93,6 +93,15 @@ dependencies {
     kspJs "com.github.UstadMobile.door:door-compiler:$version_door"
     kspAndroid "com.github.UstadMobile.door:door-compiler:$version_door"
     kspAndroid "androidx.room:room-compiler:$version_android_room"
+}
+```
+
+On your Android application module (e.g. the one building the APK), you must exclude room-annotations to avoid a
+duplicate class error. This is required due to a Kotlin/JS bug as per this [README](room-annotations/).
+
+```
+configurations.all {
+    exclude group: "com.github.UstadMobile.door", module: "room-annotations"
 }
 ```
 
@@ -314,7 +323,7 @@ Option 2: Use comment hacks:
 
 * [app-testdb](app-testdb/) Contains a test React/JS app. Used to run manual tests that don't seem to work in automated
 JS tests.
-* [door-annotations](door-annotations/) Contains androidx annotations identical to those used in room,
+* [room-annotations](room-annotations/) Contains androidx annotations identical to those used in room,
 used to compile on non-Android targets.
 * [door-compiler](door-compiler/) Contains the actual annotation processor based on Kotlin Poet
 * [door-runtime](door-runtime/) The main runtime module - contains classes and functions used by generated

@@ -45,6 +45,13 @@ android {
     namespace 'com.ustadmobile.door.testandroid'
 }
 
+/*
+ * Excluded as per README for the room-annotations module.
+ */
+configurations.all {
+    exclude module: "room-annotations"
+}
+
 dependencies {
     implementation project(":door-runtime")
     implementation project(":door-testdb")

@@ -49,7 +49,7 @@ kotlin {
         }
     }
 
-    js(BOTH) {
+    js(IR) {
         browser {
             testTask {
                 useKarma {
@@ -68,7 +68,7 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
-                compileOnly project(":door-annotations")
+                implementation project(":room-annotations")
                 implementation kotlin("stdlib-common")
                 implementation "io.ktor:ktor-client-core:$version_ktor"
                 implementation "io.ktor:ktor-client-json:$version_ktor"
@@ -100,6 +100,7 @@ kotlin {
         androidMain {
             dependsOn commonJvmMain
             dependencies {
+                implementation project(":room-annotations")
                 implementation "androidx.room:room-runtime:$version_android_room"
                 implementation "androidx.room:room-ktx:$version_android_room"
                 implementation "androidx.lifecycle:lifecycle-livedata-ktx:$version_androidx_lifecycle"
