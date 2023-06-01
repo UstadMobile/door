@@ -73,7 +73,7 @@ actual fun <T : RoomDatabase> T.wrap(dbClass: KClass<T>): T {
 
 @Suppress("UNCHECKED_CAST")
 actual fun <T : RoomDatabase> T.unwrap(dbClass: KClass<T>): T {
-    return (this as? DoorDatabaseReplicateWrapper)?.realDatabase as? T
+    return (this as? DoorDatabaseWrapper)?.realDatabase as? T
         ?: throw IllegalArgumentException("$this is not a replicate wrapper!")
 }
 
@@ -81,7 +81,7 @@ actual inline fun <reified T : RoomDatabase> T.asRepository(repositoryConfig: Re
     val dbClass = T::class
     val repoClass = DatabaseBuilder.lookupImplementations(dbClass).repositoryImplClass
         ?: throw IllegalArgumentException("Database ${dbClass.simpleName} does not have a repository!")
-    val dbUnwrapped = if(this is DoorDatabaseReplicateWrapper) {
+    val dbUnwrapped = if(this is DoorDatabaseWrapper) {
         this.unwrap(dbClass)
     }else {
         this

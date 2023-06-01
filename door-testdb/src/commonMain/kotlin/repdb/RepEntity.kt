@@ -9,7 +9,7 @@ import repdb.RepEntity.Companion.TABLE_ID
 
 @Serializable
 @Entity
-@ReplicateEntity(tableId = TABLE_ID, tracker = RepEntityTracker::class)
+@ReplicateEntity(tableId = TABLE_ID)
 @Triggers(arrayOf(
     Trigger(name = "repent_remote_insert",
         order = Trigger.Order.INSTEAD_OF,

@@ -4,7 +4,6 @@ import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.*
 import kotlin.reflect.KClass
 import com.ustadmobile.door.jdbc.*
-import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
 import com.ustadmobile.door.util.NodeIdAuthCache
 import com.ustadmobile.door.util.TransactionMode
 
@@ -107,13 +106,6 @@ expect inline fun <reified  T: RoomDatabase> T.asRepository(repositoryConfig: Re
 expect fun <T: RoomDatabase> T.wrap(dbClass: KClass<T>): T
 
 expect fun <T: RoomDatabase> T.unwrap(dbClass: KClass<T>): T
-
-/**
- * The Replication Notification Dispatcher will listen for changes to the database and run functions annotated with
- * @ReplicationRunOnChange, then fire ReplicationPendingEvent to notify any subscription manager or Server Sent Event
- * endpoints.
- */
-expect val RoomDatabase.replicationNotificationDispatcher: ReplicationNotificationDispatcher
 
 /**
  * The NodeIdAuthCache

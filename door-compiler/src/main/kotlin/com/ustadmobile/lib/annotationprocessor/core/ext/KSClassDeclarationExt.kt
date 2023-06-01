@@ -266,18 +266,6 @@ fun KSClassDeclaration.toCreateTableSql(
     return sql
 }
 
-fun KSClassDeclaration.getReplicationTracker(): KSClassDeclaration {
-    val repAnnotation = getKSAnnotationsByType(ReplicateEntity::class).firstOrNull()
-        ?: throw IllegalArgumentException("Class ${this.qualifiedName} has no replicate entity annotation")
-
-    val annotationVal = repAnnotation.arguments.first { it.name?.asString() == "tracker" }
-    return (annotationVal.value as? KSType)?.declaration as? KSClassDeclaration
-        ?: throw IllegalArgumentException("Class ${this.qualifiedName} cannot resolve tracker")
-}
-
-val KSClassDeclaration.replicationTrackerForeignKey: KSPropertyDeclaration
-    get() = getAllProperties().first { it.hasAnnotation(ReplicationEntityForeignKey::class) }
-
 val KSClassDeclaration.replicationEntityReceiveViewName: String
     get() = getAnnotation(ReplicateReceiveView::class)?.name ?: (simpleName.asString() + SUFFIX_DEFAULT_RECEIVEVIEW)
 

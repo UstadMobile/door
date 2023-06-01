@@ -514,11 +514,6 @@ fun FileSpec.Builder.addDbKtorRouteFunction(
 
                 add("val _typeToken: %T<%T> = %M()\n", org.kodein.type.TypeToken::class.java,
                     dbClassDeclaration.toClassName(), DI_ERASED_MEMBER)
-                if(dbClassDeclaration.dbHasReplicationEntities()) {
-                    add("%M(_typeToken, %T::class, json)\n",
-                        MemberName("com.ustadmobile.door.replication", "doorReplicationRoute"),
-                        dbClassDeclaration.toClassName())
-                }
             }.apply {
                 dbClassDeclaration.dbEnclosedDaos().filter {
                     it.hasAnnotation(Repository::class)

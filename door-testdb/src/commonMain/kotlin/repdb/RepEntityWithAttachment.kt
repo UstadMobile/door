@@ -7,7 +7,7 @@ import com.ustadmobile.door.annotation.*
 import repdb.RepEntityWithAttachment.Companion.TABLE_ID
 
 @Entity
-@ReplicateEntity(tableId = TABLE_ID, tracker = RepEntityWithAttachmentTracker::class, batchSize = 5)
+@ReplicateEntity(tableId = TABLE_ID, batchSize = 5)
 @Triggers(arrayOf(
     Trigger(name = "repentwithattachment_remote_insert",
         order = Trigger.Order.INSTEAD_OF,

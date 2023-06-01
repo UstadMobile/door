@@ -33,8 +33,6 @@ fun FileSpec.Builder.addAndroidReplicationCallbackType(
                     add("val _stmtList = mutableListOf<String>()\n")
                     dbKSClassDeclaration.allDbEntities().forEach { entityKSClass ->
                         if(entityKSClass.hasAnnotation(ReplicateEntity::class)) {
-                            addReplicateEntityChangeLogTrigger(entityKSClass, "_stmtList",
-                                DoorDbType.SQLITE)
                             addCreateReceiveView(entityKSClass, "_stmtList")
                         }
 

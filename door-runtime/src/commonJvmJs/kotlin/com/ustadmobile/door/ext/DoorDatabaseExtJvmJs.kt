@@ -6,7 +6,6 @@ import com.ustadmobile.door.*
 import com.ustadmobile.door.jdbc.*
 import com.ustadmobile.door.jdbc.ext.useStatement
 import com.ustadmobile.door.jdbc.ext.useStatementAsync
-import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
 import com.ustadmobile.door.util.NodeIdAuthCache
 import com.ustadmobile.door.util.systemTimeInMillis
 import io.github.aakira.napier.Napier
@@ -60,20 +59,13 @@ actual val RoomDatabase.sourceDatabase: RoomDatabase?
         return when {
             this is DoorDatabaseJdbc -> null
             (this is DoorDatabaseRepository) -> this.db
-            (this is DoorDatabaseReplicateWrapper) -> this.realDatabase
+            (this is DoorDatabaseWrapper) -> this.realDatabase
             else -> throw IllegalStateException("SourceDatabase : Not a recognized implementation: ${this::class}")
         }
     }
 
 actual val RoomDatabase.doorPrimaryKeyManager: DoorPrimaryKeyManager
     get() = (rootDatabase as DoorDatabaseJdbc).realPrimaryKeyManager
-
-actual val RoomDatabase.replicationNotificationDispatcher: ReplicationNotificationDispatcher
-    get() = if(this is DoorDatabaseJdbc) {
-        this.realReplicationNotificationDispatcher
-    }else {
-        this.rootDatabase.replicationNotificationDispatcher
-    }
 
 actual val RoomDatabase.nodeIdAuthCache: NodeIdAuthCache
     get() = if(this is DoorDatabaseJdbc) {

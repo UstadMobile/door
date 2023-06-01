@@ -19,7 +19,6 @@ import kotlin.reflect.jvm.internal.impl.builtins.jvm.JavaToKotlinClassMap
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.annotation.*
 import com.ustadmobile.door.attachments.AttachmentFilter
-import com.ustadmobile.door.entities.ChangeLog
 import com.ustadmobile.door.ext.DoorDatabaseMetadata
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
 import com.ustadmobile.door.ext.minifySql
@@ -27,10 +26,8 @@ import com.ustadmobile.door.paging.DoorLimitOffsetPagingSource
 import com.ustadmobile.door.replication.ReplicationRunOnChangeRunner
 import com.ustadmobile.door.replication.ReplicationEntityMetaData
 import com.ustadmobile.door.replication.ReplicationFieldMetaData
-import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
 import com.ustadmobile.door.room.RoomJdbcImpl
 import com.ustadmobile.door.util.DeleteZombieAttachmentsListener
-import kotlinx.coroutines.GlobalScope
 import kotlin.reflect.KClass
 import com.ustadmobile.door.util.NodeIdAuthCache
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.MEMBERNAME_EXEC_UPDATE_ASYNC
@@ -205,7 +202,7 @@ private fun FileSpec.Builder.addJsImplementationsClassesObject(
             .initializer(CodeBlock.builder()
                 .apply {
                     if(dbKSClass.dbHasReplicationEntities()) {
-                        add("%T::class", dbKSClass.toClassNameWithSuffix(DoorDatabaseReplicateWrapper.SUFFIX))
+                        add("%T::class", dbKSClass.toClassNameWithSuffix(DoorDatabaseWrapper.SUFFIX))
                     }else {
                         add("null")
                     }
@@ -251,21 +248,14 @@ private fun CodeBlock.Builder.addReplicateEntityMetaDataCode(
     }
 
     val repEntityAnnotation = entity.getAnnotation(ReplicateEntity::class)
-    val trackerTypeEl = entity.getReplicationTracker()
     add("%T(", ReplicationEntityMetaData::class)
     add("%L, ", repEntityAnnotation?.tableId)
     add("%L, ", repEntityAnnotation?.priority)
     add("%S, ", entity.entityTableName)
-    add("%S, ", trackerTypeEl.entityTableName)
     add("%S, ", entity.replicationEntityReceiveViewName)
     add("%S, ", entity.entityPrimaryKeyProps.first().simpleName.asString())
     add("%S, ", entity.firstPropWithAnnotation(ReplicationVersionId::class).simpleName.asString())
-    add("%S, ", trackerTypeEl.firstPropWithAnnotation(ReplicationEntityForeignKey::class).simpleName.asString())
-    add("%S, ", trackerTypeEl.firstPropWithAnnotation(ReplicationDestinationNodeId::class).simpleName.asString())
-    add("%S, ", trackerTypeEl.firstPropWithAnnotation(ReplicationVersionId::class).simpleName.asString())
-    add("%S, \n", trackerTypeEl.firstPropWithAnnotation(ReplicationPending::class).simpleName.asString())
     addFieldsCodeBlock(entity).add(",\n")
-    addFieldsCodeBlock(trackerTypeEl).add(",\n")
     add(entity.firstPropNameWithAnnotationOrNull(AttachmentUri::class)).add(",\n")
     add(entity.firstPropNameWithAnnotationOrNull(AttachmentMd5::class)).add(",\n")
     add(entity.firstPropNameWithAnnotationOrNull(AttachmentSize::class)).add(",\n")
@@ -275,6 +265,7 @@ private fun CodeBlock.Builder.addReplicateEntityMetaDataCode(
 }
 
 
+@Deprecated("ReplicationRunOnChangeRunner is dead")
 private fun FileSpec.Builder.addReplicationRunOnChangeRunnerType(
     dbKSClass: KSClassDeclaration
 ): FileSpec.Builder {
@@ -490,27 +481,6 @@ fun FileSpec.Builder.addJdbcDbImplType(
         .addProperty(PropertySpec.builder("jdbcQueryTimeout", Int::class, KModifier.OVERRIDE)
             .initializer("jdbcQueryTimeout")
             .build())
-        .addProperty(PropertySpec.builder("realReplicationNotificationDispatcher",
-            ReplicationNotificationDispatcher::class)
-            .addModifiers(KModifier.OVERRIDE)
-            .delegate(CodeBlock.builder()
-                .beginControlFlow("lazy")
-                .beginControlFlow("if(this == %M)",
-                    MemberName("com.ustadmobile.door.ext", "rootDatabase"))
-                .add("%T(this, ", ReplicationNotificationDispatcher::class)
-                .applyIf(dbKSClass.dbHasRunOnChangeTriggers()) {
-                    add("%T(this), ", dbKSClass.toClassNameWithSuffix(DoorJdbcProcessor.SUFFIX_REP_RUN_ON_CHANGE_RUNNER))
-                }.applyIf(!dbKSClass.dbHasRunOnChangeTriggers()) {
-                    add("null, ")
-                }
-                .add("%T)\n", GlobalScope::class)
-                .nextControlFlow("else")
-                .add("rootDatabase.%M\n",
-                    MemberName("com.ustadmobile.door.ext", "replicationNotificationDispatcher"))
-                .endControlFlow()
-                .endControlFlow()
-                .build())
-            .build())
         .addProperty(PropertySpec.builder("_deleteZombieAttachmentsListener",
             DeleteZombieAttachmentsListener::class.asTypeName().copy(nullable = true))
             .addModifiers(KModifier.PRIVATE)
@@ -530,7 +500,6 @@ fun FileSpec.Builder.addJdbcDbImplType(
                 .beginControlFlow("if(this == %M)",
                     MemberName("com.ustadmobile.door.ext", "rootDatabase"))
                 .add("val nodeIdAuthCache = %T(this)\n", NodeIdAuthCache::class)
-                .add("nodeIdAuthCache.addNewNodeListener(realReplicationNotificationDispatcher)\n")
                 .add("nodeIdAuthCache\n")
                 .nextControlFlow("else")
                 .add("rootDatabase.%M\n", MemberName("com.ustadmobile.door.ext", "nodeIdAuthCache"))
@@ -579,14 +548,11 @@ internal fun CodeBlock.Builder.addCreateReceiveView(
     entityKSClass: KSClassDeclaration,
     sqlListVar: String
 ): CodeBlock.Builder {
-    val trackerKSClass = entityKSClass.getReplicationTracker()
     val receiveViewAnn = entityKSClass.getAnnotation(ReplicateReceiveView::class)
     val viewName = receiveViewAnn?.name ?: "${entityKSClass.entityTableName}${AbstractDbProcessor.SUFFIX_DEFAULT_RECEIVEVIEW}"
     val sql = receiveViewAnn?.value ?: """
-            SELECT ${entityKSClass.entityTableName}.*, ${trackerKSClass.entityTableName}.*
+            SELECT ${entityKSClass.entityTableName}.*, 0 AS fromNodeId
               FROM ${entityKSClass.entityTableName}
-                   LEFT JOIN ${trackerKSClass.entityTableName} ON ${trackerKSClass.entityTableName}.${trackerKSClass.replicationTrackerForeignKey.simpleName.asString()} = 
-                        ${entityKSClass.entityTableName}.${entityKSClass.entityPrimaryKeyProps.first().simpleName.asString()}
         """.minifySql()
     add("$sqlListVar += %S\n", "CREATE VIEW $viewName AS $sql")
     return this
@@ -636,7 +602,6 @@ fun TypeSpec.Builder.addCreateAllTablesFunction(
 
                         if(entityKSClass.hasAnnotation(ReplicateEntity::class)) {
                             createTriggersAndViewsBlock
-                                .addReplicateEntityChangeLogTrigger(entityKSClass, "_stmtList", dbProductType)
                                 .addCreateReceiveView(entityKSClass, "_stmtList")
                         }
 
@@ -671,87 +636,6 @@ fun TypeSpec.Builder.addCreateAllTablesFunction(
     return this
 }
 
-
-/**
- * Add triggers that will insert into the ChangeLog table
- */
-fun CodeBlock.Builder.addReplicateEntityChangeLogTrigger(
-    entityKSClass: KSClassDeclaration,
-    sqlListVar: String,
-    dbProductType: Int,
-) : CodeBlock.Builder{
-    val replicateEntity = entityKSClass.getAnnotation(ReplicateEntity::class)
-        ?: throw IllegalArgumentException("addReplicateEntitychangeLogTrigger: entity has no @ReplicateEntity annotation")
-    val primaryKeyEl = entityKSClass.entityPrimaryKeyProps.first() //ReplicateEntity must have one and only one primary key
-
-    data class TriggerParams(val opName: String, val prefix: String, val opCode: Int) {
-        val opPrefix = opName.lowercase().substring(0, 3)
-    }
-
-    if(dbProductType == DoorDbType.SQLITE) {
-        val triggerParams = listOf(
-            TriggerParams("INSERT", "NEW", ChangeLog.CHANGE_UPSERT),
-            TriggerParams("UPDATE", "NEW", ChangeLog.CHANGE_UPSERT),
-            TriggerParams("DELETE", "OLD", ChangeLog.CHANGE_DELETE)
-        )
-
-        triggerParams.forEach { params ->
-            /*
-            Note: REPLACE INTO etc. does not work because the conflict policy will be determined by the statement
-            triggering this as per https://sqlite.org/lang_createtrigger.html Section 2.
-            "An ON CONFLICT clause may be specified as part of an UPDATE or INSERT action within the body of the
-            trigger. However if an ON CONFLICT clause is specified as part of the statement causing the trigger to
-             fire, then conflict handling policy of the outer statement is used instead."
-             */
-            add("$sqlListVar += %S\n",
-                """
-                CREATE TRIGGER ch_${params.opPrefix}_${replicateEntity.tableId}
-                       AFTER ${params.opName} ON ${entityKSClass.entityTableName}
-                BEGIN
-                       INSERT INTO ChangeLog(chTableId, chEntityPk, chType)
-                       SELECT ${replicateEntity.tableId} AS chTableId, 
-                              ${params.prefix}.${primaryKeyEl.simpleName.asString()} AS chEntityPk, 
-                              ${params.opCode} AS chType
-                        WHERE NOT EXISTS(
-                              SELECT chTableId 
-                                FROM ChangeLog 
-                               WHERE chTableId = ${replicateEntity.tableId}
-                                 AND chEntityPk = ${params.prefix}.${primaryKeyEl.simpleName.asString()}); 
-                END
-                """.minifySql())
-        }
-    }else {
-        val triggerParams = listOf(
-            TriggerParams("UPDATE OR INSERT", "NEW", ChangeLog.CHANGE_UPSERT),
-            TriggerParams("DELETE", "OLD", ChangeLog.CHANGE_DELETE))
-        triggerParams.forEach { params ->
-            add("$sqlListVar += %S\n",
-                """
-               CREATE OR REPLACE FUNCTION 
-               ch_${params.opPrefix}_${replicateEntity.tableId}_fn() RETURNS TRIGGER AS $$
-               BEGIN
-               INSERT INTO ChangeLog(chTableId, chEntityPk, chType)
-                       VALUES (${replicateEntity.tableId}, ${params.prefix}.${primaryKeyEl.simpleName.asString()}, ${params.opCode})
-               ON CONFLICT(chTableId, chEntityPk) DO UPDATE
-                       SET chType = ${params.opCode};
-               RETURN NULL;
-               END $$
-               LANGUAGE plpgsql         
-            """.minifySql())
-            add("$sqlListVar += %S\n",
-                """
-            CREATE TRIGGER ch_${params.opPrefix}_${replicateEntity.tableId}_trig 
-                   AFTER ${params.opName} ON ${entityKSClass.entityTableName}
-                   FOR EACH ROW
-                   EXECUTE PROCEDURE ch_${params.opPrefix}_${replicateEntity.tableId}_fn();
-            """.minifySql())
-        }
-
-
-    }
-
-    return this
-}
 
 internal fun CodeBlock.Builder.addCreateTriggersCode(
     entityKSClass: KSClassDeclaration,

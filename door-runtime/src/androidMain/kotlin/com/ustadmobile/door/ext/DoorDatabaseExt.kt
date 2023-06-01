@@ -7,7 +7,6 @@ import com.ustadmobile.door.*
 import com.ustadmobile.door.DoorDatabaseRepository.Companion.DOOR_ATTACHMENT_URI_PREFIX
 import com.ustadmobile.door.jdbc.PreparedStatement
 import com.ustadmobile.door.PreparedStatementConfig
-import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
 import com.ustadmobile.door.roomjdbc.ConnectionRoomJdbc
 import com.ustadmobile.door.util.DoorAndroidRoomHelper
 import com.ustadmobile.door.util.NodeIdAuthCache
@@ -126,7 +125,7 @@ actual val RoomDatabase.sourceDatabase: RoomDatabase?
     get() {
         return when {
             (this is DoorDatabaseRepository) -> this.db
-            (this is DoorDatabaseReplicateWrapper) -> this.realDatabase
+            (this is DoorDatabaseWrapper) -> this.realDatabase
             else -> null
         }
     }
@@ -152,7 +151,7 @@ actual val RoomDatabase.doorPrimaryKeyManager : DoorPrimaryKeyManager
 //succeed
 @Suppress("UNCHECKED_CAST")
 actual inline fun <reified  T: RoomDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T {
-    val dbUnwrapped = if(this is DoorDatabaseReplicateWrapper) {
+    val dbUnwrapped = if(this is DoorDatabaseWrapper) {
         this.unwrap(T::class)
     }else {
         this
@@ -169,7 +168,7 @@ actual inline fun <reified  T: RoomDatabase> T.asRepository(repositoryConfig: Re
 @Suppress("unused")
 fun <T: RoomDatabase> RoomDatabase.isWrappable(dbClass: KClass<T>): Boolean {
     try {
-        Class.forName("${dbClass.qualifiedName}${DoorDatabaseReplicateWrapper.SUFFIX}")
+        Class.forName("${dbClass.qualifiedName}${DoorDatabaseWrapper.SUFFIX}")
         return true
     }catch(e: Exception) {
         return false
@@ -183,14 +182,14 @@ fun <T: RoomDatabase> RoomDatabase.isWrappable(dbClass: KClass<T>): Boolean {
 @Suppress("UNCHECKED_CAST")
 actual fun <T: RoomDatabase> T.wrap(dbClass: KClass<T>) : T {
     val wrapperClass = Class.forName(
-        "${dbClass.qualifiedName}${DoorDatabaseReplicateWrapper.SUFFIX}"
+        "${dbClass.qualifiedName}${DoorDatabaseWrapper.SUFFIX}"
     ) as Class<T>
     return wrapperClass.getConstructor(dbClass.java).newInstance(this)
 }
 
 @Suppress("UNCHECKED_CAST")
 actual fun <T: RoomDatabase> T.unwrap(dbClass: KClass<T>): T {
-    if(this is DoorDatabaseReplicateWrapper) {
+    if(this is DoorDatabaseWrapper) {
         return this.realDatabase as T
     }else {
         return this
@@ -204,9 +203,6 @@ internal val RoomDatabase.dbClassName: String
 
 internal val RoomDatabase.doorAndroidRoomHelper: DoorAndroidRoomHelper
     get()  = DoorAndroidRoomHelper.lookupHelper(this)
-
-actual val RoomDatabase.replicationNotificationDispatcher : ReplicationNotificationDispatcher
-    get() = doorAndroidRoomHelper.replicationNotificationDispatcher
 
 actual val RoomDatabase.nodeIdAuthCache: NodeIdAuthCache
     get() = doorAndroidRoomHelper.nodeIdAndAuthCache

@@ -13,9 +13,11 @@ import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.writeTo
-import com.ustadmobile.door.DoorDatabaseReplicateWrapper
+import com.ustadmobile.door.DoorDatabaseWrapper
 import com.ustadmobile.door.annotation.LastChangedTime
 import com.ustadmobile.door.annotation.ReplicateEntity
+import com.ustadmobile.door.nodeevent.NodeEventManagerCommon
+import com.ustadmobile.door.nodeevent.NodeEventManagerJvm
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
 
 /**
@@ -32,7 +34,7 @@ fun TypeSpec.Builder.addDbDaoWrapperPropOrGetter(
     if(daoClassDeclaration?.daoHasReplicateEntityWriteFunctions(resolver) != true) {
         addDaoPropOrGetterDelegate(daoPropOrGetterDecl, "_db.")
     }else {
-        val wrapperClassName = daoClassDeclaration.toClassNameWithSuffix(DoorDatabaseReplicateWrapper.SUFFIX)
+        val wrapperClassName = daoClassDeclaration.toClassNameWithSuffix(DoorDatabaseWrapper.SUFFIX)
 
         addProperty(PropertySpec.builder("_${daoClassDeclaration.simpleName.asString()}",
             daoClassDeclaration.toClassName()).delegate(
@@ -225,7 +227,7 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
 ): FileSpec.Builder {
     val dbClassName = dbClassDecl.toClassName()
     addType(
-        TypeSpec.classBuilder("${dbClassDecl.simpleName.asString()}${DoorDatabaseReplicateWrapper.SUFFIX}")
+        TypeSpec.classBuilder("${dbClassDecl.simpleName.asString()}${DoorDatabaseWrapper.SUFFIX}")
             .addOriginatingKsFileOrThrow(dbClassDecl.containingFile)
             .addOriginatingKSClasses(dbClassDecl.allDbEntities())
             .addOriginatingKSClasses(dbClassDecl.dbEnclosedDaos())
@@ -233,7 +235,7 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
                 .addMember("%S, %S", "REDUNDANT_PROJECTION", "ClassName")
                 .build())
             .superclass(dbClassName)
-            .addSuperinterface(DoorDatabaseReplicateWrapper::class.asClassName())
+            .addSuperinterface(DoorDatabaseWrapper::class.asClassName())
             .primaryConstructor(FunSpec.constructorBuilder()
                 .addParameter("_db", dbClassName)
                 .build())
@@ -262,6 +264,15 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
                 .getter(FunSpec.getterBuilder().addCode("return _db\n")
                     .build())
                 .build())
+            .addProperty(
+                PropertySpec.builder(
+                "nodeEventManager", NodeEventManagerCommon::class, KModifier.OVERRIDE,
+                )
+                .applyIf(target == DoorTarget.JVM) {
+                    initializer("%T(_db)\n", NodeEventManagerJvm::class)
+                }
+                .build()
+            )
             .applyIf(target == DoorTarget.JS) {
                 addFunction(FunSpec.builder("clearAllTablesAsync")
                     .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
@@ -299,7 +310,7 @@ fun FileSpec.Builder.addDaoWrapperTypeSpec(
     target: DoorTarget,
     logger: KSPLogger,
 ): FileSpec.Builder {
-    addType(TypeSpec.classBuilder(daoClassDeclaration.toClassNameWithSuffix(DoorDatabaseReplicateWrapper.SUFFIX))
+    addType(TypeSpec.classBuilder(daoClassDeclaration.toClassNameWithSuffix(DoorDatabaseWrapper.SUFFIX))
         .addSuperClassOrInterface(daoClassDeclaration)
         .addOriginatingKSClass(daoClassDeclaration)
         .addOriginatingKSClasses(daoClassDeclaration.allDaoEntities(resolver))
@@ -354,7 +365,7 @@ private fun KSFunctionDeclaration.isDaoReplicateEntityWriteFunction(
     }
 }
 
-class DoorReplicateWrapperProcessor(
+class DoorWrapperProcessor(
     private val environment: SymbolProcessorEnvironment,
 ) : SymbolProcessor{
 
@@ -362,19 +373,17 @@ class DoorReplicateWrapperProcessor(
         val target = environment.doorTarget(resolver)
 
         resolver.getDatabaseSymbolsToProcess().forEach { dbClassDecl ->
-            if(dbClassDecl.dbHasReplicationEntities()) {
-                FileSpec.builder(dbClassDecl.packageName.asString(),
-                    "${dbClassDecl.simpleName.asString()}${DoorDatabaseReplicateWrapper.SUFFIX}")
-                    .addDbWrapperTypeSpec(dbClassDecl, resolver, target)
-                    .build()
-                    .writeTo(environment.codeGenerator, false)
-            }
+            FileSpec.builder(dbClassDecl.packageName.asString(),
+                "${dbClassDecl.simpleName.asString()}${DoorDatabaseWrapper.SUFFIX}")
+                .addDbWrapperTypeSpec(dbClassDecl, resolver, target)
+                .build()
+                .writeTo(environment.codeGenerator, false)
         }
 
         resolver.getDaoSymbolsToProcess().forEach { daoClassDec ->
             if(daoClassDec.daoHasReplicateEntityWriteFunctions(resolver)) {
                 FileSpec.builder(daoClassDec.packageName.asString(),
-                    "${daoClassDec.simpleName.asString()}${DoorDatabaseReplicateWrapper.SUFFIX}")
+                    "${daoClassDec.simpleName.asString()}${DoorDatabaseWrapper.SUFFIX}")
                     .addDaoWrapperTypeSpec(daoClassDec, resolver, target, environment.logger)
                     .build()
                     .writeTo(environment.codeGenerator, false)

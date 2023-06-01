@@ -14,7 +14,6 @@ import com.ustadmobile.door.*
 import com.ustadmobile.door.annotation.RepoHttpAccessible
 import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.attachments.EntityWithAttachment
-import com.ustadmobile.door.replication.ReplicationSubscriptionManager
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_ILLEGALSTATEEXCEPTION
 import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER
 import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.SUFFIX_REPOSITORY2
@@ -77,18 +76,6 @@ fun FileSpec.Builder.addDbRepoType(
         .addProperty(PropertySpec.builder("_db", dbKSClassDeclaration.toClassName())
             .addModifiers(KModifier.PRIVATE)
             .initializer("dbUnwrapped")
-            .build())
-        .addProperty(PropertySpec.builder("replicationSubscriptionManager",
-            ReplicationSubscriptionManager::class.asTypeName().copy(nullable = true))
-            .addModifiers(KModifier.OVERRIDE)
-            .initializer(CodeBlock.builder()
-                .beginControlFlow("if(isRootRepository && config.useReplicationSubscription)")
-                .add("%M()\n", MemberName("com.ustadmobile.door.replication",
-                    "makeNewSubscriptionManager"))
-                .nextControlFlow("else")
-                .add("null\n")
-                .endControlFlow()
-                .build())
             .build())
         .addProperty(PropertySpec.builder("db",
                 dbKSClassDeclaration.toClassName()).initializer("db")

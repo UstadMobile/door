@@ -1,4 +1,4 @@
-package com.ustadmobile.door.message
+package com.ustadmobile.door.nodeevent
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -12,7 +12,7 @@ import kotlinx.serialization.json.JsonObject
  * @param payload object payload (e.g. entities that are being replicated)
  */
 @Serializable
-data class DoorMessage(
+data class NodeEventMessage(
     val what: Int,
     val fromNode: Long,
     val toNode: Long,
@@ -24,7 +24,7 @@ data class DoorMessage(
         /**
          *
          */
-        const val REPLICATION = 1
+        const val WHAT_REPLICATION = 1
 
     }
 

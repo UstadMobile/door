@@ -90,7 +90,7 @@ actual inline fun <reified  T: RoomDatabase> T.asRepository(repositoryConfig: Re
     val dbClass = T::class
     val repoImplClass = Class.forName("${dbClass.qualifiedName}_Repo") as Class<T>
 
-    val dbUnwrapped = if(this is DoorDatabaseReplicateWrapper) {
+    val dbUnwrapped = if(this is DoorDatabaseWrapper) {
         this.unwrap(dbClass)
     }else {
         this
@@ -116,13 +116,13 @@ private val KClass<*>.qualifiedNameBeforeLastUnderscore: String?
 @Suppress("UNCHECKED_CAST")
 actual fun <T: RoomDatabase> T.wrap(dbClass: KClass<T>) : T {
     val wrapperClass = Class.forName(
-        "${dbClass.qualifiedNameBeforeLastUnderscore}${DoorDatabaseReplicateWrapper.SUFFIX}"
+        "${dbClass.qualifiedNameBeforeLastUnderscore}${DoorDatabaseWrapper.SUFFIX}"
     ) as Class<T>
     return wrapperClass.getConstructor(dbClass.java).newInstance(this)
 }
 
 @Suppress("UNCHECKED_CAST")
 actual fun <T: RoomDatabase> T.unwrap(dbClass: KClass<T>): T {
-    return (this as DoorDatabaseReplicateWrapper).realDatabase as T
+    return (this as DoorDatabaseWrapper).realDatabase as T
 }
 

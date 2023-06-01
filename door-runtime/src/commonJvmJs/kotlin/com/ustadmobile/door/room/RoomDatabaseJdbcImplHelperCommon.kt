@@ -2,6 +2,7 @@ package com.ustadmobile.door.room
 
 import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.DoorDbType
+import com.ustadmobile.door.ext.concurrentSafeListOf
 import com.ustadmobile.door.ext.concurrentSafeMapOf
 import com.ustadmobile.door.ext.rootDatabase
 import com.ustadmobile.door.jdbc.Connection
@@ -30,6 +31,42 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
     private val openTransactions = concurrentSafeMapOf<Int, TransactionElement>()
 
     protected val sqliteMutex = Mutex()
+
+
+    private val listeners = concurrentSafeListOf<Listener>()
+
+    internal interface Listener {
+        suspend fun onBeforeTransactionAsync(
+            transactionMode: TransactionMode,
+            connection: Connection,
+            transactionId: Int,
+        )
+
+        suspend fun onAfterTransactionAsync(
+            transactionMode: TransactionMode,
+            connection: Connection,
+            transactionId: Int,
+        )
+
+        suspend fun onTransactionCommittedAsync(
+            transactionMode: TransactionMode,
+            connection: Connection,
+            transactionId: Int,
+        )
+
+        fun onBeforeTransaction(
+            transactionMode: TransactionMode,
+            connection: Connection,
+            transactionId: Int,
+        )
+
+        fun onAfterTransaction(
+            transactionMode: TransactionMode,
+            connection: Connection,
+            transactionId: Int,
+        )
+
+    }
 
     class TransactionElement(
         override val key: Key,
@@ -63,6 +100,10 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
 
             val transactionElement = TransactionElement(Key, connection, transactionId)
             openTransactions[transactionId] = transactionElement
+            listeners.forEach {
+                it.onBeforeTransactionAsync(transactionMode, connection, transactionId)
+            }
+
             val result = withContext(transactionElement) {
                 block(transactionElement.connection)
             }
@@ -71,9 +112,16 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
                 changedTables.addAll(invalidationTracker.findChangedTablesOnConnectionAsync(connection))
             }
 
+            listeners.forEach {
+                it.onAfterTransactionAsync(transactionMode, connection, transactionId)
+            }
+
             connection.commit()
 
             invalidationTracker.takeIf { changedTables.isNotEmpty() }?.onTablesInvalidated(changedTables.toSet())
+            listeners.forEach {
+                it.onTransactionCommittedAsync(transactionMode, connection, transactionId)
+            }
 
             result
         }catch(t: Throwable) {
@@ -125,5 +173,13 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
 
     companion object Key : CoroutineContext.Key<TransactionElement>
 
+
+    internal fun addListener(listener: Listener) {
+        listeners += listener
+    }
+
+    internal fun removeListener(listener: Listener) {
+        listeners -= listener
+    }
 
 }

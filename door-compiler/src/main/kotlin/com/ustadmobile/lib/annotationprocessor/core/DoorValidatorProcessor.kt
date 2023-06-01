@@ -126,72 +126,14 @@ class DoorValidatorProcessor(
         //Check entities with the ReplicateEntity annotation have all the required fields
         allReplicateEntities.forEach { entity ->
             try {
-                val entityRepTrkr = entity.getReplicationTracker()
 
                 val entityVersionIdField = entity.getAllProperties().filter { it.hasAnnotation(ReplicationVersionId::class) }.toList()
-                if(entityVersionIdField.size != 1)
+                if(entityVersionIdField.size != 1) {
                     logger.error(
                         "@ReplicateEntity ${entity.qualifiedName?.asString()} must have exactly one field annotated @ReplicationVersionId",
-                        entity)
-
-
-                if(!entityRepTrkr.hasAnnotation(Entity::class))
-                    logger.error("Replication ${entityRepTrkr.qualifiedName?.asString()} tracker " +
-                            "entity does not have @Entity annotation", entityRepTrkr)
-
-                val trkrForeignKey = entityRepTrkr.getAllProperties()
-                    .filter { it.hasAnnotation(ReplicationEntityForeignKey::class) }.toList()
-
-                if(trkrForeignKey.size != 1 ||
-                    entity.entityPrimaryKeyProps.firstOrNull()?.type?.resolve() !=
-                    entityRepTrkr.getAllProperties().filter { it.hasAnnotation(ReplicationEntityForeignKey::class) }
-                        .firstOrNull()?.type?.resolve()
-                ) {
-                    logger.error("Replication tracker ${entityRepTrkr.qualifiedName?.asString()} must have exactly one field annotated " +
-                                "@ReplicationEntityForeignKey of the same type as the entity ${entity.qualifiedName?.asString()} " +
-                                "primary key", entity)
+                        entity
+                    )
                 }
-
-                val trkrVersionId = entityRepTrkr.getAllProperties().filter { it.hasAnnotation(ReplicationVersionId::class) }
-                    .toList()
-                if(trkrVersionId.size != 1 ||
-                    trkrVersionId.first().type.resolve() != entityVersionIdField.firstOrNull()?.type?.resolve()) {
-                    logger.error("Replication tracker ${entityRepTrkr.qualifiedName?.asString()} must have exactly one field annotated " +
-                                "@ReplicationVersionId and it must be the same type as the field annotated " +
-                                "@ReplicationVersionId on the main entity ${entity.qualifiedName?.asString()}",
-                        entityRepTrkr)
-                }
-
-                val trkrNodeId = entityRepTrkr.getAllProperties()
-                    .filter { it.hasAnnotation(ReplicationDestinationNodeId::class) }.toList()
-                if(trkrNodeId.size != 1 || trkrNodeId.first().type.resolve() != resolver.builtIns.longType) {
-                    logger.error( "Replication tracker ${entityRepTrkr.qualifiedName?.asString()} " +
-                            "must have exactly one field annotated @ReplicationDestinationNodeId and it must be of " +
-                            "type long", entityRepTrkr)
-                }
-
-                val trkrPending = entityRepTrkr.getAllProperties().filter { it.hasAnnotation(ReplicationPending::class) }
-                    .toList()
-                if(trkrPending.size != 1 || trkrPending.first().type.resolve() != resolver.builtIns.booleanType) {
-                    logger.error( "Replication Tracker ${entityRepTrkr.qualifiedName?.asString()}" +
-                            " must have exactly one field annotated @ReplicationPending and it must be of type" +
-                            " boolean, default value should be true", entityRepTrkr)
-                }
-
-                //check for duplicate fields between tracker and entity
-                val entityProps = entity.getAllColumnProperties(resolver)
-                val trkrFieldPropNames = entityRepTrkr.getAllColumnProperties(resolver).map { it.entityPropColumnName }
-
-                val duplicateFieldElements = entityProps.filter { it.entityPropColumnName in trkrFieldPropNames }
-                if(duplicateFieldElements.isNotEmpty()) {
-                    logger.error( "Same field names used in both entity " +
-                            "${entity.qualifiedName?.asString()} and tracker. ( " +
-                            "${duplicateFieldElements.joinToString { it.simpleName.asString() }  }) This is " +
-                            "not allowed as it will lead to a conflict in SQL query row names",
-                        entity)
-                }
-
-
             }catch(e: IllegalArgumentException){
                 logger.error("ReplicateEntity ${entity.qualifiedName?.asString()} must have a tracker entity specified",
                     entity)
@@ -209,7 +151,6 @@ class DoorValidatorProcessor(
                     val stmt = sqliteConnection.createStatement()!!
                     val pgStmt = pgConnection?.createStatement()
                     val stmtsMap = mapOf(DoorDbType.SQLITE to stmt, DoorDbType.POSTGRES to pgStmt)
-                    val repTrkr = entity.getReplicationTracker()
 
                     //When the trigger SQL runs it will have access to NEW.(fieldName). We won't have that when we try and
                     //test the validity of the SQL statement here. Therefor NEW.(fieldname) and OLD.(fieldname) will be
@@ -228,10 +169,6 @@ class DoorValidatorProcessor(
                             entity.getAllColumnProperties(resolver).forEach { field ->
                                 sqlFormatted = sqlFormatted.replaceColNameWithDefaultValueInSql(
                                     "$prefix.${field.simpleName.asString()}",
-                                    field.type.resolve().defaultSqlQueryVal(resolver, dbProductType))
-                            }
-                            repTrkr.takeIf { trigger.on == Trigger.On.RECEIVEVIEW }?.getAllColumnProperties(resolver)?.forEach { field ->
-                                sqlFormatted = sqlFormatted.replaceColNameWithDefaultValueInSql("$prefix.${field.simpleName.asString()}",
                                     field.type.resolve().defaultSqlQueryVal(resolver, dbProductType))
                             }
                         }

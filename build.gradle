@@ -91,6 +91,7 @@ ext {
     version_hikaricp = "5.0.1"
     version_junit = "4.13.2"
     version_junit_jupiter = "5.9.2"
+    version_turbine = "0.13.0"
 
     version_android_compile_sdk = 33
     version_android_target_sdk = 33

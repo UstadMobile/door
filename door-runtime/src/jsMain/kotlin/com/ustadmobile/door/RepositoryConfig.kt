@@ -1,7 +1,6 @@
 package com.ustadmobile.door
 
 import com.ustadmobile.door.attachments.AttachmentFilter
-import com.ustadmobile.door.replication.ReplicationSubscriptionManager
 import com.ustadmobile.door.replication.ReplicationSubscriptionMode
 import io.ktor.client.*
 import kotlinx.serialization.json.Json
@@ -17,9 +16,6 @@ actual class RepositoryConfig internal constructor(
     actual val nodeId: Long,
     actual val httpClient: HttpClient,
     actual val json: Json,
-    actual val useReplicationSubscription: Boolean,
-    actual val replicationSubscriptionMode: ReplicationSubscriptionMode,
-    actual val replicationSubscriptionInitListener: ReplicationSubscriptionManager.SubscriptionInitializedListener?,
 ){
 
     companion object {
@@ -36,8 +32,6 @@ actual class RepositoryConfig internal constructor(
             var useReplicationSubscription: Boolean = true
 
             val attachmentFilters = mutableListOf<AttachmentFilter>()
-
-            var replicationSubscriptionInitListener : ReplicationSubscriptionManager.SubscriptionInitializedListener? = null
 
             var replicationSubscriptionMode = ReplicationSubscriptionMode.AUTO
 

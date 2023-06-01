@@ -1,14 +1,9 @@
 package com.ustadmobile.door
 
-import com.ustadmobile.door.room.InvalidationTracker
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.attachments.AttachmentFilter
-import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
-import com.ustadmobile.door.replication.ReplicationNotificationDispatcher
 import com.ustadmobile.door.util.NodeIdAuthCache
-import com.ustadmobile.door.util.TransactionDepthCounter
-import com.ustadmobile.door.util.DoorInvalidationTracker
 
 /**
  * This interface is implemented by all generated JDBC implementations of a database.
@@ -39,12 +34,6 @@ interface DoorDatabaseJdbc {
      * The name as it was provided to the builder function
      */
     val dbName: String
-
-    /**
-     * The real replication notification dispatcher (which is generally accessed
-     * using multiplatform extension properties)
-     */
-    val realReplicationNotificationDispatcher: ReplicationNotificationDispatcher
 
     val realNodeIdAuthCache: NodeIdAuthCache
 

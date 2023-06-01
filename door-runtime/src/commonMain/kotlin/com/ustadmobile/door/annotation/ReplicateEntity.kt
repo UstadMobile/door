@@ -17,11 +17,6 @@ annotation class ReplicateEntity(
     val tableId: Int,
 
     /**
-     * The replication tracker entity
-     */
-    val tracker: KClass<*>,
-
-    /**
      * Lower priority replications will not proceed if there are any higher priority replications pending. This allows
      * one entity to depend on another (e.g. for permission management purposes etc).
      *

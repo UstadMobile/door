@@ -1,8 +1,6 @@
 package com.ustadmobile.door
 
 import com.ustadmobile.door.room.RoomDatabase
-import com.ustadmobile.door.replication.ReplicationSubscriptionManager
-import kotlin.reflect.KClass
 
 /**
  * Common interface that is implemented by any repository. Can be used to get info including
@@ -39,8 +37,6 @@ interface DoorDatabaseRepository {
     fun removeWeakConnectivityListener(listener: RepositoryConnectivityListener)
 
     var connectivityStatus: Int
-
-    val replicationSubscriptionManager: ReplicationSubscriptionManager?
 
     companion object {
 
