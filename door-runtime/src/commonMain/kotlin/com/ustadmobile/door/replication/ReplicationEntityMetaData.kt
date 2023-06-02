@@ -1,5 +1,7 @@
 package com.ustadmobile.door.replication
 
+import com.ustadmobile.door.replication.ReplicationConstants.RECEIVE_VIEW_FROM_NODE_ID_FIELDNAME
+
 
 class ReplicationEntityMetaData(
     val tableId: Int,
@@ -23,38 +25,26 @@ class ReplicationEntityMetaData(
         entityFields.first { it.fieldName == entityVersionIdFieldName }.fieldType
     }
 
-    internal val pendingReplicationFieldTypesMap: Map<String, Int>
-        get() = mapOf(KEY_PRIMARY_KEY to entityPrimaryKeyFieldType,
-            KEY_VERSION_ID to versionIdFieldType)
-
     /**
-     * Map of column name to column type for rows returned by the findPendingReplicationSql query.
+     * Map of column name to column type for all fields.
      */
-    internal val pendingReplicationColumnTypesMap: Map<String, Int>
+    internal val entityFieldsTypeMap: Map<String, Int>
         get() = entityFields.map { it.fieldName to it.fieldType }.toMap()
 
-    internal val insertIntoReceiveViewTypesList: List<Int>
-        get() = entityFields.map { it.fieldType }
-    internal val insertIntoReceiveViewTypeColNames: List<String>
-        get() = entityFields.map { it.fieldName }
 
+    val selectEntityByPrimaryKeysSql: String
+        get() = """
+            SELECT $entityTableName.* 
+              FROM $entityTableName
+             WHERE $entityTableName.$entityPrimaryKeyFieldName = ?
+        """.trimIndent()
 
-    val findAlreadyUpToDateEntitiesSql: String by lazy(LazyThreadSafetyMode.NONE) {
-        """
-        SELECT $entityPrimaryKeyFieldName AS $KEY_PRIMARY_KEY,
-               $entityVersionIdFieldName AS $KEY_VERSION_ID
-          FROM $entityTableName
-         WHERE $entityPrimaryKeyFieldName = ?
-           AND $entityVersionIdFieldName = ?
-         LIMIT $batchSize 
-        """
-    }
 
 
     val insertIntoReceiveViewSql: String by lazy(LazyThreadSafetyMode.NONE) {
         """
-        INSERT INTO $receiveViewName (${entityFields.joinToString{ it.fieldName }})
-               VALUES (${(0 until (entityFields.size)).map { "?" }.joinToString()})
+        INSERT INTO $receiveViewName (${entityFields.joinToString{ it.fieldName }}, $RECEIVE_VIEW_FROM_NODE_ID_FIELDNAME)
+               VALUES (${(0 .. (entityFields.size)).map { "?" }.joinToString()})
         """
     }
 

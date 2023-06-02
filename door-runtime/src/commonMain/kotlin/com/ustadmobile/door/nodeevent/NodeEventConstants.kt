@@ -37,4 +37,8 @@ object NodeEventConstants {
     """
 
 
+    const val CLEAR_EVENTS_TMP_TABLE = """
+        DELETE FROM NodeEvent
+    """
+
 }

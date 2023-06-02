@@ -3,97 +3,60 @@ package com.ustadmobile.door.replication
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.entities.DoorNode
 import com.ustadmobile.door.ext.*
-import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
-import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
-import com.ustadmobile.door.jdbc.ext.mapRows
-import com.ustadmobile.door.jdbc.ext.useResults
-import com.ustadmobile.door.replication.ReplicationEntityMetaData.Companion.KEY_PRIMARY_KEY
-import com.ustadmobile.door.replication.ReplicationEntityMetaData.Companion.KEY_VERSION_ID
-import kotlinx.serialization.json.*
+import com.ustadmobile.door.jdbc.ext.*
+import com.ustadmobile.door.nodeevent.NodeEvent
+
 
 /**
- * Go through a list of pending replication trackers (e.g. those received from a remote node) and find those that are
- * already up-to-date here.
+ * Select the given replicate entities as a JSON array. (e.g. that can be sent out as a replication message).
+ * document on door message
  *
- * @return list of pending replication tracker
  */
-suspend fun RoomDatabase.checkPendingReplicationTrackers(
-    dbMetaData: DoorDatabaseMetadata<*>,
-    pendingReplications: JsonArray,
-    tableId: Int
-) : JsonArray {
-    val repEntityMetaData = dbMetaData.replicateEntities[tableId] ?: throw IllegalArgumentException("No such table: $tableId")
+suspend fun RoomDatabase.selectNodeEventMessageReplications(
+    events: Iterable<NodeEvent>,
+): List<DoorReplicationEntity> {
+    return events.runningSplitBy { it.tableId }.map { tableEvents ->
+        val tableId = tableEvents.first().tableId
+        val entityMetaData = this::class.doorDatabaseMetadata().requireReplicateEntityMetaData(tableId)
+        val entityFieldsTypeMap = entityMetaData.entityFieldsTypeMap
 
-    val pendingReplicationObjects = pendingReplications.map { it as JsonObject }
-
-    val alreadyUpdatedEntities = mutableLinkedListOf<JsonObject>()
-    withDoorTransactionAsync { transactionDb ->
-        transactionDb.prepareAndUseStatementAsync(repEntityMetaData.findAlreadyUpToDateEntitiesSql) { stmt ->
-            pendingReplicationObjects.forEach { pendingRep ->
-                stmt.setJsonPrimitive(1, repEntityMetaData.entityPrimaryKeyFieldType,
-                    pendingRep.get(KEY_PRIMARY_KEY) as JsonPrimitive)
-                stmt.setJsonPrimitive(2, repEntityMetaData.versionIdFieldType,
-                    pendingRep.get(KEY_VERSION_ID) as JsonPrimitive)
-
-                stmt.executeQueryAsyncKmp().useResults {
-                    if(it.next()) {
-                        alreadyUpdatedEntities += it.rowToJsonObject(repEntityMetaData.pendingReplicationFieldTypesMap)
+        prepareAndUseStatementAsync(entityMetaData.selectEntityByPrimaryKeysSql) { stmt ->
+            tableEvents.mapNotNull { event ->
+                stmt.setLong(1, event.key1)
+                stmt.executeQueryAsyncKmp().useResults { result ->
+                    result.mapNextRow(null) { mapResult ->
+                        DoorReplicationEntity(
+                            tableId = tableId,
+                            entity = mapResult.rowToJsonObject(entityFieldsTypeMap),
+                        )
                     }
                 }
             }
         }
-    }
-
-    return JsonArray(alreadyUpdatedEntities)
+    }.flatten()
 }
 
-
-suspend fun RoomDatabase.insertReplicationsIntoReceiveView(
-    dbMetaData: DoorDatabaseMetadata<*>,
-    @Suppress("UNUSED_PARAMETER") //This is reserved for future usage (e.g. to set when doing the insert to help with permission checking)
-    remoteNodeId: Long,
-    tableId: Int,
-    receivedEntities: JsonArray
+/**
+ *
+ */
+suspend fun RoomDatabase.insertIntoRemoteReceiveView(
+    fromNodeId: Long,
+    replicationEntities: Iterable<DoorReplicationEntity>
 ) {
-    if(receivedEntities.isEmpty())
-        return //do nothing, nothing was received
+    replicationEntities.runningSplitBy { it.tableId }.forEach { tableEntities ->
+        val tableId = tableEntities.first().tableId
+        val entityMetaData = this::class.doorDatabaseMetadata().requireReplicateEntityMetaData(tableId)
 
-    val repEntityMetaData = dbMetaData.replicateEntities[tableId] ?: throw IllegalArgumentException("No such table: $tableId")
-    val receivedObjects = receivedEntities.map { it as JsonObject }
+        prepareAndUseStatementAsync(entityMetaData.insertIntoReceiveViewSql) { stmt ->
+            tableEntities.forEach { entity ->
+                stmt.setAllFromJsonObject(entity.entity, entityMetaData.entityFields)
 
-    /*
-     Will be used again after changes
-    withDoorTransactionAsync { transactionDb ->
-        transactionDb.prepareAndUseStatementAsync(repEntityMetaData.insertIntoReceiveViewSql) { insertStmt ->
-            transactionDb.prepareAndUseStatementAsync(repEntityMetaData.insertOrUpdateTrackerSql(dbType())) { updateTrackerStmt ->
-                receivedObjects.forEach { receivedObject ->
-                    for(i in 0 until repEntityMetaData.insertIntoReceiveViewTypesList.size) {
-                        val objFieldVal = (receivedObject.get(repEntityMetaData.insertIntoReceiveViewTypeColNames[i]) as? JsonPrimitive)
-                            .toDefaultValIfNull(repEntityMetaData.insertIntoReceiveViewTypesList[i])
-                        insertStmt.setJsonPrimitive(i + 1, repEntityMetaData.insertIntoReceiveViewTypesList[i],
-                            objFieldVal)
-                    }
-
-                    insertStmt.executeUpdateAsyncKmp()
-
-                    val primaryKeyVal = receivedObject.get(repEntityMetaData.entityPrimaryKeyFieldName)?.jsonPrimitive
-                        ?: throw IllegalArgumentException("No primary key field value")
-                    val entityVersionVal = receivedObject.get(repEntityMetaData.entityVersionIdFieldName)?.jsonPrimitive
-                        ?: throw IllegalArgumentException("No entity version field value")
-
-                    updateTrackerStmt.setJsonPrimitive(1, repEntityMetaData.entityPrimaryKeyFieldType, primaryKeyVal)
-                    updateTrackerStmt.setJsonPrimitive(2, repEntityMetaData.versionIdFieldType, entityVersionVal)
-                    updateTrackerStmt.setLong(3, remoteNodeId)
-                    updateTrackerStmt.setJsonPrimitive(4, repEntityMetaData.entityPrimaryKeyFieldType, primaryKeyVal)
-                    updateTrackerStmt.setJsonPrimitive(5, repEntityMetaData.versionIdFieldType, entityVersionVal)
-                    updateTrackerStmt.executeUpdateAsyncKmp()
-                }
-
+                //Set the fromNodeId, which is always last
+                stmt.setLong(entityMetaData.entityFields.size + 1, fromNodeId)
+                stmt.executeUpdateAsyncKmp()
             }
         }
     }
-     */
-
 }
 
 internal suspend fun RoomDatabase.getDoorNodeAuth(nodeId : Long): String? {

@@ -18,4 +18,11 @@ abstract class ExampleEntity3Dao {
                       0 AS orPk2  
     """)
     abstract suspend fun insertOutgoingReplication(entityUid: Long, destination: Long)
+
+    @Query("""
+        SELECT ExampleEntity3.*
+          FROM ExampleEntity3
+         WHERE ExampleEntity3.eeUid = :uid 
+    """)
+    abstract suspend fun findByUid(uid: Long): ExampleEntity3?
 }

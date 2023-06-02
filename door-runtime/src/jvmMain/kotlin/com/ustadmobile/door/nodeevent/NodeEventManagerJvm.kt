@@ -1,25 +1,16 @@
 package com.ustadmobile.door.nodeevent
 
-import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.ext.concurrentSafeMapOf
 import com.ustadmobile.door.ext.dbType
 import com.ustadmobile.door.jdbc.Connection
-import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
-import com.ustadmobile.door.jdbc.ext.executeUpdateAsync
+import com.ustadmobile.door.jdbc.ext.*
 import com.ustadmobile.door.room.RoomDatabase
-import com.ustadmobile.door.room.RoomDatabaseJdbcImplHelper
 import com.ustadmobile.door.room.RoomJdbcImpl
 import com.ustadmobile.door.util.TransactionMode
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
-import com.ustadmobile.door.jdbc.ext.useStatementAsync
-import com.ustadmobile.door.jdbc.ext.useResults
-import com.ustadmobile.door.jdbc.ext.mapRows
 import com.ustadmobile.door.room.RoomDatabaseJdbcImplHelperCommon
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.asFlow
-import kotlinx.coroutines.flow.emitAll
 
 class NodeEventManagerJvm(
     db: RoomDatabase,
@@ -41,7 +32,6 @@ class NodeEventManagerJvm(
             connection: Connection,
             transactionId: Int,
         ) {
-            println("Creating replication event temp tables and trigger")
             connection.createStatement().useStatementAsync { stmt ->
                 stmt.executeUpdateAsync(NodeEventConstants.CREATE_EVENT_TMP_TABLE_SQL)
                 stmt.executeUpdateAsync(NodeEventConstants.CREATE_OUTGOING_REPLICATION_EVENT_TRIGGER)
@@ -68,7 +58,12 @@ class NodeEventManagerJvm(
                     }
                 }
             }
-            println("onAfterTransactionAsync: found ${events.size} events")
+
+            connection.prepareStatement(
+                NodeEventConstants.CLEAR_EVENTS_TMP_TABLE
+            ).useStatementAsync { stmt ->
+                stmt.executeUpdateAsyncKmp()
+            }
 
             pendingEvents[transactionId] = events
         }
@@ -78,9 +73,8 @@ class NodeEventManagerJvm(
             connection: Connection,
             transactionId: Int,
         ) {
-            println("Emitting events")
             pendingEvents.remove(transactionId)?.also {
-                _outgoingEvents.emitAll(it.asFlow())
+                _outgoingEvents.emit(it)
             }
         }
 
