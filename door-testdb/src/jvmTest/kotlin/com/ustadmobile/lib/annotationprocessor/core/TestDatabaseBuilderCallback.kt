@@ -22,7 +22,7 @@ class TestDatabaseBuilderCallback {
 
     @Test
     fun givenEntityInsertedByOnCreateCallback_whenDbOpened_thenShouldBeRetrievable() {
-        val exampleDb2 = DatabaseBuilder.databaseBuilder( ExampleDatabase2::class, "jdbc:sqlite::memory:")
+        val exampleDb2 = DatabaseBuilder.databaseBuilder( ExampleDatabase2::class, "jdbc:sqlite::memory:", 1L)
             .addCallback(CreateEntityCallback())
             .build()
 

@@ -23,7 +23,6 @@ import com.ustadmobile.door.ext.DoorDatabaseMetadata
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
 import com.ustadmobile.door.ext.minifySql
 import com.ustadmobile.door.paging.DoorLimitOffsetPagingSource
-import com.ustadmobile.door.replication.ReplicationRunOnChangeRunner
 import com.ustadmobile.door.replication.ReplicationEntityMetaData
 import com.ustadmobile.door.replication.ReplicationFieldMetaData
 import com.ustadmobile.door.room.RoomJdbcImpl
@@ -261,138 +260,6 @@ private fun CodeBlock.Builder.addReplicateEntityMetaDataCode(
     add(entity.firstPropNameWithAnnotationOrNull(AttachmentSize::class)).add(",\n")
     add("%L", repEntityAnnotation?.batchSize ?: 1000)
     add(")")
-    return this
-}
-
-
-@Deprecated("ReplicationRunOnChangeRunner is dead")
-private fun FileSpec.Builder.addReplicationRunOnChangeRunnerType(
-    dbKSClass: KSClassDeclaration
-): FileSpec.Builder {
-    //find all DAOs on the database that contain a ReplicationRunOnChange annotation
-    val daosWithRunOnChange = dbKSClass.dbEnclosedDaos()
-        .filter { dao -> dao.getAllFunctions().any { it.hasAnnotation(ReplicationRunOnChange::class) } }
-    val daosWithRunOnNewNode = dbKSClass.dbEnclosedDaos()
-        .filter { dao -> dao.getAllFunctions().any { it.hasAnnotation(ReplicationRunOnNewNode::class) } }
-
-    val allReplicateEntities = dbKSClass.allDbEntities()
-        .filter { it.hasAnnotation(ReplicateEntity::class) }
-
-
-    addType(TypeSpec.classBuilder(dbKSClass.toClassNameWithSuffix(DoorJdbcProcessor.SUFFIX_REP_RUN_ON_CHANGE_RUNNER))
-        .addOriginatingKSClasses(daosWithRunOnChange + daosWithRunOnNewNode + allReplicateEntities)
-        .addSuperinterface(ReplicationRunOnChangeRunner::class)
-        .addAnnotation(AnnotationSpec.builder(Suppress::class)
-            .addMember("%S, %S, %S, %S", "LocalVariableName", "RedundantVisibilityModifier", "unused", "ClassName")
-            .build())
-        .primaryConstructor(FunSpec.constructorBuilder()
-            .addParameter("_db", dbKSClass.toClassName())
-            .build())
-        .addProperty(PropertySpec.builder("_db", dbKSClass.toClassName(), KModifier.PRIVATE)
-            .initializer("_db")
-            .build())
-        .apply {
-            allReplicateEntities.forEach { repEntity ->
-                addFunction(FunSpec.builder("handle${repEntity.simpleName.asString()}Changed")
-                    .receiver(dbKSClass.toClassName())
-                    .addModifiers(KModifier.SUSPEND)
-                    .addModifiers(KModifier.PRIVATE)
-                    .returns(Set::class.parameterizedBy(String::class))
-                    .addCode(CodeBlock.builder()
-                        .apply {
-                            val repTablesToCheck = mutableSetOf<String>()
-                            daosWithRunOnChange.forEach { dao ->
-                                val daoFunsToRun = dao.getAllFunctions()
-                                    .filter { daoFun ->
-                                        daoFun.annotations.any { annotation ->
-                                            annotation.isAnnotationClass(ReplicationRunOnChange::class)
-                                                    && repEntity in annotation.getArgValueAsClassList("value")
-                                        }
-                                    }
-
-                                val daoPropOrGetter = dbKSClass.findDbGetterForDao(dao)
-
-                                daoFunsToRun.forEach { funToRun ->
-                                    add(daoPropOrGetter?.toPropertyOrEmptyFunctionCaller() ?: "")
-                                    add(".${funToRun.simpleName.asString()}(")
-                                    if(funToRun.parameters.firstOrNull()?.hasAnnotation(NewNodeIdParam::class) == true) {
-                                        add("0L")
-                                    }
-
-                                    add(")\n")
-                                    val checkPendingRepTablesNames = funToRun.getKSAnnotationsByType(ReplicationCheckPendingNotificationsFor::class)
-                                        .firstOrNull()?.getArgValueAsClassList("value")
-                                        ?.map { it.simpleName.asString() } ?: listOf(repEntity.simpleName.asString())
-                                    repTablesToCheck.addAll(checkPendingRepTablesNames)
-                                }
-                            }
-                            add("%M(%L)\n",
-                                MemberName("com.ustadmobile.door.ext", "deleteFromChangeLog"),
-                                repEntity.getAnnotation(ReplicateEntity::class)?.tableId)
-
-                            add("return setOf(${repTablesToCheck.joinToString { "\"$it\"" }})\n")
-                        }
-                        .build())
-                    .build())
-            }
-        }
-        .addFunction(FunSpec.builder("runReplicationRunOnChange")
-            .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-            .addParameter("tableNames", Set::class.parameterizedBy(String::class))
-            .returns(Set::class.parameterizedBy(String::class))
-            .addCode(CodeBlock.builder()
-                .apply {
-                    add("val _checkPendingNotifications = mutableSetOf<String>()\n")
-                    beginControlFlow("_db.%M",
-                        MemberName("com.ustadmobile.door.ext", "withDoorTransactionAsync"))
-                    add("_transactionDb ->\n")
-                    allReplicateEntities.forEach { repEntity ->
-                        beginControlFlow("if(%S in tableNames)", repEntity.simpleName.asString())
-                        add("_checkPendingNotifications.addAll(_transactionDb.handle${repEntity.simpleName.asString()}Changed())\n")
-                        endControlFlow()
-                    }
-                    add("Unit\n")
-                    endControlFlow()
-                    add("return _checkPendingNotifications\n")
-                }
-                .build())
-            .build())
-        .addFunction(FunSpec.builder("runOnNewNode")
-            .addModifiers(KModifier.OVERRIDE, KModifier.SUSPEND)
-            .addParameter("newNodeId", LONG)
-            .returns(Set::class.parameterizedBy(String::class))
-            .addCode(CodeBlock.builder()
-                .apply {
-                    val entitiesChanged = mutableSetOf<String>()
-                    beginControlFlow("_db.%M",
-                        MemberName("com.ustadmobile.door.ext", "withDoorTransactionAsync"))
-                    add("_transactionDb -> \n")
-                    add("var fnTimeCounter = 0L\n")
-                    daosWithRunOnNewNode.forEach { dao ->
-                        val daoAccessor = dbKSClass.findDbGetterForDao(dao)
-                        dao.getAllFunctions().filter { it.hasAnnotation(ReplicationRunOnNewNode::class) }.forEach { daoFun ->
-                            add("fnTimeCounter = %M()\n",
-                                MemberName("com.ustadmobile.door.util", "systemTimeInMillis"))
-                            add("_transactionDb.%L.${daoFun.simpleName.asString()}(newNodeId)\n",
-                                daoAccessor?.toPropertyOrEmptyFunctionCaller())
-                            add("%T.d(%S + (%M() - fnTimeCounter) + %S)\n", Napier::class,
-                                "Ran ${dao.simpleName.asString()}#${daoFun.simpleName.asString()} in ",
-                                MemberName("com.ustadmobile.door.util", "systemTimeInMillis"),
-                                "ms")
-                            val funEntitiesChanged = daoFun.getKSAnnotationsByType(ReplicationCheckPendingNotificationsFor::class)
-                                .firstOrNull()
-                                ?.getArgValueAsClassList("value") ?: emptyList()
-
-                            entitiesChanged += funEntitiesChanged.map { it.entityTableName }
-                        }
-                    }
-                    endControlFlow()
-                    add("return setOf(${entitiesChanged.joinToString(separator = "\", \"", prefix = "\"", postfix = "\"")})\n")
-                }
-                .build())
-            .build())
-        .build())
-
     return this
 }
 
@@ -1475,12 +1342,6 @@ class DoorJdbcProcessor(
                 .build()
                 .writeTo(environment.codeGenerator, false)
 
-            FileSpec.takeIf { dbKSClass.dbHasRunOnChangeTriggers() }
-                ?.builder(dbKSClass.packageName.asString(), dbKSClass.simpleName.asString() + SUFFIX_REP_RUN_ON_CHANGE_RUNNER)
-                ?.addReplicationRunOnChangeRunnerType(dbKSClass)
-                ?.build()
-                ?.writeTo(environment.codeGenerator, false)
-
             if(target in JDBC_TARGETS) {
                 FileSpec.builder(dbKSClass.packageName.asString(), dbKSClass.simpleName.asString() + SUFFIX_JDBC_KT2)
                     .addJdbcDbImplType(dbKSClass, target, resolver)
@@ -1512,11 +1373,8 @@ class DoorJdbcProcessor(
 
         val JDBC_TARGETS = listOf(DoorTarget.JVM, DoorTarget.JS)
 
-
         //As it should be including the underscore - the above will be deprecated
         const val SUFFIX_JDBC_KT2 = "_JdbcKt"
-
-        const val SUFFIX_REP_RUN_ON_CHANGE_RUNNER = "_ReplicationRunOnChangeRunner"
 
         const val SUFFIX_JS_IMPLEMENTATION_CLASSES = "JsImplementations"
     }

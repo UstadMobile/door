@@ -4,7 +4,6 @@ import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.DoorConstants.DBINFO_TABLENAME
 import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.dbType
-import com.ustadmobile.door.ext.doorDatabaseMetadata
 import com.ustadmobile.door.ext.wrap
 import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.migration.DoorMigrationAsync
@@ -14,7 +13,6 @@ import com.ustadmobile.door.util.PostgresChangeTracker
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.lang.IllegalStateException
-import java.sql.Connection
 import java.sql.ResultSet
 import java.sql.SQLException
 import java.sql.Statement
@@ -33,6 +31,7 @@ import org.sqlite.SQLiteDataSource
 class DatabaseBuilder<T: RoomDatabase> internal constructor(
     private var dbClass: KClass<T>,
     private var dbUrl: String,
+    private var nodeId: Long,
     private var dbUsername: String?,
     private var dbPassword: String?,
     private var attachmentDir: File? = null,
@@ -48,12 +47,13 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
         fun <T : RoomDatabase> databaseBuilder(
             dbClass: KClass<T>,
             dbUrl: String,
+            nodeId: Long,
             dbUsername: String? = null,
             dbPassword: String? = null,
             attachmentDir: File? = null,
             attachmentFilters: List<AttachmentFilter> = listOf(),
             queryTimeout: Int = PreparedStatementConfig.STATEMENT_DEFAULT_TIMEOUT_SECS,
-        ): DatabaseBuilder<T> = DatabaseBuilder(dbClass, dbUrl, dbUsername, dbPassword, attachmentDir,
+        ): DatabaseBuilder<T> = DatabaseBuilder(dbClass, dbUrl, nodeId, dbUsername, dbPassword, attachmentDir,
             attachmentFilters, queryTimeout)
     }
 
@@ -194,11 +194,7 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                 postgresChangeTracker.setupTriggers()
             }
 
-            return if(doorDb::class.doorDatabaseMetadata().hasReadOnlyWrapper) {
-                doorDb.wrap(dbClass)
-            }else {
-                doorDb
-            }
+            return doorDb.wrap(dbClass = dbClass, nodeId = nodeId)
         }
     }
 

@@ -20,7 +20,7 @@ class PrimaryKeyTest {
 
     @Before
     fun setup() {
-        db = DatabaseBuilder.databaseBuilder( RepDb::class,"jdbc:sqlite::memory:")
+        db = DatabaseBuilder.databaseBuilder( RepDb::class,"jdbc:sqlite::memory:", 1L)
             .build().also {
                 it.clearAllTables()
             }

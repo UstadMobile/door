@@ -32,37 +32,6 @@ actual fun <T: RoomDatabase, R> T.withDoorTransaction(
     }
 }
 
-/**
- * Where the receiver database is the transaction database created by
- * createTransactionDataSourceAndDb this is used by generated code to create a
- * new repository with the same repository config linked to the transaction
- * database.
- *
- * This is used by generated code
- *
- * @receiver transaction database created by createTransactionDataSourceAndDb
- * @param originalRepo the repository from which the repo config will be copied
- * @param dbKClass the KClass representing the database itself
- * @param repoImplKClass the KClass representing the generated repository implementation
- */
-@Suppress("unused")
-fun <T: RoomDatabase> T.wrapDbAsRepositoryForTransaction(
-    originalRepo: T,
-    dbKClass: KClass<T>,
-    repoImplKClass: KClass<T>,
-) : T {
-    val wrappedDb = if(this::class.doorDatabaseMetadata().hasReadOnlyWrapper) {
-        this.wrap(dbKClass)
-    }else {
-        this
-    }
-
-    val repoConfig = (originalRepo as DoorDatabaseRepository).config
-    return repoImplKClass.java.getConstructor(
-        dbKClass.java, dbKClass.java, RepositoryConfig::class.java, Boolean::class.javaPrimitiveType
-    ).newInstance(wrappedDb, this, repoConfig, false) as T
-}
-
 actual fun RoomDatabase.execSqlBatch(vararg sqlStatements: String) {
     rootDatabase.execSQLBatch(*sqlStatements)
 }
@@ -114,11 +83,16 @@ private val KClass<*>.qualifiedNameBeforeLastUnderscore: String?
  * the repo.
  */
 @Suppress("UNCHECKED_CAST")
-actual fun <T: RoomDatabase> T.wrap(dbClass: KClass<T>) : T {
+actual fun <T: RoomDatabase> T.wrap(
+    dbClass: KClass<T>,
+    nodeId: Long,
+) : T {
     val wrapperClass = Class.forName(
         "${dbClass.qualifiedNameBeforeLastUnderscore}${DoorDatabaseWrapper.SUFFIX}"
     ) as Class<T>
-    return wrapperClass.getConstructor(dbClass.java).newInstance(this)
+    return wrapperClass.getConstructor(
+        dbClass.java, Long::class.javaPrimitiveType
+    ).newInstance(this, nodeId)
 }
 
 @Suppress("UNCHECKED_CAST")

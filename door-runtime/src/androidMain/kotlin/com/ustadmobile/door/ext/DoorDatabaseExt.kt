@@ -48,13 +48,13 @@ actual fun <T: RoomDatabase, R> T.withDoorTransaction(
 fun RoomDatabase.resolveAttachmentAndroidUri(attachmentUri: String): Uri {
     val attachmentsDir = requireAttachmentStorageUri().toFile()
 
-    if(attachmentUri.startsWith(DOOR_ATTACHMENT_URI_PREFIX)) {
+    return if(attachmentUri.startsWith(DOOR_ATTACHMENT_URI_PREFIX)) {
         val attachmentFile = File(attachmentsDir,
             attachmentUri.substringAfter(DOOR_ATTACHMENT_URI_PREFIX))
 
-        return Uri.fromFile(attachmentFile)
+        Uri.fromFile(attachmentFile)
     }else {
-        return Uri.parse(attachmentUri)
+        Uri.parse(attachmentUri)
     }
 }
 
@@ -180,7 +180,10 @@ fun <T: RoomDatabase> RoomDatabase.isWrappable(dbClass: KClass<T>): Boolean {
  * annotated with @LastChangedTime) setting the last changed time as the version id, and storing attachment data.
  */
 @Suppress("UNCHECKED_CAST")
-actual fun <T: RoomDatabase> T.wrap(dbClass: KClass<T>) : T {
+actual fun <T: RoomDatabase> T.wrap(
+    dbClass: KClass<T>,
+    nodeId: Long,
+) : T {
     val wrapperClass = Class.forName(
         "${dbClass.qualifiedName}${DoorDatabaseWrapper.SUFFIX}"
     ) as Class<T>

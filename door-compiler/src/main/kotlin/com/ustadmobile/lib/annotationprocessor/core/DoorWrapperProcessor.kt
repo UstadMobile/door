@@ -238,9 +238,12 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
             .addSuperinterface(DoorDatabaseWrapper::class.asClassName())
             .primaryConstructor(FunSpec.constructorBuilder()
                 .addParameter("_db", dbClassName)
+                .addParameter("_nodeId", LONG)
                 .build())
             .addProperty(PropertySpec.builder("_db", dbClassName, KModifier.PRIVATE)
                 .initializer("_db").build())
+            .addProperty(PropertySpec.builder("_nodeId", LONG, KModifier.PRIVATE)
+                .initializer("_nodeId").build())
             .applyIf(target == DoorTarget.JS || target == DoorTarget.JVM) {
                 addDbVersionProperty(dbClassDecl)
                 addFunction(FunSpec.builder("createAllTables")

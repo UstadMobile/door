@@ -103,7 +103,10 @@ expect val RoomDatabase.doorPrimaryKeyManager: DoorPrimaryKeyManager
  */
 expect inline fun <reified  T: RoomDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T
 
-expect fun <T: RoomDatabase> T.wrap(dbClass: KClass<T>): T
+expect fun <T: RoomDatabase> T.wrap(
+    dbClass: KClass<T>,
+    nodeId: Long,
+): T
 
 expect fun <T: RoomDatabase> T.unwrap(dbClass: KClass<T>): T
 

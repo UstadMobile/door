@@ -25,7 +25,7 @@ class NodeEventTest {
      */
     @Test
     fun givenEmptyDatabase_whenNewOutgoingReplicationInserted_thenShouldEmitNodeEventWhichCanBeSelectedAsReplicationEntity() {
-        val db = DatabaseBuilder.databaseBuilder(ExampleDb3::class, "jdbc:sqlite::memory:")
+        val db = DatabaseBuilder.databaseBuilder(ExampleDb3::class, "jdbc:sqlite::memory:", 1L)
             .build()
         db.clearAllTables()
 
@@ -55,14 +55,15 @@ class NodeEventTest {
 
     }
 
+    //Note: fixing this might require changing trigger
     @Test
     fun givenEmptyDatabases_whenNewOutgoingReplicationInsertedIsEmittedToSecondDatabase_thenEntityIsPresentOnSecondDatabase() {
-        val db1 = DatabaseBuilder.databaseBuilder(ExampleDb3::class, "jdbc:sqlite::memory:")
+        val db1 = DatabaseBuilder.databaseBuilder(ExampleDb3::class, "jdbc:sqlite::memory:", 1L)
             .build().also {
                 it.clearAllTables()
             }
 
-        val db2 = DatabaseBuilder.databaseBuilder(ExampleDb3::class, "jdbc:sqlite::memory:")
+        val db2 = DatabaseBuilder.databaseBuilder(ExampleDb3::class, "jdbc:sqlite::memory:", 2L)
             .build().also {
                 it.clearAllTables()
             }

@@ -26,7 +26,7 @@ class TestDbBuilderKt {
 
     @Before
     fun openAndClearDb() {
-        exampleDb2 = DatabaseBuilder.databaseBuilder( ExampleDatabase2::class, "jdbc:sqlite::memory:")
+        exampleDb2 = DatabaseBuilder.databaseBuilder( ExampleDatabase2::class, "jdbc:sqlite::memory:",1L)
             .addCallback(object: DoorDatabaseCallbackStatementList {
                 override fun onOpen(db: DoorSqlDatabase): List<String> {
                     return listOf()

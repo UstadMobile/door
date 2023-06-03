@@ -19,9 +19,9 @@ import com.ustadmobile.door.annotation.*
                 REPLACE INTO ExampleEntity3(eeUid, cardNumber, name, lastUpdatedTime)
                       SELECT NEW.eeUid, NEW.cardNumber, NEW.name, NEW.lastUpdatedTime
                        WHERE NEW.lastUpdatedTime !=
-                             (SELECT ExampleEntity3Internal.lastUpdatedTime
-                                FROM ExampleEntity3 ExampleEntity3Internal
-                               WHERE ExampleEntity3Internal.eeUid = NEW.eeUid)
+                             COALESCE((SELECT ExampleEntity3Internal.lastUpdatedTime
+                                         FROM ExampleEntity3 ExampleEntity3Internal
+                                        WHERE ExampleEntity3Internal.eeUid = NEW.eeUid), 0)
                 """
             )
         )

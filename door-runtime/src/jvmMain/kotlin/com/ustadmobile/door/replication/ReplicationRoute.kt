@@ -1,34 +1,9 @@
 package com.ustadmobile.door.replication
 
-import com.ustadmobile.door.room.RoomDatabase
-import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_CHECK_FOR_ENTITIES_ALREADY_RECEIVED
-import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_FIND_PENDING_REPLICATIONS
-import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_FIND_PENDING_REPLICATION_TRACKERS
-import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_MARK_REPLICATE_TRACKERS_AS_PROCESSED
-import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_RECEIVE_ENTITIES
-import com.ustadmobile.door.DoorDatabaseRepository.Companion.ENDPOINT_SUBSCRIBE_SSE
-import com.ustadmobile.door.DoorDatabaseRepository.Companion.PATH_REPLICATION
-import com.ustadmobile.door.IncomingReplicationEvent
-import com.ustadmobile.door.entities.NodeIdAndAuth
-import com.ustadmobile.door.ext.*
-import com.ustadmobile.door.sse.DoorServerSentEvent
-import io.github.aakira.napier.Napier
-import io.ktor.server.application.*
-import io.ktor.http.*
-import io.ktor.server.request.*
-import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.coroutines.channels.Channel
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import org.kodein.di.DI
-import org.kodein.di.direct
-import org.kodein.di.instance
-import org.kodein.di.ktor.closestDI
-import org.kodein.di.on
-import org.kodein.type.TypeToken
-import java.util.concurrent.atomic.AtomicInteger
-import kotlin.reflect.KClass
-import com.ustadmobile.door.ktor.addNodeIdAndAuthCheckInterceptor
-import com.ustadmobile.door.util.systemTimeInMillis
 
+fun Route.replication(
+    
+) {
+
+}

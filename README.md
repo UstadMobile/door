@@ -5,33 +5,73 @@
 ![JVM](https://img.shields.io/badge/platform-jvm-orange)
 ![JS](https://img.shields.io/badge/platform-js-orange)
 
-Door is a Kotlin Symbol Processor that builds on [Room](https://developer.android.com/training/data-storage/room) and makes
-it possible to use Room databases, DAOs and entities with Kotlin Multiplatform (using [expect/actual](https://kotlinlang.org/docs/multiplatform-connect-to-apis.html)). 
-On Android Door uses a simple expect/actual system where the actual implementation is provided by Room itself. On JVM
-and Javascript Door provides equivalent functionality, with support for:
- * Synchronous and suspended queries
- * RawQuery
- * LiveData, Flow, and DataSource.Factory return types
- * Embedded entities
-
-Just put your Database, DAOs, and entity classes in your Kotlin Multiplatform common code and add the ```expect``` keyword to
-DAO and Database classes. 
-Door will generate actuals for each platform automatically!
+Door is a Kotlin Symbol Processor that builds on [Room](https://developer.android.com/training/data-storage/room) to
+generate a complete full-stack offline-first database system, including HTTP REST server endpoints, local data sources 
+and client repositories. Door supports both pull and push operations.
 
 Door supports:
-* **Android**: Door will generate the actual class for Android, which in turn is then used by Room to generate the 
-implementation (the same implementation if you had used Room itself).
-* **JVM**: Door supports SQLite and PostgreSQL using JDBC. Door will generate the entire implementation for you to run 
-queries using JDBC and return results.
-* **Javascript** Door supports SQLite in the browser through SQLite.JS. Door will generate the entire implementation for
-you to run the queries and return results. Only asynchronous operations are supported (suspended functions, LiveData, 
-and DataSource.Factory). The database can be saved to indexeddb.
+* **Android**: Door will generate the actual class for Android, which in turn is then used by Room to generate the
+  implementation (the same implementation if you had used Room itself). Full support for auto-generation of offline-first
+  repository.
+* **JVM**: Door supports SQLite and PostgreSQL using JDBC. Door will generate the entire implementation for you to run
+  queries using JDBC and return results. Full support for auto-generation of offline-first repository.
+* **Javascript**: Door can automatically generate an implementation that makes HTTP calls direct to the generated REST 
+  server.
 
-No support for iOS/Native (yet - pull request would be welcome. Happy to help support anyone who would like to work on 
+No support for iOS/Native (yet - pull request would be welcome. Happy to help support anyone who would like to work on
 this).
 
-Door contains an experimental [replication/sync](README-REPLICATION.md) engine that can be used to selectively sync instances. 
+Example Entity:
+```
+@Entity
+@Triggers()
+class Widget() {
+    @PrimaryKey(autoIncrement = true)
+    var widgetUid: Long = 0
+    
+    var widgetPrice: Float = 0f
+    
+    var widgetName: String? = null
+    
+    @ReplicationEtag
+    @ReplicationLastModified
+    var widgetLastModified: Long = 0
+}
+```
 
+Example DAO:
+
+```
+expect class MyDao {
+
+    @HttpAccessible
+    suspend fun findAllWidgets(): List<Widget>
+    
+}
+```
+
+**REST Server**:
+
+Door will automatically generate a KTOR REST endpoint. You can add it to your KTOR server using doorRoute.
+```
+val myDb = DatabaseBuilder.builder(DbClass::class, "jdbc:sqlite:file.db")
+               .build()
+route("mydatasource") {
+    doorRoute(myDb)
+}
+```
+
+Now an HTTP get to /mydatasource/MyDao/findAllWidgets will return the list.
+
+**Android Client**:
+```
+val myDb = DatabaseBuilder.builder(DbClass::class, "MyDb", context)
+          .build()
+
+val repository = myDb.asRepository("http://mserver.com/mydatasource/")
+
+val widgets = repository.myDao.findAllWidgets()
+```
 
 ## Getting started
 
@@ -191,73 +231,6 @@ Limitations:
 Use Gradle in debug mode e.g.:
 ```
 ./gradlew --no-daemon -Dorg.gradle.debug=true build
-```
-
-## Reactive sync/replication (in progress)
-
-Door makes it easy to sync data between instances efficiently and selectively.
-Each instance has a node id (a random 64-bit integer). All known nodes are stored
-in the table DoorNode.
-
-Any entity being replicated must have an annotated etag field. The etag must change
-when the underlying data changes. If the field is annotated with @LastModifiedTime, 
-Door will automatically set it to the last modified time when @Insert and @Update 
-functions are used.
-
-```
-@ReplicateEntity(tableId = UNIQUE_TABLE_ID)
-@Entity
-class MyEntity {
-    
-    @PrimaryKey(autoIncrement = true)
-    var primaryKey: Long = 0
-    
-    @EtagField
-    @LastModifiedTime
-    var lastChangedTime: Long = 0
-    
-    var name: String? = null
-    
-}
-```
-
-You can define queries that automatically replicate data to the given destination
-
-```
-@ReplicateQuery(rateLimit = 60000) //Run at most once per minute
-@Query("""
-SELECT primaryKey, lastChangedTime, destNode
-  FROM MyEntity
-       JOIN Subscribers ON ...
- WHERE Subscriber.alertActive     
-""")
-suspend fun sendAlertsToClients()
-```
-
-That's it! Door will automatically detect changes and replicate anything new to the 
-other nodes you specify as per the destNode.
-
-If you have a database that changes a lot and/or complex conditions that determine 
-which data goes where, then you can rate-limit the query as above.
-
-If you need additionally security checks on entities coming from a remote node etc, you can use insert into a view 
-instead of inserting into the table directly. You can then use a trigger (e.g. INSTEAD OF INSERT) to validate data 
-from the remote node. See example.
-
-If you want to manually tell Door to replicate something, you can simply run:
-```
-db.replicate(tableId, destinationNodeId, primaryKey)
-```
-
-You can also create a trigger (e.g. in database open callbacks):
-
-```
-CREATE TRIGGER send_urgent_alert
-AFTER UPDATE ON MyEntity
-BEGIN
-INSERT INTO OutgoingReplication(tableId, primaryKey, destNode) 
-VALUES(MyEntity.TABLE_ID, MyEntity.primaryKey, destinationNodeId)
-END;
 ```
 
 ## Automatic REST endpoint generation

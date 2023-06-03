@@ -62,7 +62,10 @@ actual fun <T : RoomDatabase> KClass<T>.doorDatabaseMetadata(): DoorDatabaseMeta
     return DatabaseBuilder.lookupImplementations(this).metadata
 }
 
-actual fun <T : RoomDatabase> T.wrap(dbClass: KClass<T>): T {
+actual fun <T : RoomDatabase> T.wrap(
+    dbClass: KClass<T>,
+    nodeId: Long,
+): T {
     val jsImplClasses = DatabaseBuilder.lookupImplementations(dbClass)
     val rootDb = rootDatabase
     val wrapperKClass = jsImplClasses.replicateWrapperImplClass

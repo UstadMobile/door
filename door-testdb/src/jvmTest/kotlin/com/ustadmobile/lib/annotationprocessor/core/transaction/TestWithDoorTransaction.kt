@@ -1,6 +1,5 @@
 package com.ustadmobile.lib.annotationprocessor.core.transaction
 
-import com.ustadmobile.door.room.InvalidationTracker
 import com.ustadmobile.door.DatabaseBuilder
 import com.ustadmobile.door.entities.DoorNode
 import com.ustadmobile.door.ext.withDoorTransaction
@@ -64,7 +63,9 @@ class TestWithDoorTransaction {
         }
 
 
-        db = DatabaseBuilder.databaseBuilder( RepDb::class, "java:/comp/env/jdbc/RepDbSpy$dbIndexToBind").build()
+        db = DatabaseBuilder.databaseBuilder(
+            RepDb::class, "java:/comp/env/jdbc/RepDbSpy$dbIndexToBind", dbIndexToBind.toLong()
+        ).build()
             .apply {
                 clearAllTables()
             }
