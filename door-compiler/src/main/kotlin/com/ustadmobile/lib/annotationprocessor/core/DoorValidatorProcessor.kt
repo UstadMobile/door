@@ -20,11 +20,8 @@ import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
 import org.sqlite.SQLiteDataSource
 import java.io.File
-import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException
-import javax.lang.model.element.ExecutableElement
-import javax.tools.Diagnostic
 
 /**
  * This processor will create all tables on all databases for a given round of processing. It will also attempt
@@ -76,6 +73,7 @@ class DoorValidatorProcessor(
             }
 
             val allEntityProps = entity.getAllProperties().toList()
+            /*
             val missingPkFields = entity.getAnnotation(Entity::class)?.primaryKeys?.filter { pkFieldName ->
                 !allEntityProps.any { it.simpleName.asString() == pkFieldName }
             } ?: emptyList()
@@ -83,7 +81,7 @@ class DoorValidatorProcessor(
             if(missingPkFields.isNotEmpty()) {
                 logger.error("Entity annotation primary key " +
                         "fields not found: ${missingPkFields.joinToString()}", entity)
-            }
+            }*/
 
             if(entity.entityPrimaryKeyProps.isEmpty()) {
                 logger.error(

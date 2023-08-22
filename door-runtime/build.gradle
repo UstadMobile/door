@@ -23,8 +23,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
     }
 
     buildTypes {
@@ -32,6 +32,7 @@ android {
             consumerProguardFiles 'proguard-rules.pro'
         }
     }
+
     namespace 'com.ustadmobile.door.runtime'
 }
 
@@ -41,12 +42,12 @@ kotlin {
     }
 
     jvmToolchain {
-        languageVersion.set(JavaLanguageVersion.of(8))
+        languageVersion.set(JavaLanguageVersion.of(11))
     }
 
     jvm {
         compilations.all {
-            kotlinOptions.jvmTarget = JavaVersion.VERSION_1_8
+            kotlinOptions.jvmTarget = JavaVersion.VERSION_11
         }
         testRuns["test"].executionTask.configure {
             useJUnit()

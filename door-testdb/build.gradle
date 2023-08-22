@@ -20,15 +20,10 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = '1.8'
-        targetCompatibility = '1.8'
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
 
-    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile) {
-        kotlinOptions {
-            jvmTarget = "1.8"
-        }
-    }
 
     buildTypes {
         release {
@@ -46,7 +41,7 @@ kotlin {
 
     jvm {
         compilations.all {
-            kotlinOptions.jvmTarget = '1.8'
+            kotlinOptions.jvmTarget = JavaVersion.VERSION_11
         }
         testRuns["test"].executionTask.configure {
             useJUnit()
