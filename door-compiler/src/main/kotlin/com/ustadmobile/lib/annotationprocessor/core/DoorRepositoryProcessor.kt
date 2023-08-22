@@ -129,6 +129,7 @@ fun FileSpec.Builder.addDbRepoType(
         .addRepositoryHelperDelegateCalls("_repositoryHelper")
         .applyIf(target != DoorTarget.ANDROID) {
             addFunction(FunSpec.builder("createAllTables")
+                .returns(List::class.parameterizedBy(String::class))
                 .addModifiers(KModifier.OVERRIDE)
                 .addCode("throw %T(%S)\n",
                     ClassName("kotlin", "IllegalStateException"),

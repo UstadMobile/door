@@ -35,6 +35,10 @@ android {
 
 kotlin {
 
+    jvmToolchain {
+        languageVersion.set(JavaLanguageVersion.of(11))
+    }
+
     android {
 
     }
@@ -111,7 +115,7 @@ kotlin {
 
         jsMain {
             dependencies {
-
+                implementation project(":room-annotations")
             }
         }
 

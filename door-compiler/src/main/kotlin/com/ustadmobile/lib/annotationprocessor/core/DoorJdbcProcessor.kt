@@ -880,6 +880,7 @@ fun TypeSpec.Builder.addDaoJdbcEntityInsertAdapter(
         .superclass(EntityInsertionAdapter::class.asClassName().parameterizedBy(entityKSClass.toClassName()))
         .addSuperclassConstructorParameter("_db")
         .addFunction(FunSpec.builder("makeSql")
+            .returns(String::class)
             .addParameter("returnsId", BOOLEAN)
             .addModifiers(KModifier.OVERRIDE)
             .addCode(CodeBlock.builder()
