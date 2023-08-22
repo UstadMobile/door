@@ -16,6 +16,7 @@ import com.ustadmobile.door.PreparedStatementConfig
 import com.ustadmobile.door.annotation.*
 import com.ustadmobile.door.entities.ZombieAttachmentData
 import com.ustadmobile.door.ext.prepareStatement
+import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
 import org.sqlite.SQLiteDataSource
 import java.io.File

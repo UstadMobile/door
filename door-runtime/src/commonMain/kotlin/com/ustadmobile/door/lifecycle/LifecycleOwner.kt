@@ -2,6 +2,6 @@ package com.ustadmobile.door.lifecycle
 
 expect interface LifecycleOwner {
 
-    fun getLifecycle(): Lifecycle
+    val lifecycle: Lifecycle
 
 }

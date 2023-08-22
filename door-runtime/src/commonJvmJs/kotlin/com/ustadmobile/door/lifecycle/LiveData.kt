@@ -67,13 +67,13 @@ actual abstract class LiveData<T : Any?> {
     }
 
     actual open fun observe(lifecycleOwner: LifecycleOwner, observer: Observer<in T>) {
-        if(lifecycleOwner.getLifecycle().currentDoorState.isAtLeast(DoorState.STARTED)) {
+        if(lifecycleOwner.lifecycle.currentDoorState.isAtLeast(DoorState.STARTED)) {
             addActiveObserver(observer)
         }
 
         val lifecycleObserver = InnerLifecycleObserver(observer)
         lifecycleObservers[observer] = Pair(lifecycleOwner, lifecycleObserver)
-        lifecycleOwner.getLifecycle().addObserver(lifecycleObserver)
+        lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
     }
 
     actual open fun observeForever(observer: Observer<in T>) {
@@ -83,7 +83,7 @@ actual abstract class LiveData<T : Any?> {
     actual open fun removeObserver(observer: Observer<in T>) {
         removeActiveObserver(observer)
         val observedLifecycle = lifecycleObservers[observer]
-        observedLifecycle?.first?.getLifecycle()?.removeObserver(observedLifecycle.second)
+        observedLifecycle?.first?.lifecycle?.removeObserver(observedLifecycle.second)
     }
 
 

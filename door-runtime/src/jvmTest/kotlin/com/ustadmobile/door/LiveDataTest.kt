@@ -38,7 +38,7 @@ class LiveDataTest {
             on { realCurrentDoorState }.thenReturn(DoorState.STARTED)
         }
         val mockLifecycleOwner = mock<LifecycleOwner> {
-            on { getLifecycle() }.thenReturn(mockActiveLifecycle)
+            on { lifecycle }.thenReturn(mockActiveLifecycle)
         }
 
         val countdownLatch = CountDownLatch(1)
@@ -74,7 +74,7 @@ class LiveDataTest {
             }
         }
         val mockLifecycleOwner = mock<LifecycleOwner> {
-            on { getLifecycle() }.thenReturn(mockLifecycle)
+            on { lifecycle }.thenReturn(mockLifecycle)
         }
 
         val countdownLatch = CountDownLatch(1)
