@@ -1,5 +1,8 @@
 package com.ustadmobile.door.nodeevent
 
+/**
+ * Represents an
+ */
 class NodeEvent(
     val what: Int,
     val toNode: Long,

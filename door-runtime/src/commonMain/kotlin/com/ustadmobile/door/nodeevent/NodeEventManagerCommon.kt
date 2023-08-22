@@ -53,7 +53,8 @@ abstract class NodeEventManagerCommon(
      * DoorWrapper will setup listeners (e.g. for new outgoingreplication entities etc) that will listen for changes and
      * then emit them via _outgoingEvents .
      *
-     * The event is "converted" to a DoorNode if/when needed e.g. by the SSE endpoint.
+     * The event is "converted" to a NodeEventMessage as/when needed e.g. by the SSE endpoint. The NodeEvent itself
+     * contains only the entity table id and primary key(s). The NodeEventMessage contains the actual entity data.
      */
     val outgoingEvents: Flow<List<NodeEvent>> = _outgoingEvents.asSharedFlow()
 

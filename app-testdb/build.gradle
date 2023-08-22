@@ -1,5 +1,5 @@
 plugins {
-    id 'org.jetbrains.kotlin.js'
+    id 'org.jetbrains.kotlin.multiplatform'
     id 'org.jetbrains.kotlin.plugin.serialization'
 }
 
@@ -14,27 +14,32 @@ kotlin {
     js(IR) {
         binaries.executable()
         browser {
-            commonWebpackConfig {
-                /* This is not supported from Kotlin 1.8
-                 * webpackConfig.cssSupport.enabled = true
-                 */
+
+        }
+    }
+
+    sourceSets {
+        jsMain {
+            dependencies {
+                implementation enforcedPlatform("org.jetbrains.kotlin-wrappers:kotlin-wrappers-bom:$version_kotlin_wrappers_bom")
+                implementation "org.jetbrains.kotlin-wrappers:kotlin-react"
+                implementation "org.jetbrains.kotlin-wrappers:kotlin-react-dom"
+                implementation "org.jetbrains.kotlin-wrappers:kotlin-styled"
+                implementation "org.jetbrains.kotlin-wrappers:kotlin-react-router-dom"
+                implementation "io.github.aakira:napier:$version_napier"
+                implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
+
+                implementation project(":door-runtime")
+                implementation project(":door-testdb")
+
+                implementation "io.ktor:ktor-client-js:$version_ktor"
+            }
+        }
+
+        jsTest {
+            dependencies {
+                implementation "org.jetbrains.kotlin:kotlin-test:$version_kotlin"
             }
         }
     }
-}
-
-dependencies {
-    testImplementation "org.jetbrains.kotlin:kotlin-test:$version_kotlin"
-    implementation enforcedPlatform("org.jetbrains.kotlin-wrappers:kotlin-wrappers-bom:$version_kotlin_wrappers_bom")
-    implementation "org.jetbrains.kotlin-wrappers:kotlin-react"
-    implementation "org.jetbrains.kotlin-wrappers:kotlin-react-dom"
-    implementation "org.jetbrains.kotlin-wrappers:kotlin-styled"
-    implementation "org.jetbrains.kotlin-wrappers:kotlin-react-router-dom"
-    implementation "io.github.aakira:napier:$version_napier"
-    implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
-
-    implementation project(":door-runtime")
-    implementation project(":door-testdb")
-
-    implementation "io.ktor:ktor-client-js:$version_ktor"
 }

@@ -16,13 +16,7 @@ class ExampleComponent(mProps: PropsWithChildren): RComponent<PropsWithChildren,
 
     private var mPresenter: ExamplePresenter<*>? = null
 
-    private var lifecycleState = DoorState.DESTROYED
-
     private val observerList: MutableList<LifecycleObserver> = mutableListOf()
-
-    override fun getLifecycle(): Lifecycle {
-        TODO("Not yet implemented")
-    }
 
     override var list: List<ExampleEntity2>? = null
         get() = field

@@ -21,7 +21,6 @@ import org.junit.After
 import org.junit.Assert
 import org.junit.Before
 import org.junit.Test
-import java.io.IOException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -71,12 +70,8 @@ class RepositoryLoadHelperTest  {
         }
 
         val invocationCount = AtomicInteger()
-        val repoLoadHelper = RepositoryLoadHelper(mockRepository,
-                lifecycleHelperFactory = mock {  }) {endpoint ->
-            invocationCount.incrementAndGet()
-            val entity = DummyEntity(100, "Bob", "Jones$endpoint")
-            entity
-        }
+        val repoLoadHelper = RepositoryLoadHelper(mockRepository
+        )
 
         val loadObserver = mock<Observer<RepositoryLoadHelper.RepoLoadStatus>>{}
         repoLoadHelper.statusLiveData.observeForever(loadObserver)
@@ -116,13 +111,8 @@ class RepositoryLoadHelperTest  {
 
         val countDownLatch2 = CountDownLatch(2)
         val countDownLatch1 = CountDownLatch(1)
-        val repoLoadHelper = RepositoryLoadHelper(mockRepository,
-                lifecycleHelperFactory = mock {  }) {endpoint ->
-            val entity = DummyEntity(100, "Bob", "Jones$endpoint")
-            countDownLatch1.countDown()
-            countDownLatch2.countDown()
-            entity
-        }
+        val repoLoadHelper = RepositoryLoadHelper(mockRepository
+        )
 
         val mockLiveData = repoLoadHelper.wrapLiveData(mock<LiveData<DummyEntity>> {  })
 
@@ -153,14 +143,7 @@ class RepositoryLoadHelperTest  {
         val completableDeferred = CompletableDeferred<DummyEntity>()
 
         val repoLoadHelper = RepositoryLoadHelper(mockRepository,
-                lifecycleHelperFactory = mock {  }, retryDelay = 500) {
-            if(currentConnectivityStatus.get() == STATUS_CONNECTED) {
-                completableDeferred.complete(entity)
-                entity
-            }else {
-                throw IOException("Mock IOException Not connected")
-            }
-        }
+            retryDelay = 500)
 
         val loadObserver = mock<Observer<RepositoryLoadHelper.RepoLoadStatus>> { }
         repoLoadHelper.statusLiveData.observeForever(loadObserver)
@@ -213,14 +196,7 @@ class RepositoryLoadHelperTest  {
         val completableDeferred = CompletableDeferred<DummyEntity>()
 
         val repoLoadHelper = RepositoryLoadHelper(mockRepository,
-                lifecycleHelperFactory = mock {  }, retryDelay = 200) {
-            if(currentConnectivityStatus.get() == STATUS_CONNECTED) {
-                completableDeferred.complete(entity)
-                entity
-            }else {
-                throw IOException("Mock IOException Not connected")
-            }
-        }
+            retryDelay = 200)
 
         val loadObserver = mock<Observer<RepositoryLoadHelper.RepoLoadStatus>>{}
         repoLoadHelper.statusLiveData.observeForever(loadObserver)
@@ -282,15 +258,7 @@ class RepositoryLoadHelperTest  {
 
         val loadHelperCallCount = AtomicInteger()
         val repoLoadHelper = RepositoryLoadHelper(mockRepository,
-                lifecycleHelperFactory = mock {  }, retryDelay = 200) {
-            loadHelperCallCount.incrementAndGet()
-            if(currentConnectivityStatus.get() == STATUS_CONNECTED) {
-                completableDeferred.complete(entity)
-                entity
-            }else {
-                throw IOException("Mock IOException Not connected")
-            }
-        }
+            retryDelay = 200)
 
         val loadObserver = mock<Observer<RepositoryLoadHelper.RepoLoadStatus>>{}
         repoLoadHelper.statusLiveData.observeForever(loadObserver)
@@ -352,15 +320,7 @@ class RepositoryLoadHelperTest  {
 
         val loadHelperCallCount = AtomicInteger()
         val repoLoadHelper = RepositoryLoadHelper(mockRepository,
-                lifecycleHelperFactory = mock {  }, retryDelay = 200) {
-            loadHelperCallCount.incrementAndGet()
-            if(currentConnectivityStatus.get() == STATUS_CONNECTED) {
-                completableDeferred.complete(entity)
-                entity
-            }else {
-                throw IOException("Mock IOException Not connected")
-            }
-        }
+            retryDelay = 200)
 
         val loadObserver = mock<Observer<RepositoryLoadHelper.RepoLoadStatus>>{}
         repoLoadHelper.statusLiveData.observeForever(loadObserver)

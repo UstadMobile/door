@@ -133,16 +133,6 @@ abstract class ExampleDao2 {
     @QueryLiveTables(["ExampleEntity2"])
     abstract fun rawQueryForLiveData(query: DoorQuery): LiveData<List<ExampleEntity2>>
 
-    @RawQuery(observedEntities = [ExampleEntity2::class])
-    @QueryLiveTables(["ExampleEntity2"])
-    abstract fun rawQueryForDataSource(query: DoorQuery): DataSourceFactory<Int, ExampleEntity2>
-
-    @Query("SELECT * FROM ExampleEntity2")
-    abstract fun queryAllLive(): DataSourceFactory<Int, ExampleEntity2>
-
-    @Query("SELECT * FROM ExampleEntity2")
-    abstract fun queryAllLiveAsync(): DataSourceFactory<Int, ExampleEntity2>
-
     @RawQuery
     abstract fun rawQueryWithArrParam(query: DoorQuery): List<ExampleEntity2>
 

@@ -2,7 +2,7 @@ package com.ustadmobile.door
 
 import java.sql.*
 
-internal actual class JdbcArrayProxy actual constructor(
+actual class JdbcArrayProxy actual constructor(
     typeName: String,
     objects: kotlin.Array<out Any?>
 ) : JdbcArrayProxyCommon(typeName, objects){

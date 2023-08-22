@@ -20,6 +20,8 @@ interface DoorDatabaseWrapper {
 
     val nodeEventManager: NodeEventManagerCommon
 
+    val nodeId: Long
+
     companion object {
 
         /**

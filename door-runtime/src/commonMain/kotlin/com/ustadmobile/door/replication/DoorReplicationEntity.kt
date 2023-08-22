@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
 /**
- * Simple class that represents a Replicatable entity - this can be used when it is transmitted in
+ * Simple class that represents a Replicatable entity - this can be used when it is transmitted
  */
 @Serializable
 data class DoorReplicationEntity(
