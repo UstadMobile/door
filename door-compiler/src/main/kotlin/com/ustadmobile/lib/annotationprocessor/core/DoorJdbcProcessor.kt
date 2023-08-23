@@ -759,7 +759,7 @@ internal fun CodeBlock.Builder.addCreateTriggersCode(
     dbProductType: Int
 ): CodeBlock.Builder {
     Napier.d("Door Wrapper: addCreateTriggersCode ${entityKSClass.simpleName.asString()}")
-    entityKSClass.getAnnotations(Triggers::class).firstOrNull()?.value?.forEach { trigger ->
+    entityKSClass.getKSAnnotationByType(Triggers::class)?.toTriggers()?.value?.forEach { trigger ->
         trigger.toSql(entityKSClass, dbProductType).forEach { sqlStr ->
             add("$stmtListVar += %S\n", sqlStr)
         }

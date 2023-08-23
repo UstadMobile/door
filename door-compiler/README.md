@@ -6,5 +6,11 @@ Add Remote JVM Debug with port 5005)
 
 KSP:
 ```
-./gradlew -Dorg.gradle.debug=true -Dkotlin.compiler.execution.strategy=in-process door-testdb:jvmJar
+./gradlew :module:taskName --no-daemon -Dorg.gradle.debug=true -Pkotlin.compiler.execution.strategy=in-process
 ```
+
+e.g.
+```
+./gradlew :door-testdb:jvmJar --no-daemon -Dorg.gradle.debug=true -Pkotlin.compiler.execution.strategy=in-process
+```
+

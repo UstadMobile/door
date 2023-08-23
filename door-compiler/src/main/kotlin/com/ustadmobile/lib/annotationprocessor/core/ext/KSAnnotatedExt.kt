@@ -14,6 +14,10 @@ fun <T: Annotation> KSAnnotated.getKSAnnotationsByType(annotationKClass: KClass<
     return annotations.filter { it.isAnnotationClass(annotationKClass) }
 }
 
+fun <T: Annotation> KSAnnotated.getKSAnnotationByType(annotationKClass: KClass<T>): KSAnnotation? {
+    return getKSAnnotationsByType(annotationKClass).firstOrNull()
+}
+
 /**
  * Wrapper to avoid OptIn. This implementation is trivial and could be changed.
  */

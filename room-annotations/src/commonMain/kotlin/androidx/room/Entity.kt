@@ -69,7 +69,7 @@ annotation class Entity(
          *
          * @return The list of indices on the table.
          */
-        val indices: Array<Index> = arrayOf(),
+        val indices: Array<Index> = [],
         /**
          * If set to `true`, any Index defined in parent classes of this class will be carried
          * over to the current `Entity`. Note that if you set this to `true`, even if the

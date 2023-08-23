@@ -6,9 +6,7 @@ import io.ktor.client.request.forms.*
 import io.ktor.content.*
 import io.ktor.http.*
 import com.google.devtools.ksp.processing.Resolver
-import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import com.google.devtools.ksp.symbol.KSType
+import com.google.devtools.ksp.symbol.*
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.MEMBERNAME_CLIENT_SET_BODY
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.MEMBERNAME_ENCODED_PATH
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
@@ -70,8 +68,9 @@ fun CodeBlock.Builder.addCreateTableCode(
     resolver: Resolver,
 ) : CodeBlock.Builder {
     addSql(execSqlFn, sqlListVar, entityKSClass.toCreateTableSql(dbProductType, resolver))
+    val entity = entityKSClass.getKSAnnotationByType(Entity::class)?.toEntity(entityKSClass.simpleName.asString())
 
-    entityKSClass.getAnnotation(Entity::class)?.indices?.forEach { index ->
+    entity?.indices?.forEach { index ->
         val indexName = if(index.name != "") {
             index.name
         }else {

@@ -1,10 +1,10 @@
 
 buildscript {
 
-    ext.kotlin_version = "1.9.0"
-    ext.atomicfu_version = '0.22.0'
+    ext.kotlin_version = "1.8.22"
+    ext.atomicfu_version = '0.21.0'
     ext.version_shadow = "8.1.1"
-    ext.ksp_version = "1.0.13"
+    ext.ksp_version = "1.0.11"
 
     repositories {
         google()
@@ -54,10 +54,10 @@ if(System.getenv("DOOR_POSTGRES_PASS") != null) {
 
 ext {
     version_kotlin = "1.9.0"
-    version_ktor = "2.3.3"
+    version_ktor = "2.3.2"
     version_nanohttpd = "2.3.1"
     version_napier = "2.6.1"
-    version_atomicfu = '0.22.0'
+    version_atomicfu = '0.21.0'
     version_sqlite_jdbc = "3.42.0.0"
     version_kodein_di = "7.20.2"
     version_kotlin_mockito = "5.1.0"
@@ -77,7 +77,7 @@ ext {
     version_apache_commons_dbcp2 = "2.9.0"
     version_logback = "1.4.11"
     version_okhttp = "4.11.0"
-    version_kotlinx_serialization = "1.6.0"
+    version_kotlinx_serialization = "1.5.1"
     version_androidx_test = "1.4.2"
     version_androidx_test_orchestrator = "1.4.2"
     version_androidx_test_runner = "1.5.2"
@@ -99,9 +99,9 @@ ext {
     version_android_material = "1.9.0"
     version_android_constraint_layout = "2.1.4"
 
-    version_kotlin_wrappers_bom = "1.0.0-pre.619"
+    version_kotlin_wrappers_bom = "1.0.0-pre.599"
 
-    version_kotlin_extensions = "1.0.1-pre.619"
+    version_kotlin_extensions = "1.0.1-pre.599"
 
     version_npm_sparkmd5 = "^3.0.2"
 
