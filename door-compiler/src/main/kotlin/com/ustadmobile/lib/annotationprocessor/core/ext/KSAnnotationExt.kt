@@ -70,9 +70,7 @@ fun KSAnnotation.getArgumentValueByNameAsKSTypeList(
  *
  * In the meantime, use KSAnnotation instead.
  */
-fun KSAnnotation.toIndex(
-    entityTableName: String,
-): Index {
+fun KSAnnotation.toIndex(): Index {
     assertQualifiedNameIs("androidx.room.Index")
     val nameArg = arguments.firstOrNullByName("name")?.value as? String
     val colNameValues: List<*> = arguments.firstOrNullByName("value")?.value as List<*>
@@ -80,10 +78,7 @@ fun KSAnnotation.toIndex(
 
     return Index(
         value = colNameValues.mapNotNull { it as? String }.toTypedArray(),
-        name = if(nameArg != null && nameArg != "")
-            nameArg
-        else
-            "index_${entityTableName}_${colNameValues.joinToString(separator = "_", postfix = "", prefix = "")}",
+        name = nameArg ?: "",
         unique = isUnique,
     )
 }
@@ -95,15 +90,12 @@ fun KSAnnotation.toIndex(
  *
  * In the meantime, use KSAnnotation instead.
  */
-fun KSAnnotation.toEntity(
-    entitySimpleName: String,
-): Entity {
+fun KSAnnotation.toEntity(): Entity {
     assertQualifiedNameIs("androidx.room.Entity")
     val entityTableNameArg = arguments.firstOrNullByName("tableName")?.value as? String
-    val effectiveTableName = entityTableNameArg ?: entitySimpleName
 
     val indices: List<Index> = getArgumentValueByNameAsAnnotationList("indices")?.map {
-        it.toIndex(entityTableName = effectiveTableName)
+        it.toIndex()
     } ?: emptyList()
 
     return Entity(

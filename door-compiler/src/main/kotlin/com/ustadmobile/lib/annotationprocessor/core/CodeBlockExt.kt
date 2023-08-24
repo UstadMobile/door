@@ -68,7 +68,7 @@ fun CodeBlock.Builder.addCreateTableCode(
     resolver: Resolver,
 ) : CodeBlock.Builder {
     addSql(execSqlFn, sqlListVar, entityKSClass.toCreateTableSql(dbProductType, resolver))
-    val entity = entityKSClass.getKSAnnotationByType(Entity::class)?.toEntity(entityKSClass.simpleName.asString())
+    val entity = entityKSClass.getKSAnnotationByType(Entity::class)?.toEntity()
 
     entity?.indices?.forEach { index ->
         val indexName = if(index.name != "") {
@@ -111,7 +111,7 @@ internal fun CodeBlock.Builder.addKtorRequestForFunction(
     val nonQueryParams =  funSpec.parameters.filter { !it.type.isHttpQueryQueryParam() }
 
     //The type of the response we expect from the server.
-    val httpResultType = funSpec.returnType?.unwrapLiveDataOrDataSourceFactory() ?: UNIT
+    val httpResultType = funSpec.returnType.unwrapLiveDataOrDataSourceFactory()
 
     val httpMemberFn = if(nonQueryParams.isEmpty()) {
         CLIENT_GET_MEMBER_NAME
