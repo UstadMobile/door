@@ -22,9 +22,10 @@ android {
         targetSdkVersion rootProject.ext.version_android_target_sdk
     }
 
+    //As per https://developer.android.com/build/jdks
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     buildTypes {
@@ -34,20 +35,22 @@ android {
     }
 
     namespace 'com.ustadmobile.door.runtime'
+
 }
 
 kotlin {
-    android {
+    androidTarget {
         publishLibraryVariants("release", "debug")
     }
 
+    //As per https://developer.android.com/build/jdks#toolchain
     jvmToolchain {
-        languageVersion.set(JavaLanguageVersion.of(11))
+        languageVersion.set(JavaLanguageVersion.of(17))
     }
 
     jvm {
         compilations.all {
-            kotlinOptions.jvmTarget = JavaVersion.VERSION_11
+            kotlinOptions.jvmTarget = JavaVersion.VERSION_17
         }
         testRuns["test"].executionTask.configure {
             useJUnit()

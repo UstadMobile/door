@@ -21,13 +21,13 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile) {
         kotlinOptions {
-            jvmTarget = JavaVersion.VERSION_11
+            jvmTarget = JavaVersion.VERSION_17
         }
     }
 
@@ -41,13 +41,13 @@ android {
 
 kotlin {
 
-    android {
+    androidTarget {
         publishLibraryVariants("release", "debug")
     }
 
     jvm {
         compilations.all {
-            kotlinOptions.jvmTarget = JavaVersion.VERSION_11
+            kotlinOptions.jvmTarget = JavaVersion.VERSION_17
         }
         testRuns["test"].executionTask.configure {
             useJUnit()
