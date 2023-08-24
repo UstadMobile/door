@@ -186,9 +186,11 @@ kotlin {
 }
 
 publishing {
-    repositories {
-        maven {
-            url rootProject.ext.localProperties["repo.dir"]
+    publications {
+        maven(MavenPublication) {
+            artifactId = project.name
+
+            from components.java
         }
     }
 }

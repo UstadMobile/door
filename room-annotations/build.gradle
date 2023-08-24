@@ -89,3 +89,15 @@ kotlin {
 
     }
 }
+
+publishing {
+
+    publications {
+        maven(MavenPublication) {
+            artifactId = project.name
+
+            from components.java
+        }
+    }
+
+}
