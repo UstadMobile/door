@@ -42,3 +42,13 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib"
 }
 
+
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+        }
+    }
+}
+
