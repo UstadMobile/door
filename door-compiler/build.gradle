@@ -61,15 +61,3 @@ dependencies {
     testImplementation "junit:junit:$version_junit"
 }
 
-
-publishing {
-
-    publications {
-        maven(MavenPublication) {
-            artifactId = project.name
-
-            from components.java
-        }
-    }
-
-}
