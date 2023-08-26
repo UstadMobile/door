@@ -1,6 +1,6 @@
 package com.ustadmobile.door
 
-expect class JdbcArrayProxy(
+internal expect class JdbcArrayProxy actual constructor(
     typeName: String,
     objects: kotlin.Array<out Any?>
 ): JdbcArrayProxyCommon

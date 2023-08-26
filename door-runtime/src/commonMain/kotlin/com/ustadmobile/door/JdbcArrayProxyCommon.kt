@@ -3,7 +3,7 @@ package com.ustadmobile.door
 import com.ustadmobile.door.jdbc.Array
 import com.ustadmobile.door.jdbc.TypesKmp
 
-abstract class JdbcArrayProxyCommon(
+internal abstract class JdbcArrayProxyCommon(
     val typeName: String,
     val objects: kotlin.Array<out Any?>
 ) : Array{

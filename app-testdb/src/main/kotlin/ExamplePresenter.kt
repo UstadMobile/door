@@ -1,4 +1,5 @@
 import com.ustadmobile.door.lifecycle.LifecycleObserver
+import com.ustadmobile.door.lifecycle.LifecycleOwner
 import com.ustadmobile.door.*
 import com.ustadmobile.door.jdbc.types.Date
 import db2.ExampleDatabase2
@@ -8,9 +9,13 @@ import db2.ExampleEntity2
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 
-class ExamplePresenter<V :  ExampleView> (private val view: V): LifecycleObserver {
+class ExamplePresenter<V :  ExampleView> (private val view: V, private val lifecycleOwner: LifecycleOwner): LifecycleObserver {
 
     private var database: ExampleDatabase2? = null;
+
+    private val observer = ObserverFnWrapper<List<ExampleEntity2>>{
+        view.list = it.sortedByDescending { data -> data.uid }
+    }
 
     init {
         //This will be obsolete - moving to FC
@@ -25,6 +30,9 @@ class ExamplePresenter<V :  ExampleView> (private val view: V): LifecycleObserve
 
             database =  DatabaseBuilder.databaseBuilder<ExampleDatabase2>(builderOptions).build()
 
+            val listLiveData = database?.exampleDao2()?.queryAllLiveAsync()?.getData(0, Int.MAX_VALUE)
+            listLiveData?.removeObserver(observer)
+            listLiveData?.observe(lifecycleOwner,observer)
         }
     }
 
