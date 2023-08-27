@@ -238,12 +238,12 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
             .addSuperinterface(DoorDatabaseWrapper::class.asClassName())
             .primaryConstructor(FunSpec.constructorBuilder()
                 .addParameter("_db", dbClassName)
-                .addParameter("_nodeId", LONG)
+                .addParameter("nodeId", LONG)
                 .build())
             .addProperty(PropertySpec.builder("_db", dbClassName, KModifier.PRIVATE)
                 .initializer("_db").build())
-            .addProperty(PropertySpec.builder("_nodeId", LONG, KModifier.PRIVATE)
-                .initializer("_nodeId").build())
+            .addProperty(PropertySpec.builder("nodeId", LONG, KModifier.OVERRIDE)
+                .initializer("nodeId").build())
             .applyIf(target == DoorTarget.JS || target == DoorTarget.JVM) {
                 addDbVersionProperty(dbClassDecl)
                 addFunction(FunSpec.builder("createAllTables")
@@ -368,6 +368,9 @@ private fun KSFunctionDeclaration.isDaoReplicateEntityWriteFunction(
     }
 }
 
+/**
+ * Generate the DoorWrapper for databases and DAOs. See DoorDatabaseWrapper interface
+ */
 class DoorWrapperProcessor(
     private val environment: SymbolProcessorEnvironment,
 ) : SymbolProcessor{

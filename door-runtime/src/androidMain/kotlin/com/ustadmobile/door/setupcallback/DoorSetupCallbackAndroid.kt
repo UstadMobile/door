@@ -14,6 +14,8 @@ class DoorSetupCallbackAndroid(
             addAll(super.onOpen(db))
 
             add(CREATE_EVENT_TMP_TABLE_SQL)
+
+            //This should check if there is an outgoingreplication table
             add(CREATE_OUTGOING_REPLICATION_EVENT_TRIGGER)
         }
 

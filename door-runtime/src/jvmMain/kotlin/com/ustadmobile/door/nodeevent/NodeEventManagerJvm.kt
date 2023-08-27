@@ -34,7 +34,7 @@ class NodeEventManagerJvm(
         ) {
             connection.createStatement().useStatementAsync { stmt ->
                 stmt.executeUpdateAsync(NodeEventConstants.CREATE_EVENT_TMP_TABLE_SQL)
-                stmt.executeUpdateAsync(NodeEventConstants.CREATE_OUTGOING_REPLICATION_EVENT_TRIGGER)
+                stmt.takeIf { hasOutgoingReplicationTable }?.executeUpdateAsync(NodeEventConstants.CREATE_OUTGOING_REPLICATION_EVENT_TRIGGER)
             }
         }
 

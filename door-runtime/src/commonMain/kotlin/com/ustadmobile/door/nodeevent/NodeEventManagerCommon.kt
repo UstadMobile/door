@@ -1,5 +1,7 @@
 package com.ustadmobile.door.nodeevent
 
+import com.ustadmobile.door.entities.OutgoingReplication
+import com.ustadmobile.door.ext.doorDatabaseMetadata
 import com.ustadmobile.door.replication.insertIntoRemoteReceiveView
 import com.ustadmobile.door.room.RoomDatabase
 import kotlinx.coroutines.CoroutineDispatcher
@@ -36,6 +38,10 @@ abstract class NodeEventManagerCommon(
     protected val dispatcher: CoroutineDispatcher = Dispatchers.Default,
     //protected val scope: CoroutineScope,
 ) {
+
+    protected val hasOutgoingReplicationTable = OutgoingReplication::class.simpleName?.let {
+        it in db::class.doorDatabaseMetadata().allTables
+    } ?: false
 
     protected val _outgoingEvents = MutableSharedFlow<List<NodeEvent>>()
 

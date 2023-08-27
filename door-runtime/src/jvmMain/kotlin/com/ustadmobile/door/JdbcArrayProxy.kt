@@ -2,7 +2,8 @@ package com.ustadmobile.door
 
 import java.sql.*
 
-actual class JdbcArrayProxy actual constructor(
+@Suppress("RemoveRedundantQualifierName") //Should show what is a normal system array vs. what is a JDBC array
+internal actual class JdbcArrayProxy actual constructor(
     typeName: String,
     objects: kotlin.Array<out Any?>
 ) : JdbcArrayProxyCommon(typeName, objects){

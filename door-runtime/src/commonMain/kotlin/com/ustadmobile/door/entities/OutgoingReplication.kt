@@ -7,6 +7,8 @@ import androidx.room.PrimaryKey
  * Represents a replication that needs to be sent to another node. Replicate Entities MUST have a primary key consisting
  * of one or two Longs. Two longs can be used to store a UUID.
  *
+ * Replication is triggered when an insertion is made into the OutgoingReplication table.
+ *
  * @param orUid the Primary Key for this table
  * @param destNodeId the nodeId of the node that this outgoingreplication should be delivered to
  * @param orTableId the tableId for this entity as per the tableId on the ReplicateEntity annotation on the Entity class
