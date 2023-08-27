@@ -4,7 +4,13 @@
 Door's objective is to provide an offline-first database layer where data can be accessed, queried, and 
 updated offline and synced when a network connection is available (directly to a cloud server and/or via a peer device). 
 This is similar to the objective in the [Android app architecture recommendation offline-first data layer](https://developer.android.com/topic/architecture/data-layer/offline-first)
-without all the manual boilerplate. There are two ways that data can be transferred:
+without all the manual boilerplate.
+
+This is intended for those who want to understand how the Door offline-first data system works under the hood. 
+It is assumed that readers of this are familiar with the concepts in an offline-first data layer and
+[Android's Room Database](https://developer.android.com/training/data-storage/room).
+
+There are two ways that data can be transferred:
 
 * __Push__: when the sending node initiates transfer to the receiving node. This makes sense if the data is highly likely to
  be relevant to the other device (e.g. data about an item where the user selected to make it available offline or a 
