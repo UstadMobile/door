@@ -2,10 +2,11 @@ package db2
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 
-@Entity(tableName = "ExampleEntity2")
+@Entity(tableName = "ExampleEntity2", indices = [Index("name", "checked", name = "name_checked_idx", unique = false)])
 @Serializable
 open class ExampleEntity2(
         @PrimaryKey(autoGenerate = true)

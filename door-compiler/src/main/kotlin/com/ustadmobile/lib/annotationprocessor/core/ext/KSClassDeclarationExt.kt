@@ -123,10 +123,6 @@ fun KSClassDeclaration.isListDeclaration(): Boolean {
     return qualifiedName?.asString() in listOf("kotlin.collections.List", "kotlin.collections.MutableList")
 }
 
-fun KSClassDeclaration.isMutableListDeclaration(): Boolean {
-    return qualifiedName?.asString() == "kotlin.collections.MutableList"
-}
-
 fun KSClassDeclaration.isArrayDeclaration(): Boolean {
     return qualifiedName?.asString() == "kotlin.Array"
 }
@@ -188,11 +184,11 @@ fun KSClassDeclaration.entityProps(
 
 val KSClassDeclaration.entityTableName: String
     get() {
-        val annotatedTableName = getAnnotation(Entity::class)?.tableName ?: ""
-        if(annotatedTableName != "")
-            return annotatedTableName
+        val annotatedTableName = getKSAnnotationByType(Entity::class)?.toEntity()?.tableName
+        return if(annotatedTableName != null && annotatedTableName != "")
+            annotatedTableName
         else
-            return simpleName.asString()
+            simpleName.asString()
     }
 
 

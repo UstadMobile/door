@@ -27,7 +27,7 @@ actual class RepositoryLoadHelperLifecycleHelper actual constructor(lifecycleOwn
      * Returns the current state as an Int as per DoorLifecycleObserver constants
      */
     actual val currentState: Int
-        get() = actLifecycleOwner?.getLifecycle()?.currentDoorState?.ordinal ?: DoorState.DESTROYED.ordinal
+        get() = actLifecycleOwner?.lifecycle?.currentDoorState?.ordinal ?: DoorState.DESTROYED.ordinal
 
     actual fun dispose() {
         actLifecycleOwner = null

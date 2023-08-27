@@ -12,6 +12,10 @@ plugins {
 group rootProject.group
 version rootProject.version
 
+sourceCompatibility = JavaVersion.VERSION_17
+targetCompatibility = JavaVersion.VERSION_17
+
+
 repositories {
     mavenCentral()
     mavenCentral()
@@ -26,6 +30,9 @@ shadowJar {
     archiveBaseName = "door-testdb-server-all"
 }
 
+compileKotlin {
+    kotlinOptions.jvmTarget = JavaVersion.VERSION_17
+}
 
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib"

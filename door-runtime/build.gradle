@@ -22,9 +22,10 @@ android {
         targetSdkVersion rootProject.ext.version_android_target_sdk
     }
 
+    //As per https://developer.android.com/build/jdks
     compileOptions {
-        sourceCompatibility = '1.8'
-        targetCompatibility = '1.8'
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     buildTypes {
@@ -32,17 +33,25 @@ android {
             consumerProguardFiles 'proguard-rules.pro'
         }
     }
+
     namespace 'com.ustadmobile.door.runtime'
+
 }
 
 kotlin {
-    android {
+    //This is essential: if this is removed, then expect/actual typealias resolution breaks on Android compilation.
+    androidTarget {
         publishLibraryVariants("release", "debug")
+    }
+
+    //As per https://developer.android.com/build/jdks#toolchain
+    jvmToolchain {
+        languageVersion.set(JavaLanguageVersion.of(17))
     }
 
     jvm {
         compilations.all {
-            kotlinOptions.jvmTarget = "1.8"
+            kotlinOptions.jvmTarget = JavaVersion.VERSION_17
         }
         testRuns["test"].executionTask.configure {
             useJUnit()
@@ -132,7 +141,7 @@ kotlin {
             dependencies {
                 implementation "org.kodein.di:kodein-di-framework-ktor-server-jvm:$version_kodein_di"
                 implementation "org.xerial:sqlite-jdbc:$version_sqlite_jdbc"
-                implementation "org.postgresql:postgresql:$version_postgres_jdbc"
+                compileOnly "org.postgresql:postgresql:$version_postgres_jdbc"
                 implementation "io.ktor:ktor-server-core:$version_ktor"
                 implementation "com.squareup.okhttp3:okhttp:$version_okhttp"
                 implementation "com.squareup.okhttp3:okhttp-sse:$version_okhttp"
@@ -177,10 +186,3 @@ kotlin {
     }
 }
 
-publishing {
-    repositories {
-        maven {
-            url rootProject.ext.localProperties["repo.dir"]
-        }
-    }
-}

@@ -12,18 +12,18 @@ repositories {
     mavenCentral()
 }
 
-sourceCompatibility = "1.8"
-targetCompatibility = "1.8"
+sourceCompatibility = JavaVersion.VERSION_17
+targetCompatibility = JavaVersion.VERSION_17
 
 compileKotlin{
-    kotlinOptions.jvmTarget = "1.8"
+    kotlinOptions.jvmTarget = JavaVersion.VERSION_17
     kotlinOptions {
         freeCompilerArgs += "-Xopt-in=com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview"
     }
 }
 
 compileTestKotlin {
-    kotlinOptions.jvmTarget = "1.8"
+    kotlinOptions.jvmTarget = JavaVersion.VERSION_17
     kotlinOptions {
         freeCompilerArgs += "-Xopt-in=com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview"
     }
@@ -63,18 +63,10 @@ dependencies {
 
 
 publishing {
-
     publications {
         maven(MavenPublication) {
-            artifactId = project.name
-
             from components.java
         }
     }
-
-    repositories {
-        maven {
-            url rootProject.ext.localProperties["repo.dir"]
-        }
-    }
 }
+

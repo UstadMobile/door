@@ -791,4 +791,6 @@ class ResultSetRoomJdbc(
     override fun updateNCharacterStream(columnLabel: String?, reader: Reader?) {
         TODO("Not yet implemented")
     }
+
+
 }

@@ -510,7 +510,7 @@ internal fun CodeBlock.Builder.addCreateTriggersCode(
     dbProductType: Int
 ): CodeBlock.Builder {
     Napier.d("Door Wrapper: addCreateTriggersCode ${entityKSClass.simpleName.asString()}")
-    entityKSClass.getAnnotations(Triggers::class).firstOrNull()?.value?.forEach { trigger ->
+    entityKSClass.getKSAnnotationByType(Triggers::class)?.toTriggers()?.value?.forEach { trigger ->
         trigger.toSql(entityKSClass, dbProductType).forEach { sqlStr ->
             add("$stmtListVar += %S\n", sqlStr)
         }
@@ -631,6 +631,7 @@ fun TypeSpec.Builder.addDaoJdbcEntityInsertAdapter(
         .superclass(EntityInsertionAdapter::class.asClassName().parameterizedBy(entityKSClass.toClassName()))
         .addSuperclassConstructorParameter("_db")
         .addFunction(FunSpec.builder("makeSql")
+            .returns(String::class)
             .addParameter("returnsId", BOOLEAN)
             .addModifiers(KModifier.OVERRIDE)
             .addCode(CodeBlock.builder()

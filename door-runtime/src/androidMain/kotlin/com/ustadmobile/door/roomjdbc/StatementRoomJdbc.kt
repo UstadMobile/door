@@ -179,4 +179,7 @@ open class StatementRoomJdbc(
     override fun isPoolable(): Boolean {
         return true
     }
+
+
+
 }
