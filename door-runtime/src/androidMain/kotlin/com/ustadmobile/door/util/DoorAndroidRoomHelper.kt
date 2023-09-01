@@ -2,7 +2,6 @@ package com.ustadmobile.door.util
 
 import android.content.Context
 import androidx.room.RoomDatabase
-import com.ustadmobile.door.IncomingReplicationListenerHelper
 import com.ustadmobile.door.attachments.AttachmentFilter
 import java.util.*
 import com.ustadmobile.door.ext.rootDatabase
@@ -21,8 +20,6 @@ class DoorAndroidRoomHelper(
     val attachmentFilters: List<AttachmentFilter>,
     private val deleteZombieAttachmentsListener: DeleteZombieAttachmentsListener,
 ) : Closeable {
-
-    val incomingReplicationListenerHelper = IncomingReplicationListenerHelper()
 
     val nodeIdAndAuthCache: NodeIdAuthCache by lazy {
         NodeIdAuthCache(db)

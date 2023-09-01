@@ -21,22 +21,6 @@ import com.ustadmobile.lib.annotationprocessor.core.ext.*
 import io.ktor.client.*
 
 /**
- * Generate the table id map of entity names (strings) to the table id as per the syncableentity
- * annotation
- */
-fun TypeSpec.Builder.addTableIdMapProperty() : TypeSpec.Builder {
-    addProperty(PropertySpec.builder("TABLE_ID_MAP",
-            Map::class.asClassName().parameterizedBy(String::class.asClassName(), INT))
-            .initializer(CodeBlock.builder()
-                    .add("mapOf<String, Int>(")
-                    .add(")\n")
-                    .build())
-            .build())
-
-    return this
-}
-
-/**
  * Add a TypeSpec to the given FileSpec Builder that is an implementation of the repository for a
  * database as per the dbKSClassDeclaration parameter.
  */

@@ -2,7 +2,10 @@ package com.ustadmobile.door.nodeevent
 
 import com.ustadmobile.door.entities.OutgoingReplication
 import com.ustadmobile.door.ext.doorDatabaseMetadata
-import com.ustadmobile.door.replication.insertIntoRemoteReceiveView
+import com.ustadmobile.door.ext.withDoorTransactionAsync
+import com.ustadmobile.door.message.DoorMessage
+import com.ustadmobile.door.message.DoorMessageCallback
+import com.ustadmobile.door.replication.insertEntitiesFromMessage
 import com.ustadmobile.door.room.RoomDatabase
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -19,8 +22,8 @@ import kotlinx.coroutines.flow.asSharedFlow
  * and emits them on the outgoing events flow. The outgoing events flow is observed by any/all components that deliver
  * messages e.g. server sent event http endpoints, http repository client, and bluetooth client. If the event needs to be
  * transmitted (e.g. there is a client actively connected to the http server sent events endpoint, within bluetooth range,
- * etc), the component that observes the flow will convert the event into a NodeEventMessage. The NodeEventsMessage can
- * send multiple events and will contain the full information required by the other node (eg. the JSON data of the
+ * etc), the component that observes the flow will convert the event into a DoorMessage. The DoorMessage can contain
+ * data from multiple events and will contain the full information required by the other node (eg. the JSON data of the
  * entities being replicated).
  *
  * Notes: RepositoryClient can use server sent events client on http, on bluetooth it can send a heartbeat so that any
@@ -33,10 +36,12 @@ import kotlinx.coroutines.flow.asSharedFlow
  *
  */
 @Suppress("PropertyName")
-abstract class NodeEventManagerCommon(
-    protected val db: RoomDatabase,
+abstract class NodeEventManagerCommon<T : RoomDatabase>(
+    protected val db: T,
+    protected val messageCallback: DoorMessageCallback<T>,
     protected val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
+
 
     protected val hasOutgoingReplicationTable = OutgoingReplication::class.simpleName?.let {
         it in db::class.doorDatabaseMetadata().allTables
@@ -64,7 +69,7 @@ abstract class NodeEventManagerCommon(
     val outgoingEvents: Flow<List<NodeEvent>> = _outgoingEvents.asSharedFlow()
 
 
-    private val _incomingMessages  = MutableSharedFlow<NodeEventMessage>()
+    private val _incomingMessages  = MutableSharedFlow<DoorMessage>()
 
     /**
      * The flow of incoming messages being received from other nodes. This is received as follows:
@@ -77,7 +82,7 @@ abstract class NodeEventManagerCommon(
      *    - InvalidationHandler (for later): an event could be emitted to indicate that something has been invalidated
      *      e.g. to trigger repository flow invalidation
      */
-    val incomingMessages: Flow<NodeEventMessage> = _incomingMessages.asSharedFlow()
+    val incomingMessages: Flow<DoorMessage> = _incomingMessages.asSharedFlow()
 
 
     init {
@@ -90,12 +95,17 @@ abstract class NodeEventManagerCommon(
      *
      * Note: if this event contains incoming replication, we need to do the incoming replication insertion in this
      * function (if something goes wrong, we must throw an exception)
-     *
      */
-    suspend fun onIncomingEventReceived(event: NodeEventMessage) {
+    suspend fun onIncomingMessageReceived(message: DoorMessage) {
         try {
-            db.insertIntoRemoteReceiveView(event.fromNode, event.replications)
-            _incomingMessages.emit(event)
+            //this should check what is the strategy on the replicate entity
+            db.withDoorTransactionAsync {
+                val messageToProcess = messageCallback.onIncomingMessageReceived(db, message)
+                db.insertEntitiesFromMessage(messageToProcess)
+                messageCallback.onIncomingMessageProcessed(db, messageToProcess)
+            }
+
+            _incomingMessages.emit(message)
         }catch(e: Exception){
             throw e
         }

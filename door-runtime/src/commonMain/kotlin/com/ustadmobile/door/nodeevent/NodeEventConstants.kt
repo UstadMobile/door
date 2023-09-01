@@ -1,5 +1,7 @@
 package com.ustadmobile.door.nodeevent
 
+import com.ustadmobile.door.message.DoorMessage
+
 object NodeEventConstants {
 
     const val CREATE_EVENT_TMP_TABLE_SQL = """
@@ -18,7 +20,7 @@ object NodeEventConstants {
              AFTER INSERT
                 ON OutgoingReplication
              BEGIN INSERT INTO NodeEvent(what, toNode, tableId, key1, key2)
-                   VALUES (${NodeEventMessage.WHAT_REPLICATION}, 
+                   VALUES (${DoorMessage.WHAT_REPLICATION}, 
                            NEW.destNodeId, 
                            NEW.orTableId,
                            NEW.orPk1,

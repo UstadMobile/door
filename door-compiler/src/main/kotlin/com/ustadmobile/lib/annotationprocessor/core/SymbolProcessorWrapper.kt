@@ -17,7 +17,7 @@ class SymbolProcessorWrapper(
 
     private val processors = listOf(DoorWrapperProcessor(environment), DoorHttpServerProcessor(environment),
         DoorRepositoryProcessor(environment), jdbcProcessor, DoorExpectTypeAliasProcessor(environment),
-        DoorAndroidReplicationCallbackProcessor(environment))
+        )
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         try {

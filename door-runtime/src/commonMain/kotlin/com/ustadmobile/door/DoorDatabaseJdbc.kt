@@ -37,8 +37,6 @@ interface DoorDatabaseJdbc {
 
     val realNodeIdAuthCache: NodeIdAuthCache
 
-    val realIncomingReplicationListenerHelper: IncomingReplicationListenerHelper
-
     val realAttachmentStorageUri: DoorUri?
 
     val realAttachmentFilters: List<AttachmentFilter>

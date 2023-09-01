@@ -210,14 +210,3 @@ internal val RoomDatabase.doorAndroidRoomHelper: DoorAndroidRoomHelper
 actual val RoomDatabase.nodeIdAuthCache: NodeIdAuthCache
     get() = doorAndroidRoomHelper.nodeIdAndAuthCache
 
-actual fun RoomDatabase.addIncomingReplicationListener(incomingReplicationListener: IncomingReplicationListener) {
-    doorAndroidRoomHelper.incomingReplicationListenerHelper.addIncomingReplicationListener(incomingReplicationListener)
-}
-
-actual fun RoomDatabase.removeIncomingReplicationListener(incomingReplicationListener: IncomingReplicationListener) {
-    doorAndroidRoomHelper.incomingReplicationListenerHelper.removeIncomingReplicationListener(incomingReplicationListener)
-}
-
-actual val RoomDatabase.incomingReplicationListenerHelper: IncomingReplicationListenerHelper
-    get() = doorAndroidRoomHelper.incomingReplicationListenerHelper
-

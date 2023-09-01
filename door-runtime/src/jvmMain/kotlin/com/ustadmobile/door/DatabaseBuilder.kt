@@ -4,6 +4,7 @@ import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.DoorConstants.DBINFO_TABLENAME
 import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.dbType
+import com.ustadmobile.door.ext.doorDatabaseMetadata
 import com.ustadmobile.door.ext.wrap
 import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.migration.DoorMigrationAsync
@@ -21,6 +22,9 @@ import javax.sql.DataSource
 import kotlin.reflect.KClass
 import com.ustadmobile.door.jdbc.ext.useResults
 import com.ustadmobile.door.jdbc.ext.mapRows
+import com.ustadmobile.door.message.DefaultDoorMessageCallback
+import com.ustadmobile.door.message.DoorMessageCallback
+import com.ustadmobile.door.triggers.setupTriggers
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import org.sqlite.SQLiteConfig
@@ -37,6 +41,7 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
     private var attachmentDir: File? = null,
     private var attachmentFilters: List<AttachmentFilter> = mutableListOf(),
     private var queryTimeout: Int = PreparedStatementConfig.STATEMENT_DEFAULT_TIMEOUT_SECS,
+    private var messageCallback: DoorMessageCallback<T> = DefaultDoorMessageCallback(),
 ){
 
     private val callbacks = mutableListOf<DoorDatabaseCallback>()
@@ -135,6 +140,8 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                     }
                 }
 
+                sqlDatabase.setupTriggers(dbClass.doorDatabaseMetadata())
+
                 callbacks.forEach {
                     when(it) {
                         is DoorDatabaseCallbackSync -> it.onCreate(sqlDatabase)
@@ -194,7 +201,9 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                 postgresChangeTracker.setupTriggers()
             }
 
-            return doorDb.wrap(dbClass = dbClass, nodeId = nodeId)
+            val wrapperClass = Class.forName("${dbClass.java.canonicalName}${DoorDatabaseWrapper.SUFFIX}") as Class<T>
+            return wrapperClass.getConstructor(dbClass.java, Long::class.javaPrimitiveType, DoorMessageCallback::class.java)
+                .newInstance(doorDb, nodeId, messageCallback)
         }
     }
 
@@ -206,6 +215,11 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
 
     fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
         migrationList.addAll(migrations)
+        return this
+    }
+
+    fun messageCallback(messageCallback: DoorMessageCallback<T>): DatabaseBuilder<T> {
+        this.messageCallback = messageCallback
         return this
     }
 

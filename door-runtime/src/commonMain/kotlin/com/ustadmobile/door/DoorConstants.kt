@@ -15,4 +15,10 @@ object DoorConstants {
 
     const val DBINFO_TABLENAME = "_doorwayinfo"
 
+    const val PGSECTION_COMMENT_PREFIX = "/*psql"
+
+    const val NOTPGSECTION_COMMENT_PREFIX = "--notpsql"
+
+    const val NOTPGSECTION_END_COMMENT_PREFIX = "--endnotpsql"
+
 }

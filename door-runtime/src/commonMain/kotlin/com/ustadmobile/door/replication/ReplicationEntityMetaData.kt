@@ -1,5 +1,7 @@
 package com.ustadmobile.door.replication
 
+import com.ustadmobile.door.annotation.ReplicateEntity
+import com.ustadmobile.door.annotation.Trigger
 import com.ustadmobile.door.replication.ReplicationConstants.RECEIVE_VIEW_FROM_NODE_ID_FIELDNAME
 
 
@@ -14,7 +16,9 @@ class ReplicationEntityMetaData(
     val attachmentUriField: String?,
     val attachmentMd5SumField: String?,
     val attachmentSizeField: String?,
-    val batchSize: Int = 1000
+    val batchSize: Int = 1000,
+    val remoteInsertStrategy: ReplicateEntity.RemoteInsertStrategy,
+    val triggers: List<Trigger>,
 ) {
 
     val entityPrimaryKeyFieldType: Int by lazy(LazyThreadSafetyMode.NONE) {
@@ -49,9 +53,4 @@ class ReplicationEntityMetaData(
     }
 
 
-    companion object {
-        const val KEY_PRIMARY_KEY = "primaryKey"
-
-        const val KEY_VERSION_ID = "versionId"
-    }
 }

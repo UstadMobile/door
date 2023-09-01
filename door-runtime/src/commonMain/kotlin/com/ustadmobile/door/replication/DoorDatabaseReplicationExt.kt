@@ -4,6 +4,7 @@ import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.entities.DoorNode
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.ext.*
+import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.nodeevent.NodeEvent
 
 
@@ -39,11 +40,10 @@ suspend fun RoomDatabase.selectNodeEventMessageReplications(
 /**
  *
  */
-suspend fun RoomDatabase.insertIntoRemoteReceiveView(
-    fromNodeId: Long,
-    replicationEntities: Iterable<DoorReplicationEntity>
+suspend fun RoomDatabase.insertEntitiesFromMessage(
+    message: DoorMessage,
 ) {
-    replicationEntities.runningSplitBy { it.tableId }.forEach { tableEntities ->
+    message.replications.runningSplitBy { it.tableId }.forEach { tableEntities ->
         val tableId = tableEntities.first().tableId
         val entityMetaData = this::class.doorDatabaseMetadata().requireReplicateEntityMetaData(tableId)
 
@@ -52,7 +52,7 @@ suspend fun RoomDatabase.insertIntoRemoteReceiveView(
                 stmt.setAllFromJsonObject(entity.entity, entityMetaData.entityFields)
 
                 //Set the fromNodeId, which is always last
-                stmt.setLong(entityMetaData.entityFields.size + 1, fromNodeId)
+                stmt.setLong(entityMetaData.entityFields.size + 1, message.fromNode)
                 stmt.executeUpdateAsyncKmp()
             }
         }

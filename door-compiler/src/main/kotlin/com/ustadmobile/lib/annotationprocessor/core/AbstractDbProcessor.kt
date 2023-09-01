@@ -139,11 +139,7 @@ abstract class AbstractDbProcessor: AbstractProcessor() {
 
         const val SUFFIX_DEFAULT_RECEIVEVIEW = "_ReceiveView"
 
-        const val PGSECTION_COMMENT_PREFIX = "/*psql"
 
-        const val NOTPGSECTION_COMMENT_PREFIX = "--notpsql"
-
-        const val NOTPGSECTION_END_COMMENT_PREFIX = "--endnotpsql"
 
         val MEMBERNAME_EXEC_UPDATE_ASYNC = MemberName("com.ustadmobile.door.jdbc.ext", "executeUpdateAsyncKmp")
 

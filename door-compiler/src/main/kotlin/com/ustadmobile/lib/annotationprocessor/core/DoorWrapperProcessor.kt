@@ -16,6 +16,7 @@ import com.squareup.kotlinpoet.ksp.writeTo
 import com.ustadmobile.door.DoorDatabaseWrapper
 import com.ustadmobile.door.annotation.LastChangedTime
 import com.ustadmobile.door.annotation.ReplicateEntity
+import com.ustadmobile.door.message.DoorMessageCallback
 import com.ustadmobile.door.nodeevent.NodeEventManagerCommon
 import com.ustadmobile.door.nodeevent.NodeEventManagerJvm
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
@@ -235,15 +236,23 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
                 .addMember("%S, %S", "REDUNDANT_PROJECTION", "ClassName")
                 .build())
             .superclass(dbClassName)
-            .addSuperinterface(DoorDatabaseWrapper::class.asClassName())
+            .addSuperinterface(DoorDatabaseWrapper::class.asClassName().parameterizedBy(dbClassName))
             .primaryConstructor(FunSpec.constructorBuilder()
                 .addParameter("_db", dbClassName)
                 .addParameter("nodeId", LONG)
+                .addParameter("messageCallback",
+                    DoorMessageCallback::class.asClassName().parameterizedBy(dbClassDecl.toClassName()))
                 .build())
             .addProperty(PropertySpec.builder("_db", dbClassName, KModifier.PRIVATE)
                 .initializer("_db").build())
             .addProperty(PropertySpec.builder("nodeId", LONG, KModifier.OVERRIDE)
                 .initializer("nodeId").build())
+            .addProperty(PropertySpec.builder("messageCallback",
+                    DoorMessageCallback::class.asClassName().parameterizedBy(dbClassDecl.toClassName()),
+                    KModifier.PRIVATE)
+                .initializer("messageCallback")
+                .build()
+            )
             .applyIf(target == DoorTarget.JS || target == DoorTarget.JVM) {
                 addDbVersionProperty(dbClassDecl)
                 addFunction(FunSpec.builder("createAllTables")
@@ -269,10 +278,12 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
                 .build())
             .addProperty(
                 PropertySpec.builder(
-                "nodeEventManager", NodeEventManagerCommon::class, KModifier.OVERRIDE,
+                "nodeEventManager",
+                    NodeEventManagerCommon::class.asClassName().parameterizedBy(dbClassName),
+                    KModifier.OVERRIDE,
                 )
                 .applyIf(target == DoorTarget.JVM) {
-                    initializer("%T(_db)\n", NodeEventManagerJvm::class)
+                    initializer("%T(_db, messageCallback)\n", NodeEventManagerJvm::class)
                 }
                 .build()
             )

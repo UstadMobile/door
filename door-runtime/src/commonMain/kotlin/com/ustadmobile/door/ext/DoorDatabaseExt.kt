@@ -115,15 +115,3 @@ expect fun <T: RoomDatabase> T.unwrap(dbClass: KClass<T>): T
  */
 expect val RoomDatabase.nodeIdAuthCache: NodeIdAuthCache
 
-/**
- * Add a listener to receive events when incoming replication data has been received.
- */
-expect fun RoomDatabase.addIncomingReplicationListener(incomingReplicationListener: IncomingReplicationListener)
-
-/**
- * Remove a listener that was added using addIncomingReplicationListener
- */
-expect fun RoomDatabase.removeIncomingReplicationListener(incomingReplicationListener: IncomingReplicationListener)
-
-internal expect val RoomDatabase.incomingReplicationListenerHelper: IncomingReplicationListenerHelper
-

@@ -1,7 +1,5 @@
 package com.ustadmobile.door.annotation
 
-import kotlin.reflect.KClass
-
 
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS)
@@ -27,8 +25,24 @@ annotation class ReplicateEntity(
     /**
      * The number of entities to transfer at a time. By default, 1000.
      */
-    val batchSize: Int = 1000
-) {
+    val batchSize: Int = 1000,
+
+    /**
+     * How to handle when this entity is received from a remote node (via pull or push).
+     */
+    val remoteInsertStrategy: RemoteInsertStrategy = RemoteInsertStrategy.CALLBACK,
+
+    ) {
+
+    enum class RemoteInsertStrategy {
+        /**
+         * The EventManager will emit an event and nothing more.
+         */
+        CALLBACK,
+        INSERT_DIRECT,
+        INSERT_INTO_VIEW
+    }
+
     companion object {
         const val HIGHEST_PRIORITY = 0
 

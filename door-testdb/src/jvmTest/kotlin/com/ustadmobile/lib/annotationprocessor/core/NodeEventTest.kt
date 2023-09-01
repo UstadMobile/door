@@ -4,8 +4,8 @@ import app.cash.turbine.test
 import com.ustadmobile.door.DatabaseBuilder
 import com.ustadmobile.door.DoorDatabaseWrapper
 import com.ustadmobile.door.ext.withDoorTransactionAsync
-import com.ustadmobile.door.nodeevent.NodeEventMessage
-import com.ustadmobile.door.nodeevent.NodeEventMessage.Companion.WHAT_REPLICATION
+import com.ustadmobile.door.message.DoorMessage
+import com.ustadmobile.door.message.DoorMessage.Companion.WHAT_REPLICATION
 import com.ustadmobile.door.replication.selectNodeEventMessageReplications
 import db3.ExampleDb3
 import db3.ExampleEntity3
@@ -30,7 +30,7 @@ class NodeEventTest {
         db.clearAllTables()
 
         runBlocking {
-            val outgoingNodeEvents = (db as DoorDatabaseWrapper).nodeEventManager.outgoingEvents
+            val outgoingNodeEvents = (db as DoorDatabaseWrapper<*>).nodeEventManager.outgoingEvents
             outgoingNodeEvents.filter {
                 it.isNotEmpty() && it.first().what == WHAT_REPLICATION
             }.test(timeout = 500.seconds) {
@@ -40,12 +40,13 @@ class NodeEventTest {
                     uid
                 }
 
-                val replicationEvent = awaitItem().first()
-                assertEquals(123L, replicationEvent.toNode)
-                assertEquals(insertedUid, replicationEvent.key1)
-                assertEquals(ExampleEntity3.TABLE_ID, replicationEvent.tableId)
+                val nodeEvents = awaitItem()
+                assertEquals(1, nodeEvents.size)
+                assertEquals(123L, nodeEvents.first().toNode)
+                assertEquals(insertedUid, nodeEvents.first().key1)
+                assertEquals(ExampleEntity3.TABLE_ID, nodeEvents.first().tableId)
 
-                val eventReplication = db.selectNodeEventMessageReplications(listOf(replicationEvent)).first()
+                val eventReplication = db.selectNodeEventMessageReplications(nodeEvents).first()
                 assertEquals(ExampleEntity3.TABLE_ID, eventReplication.tableId)
                 assertEquals(insertedUid, eventReplication.entity.get("eeUid")?.jsonPrimitive?.long)
 
@@ -57,7 +58,7 @@ class NodeEventTest {
 
     //Note: fixing this might require changing trigger
     @Test
-    fun givenEmptyDatabases_whenNewOutgoingReplicationInsertedIsEmittedToSecondDatabase_thenEntityIsPresentOnSecondDatabase() {
+    fun givenEmptyDatabases_whenNewOutgoingReplicationInsertedIsEmittedAndMessageIsSentToSecondDatabase_thenEntityIsPresentOnSecondDatabase() {
         val db1 = DatabaseBuilder.databaseBuilder(ExampleDb3::class, "jdbc:sqlite::memory:", 1L)
             .build().also {
                 it.clearAllTables()
@@ -69,10 +70,10 @@ class NodeEventTest {
             }
 
         runBlocking {
-            val outgoingNodeEvents = (db1 as DoorDatabaseWrapper).nodeEventManager.outgoingEvents
+            val outgoingNodeEvents = (db1 as DoorDatabaseWrapper<*>).nodeEventManager.outgoingEvents
             outgoingNodeEvents.filter {
                 it.isNotEmpty() && it.first().what == WHAT_REPLICATION
-            }.test(timeout = 500.seconds) {
+            }.test(timeout = 5.seconds) {
                 val insertedUid = db1.withDoorTransactionAsync {
                     val uid = db1.exampleEntity3Dao.insertAsync(ExampleEntity3())
                     db1.exampleEntity3Dao.insertOutgoingReplication(uid, 123L)
@@ -85,8 +86,8 @@ class NodeEventTest {
                     .selectNodeEventMessageReplications(listOf(replicationEvent))
                     .first()
 
-                (db2 as DoorDatabaseWrapper).nodeEventManager.onIncomingEventReceived(
-                    NodeEventMessage(
+                (db2 as DoorDatabaseWrapper<*>).nodeEventManager.onIncomingMessageReceived(
+                    DoorMessage(
                         what = WHAT_REPLICATION,
                         fromNode = 1L,
                         toNode = 2L,

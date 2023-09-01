@@ -59,7 +59,7 @@ actual inline fun <reified  T: RoomDatabase> T.asRepository(repositoryConfig: Re
     val dbClass = T::class
     val repoImplClass = Class.forName("${dbClass.qualifiedName}_Repo") as Class<T>
 
-    val dbUnwrapped = if(this is DoorDatabaseWrapper) {
+    val dbUnwrapped = if(this is DoorDatabaseWrapper<*>) {
         this.unwrap(dbClass)
     }else {
         this
@@ -97,6 +97,6 @@ actual fun <T: RoomDatabase> T.wrap(
 
 @Suppress("UNCHECKED_CAST")
 actual fun <T: RoomDatabase> T.unwrap(dbClass: KClass<T>): T {
-    return (this as DoorDatabaseWrapper).realDatabase as T
+    return (this as DoorDatabaseWrapper<*>).realDatabase as T
 }
 

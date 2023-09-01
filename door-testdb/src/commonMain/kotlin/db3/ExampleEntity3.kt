@@ -5,7 +5,10 @@ import androidx.room.PrimaryKey
 import com.ustadmobile.door.annotation.*
 
 @Entity
-@ReplicateEntity(tableId = 542)
+@ReplicateEntity(
+    tableId = 542,
+    remoteInsertStrategy = ReplicateEntity.RemoteInsertStrategy.INSERT_INTO_VIEW
+)
 
 @Triggers(
     arrayOf(

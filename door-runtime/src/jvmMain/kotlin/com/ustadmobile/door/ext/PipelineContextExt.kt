@@ -20,7 +20,7 @@ import org.kodein.type.TypeToken
 @Suppress("UNCHECKED_CAST")
 fun <T: RoomDatabase> PipelineContext<Unit, ApplicationCall>.unwrappedDbOnCall(typeToken: TypeToken<T>, tag: Int = DoorTag.TAG_DB): T{
     val db = closestDI().on(call).direct.Instance(typeToken, tag = tag)
-    return if(db is DoorDatabaseWrapper) {
+    return if(db is DoorDatabaseWrapper<*>) {
         db.realDatabase as T
     }else {
         db

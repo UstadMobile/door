@@ -5,6 +5,7 @@ import com.ustadmobile.door.ext.concurrentSafeMapOf
 import com.ustadmobile.door.ext.dbType
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.ext.*
+import com.ustadmobile.door.message.DoorMessageCallback
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.room.RoomJdbcImpl
 import com.ustadmobile.door.util.TransactionMode
@@ -12,16 +13,17 @@ import kotlinx.coroutines.CoroutineDispatcher
 import com.ustadmobile.door.room.RoomDatabaseJdbcImplHelperCommon
 import kotlinx.coroutines.Dispatchers
 
-class NodeEventManagerJvm(
-    db: RoomDatabase,
+class NodeEventManagerJvm<T: RoomDatabase>(
+    db: T,
+    messageCallback: DoorMessageCallback<T>,
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
     //scope: CoroutineScope,
-) : NodeEventManagerCommon(
-    db, dispatcher, //scope
+) : NodeEventManagerCommon<T>(
+    db, messageCallback, dispatcher, //scope
 ) {
 
     /**
-     * Used on SQLite - where we pickup events using the jdbcimplhelper.
+     * Used on SQLite - where we pick up events using the jdbcimplhelper.
      */
     private val jdbcImplListener = object: RoomDatabaseJdbcImplHelperCommon.Listener {
 

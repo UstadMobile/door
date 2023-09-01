@@ -59,7 +59,7 @@ actual val RoomDatabase.sourceDatabase: RoomDatabase?
         return when {
             this is DoorDatabaseJdbc -> null
             (this is DoorDatabaseRepository) -> this.db
-            (this is DoorDatabaseWrapper) -> this.realDatabase
+            (this is DoorDatabaseWrapper<*>) -> this.realDatabase
             else -> throw IllegalStateException("SourceDatabase : Not a recognized implementation: ${this::class}")
         }
     }
@@ -73,17 +73,4 @@ actual val RoomDatabase.nodeIdAuthCache: NodeIdAuthCache
     }else {
         this.rootDatabase.nodeIdAuthCache
     }
-
-actual fun RoomDatabase.addIncomingReplicationListener(incomingReplicationListener: IncomingReplicationListener) {
-    val rootDb = this.rootDatabase as DoorDatabaseJdbc
-    rootDb.realIncomingReplicationListenerHelper.addIncomingReplicationListener(incomingReplicationListener)
-}
-
-actual fun RoomDatabase.removeIncomingReplicationListener(incomingReplicationListener: IncomingReplicationListener) {
-    val rootDb = this.rootDatabase as DoorDatabaseJdbc
-    rootDb.realIncomingReplicationListenerHelper.removeIncomingReplicationListener(incomingReplicationListener)
-}
-
-actual val RoomDatabase.incomingReplicationListenerHelper: IncomingReplicationListenerHelper
-    get() = (this.rootDatabase as DoorDatabaseJdbc).realIncomingReplicationListenerHelper
 

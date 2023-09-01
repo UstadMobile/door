@@ -2,7 +2,6 @@ package com.ustadmobile.door.setupcallback
 
 import com.ustadmobile.door.DoorDatabaseCallbackStatementList
 import com.ustadmobile.door.DoorSqlDatabase
-import com.ustadmobile.door.nodeevent.NodeEventMessage
 import com.ustadmobile.door.room.RoomDatabase
 import kotlin.reflect.KClass
 

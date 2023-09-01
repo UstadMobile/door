@@ -21,6 +21,7 @@ import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.DoorDatabaseMetadata
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
 import com.ustadmobile.door.ext.minifySql
+import com.ustadmobile.door.ext.sqlToPostgresSql
 import com.ustadmobile.door.paging.DoorLimitOffsetPagingSource
 import com.ustadmobile.door.replication.ReplicationEntityMetaData
 import com.ustadmobile.door.replication.ReplicationFieldMetaData
@@ -132,12 +133,6 @@ private fun FileSpec.Builder.addDatabaseMetadataType(
                 .addCode("return %L\n", dbKSClass.allDbEntities().any { it.entityHasAttachments() })
                 .build())
             .build())
-        .addProperty(PropertySpec.builder("syncableTableIdMap", Map::class.parameterizedBy(String::class, Int::class))
-            .addModifiers(KModifier.OVERRIDE)
-            .getter(FunSpec.getterBuilder()
-                .addCode("return TABLE_ID_MAP\n", dbKSClass.toClassNameWithSuffix(SUFFIX_REPOSITORY2))
-                .build())
-            .build())
         .addProperty(PropertySpec.builder("version", INT)
             .addModifiers(KModifier.OVERRIDE)
             .getter(FunSpec.getterBuilder()
@@ -169,9 +164,6 @@ private fun FileSpec.Builder.addDatabaseMetadataType(
                     .add(")\n")
                     .endControlFlow()
                     .build())
-            .build())
-        .addType(TypeSpec.companionObjectBuilder()
-            .addTableIdMapProperty()
             .build())
         .build())
 
@@ -231,33 +223,97 @@ private fun FileSpec.Builder.addJsImplementationsClassesObject(
     return this
 }
 
+private fun CodeBlock.Builder.addTriggerMetadataCode(
+    trigger: Trigger
+) : CodeBlock.Builder {
+
+    fun addStringArrayVal(array: Array<String>) {
+        if(array.isNotEmpty()) {
+            add("arrayOf(\n")
+            indent()
+            array.forEach {
+                add("%S,\n", it)
+            }
+            unindent()
+            add(")")
+        }else {
+            add("arrayOf()")
+        }
+    }
+
+    add("%T(\n", Trigger::class, )
+    indent()//indent for start of trigger init
+
+    add("name = %S,\n", trigger.name)
+    add("order = ")
+    when(trigger.order) {
+        Trigger.Order.BEFORE -> add("%T.BEFORE,\n", Trigger.Order::class)
+        Trigger.Order.AFTER -> add("%T.AFTER,\n", Trigger.Order::class)
+        Trigger.Order.INSTEAD_OF -> add("%T.INSTEAD_OF,\n", Trigger.Order::class)
+    }
+
+    add("events = arrayOf(")
+    trigger.events.forEach { add("%T.%L,", Trigger.Event::class, it.name) }
+    add("),\n")
+
+    add("on = %T.%L,\n", Trigger.On::class, trigger.on.name)
+
+    add("sqlStatements = ")
+    addStringArrayVal(trigger.sqlStatements)
+    add(",\n")
+
+    add("postgreSqlStatements = ")
+    addStringArrayVal(trigger.postgreSqlStatements)
+    add(",\n")
+
+    add("conditionSql = %S,\n", trigger.conditionSql)
+
+    add("conditionSqlPostgres = %S,\n", trigger.conditionSqlPostgres)
+
+    unindent()//unindent for end of trigger init
+    add(")")
+
+    return this
+}
+
 private fun CodeBlock.Builder.addReplicateEntityMetaDataCode(
     entity: KSClassDeclaration,
 ): CodeBlock.Builder {
 
     fun CodeBlock.Builder.addFieldsCodeBlock(typeEl: KSClassDeclaration) : CodeBlock.Builder{
-        add("listOf(")
+        add("entityFields = listOf(")
         typeEl.entityProps().forEach {
             add("%T(%S, %L),", ReplicationFieldMetaData::class, it.simpleName.asString(),
                 it.type.resolve().toTypeName().toSqlTypesInt())
         }
-        add(")")
+        add(")\n")
         return this
     }
 
     val repEntityAnnotation = entity.getAnnotation(ReplicateEntity::class)
+    val triggersAnnotation = entity.getAnnotation(Triggers::class)
     add("%T(", ReplicationEntityMetaData::class)
-    add("%L, ", repEntityAnnotation?.tableId)
-    add("%L, ", repEntityAnnotation?.priority)
-    add("%S, ", entity.entityTableName)
-    add("%S, ", entity.replicationEntityReceiveViewName)
-    add("%S, ", entity.entityPrimaryKeyProps.first().simpleName.asString())
-    add("%S, ", entity.firstPropWithAnnotation(ReplicationVersionId::class).simpleName.asString())
+    add("tableId = %L, \n", repEntityAnnotation?.tableId)
+    add("priority = %L, \n", repEntityAnnotation?.priority)
+    add("entityTableName = %S, \n", entity.entityTableName)
+    add("receiveViewName = %S, \n", entity.replicationEntityReceiveViewName)
+    add("entityPrimaryKeyFieldName = %S, \n", entity.entityPrimaryKeyProps.first().simpleName.asString())
+    add("entityVersionIdFieldName = %S, \n", entity.firstPropWithAnnotation(ReplicationVersionId::class).simpleName.asString())
     addFieldsCodeBlock(entity).add(",\n")
-    add(entity.firstPropNameWithAnnotationOrNull(AttachmentUri::class)).add(",\n")
-    add(entity.firstPropNameWithAnnotationOrNull(AttachmentMd5::class)).add(",\n")
-    add(entity.firstPropNameWithAnnotationOrNull(AttachmentSize::class)).add(",\n")
-    add("%L", repEntityAnnotation?.batchSize ?: 1000)
+    add("attachmentUriField = ").add(entity.firstPropNameWithAnnotationOrNull(AttachmentUri::class)).add(",\n")
+    add("attachmentMd5SumField = ").add(entity.firstPropNameWithAnnotationOrNull(AttachmentMd5::class)).add(",\n")
+    add("attachmentSizeField = ").add(entity.firstPropNameWithAnnotationOrNull(AttachmentSize::class)).add(",\n")
+    add("batchSize = ").add("%L", repEntityAnnotation?.batchSize ?: 1000).add(",\n")
+    add("remoteInsertStrategy = %T.%L,\n", ReplicateEntity.RemoteInsertStrategy::class.java,
+        repEntityAnnotation?.remoteInsertStrategy?.name)
+    add("triggers = listOf(\n")
+    indent()
+    triggersAnnotation?.value?.forEach {
+        addTriggerMetadataCode(it)
+        add(",")
+    }
+    unindent()
+    add("),\n") //end trigger list
     add(")")
     return this
 }
@@ -354,11 +410,6 @@ fun FileSpec.Builder.addJdbcDbImplType(
                 MemberName("com.ustadmobile.door.ext", "rootDatabase"),
                 DeleteZombieAttachmentsListener::class)
             .build())
-        .addProperty(PropertySpec.builder("realIncomingReplicationListenerHelper",
-            IncomingReplicationListenerHelper::class)
-            .addModifiers(KModifier.OVERRIDE)
-            .initializer(CodeBlock.of("%T()\n", IncomingReplicationListenerHelper::class))
-            .build())
         .addProperty(PropertySpec.builder("realNodeIdAuthCache", NodeIdAuthCache::class,
             KModifier.OVERRIDE)
             .delegate(CodeBlock.builder()
@@ -448,7 +499,6 @@ fun TypeSpec.Builder.addCreateAllTablesFunction(
 
                     //All entities MUST be created first, triggers etc. can only be created after all entities exist
                     val createEntitiesCodeBlock = CodeBlock.builder()
-                    val createTriggersAndViewsBlock = CodeBlock.builder()
 
                     dbKSClass.allDbEntities().forEach { entityKSClass ->
                         val fieldListStr = entityKSClass.entityProps().joinToString { it.simpleName.asString() }
@@ -465,30 +515,9 @@ fun TypeSpec.Builder.addCreateAllTablesFunction(
                             .add("_stmt.executeUpdate(%S)\n", "DROP TABLE ${entityKSClass.entityTableName}_OLD")
                             .add("END MIGRATION*/\n")
 
-
-                        if(entityKSClass.hasAnnotation(ReplicateEntity::class)) {
-                            createTriggersAndViewsBlock
-                                .addCreateReceiveView(entityKSClass, "_stmtList")
-                        }
-
-                        createTriggersAndViewsBlock.addCreateTriggersCode(entityKSClass, "_stmtList",
-                            dbProductType)
-
-
-                        if(entityKSClass.entityHasAttachments()) {
-                            if(dbProductType == DoorDbType.SQLITE) {
-                                createTriggersAndViewsBlock.addGenerateAttachmentTriggerSqlite(entityKSClass,
-                                    "_stmt.executeUpdate", "_stmtList")
-                            }else {
-                                createTriggersAndViewsBlock.addGenerateAttachmentTriggerPostgres(
-                                    entityKSClass, "_stmtList")
-                            }
-                        }
-
                         createEntitiesCodeBlock.add("//End: Create table ${entityKSClass.entityTableName} for $dbTypeName\n\n")
                     }
                     add(createEntitiesCodeBlock.build())
-                    add(createTriggersAndViewsBlock.build())
 
                     endControlFlow()
                 }
@@ -502,21 +531,6 @@ fun TypeSpec.Builder.addCreateAllTablesFunction(
     return this
 }
 
-
-internal fun CodeBlock.Builder.addCreateTriggersCode(
-    entityKSClass: KSClassDeclaration,
-    stmtListVar: String,
-    dbProductType: Int
-): CodeBlock.Builder {
-    Napier.d("Door Wrapper: addCreateTriggersCode ${entityKSClass.simpleName.asString()}")
-    entityKSClass.getKSAnnotationByType(Triggers::class)?.toTriggers()?.value?.forEach { trigger ->
-        trigger.toSql(entityKSClass, dbProductType).forEach { sqlStr ->
-            add("$stmtListVar += %S\n", sqlStr)
-        }
-    }
-
-    return this
-}
 
 private fun TypeSpec.Builder.addClearAllTablesFunction(
     dbKSClass: KSClassDeclaration,

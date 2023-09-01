@@ -13,11 +13,6 @@ import kotlin.reflect.KClass
 abstract class DoorDatabaseMetadata<T: RoomDatabase> {
 
     /**
-     * Map of Table Name -> TableId for all syncable tables.
-     */
-    abstract val syncableTableIdMap: Map<String, Int>
-
-    /**
      * The KClass object for this database.
      */
     abstract val dbClass: KClass<T>

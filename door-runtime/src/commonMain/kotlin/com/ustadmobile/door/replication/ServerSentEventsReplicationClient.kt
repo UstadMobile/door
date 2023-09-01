@@ -54,8 +54,9 @@ class ServerSentEventsReplicationClient(
                 //send any pending replications for this node
             }
 
+
             replicationScope.launch {
-                (doorWrappedDb as DoorDatabaseWrapper).nodeEventManager.outgoingEvents.map { evtList ->
+                (doorWrappedDb as DoorDatabaseWrapper<*>).nodeEventManager.outgoingEvents.map { evtList ->
                     evtList.filter { it.toNode == nodeId }
                 }.filter {
                     it.isNotEmpty()

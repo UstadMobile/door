@@ -64,59 +64,6 @@ fun String.getSqlQueryNamedParameters(): List<String> {
 }
 
 /**
- * Where SQLite and Postgres disagree, sometimes it is possible to simply add additional (postgres only) comments and
- * change SQLite's REPLACE INTO into INSERT INTO ... ON CONFLICT for Postgres.
- *
- */
-fun String.sqlToPostgresSql() : String {
-    val uppercaseSql = uppercase()
-    var newSql = this
-    if(uppercaseSql.trimStart().startsWith("REPLACE INTO"))
-        newSql = "INSERT INTO" + this.substring(newSql.indexOf("REPLACE INTO") + "REPLACE INTO".length)
-
-    var pgSectionIndex: Int
-    while(newSql.indexOf(AbstractDbProcessor.PGSECTION_COMMENT_PREFIX).also { pgSectionIndex = it } != -1) {
-        val pgSectionEnd = newSql.indexOf("*/", pgSectionIndex)
-        newSql = newSql.substring(0, pgSectionIndex) +
-                newSql.substring(pgSectionIndex + AbstractDbProcessor.PGSECTION_COMMENT_PREFIX.length, pgSectionEnd) +
-                newSql.substring(pgSectionEnd + 2)
-    }
-
-    var inNoPgSection = false
-
-    var newSqlLines = ""
-    newSql.lines().forEach { line ->
-        val trimmedLine = line.trimStart()
-        if(trimmedLine.startsWith(AbstractDbProcessor.NOTPGSECTION_COMMENT_PREFIX)) {
-            inNoPgSection = true
-        }
-
-        if(!inNoPgSection)
-            newSqlLines += line + "\n"
-
-        if(trimmedLine.startsWith(AbstractDbProcessor.NOTPGSECTION_END_COMMENT_PREFIX))
-            inNoPgSection = false
-    }
-
-
-    return newSqlLines
-}
-
-fun String.useAsPostgresSqlIfNotBlankOrFallback(generalSql: String): String {
-    return if(this != "")
-        this
-    else
-        generalSql.sqlToPostgresSql()
-}
-
-fun Array<String>.useAsPostgresSqlIfNotEmptyOrFallback(generalSql: Array<String>) : Array<String> {
-    return if(isNotEmpty())
-        this
-    else
-        generalSql.map { it.sqlToPostgresSql() }.toTypedArray()
-}
-
-/**
  * Used where we need to test a query, but a field name does not exist because it's not inside a trigger
  * (e.g. NEW.someField). This uses a regex to avoid issues where one field name is a substring of another.
  */

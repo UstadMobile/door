@@ -9,7 +9,7 @@ import com.ustadmobile.door.room.RoomDatabase
  *   Using doorPrimaryKeyManager to set the primarykey on replicate entities
  *   Running the NodeEventManager
  */
-interface DoorDatabaseWrapper {
+interface DoorDatabaseWrapper<T: RoomDatabase> {
 
     /**
      * The underlying database: on JVM this is the JdbcImpl class, on Android this is the Room instance.
@@ -18,7 +18,7 @@ interface DoorDatabaseWrapper {
 
     val dbName: String
 
-    val nodeEventManager: NodeEventManagerCommon
+    val nodeEventManager: NodeEventManagerCommon<T>
 
     val nodeId: Long
 

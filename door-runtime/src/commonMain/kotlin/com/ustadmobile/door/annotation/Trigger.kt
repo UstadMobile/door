@@ -60,8 +60,18 @@ annotation class Trigger(
         INSERT("INSERT"), UPDATE("UPDATE"), DELETE("DELETE")
     }
 
-    enum class Order(val sqlStr: String) { AFTER("AFTER"), BEFORE("BEFORE"), INSTEAD_OF("INSTEAD OF") }
+    enum class Order(val sqlStr: String) {
+        AFTER("AFTER"), BEFORE("BEFORE"), INSTEAD_OF("INSTEAD OF")
+    }
 
     enum class On { ENTITY, RECEIVEVIEW }
 
+    companion object {
+
+        /**
+         * Prefix on all triggers that are added by Door. This is used to find and delete triggers before database updates
+         */
+        const val NAME_PREFIX = "_d"
+
+    }
 }
