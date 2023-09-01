@@ -1,8 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import com.ustadmobile.door.lifecycle.LiveData
 import com.squareup.kotlinpoet.*
-import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.ustadmobile.door.jdbc.TypesKmp
 import kotlinx.coroutines.flow.Flow
 /**
@@ -21,11 +19,6 @@ fun TypeName.toSqlTypesInt() = when {
     else -> throw IllegalArgumentException("Could not get sqlTypeInt for: $this")
 }
 
-internal fun TypeName.isDataSourceFactory(): Boolean {
-    return this is ParameterizedTypeName
-            && this.rawType == com.ustadmobile.door.paging.DataSourceFactory::class.asClassName()
-}
-
 internal fun TypeName.isPagingSource(): Boolean {
     return this is ParameterizedTypeName
             && this.rawType == com.ustadmobile.door.paging.PagingSource::class.asClassName()
@@ -37,7 +30,7 @@ internal fun TypeName.isFlow(): Boolean {
 
 
 internal fun TypeName.isAsynchronousReturnType() = this is ParameterizedTypeName
-        && (isDataSourceFactory() || isPagingSource() || isFlow () || this.rawType == LiveData::class.asClassName())
+        && (isPagingSource() || isFlow ())
 
 fun TypeName.isListOrArray() = (this is ClassName && this.canonicalName =="kotlin.Array")
         || (this is ParameterizedTypeName && this.rawType == List::class.asClassName())
@@ -52,49 +45,6 @@ val TypeName.isNullableAsSelectReturnResult
     get() = this != UNIT
             && !PRIMITIVE.contains(this)
             && this !is ParameterizedTypeName
-
-
-/**
- * If the given TypeName represents typed LiveData or a DataSource Factory, unwrap it to the
- * raw type.
- *
- * In the case of LiveData this is simply the first parameter type.
- * E.g. LiveData<Foo> will return 'Foo', LiveData<List<Foo>> will return List<Foo>
- *
- * In the case of a DataSourceFactory, this will be a list of the first parameter type (as a
- * DataSource.Factory is providing a list)
- * E.g. DataSource.Factory<Foo> will unwrap as List<Foo>
- */
-fun TypeName.unwrapLiveDataOrDataSourceFactory()  =
-    when {
-        this is ParameterizedTypeName && rawType == LiveData::class.asClassName() -> typeArguments[0]
-        this is ParameterizedTypeName && rawType == com.ustadmobile.door.paging.DataSourceFactory::class.asClassName() ->
-            List::class.asClassName().parameterizedBy(typeArguments[1])
-        else -> this
-    }
-
-/**
- * Unwrap the component type of an array or list
- */
-fun TypeName.unwrapListOrArrayComponentType() =
-        if(this is ParameterizedTypeName &&
-                (this.rawType == List::class.asClassName() || this.rawType == ClassName("kotlin", "Array"))) {
-            val typeArg = typeArguments[0]
-            if(typeArg is WildcardTypeName) {
-                typeArg.outTypes[0]
-            }else {
-                typeArg
-            }
-        }else {
-            this
-        }
-
-/**
- * Unwrap everything that could be wrapping query return types. This will unwrap DataSource.Factory,
- * LiveData, List, and Array to give the singular type. This can be useful if you want to know
- * the type of entity that is being used.
- */
-fun TypeName.unwrapQueryResultComponentType() = unwrapLiveDataOrDataSourceFactory().unwrapListOrArrayComponentType()
 
 
 /**

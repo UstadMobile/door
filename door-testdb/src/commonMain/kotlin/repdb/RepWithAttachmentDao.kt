@@ -5,7 +5,6 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.ustadmobile.door.annotation.*
-import com.ustadmobile.door.lifecycle.LiveData
 
 @DoorDao
 @Repository
@@ -64,13 +63,6 @@ expect abstract class RepWithAttachmentDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract fun replace(entityWithAttachment: RepEntityWithAttachment)
-
-    @Query("""
-        SELECT RepEntityWithAttachment.*
-          FROM RepEntityWithAttachment
-         WHERE waUid = :uid
-    """)
-    abstract fun findByUidLive(uid: Long): LiveData<RepEntityWithAttachment?>
 
     @Query("""
         SELECT RepEntityWithAttachment.*

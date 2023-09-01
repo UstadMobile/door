@@ -18,14 +18,6 @@ expect class RepositoryConfig {
     val json: Json
 
     /**
-     * If true, the repository will automatically create a replication subscription manager and connect to start
-     * replication.
-     *
-     * The database itself should be initialized addCallback(SyncNodeIdCallback(nodeId))
-     */
-    val useReplicationSubscription: Boolean
-
-    /**
      * The nodeId for the local node (not the remote node - which is only discovered after connecting to it). This
      * will match the single row that is in SyncNode.
      */

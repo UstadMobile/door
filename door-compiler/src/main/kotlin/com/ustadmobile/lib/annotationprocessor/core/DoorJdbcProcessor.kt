@@ -1,6 +1,5 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import com.ustadmobile.door.lifecycle.LiveData
 import com.ustadmobile.door.room.*
 import androidx.room.*
 import com.google.devtools.ksp.processing.KSPLogger
@@ -1014,67 +1013,7 @@ fun TypeSpec.Builder.addDaoQueryFunction(
                 .build()
             )
         }
-        .applyIf(daoFun.returnType?.isDataSourceFactory() == true) {
-            val resultComponentType = resultType.unwrapComponentTypeIfListOrArray(resolver)
-            val dataSourceQueryVarsMap = queryVarsMap + mapOf("_offset" to resolver.builtIns.intType,
-                "_limit" to resolver.builtIns.intType)
-            addCode(CodeBlock.builder()
-                .add("return %L\n",
-                    TypeSpec.anonymousClassBuilder()
-                        .superclass(daoFun.returnType?.toTypeName() ?: throw IllegalArgumentException("DataSourceFactory no return type"))
-                        .addFunction(FunSpec.builder("getData")
-                            .addModifiers(KModifier.OVERRIDE)
-                            .returns(LiveData::class.asTypeName()
-                                .parameterizedBy(List::class.asTypeName().parameterizedBy(resultComponentType.toTypeName())))
-                            .addParameter("_offset", INT)
-                            .addParameter("_limit", INT)
-                            .addCode(CodeBlock.builder()
-                                .applyIf(rawQueryParamName != null) {
-                                    add("val $rawQueryParamName = $rawQueryParamName.%M(\n",
-                                        MemberName("com.ustadmobile.door.ext", "copyWithExtraParams"))
-                                    add("sql = \"SELECT * FROM (\${$rawQueryParamName.sql}) LIMIT ? OFFSET ?\",\n")
-                                    add("extraParams = arrayOf(_limit, _offset))\n")
-                                }
-                                .add("return ")
-                                .beginControlFlow("%T(_db, listOf(%L)) ",
-                                    LiveDataImpl::class.asClassName(),
-                                    daoFunDecl.getQueryTables(environment.logger).joinToString { "\"$it\"" })
-                                .addJdbcQueryCode(daoFunDecl, daoDecl, dataSourceQueryVarsMap, resolver,
-                                    querySql = querySql?.let { "SELECT * FROM ($it) LIMIT :_limit OFFSET :_offset" })
-                                .endControlFlow()
-                                .build())
-                            .build())
-                        .addFunction(FunSpec.builder("getLength")
-                            .addModifiers(KModifier.OVERRIDE)
-                            .returns(LiveData::class.asTypeName().parameterizedBy(INT))
-                            .addCode(CodeBlock.builder()
-                                .applyIf(rawQueryParamName != null) {
-                                    add("val $rawQueryParamName = $rawQueryParamName.%M(\n",
-                                        MemberName("com.ustadmobile.door.ext", "copy"))
-                                    add("sql = \"SELECT COUNT(*) FROM (\${$rawQueryParamName.sql})\")\n")
-                                }
-                                .add("return ")
-                                .beginControlFlow("%T(_db, listOf(%L)) ",
-                                    LiveDataImpl::class.asClassName(),
-                                    daoFunDecl.getQueryTables(environment.logger).joinToString { "\"$it\"" })
-                                .addJdbcQueryCode(daoFunDecl, daoDecl, dataSourceQueryVarsMap, resolver,
-                                    resultType = resolver.builtIns.intType,
-                                    querySql = querySql?.let { "SELECT COUNT(*) FROM ($querySql) " })
-                                .endControlFlow()
-                                .build())
-                            .build())
-                        .build())
-                .build())
-        }.applyIf(daoFun.returnType?.isLiveData() == true) {
-            addCode(CodeBlock.builder()
-                .add("return ")
-                .beginControlFlow("%T(_db, listOf(%L)) ",
-                    LiveDataImpl::class.asClassName(),
-                    daoFunDecl.getQueryTables(environment.logger).joinToString { "\"$it\"" })
-                .addJdbcQueryCode(daoFunDecl, daoDecl, queryVarsMap, resolver)
-                .endControlFlow()
-                .build())
-        }.applyIf(daoFun.returnType?.isFlow() == true) {
+        .applyIf(daoFun.returnType?.isFlow() == true) {
             addCode(CodeBlock.builder()
                 .add("return ")
                 .beginControlFlow("_db.%M(arrayOf(%L))",
@@ -1083,7 +1022,7 @@ fun TypeSpec.Builder.addDaoQueryFunction(
                 .addJdbcQueryCode(daoFunDecl, daoDecl, queryVarsMap, resolver)
                 .endControlFlow()
                 .build())
-        }.applyIf(daoFun.returnType?.isPagingSourceOrDataSourceFactoryOrLiveDataOrFlow() != true) {
+        }.applyIf(daoFun.returnType?.isPagingSourceOrFlow() != true) {
             if(daoFun.hasReturnType(resolver))
                 addCode("return ")
             addCode(CodeBlock.builder()
@@ -1136,7 +1075,7 @@ fun CodeBlock.Builder.addMapResultRowCode(
 ): CodeBlock.Builder {
     val queryReturnType = resultType.unwrapResultType(resolver)
     val resultComponentType = queryReturnType.unwrapComponentTypeIfListOrArray(resolver)
-    if(queryReturnType.isListOrArrayType(resolver) || resultType.isDataSourceFactory()) {
+    if(queryReturnType.isListOrArrayType(resolver)) {
         beginControlFlow("$resultVarName.%M", MemberName("com.ustadmobile.door.jdbc.ext", "mapRows"))
     }else {
         beginControlFlow("$resultVarName.%M(%L)", MemberName("com.ustadmobile.door.jdbc.ext", "mapNextRow"),

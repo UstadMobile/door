@@ -98,7 +98,6 @@ class NodeEventManagerJvm(
     init {
         //If using SQLite on JDBC, we need to add a listener to setup
         if(db.dbType() == DoorDbType.SQLITE) {
-            println("Adding JDBC implementation listener")
             (db as RoomJdbcImpl).jdbcImplHelper.addListener(jdbcImplListener)
         }else {
             //Setup listening for postgres channel

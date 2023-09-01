@@ -1,7 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
 import com.google.devtools.ksp.processing.KSPLogger
-import com.ustadmobile.door.lifecycle.LiveData
 import com.ustadmobile.door.room.RoomDatabase
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
@@ -313,10 +312,8 @@ fun CodeBlock.Builder.addHttpServerPassToDaoCodeBlock(
         callCodeBlock.add("val _result = ")
     }
 
-    val isLiveData = returnType is ParameterizedTypeName
-            && returnType.rawType == LiveData::class.asClassName()
     val useRunBlocking = serverType == SERVER_TYPE_NANOHTTPD
-            && (KModifier.SUSPEND in daoMethod.modifiers || isLiveData)
+            && (KModifier.SUSPEND in daoMethod.modifiers)
 
     callCodeBlock.takeIf { useRunBlocking }?.beginControlFlow("%M",
             MemberName("kotlinx.coroutines", "runBlocking"))
@@ -346,16 +343,11 @@ fun CodeBlock.Builder.addHttpServerPassToDaoCodeBlock(
 
 
 
-    callCodeBlock.add(")")
-    if(isLiveData) {
-        callCodeBlock.add(".%M()",
-                MemberName("com.ustadmobile.door", "getFirstValue"))
-    }
-    callCodeBlock.add("\n")
+    callCodeBlock.add(")\n")
 
     callCodeBlock.takeIf { useRunBlocking }?.endControlFlow()
 
-    var respondResultType = returnType.unwrapLiveDataOrDataSourceFactory()
+    var respondResultType = returnType
     respondResultType = respondResultType.copy(nullable = respondResultType.isNullableAsSelectReturnResult)
 
     add(getVarsCodeBlock.build())
@@ -581,7 +573,7 @@ fun FileSpec.Builder.addDbNanoHttpdMapperFunction(
  *  methods use refactored SQL that avoids sending a client entities it was already sent. The
  *  generated method will have a clientId parameter (to filter by), and offset and limit parameters
  *  (if the DAO itself returns a DataSource.Factory). The return type will always be the plain entity
- *  itself or a list thereof (not LiveData or DataSource.Factory).
+ *  itself or a list thereof (not Flow or PagingSource).
  *
  * - DaoName_KtorHelperLocal: Abstract class implementing DaoName_KtorHelper using the local change
  *  sequence number as the basis for filtering entities. A JDBC implementation of this DAO will also

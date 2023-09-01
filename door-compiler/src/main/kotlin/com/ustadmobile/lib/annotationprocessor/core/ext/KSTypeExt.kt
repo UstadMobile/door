@@ -1,8 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core.ext
 
 import com.google.devtools.ksp.findActualType
-import com.ustadmobile.door.lifecycle.LiveData
-import com.ustadmobile.door.paging.DataSourceFactory
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.CodeBlock
@@ -26,13 +24,13 @@ fun KSType.unwrapComponentTypeIfListOrArray(
 /**
  *
  * @receiver The return type of a DAO function. This can be a primitive, object, a list or array of a primitive or object
- * or LiveData, DataSourceFactory, or Flow with a primitive or object type reference
- * e.g. Entity, List<Entity>, LiveData<Entity>, LiveData<List<Entity>> etc.
+ * or Flow with a primitive or object type reference
+ * e.g. Entity, List<Entity>, Flow<Entity>, Flow<List<Entity>>, PagingSource<Int, Entity> etc.
  *
  * @param resolver the KSP resolver
  *
  * @return The result type expected when running the actual query - either the object itself, or a list of objects. This
- * will unwrap LiveData, Flow, and DataSourceFactory.
+ * will unwrap Flow and PagingSource
  * e.g. Entity, List<Entity>, Entity, List<Entity> etc.
  *
  */
@@ -40,23 +38,20 @@ fun KSType.unwrapResultType(
     resolver: Resolver,
 ): KSType {
     val qualifiedName = this.declaration.qualifiedName?.asString()
-    if (qualifiedName == LiveData::class.qualifiedName) {
-        return this.arguments.first().type?.resolve()
-            ?: throw IllegalArgumentException("unwrapLiveDataOrDataSourceFactoryResultType: Cannot resolve LiveData type!")
-    } else if (qualifiedName == DataSourceFactory::class.qualifiedName ||
-        qualifiedName == PagingSource::class.qualifiedName
-    ) {
-        val entityTypeRef = arguments.get(1).type ?: throw IllegalArgumentException("PagingSource/Factory has no type argument")
-        return resolver.getClassDeclarationByName(resolver.getKSNameFromString("kotlin.collections.List"))
-            ?.asType(listOf(resolver.getTypeArgument(entityTypeRef, Variance.INVARIANT)))
-                ?: throw IllegalArgumentException("unwrapLiveDataOrDataSourceFactoryResultType: could not lookup pagingsource comp type")
-    }else if(qualifiedName == Flow::class.qualifiedName) {
-        return this.arguments.first().type?.resolve()
-            ?: throw IllegalArgumentException("unwrapLiveDataOrDataSourceFactoryResultType: Cannot resolve Flow type!")
-    }
-
-    else {
-        return this
+    return when (qualifiedName) {
+        PagingSource::class.qualifiedName -> {
+            val entityTypeRef = arguments.get(1).type ?: throw IllegalArgumentException("PagingSource has no type argument")
+            resolver.getClassDeclarationByName(resolver.getKSNameFromString("kotlin.collections.List"))
+                ?.asType(listOf(resolver.getTypeArgument(entityTypeRef, Variance.INVARIANT)))
+                ?: throw IllegalArgumentException("unwrapResultType: could not lookup pagingsource comp type")
+        }
+        Flow::class.qualifiedName -> {
+            this.arguments.first().type?.resolve()
+                ?: throw IllegalArgumentException("unwrapResultType: Cannot resolve Flow type!")
+        }
+        else -> {
+            this
+        }
     }
 
 }
@@ -179,13 +174,9 @@ fun KSType.isIntArray(): Boolean {
     return (declaration as? KSClassDeclaration)?.qualifiedName?.asString() == "kotlin.IntArray"
 }
 
-fun KSType.isDataSourceFactory() = declaration.isDataSourceFactory()
-
 fun KSType.isPagingSource() = declaration.isPagingSource()
 
-fun KSType.isLiveData() = declaration.isLiveData()
-
-fun KSType.isPagingSourceOrDataSourceFactoryOrLiveDataOrFlow() = declaration.isPagingSourceOrDataSourceFactoryOrLiveDataOrFlow()
+fun KSType.isPagingSourceOrFlow() = declaration.isPagingSourceOrFlow()
 
 fun KSType.isFlow() = declaration.isFlow()
 

@@ -104,8 +104,6 @@ val KSFunctionDeclaration.useSuspendedQuery: Boolean
         }
 
         return isSuspended ||
-                returnTypeDecl?.isLiveData() == true ||
-                returnTypeDecl?.isDataSourceFactory() == true ||
                 returnTypeDecl?.isFlow() == true ||
                 returnTypeDecl?.isPagingSource() == true
     }

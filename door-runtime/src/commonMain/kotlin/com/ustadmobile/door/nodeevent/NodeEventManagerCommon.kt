@@ -36,7 +36,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 abstract class NodeEventManagerCommon(
     protected val db: RoomDatabase,
     protected val dispatcher: CoroutineDispatcher = Dispatchers.Default,
-    //protected val scope: CoroutineScope,
 ) {
 
     protected val hasOutgoingReplicationTable = OutgoingReplication::class.simpleName?.let {

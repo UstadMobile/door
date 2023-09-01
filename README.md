@@ -120,7 +120,6 @@ kotlin {
                 //Add Room dependencies for Android
                 implementation "androidx.room:room-runtime:$version_android_room"
                 implementation "androidx.room:room-ktx:$version_android_room"
-                implementation "androidx.lifecycle:lifecycle-livedata-ktx:$version_androidx_lifecycle"
                 implementation "androidx.paging:paging-runtime:$version_androidx_paging"
             }
         }

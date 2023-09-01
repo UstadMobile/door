@@ -74,7 +74,6 @@ class ReplicationTest {
         repo = db.asRepository(repositoryConfig(context, "http://192.168.1.148:8098/RepDb/",
             Random.nextLong(), "af", httpClient, okHttpClient)
         {
-            useReplicationSubscription = true
 
         })
     }

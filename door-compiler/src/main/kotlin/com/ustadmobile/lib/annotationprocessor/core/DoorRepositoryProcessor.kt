@@ -483,9 +483,5 @@ class DoorRepositoryProcessor(
          */
         const val DB_NAME_VAR = "_DB_NAME"
 
-        const val DATASOURCEFACTORY_TO_BOUNDARYCALLBACK_VARNAME = "_dataSourceFactoryToBoundaryCallbackMap"
-
-        val BOUNDARY_CALLBACK_CLASSNAME = ClassName("com.ustadmobile.door",
-            "RepositoryBoundaryCallback")
     }
 }

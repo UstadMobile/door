@@ -111,7 +111,7 @@ internal fun CodeBlock.Builder.addKtorRequestForFunction(
     val nonQueryParams =  funSpec.parameters.filter { !it.type.isHttpQueryQueryParam() }
 
     //The type of the response we expect from the server.
-    val httpResultType = funSpec.returnType.unwrapLiveDataOrDataSourceFactory()
+    val httpResultType = funSpec.returnType
 
     val httpMemberFn = if(nonQueryParams.isEmpty()) {
         CLIENT_GET_MEMBER_NAME

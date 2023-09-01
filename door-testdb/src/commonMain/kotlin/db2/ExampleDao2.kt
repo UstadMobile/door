@@ -1,11 +1,8 @@
 package db2
 
-import com.ustadmobile.door.lifecycle.LiveData
 import androidx.room.*
 import com.ustadmobile.door.*
 import com.ustadmobile.door.annotation.DoorDao
-import com.ustadmobile.door.annotation.QueryLiveTables
-import com.ustadmobile.door.paging.DataSourceFactory
 import com.ustadmobile.door.paging.PagingSource
 import kotlinx.coroutines.flow.Flow
 
@@ -87,9 +84,6 @@ abstract class ExampleDao2 {
     @Update
     abstract fun updateList(updateEntityList: List<ExampleEntity2>)
 
-    @Query("SELECT * FROM ExampleEntity2")
-    abstract fun findByMinUidLive(): LiveData<List<ExampleEntity2>>
-
     @Query("UPDATE ExampleEntity2 SET name = :newName WHERE someNumber >= :num")
     abstract fun updateByParam(newName: String, num: Long) : Int
 
@@ -128,10 +122,6 @@ abstract class ExampleDao2 {
 
     @RawQuery
     abstract fun rawQueryForSingleValue(query: DoorQuery): ExampleEntity2?
-
-    @RawQuery(observedEntities = [ExampleEntity2::class])
-    @QueryLiveTables(["ExampleEntity2"])
-    abstract fun rawQueryForLiveData(query: DoorQuery): LiveData<List<ExampleEntity2>>
 
     @RawQuery
     abstract fun rawQueryWithArrParam(query: DoorQuery): List<ExampleEntity2>

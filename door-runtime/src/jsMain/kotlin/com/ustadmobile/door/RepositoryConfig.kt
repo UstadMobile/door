@@ -29,15 +29,12 @@ actual class RepositoryConfig internal constructor(
             val json: Json
         ) {
 
-            var useReplicationSubscription: Boolean = true
-
             val attachmentFilters = mutableListOf<AttachmentFilter>()
 
             var replicationSubscriptionMode = ReplicationSubscriptionMode.AUTO
 
             fun build() : RepositoryConfig{
-                return RepositoryConfig(context, endpoint, auth, nodeId, httpClient, json,
-                    useReplicationSubscription, replicationSubscriptionMode, replicationSubscriptionInitListener)
+                return RepositoryConfig(context, endpoint, auth, nodeId, httpClient, json)
             }
 
         }

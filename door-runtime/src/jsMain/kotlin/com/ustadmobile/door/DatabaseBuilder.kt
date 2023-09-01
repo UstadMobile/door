@@ -133,7 +133,7 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
         connection.close()
 
         val dbWrappedIfNeeded = if(dbMetaData.hasReadOnlyWrapper) {
-            dbImpl.wrap(builderOptions.dbClass)
+            dbImpl.wrap(builderOptions.dbClass, 0)
         }else {
             dbImpl
         }

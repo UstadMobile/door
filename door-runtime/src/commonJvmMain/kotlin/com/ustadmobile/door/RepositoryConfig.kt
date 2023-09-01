@@ -14,7 +14,6 @@ actual class RepositoryConfig internal constructor(
     actual val httpClient: HttpClient,
     val okHttpClient: OkHttpClient,
     actual val json: Json,
-    actual val useReplicationSubscription: Boolean,
 ) {
 
     companion object {
@@ -31,14 +30,11 @@ actual class RepositoryConfig internal constructor(
 
             var attachmentsDir: String? = null
 
-            var useReplicationSubscription = true
-
             val attachmentFilters = mutableListOf<AttachmentFilter>()
 
             fun build() : RepositoryConfig{
                 return RepositoryConfig(
                     context, endpoint, auth, nodeId, httpClient, okHttpClient, json,
-                    useReplicationSubscription,
                 )
             }
 

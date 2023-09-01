@@ -12,15 +12,14 @@ import com.ustadmobile.door.ext.wrap
 import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.util.DeleteZombieAttachmentsListener
 import com.ustadmobile.door.util.DoorAndroidRoomHelper
-import io.github.aakira.napier.Napier
 import java.io.File
-import java.util.concurrent.Executors
 
 @Suppress("UNCHECKED_CAST", "unused") //This is used as an API
 class DatabaseBuilder<T: RoomDatabase>(
     private val roomBuilder: RoomDatabase.Builder<T>,
     private val dbClass: KClass<T>,
     private val appContext: Context,
+    private val nodeId: Long,
     private val attachmentsDir: File?,
     private val attachmentFilters: List<AttachmentFilter>,
 ) {
@@ -30,12 +29,13 @@ class DatabaseBuilder<T: RoomDatabase>(
             context: Any,
             dbClass: KClass<T>,
             dbName: String,
+            nodeId: Long,
             attachmentsDir: File? = null,
             attachmentFilters: List<AttachmentFilter> = listOf(),
         ): DatabaseBuilder<T> {
             val applicationContext = (context as Context).applicationContext
             val builder = DatabaseBuilder(Room.databaseBuilder(applicationContext, dbClass.java, dbName),
-                dbClass, applicationContext, attachmentsDir, attachmentFilters)
+                dbClass, applicationContext, nodeId, attachmentsDir, attachmentFilters)
 
             val callbackClassName = "${dbClass.java.canonicalName}_AndroidReplicationCallback"
             println("Attempt to load callback $callbackClassName")
@@ -55,7 +55,7 @@ class DatabaseBuilder<T: RoomDatabase>(
         DoorAndroidRoomHelper.createAndRegisterHelper(db, appContext, attachmentsDir, attachmentFilters,
             DeleteZombieAttachmentsListener(db))
         return if(db.isWrappable(dbClass)) {
-            db.wrap(dbClass)
+            db.wrap(dbClass, nodeId)
         }else {
             db
         }

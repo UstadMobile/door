@@ -1,4 +1,3 @@
-import com.ustadmobile.door.lifecycle.Observer
 import com.ustadmobile.door.*
 import com.ustadmobile.door.ext.asRepository
 import com.ustadmobile.door.ext.rootDatabase
@@ -95,11 +94,6 @@ fun main() {
             console.log("IndexTest: Server says: $response ... Waiting...")
 
             val completableDeferred = CompletableDeferred<RepEntity>()
-            val observer = Observer<RepEntity?> {
-                if(it != null)
-                    completableDeferred.complete(it)
-            }
-            repDb.repDao.findByUidLive(serverInsertUid).observeForever(observer)
             val entityReceived = withTimeout(5000) {
                 completableDeferred.await()
             }
