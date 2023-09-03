@@ -65,7 +65,9 @@ fun Route.ReplicationRoute(
      * RoomDatabase#acknowledgeReceivedReplicationsAndSelectNextPendingBatch
      */
     post("ackAndGetPendingReplications") {
-        val receivedAck : ReplicationReceivedAck = call.receive()
+        val receivedAck : ReplicationReceivedAck = json.decodeFromString(
+            ReplicationReceivedAck.serializer(), call.receiveText()
+        )
         val nodeIdAndAuth = requireRemoteNodeIdAndAuth()
         val remoteNodeId = nodeIdAndAuth.first
 
@@ -76,9 +78,15 @@ fun Route.ReplicationRoute(
             receivedAck = receivedAck,
         )
 
-        call.respondText(contentType = ContentType.Application.Json) {
-            json.encodeToString(DoorMessage.serializer(), responseMessage)
+
+        if(responseMessage.replications.isNotEmpty()) {
+            call.respondText(contentType = ContentType.Application.Json) {
+                json.encodeToString(DoorMessage.serializer(), responseMessage)
+            }
+        }else {
+            call.respondBytes(byteArrayOf(), ContentType.Text.Plain, HttpStatusCode.NoContent)
         }
+
     }
 
 }
