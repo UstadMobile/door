@@ -12,10 +12,14 @@ import kotlinx.serialization.Serializable
  *  'replications': [
  *     {
  *       tableId: 42,
+ *       orUid: 123,
  *       entity: { .. entity fields }
  *     }
  *   ],
  *  'invalidations': []
+ *
+ *  Important: Must be serialized ONLY using Kotlinx Serialization (not Gson etc) because DoorReplicationEntity
+ *  uses Kotlinx Serialization's own JsonObject.
  *
  * @param fromNode the node id of the node that is sending the message
  * @param toNode the node id of the node that should receive this message
@@ -36,9 +40,6 @@ data class DoorMessage(
          */
         const val WHAT_REPLICATION = 1
 
-        const val KEY_REPLICATION_TABLEID = "tableId"
-
-        const val KEY_REPLICATION_ENTITY = "entity"
 
     }
 

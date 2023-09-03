@@ -22,13 +22,13 @@ import kotlinx.serialization.json.Json
 import java.io.Writer
 
 
-
 fun Route.ReplicationRoute(
     json: Json,
     adapter: KtorCallDbAdapter<*>,
 ) {
     fun Writer.writeDoorEvent(event: DoorServerSentEvent) {
         write("data: ${event.stringify()}\n\n")
+        flush()
     }
 
     /**
@@ -61,7 +61,8 @@ fun Route.ReplicationRoute(
     }
 
     /**
-     * Handle a client acknowledging entities being received and respond with next batch. See
+     * Handle a client acknowledging entities being received and respond with next batch of outgoing replications for
+     * this client. See
      * RoomDatabase#acknowledgeReceivedReplicationsAndSelectNextPendingBatch
      */
     post("ackAndGetPendingReplications") {
@@ -86,7 +87,29 @@ fun Route.ReplicationRoute(
         }else {
             call.respondBytes(byteArrayOf(), ContentType.Text.Plain, HttpStatusCode.NoContent)
         }
+    }
 
+    /**
+     * Handle a client submitting replications (e.g. incoming replication)
+     */
+    post("message") {
+        val db = adapter(call)
+        val nodeIdAndAuth = requireRemoteNodeIdAndAuth()
+        val message = json.decodeFromString(DoorMessage.serializer(), call.receiveText())
+
+        if(message.fromNode != nodeIdAndAuth.first) {
+            call.respondBytes(byteArrayOf(), ContentType.Text.Plain, HttpStatusCode.Forbidden)
+            return@post
+        }
+
+        db.doorWrapper.nodeEventManager.onIncomingMessageReceived(message)
+        val receivedAck = ReplicationReceivedAck(
+            replicationUids = message.replications.map { it.orUid }
+        )
+
+        call.respondText(contentType = ContentType.Application.Json) {
+            json.encodeToString(ReplicationReceivedAck.serializer(), receivedAck)
+        }
     }
 
 }

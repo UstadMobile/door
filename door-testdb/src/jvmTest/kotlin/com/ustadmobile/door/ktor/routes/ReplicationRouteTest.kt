@@ -2,10 +2,19 @@ package com.ustadmobile.door.ktor.routes
 
 import com.ustadmobile.door.DatabaseBuilder
 import com.ustadmobile.door.DoorConstants
+import com.ustadmobile.door.RepositoryConfig
+import com.ustadmobile.door.ext.doorWrapperNodeId
 import com.ustadmobile.door.ext.getOrThrow
 import com.ustadmobile.door.ext.withDoorTransactionAsync
 import com.ustadmobile.door.message.DoorMessage
+import com.ustadmobile.door.replication.DoorReplicationEntity
 import com.ustadmobile.door.replication.ReplicationReceivedAck
+import com.ustadmobile.door.replication.ServerSentEventsReplicationClient.Companion.EVT_INIT
+import com.ustadmobile.door.replication.ServerSentEventsReplicationClient.Companion.EVT_PENDING_REPLICATION
+import com.ustadmobile.door.sse.DoorEventListener
+import com.ustadmobile.door.sse.DoorEventSource
+import com.ustadmobile.door.sse.DoorServerSentEvent
+import com.ustadmobile.door.util.systemTimeInMillis
 import db3.ExampleDb3
 import db3.ExampleEntity3
 import io.ktor.client.request.*
@@ -19,8 +28,18 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlin.test.assertEquals
 import io.ktor.client.HttpClient
+import io.ktor.client.call.*
+import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.engine.*
+import io.ktor.server.netty.*
+import io.ktor.server.routing.*
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
+import okhttp3.OkHttpClient
+import java.net.URLEncoder
 
 class ReplicationRouteTest {
 
@@ -28,7 +47,6 @@ class ReplicationRouteTest {
         val db: ExampleDb3,
         val json: Json,
         val client: HttpClient
-
     )
 
 
@@ -50,7 +68,7 @@ class ReplicationRouteTest {
             }
 
 
-            @Suppress("RemoveRedundantQualifierName")
+            @Suppress("RemoveRedundantQualifierName", "RedundantSuppression") //Ensure clarity between client and server
             install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) {
                 gson {
                     register(ContentType.Application.Json, GsonConverter())
@@ -63,8 +81,9 @@ class ReplicationRouteTest {
             }
 
             val client = createClient {
+                @Suppress("RemoveRedundantQualifierName", "RedundantSuppression") //Ensure clarity between client and server
                 install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
-                    gson()
+                    json(json = json)
                 }
             }
 
@@ -81,7 +100,9 @@ class ReplicationRouteTest {
             val remoteNodeId = 123L
             val insertedUid = runBlocking {
                 context.db.withDoorTransactionAsync {
-                    val uid = context.db.exampleEntity3Dao.insertAsync(ExampleEntity3())
+                    val uid = context.db.exampleEntity3Dao.insertAsync(ExampleEntity3(
+                        lastUpdatedTime = systemTimeInMillis()
+                    ))
                     context.db.exampleEntity3Dao.insertOutgoingReplication(uid, remoteNodeId)
                     uid
                 }
@@ -111,7 +132,9 @@ class ReplicationRouteTest {
             val remoteNodeId = 123L
             val insertedUid = runBlocking {
                 context.db.withDoorTransactionAsync {
-                    val uid = context.db.exampleEntity3Dao.insertAsync(ExampleEntity3())
+                    val uid = context.db.exampleEntity3Dao.insertAsync(ExampleEntity3(
+                        lastUpdatedTime = systemTimeInMillis()
+                    ))
                     context.db.exampleEntity3Dao.insertOutgoingReplication(uid, remoteNodeId)
                     uid
                 }
@@ -135,5 +158,124 @@ class ReplicationRouteTest {
             assertEquals(HttpStatusCode.NoContent, response2.status)
         }
     }
+
+    @Test
+    fun givenEmptyDatabase_whenIncomingMessageWithReplicationReceived_thenShouldBeInserted() {
+        testReplicationRoute { context ->
+            val exampleEntity = ExampleEntity3(
+                eeUid = 1042,
+                lastUpdatedTime = systemTimeInMillis(), //Required due do the trigger condition
+            )
+
+            val remoteNodeId = 123L
+
+            val outgoingReplicationUid = 10420L
+
+            val incomingMessage = DoorMessage(
+                what = DoorMessage.WHAT_REPLICATION,
+                fromNode =123L,
+                toNode = context.db.doorWrapperNodeId,
+                replications = listOf(
+                    DoorReplicationEntity(
+                        tableId = ExampleEntity3.TABLE_ID,
+                        orUid = outgoingReplicationUid,
+                        entity = context.json.encodeToJsonElement(
+                            ExampleEntity3.serializer(), exampleEntity
+                        ).jsonObject
+                    )
+                )
+            )
+
+            val response = context.client.post("/message") {
+                header(DoorConstants.HEADER_NODE, "${remoteNodeId}/secret")
+                contentType(ContentType.Application.Json)
+                setBody(incomingMessage)
+            }
+
+            val receivedAck: ReplicationReceivedAck = response.body()
+            assertEquals(outgoingReplicationUid, receivedAck.replicationUids.first())
+
+            val entityInDb = context.db.exampleEntity3Dao.findByUid(exampleEntity.eeUid)
+            assertEquals(exampleEntity, entityInDb)
+        }
+    }
+
+    /**
+     * Test that if there is a new pending replication whilst a client is connected to the Server Sent Events endpoint
+     * that it will receive an EVT_PENDING_REPLICATION event.
+     *
+     * This has to be done using a real server because the Ktor Http client does not support server sent events.
+     *
+     */
+    @Test
+    fun givenServerSentEventsClientConnected_whenNewOutgoingReplicationIsPending_thenWillReceiveEvent() {
+        val db = DatabaseBuilder.databaseBuilder(ExampleDb3::class, "jdbc:sqlite::memory:", 1L)
+            .build()
+        db.clearAllTables()
+        val remoteNodeId = 123L
+
+        val json = Json {
+            encodeDefaults = true
+        }
+
+        val okHttpClient = OkHttpClient.Builder().build()
+        val httpClient = HttpClient {  }
+        val repoConfig = RepositoryConfig.repositoryConfig(Any(), "http://localhost:8094", remoteNodeId,
+                "secret", httpClient, okHttpClient)
+
+        val server = embeddedServer(Netty, 8094) {
+            routing {
+                ReplicationRoute(json) { db }
+            }
+        }
+        server.start()
+        val url = "http://localhost:8094/sse?door-node=${URLEncoder.encode("$remoteNodeId/secret", "UTF-8")}"
+
+        val eventChannel = Channel<DoorServerSentEvent>(capacity = Channel.UNLIMITED)
+        val listener = object: DoorEventListener {
+            override fun onOpen() {
+
+            }
+
+            override fun onMessage(message: DoorServerSentEvent) {
+                eventChannel.trySend(message)
+            }
+
+            override fun onError(e: Exception) {
+
+            }
+        }
+
+        val serverSentEventsClient = DoorEventSource(
+            repoConfig = repoConfig,
+            url = url,
+            listener = listener,
+            retry = 1000
+        )
+
+        try {
+            runBlocking {
+                val initEvt = withTimeout(500000) { eventChannel.receive() }
+                assertEquals(EVT_INIT, initEvt.event)
+
+                db.withDoorTransactionAsync {
+                    val uid = db.exampleEntity3Dao.insertAsync(
+                        ExampleEntity3(
+                            lastUpdatedTime = systemTimeInMillis()
+                        )
+                    )
+                    db.exampleEntity3Dao.insertOutgoingReplication(uid, remoteNodeId)
+                }
+
+                val replicationPendingEvt = withTimeout(5000) { eventChannel.receive() }
+                assertEquals(EVT_PENDING_REPLICATION, replicationPendingEvt.event)
+            }
+        }finally {
+            server.stop()
+            serverSentEventsClient.close()
+            httpClient.close()
+        }
+    }
+
 
 }
