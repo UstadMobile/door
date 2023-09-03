@@ -20,7 +20,6 @@ import com.ustadmobile.door.annotation.*
 import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.DoorDatabaseMetadata
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
-import com.ustadmobile.door.ext.minifySql
 import com.ustadmobile.door.ext.sqlToPostgresSql
 import com.ustadmobile.door.paging.DoorLimitOffsetPagingSource
 import com.ustadmobile.door.replication.ReplicationEntityMetaData
@@ -457,23 +456,6 @@ fun FileSpec.Builder.addJdbcDbImplType(
     return this
 }
 
-
-/**
- * Add a ReceiveView for the given EntityTypeElement.
- */
-internal fun CodeBlock.Builder.addCreateReceiveView(
-    entityKSClass: KSClassDeclaration,
-    sqlListVar: String
-): CodeBlock.Builder {
-    val receiveViewAnn = entityKSClass.getAnnotation(ReplicateReceiveView::class)
-    val viewName = receiveViewAnn?.name ?: "${entityKSClass.entityTableName}${AbstractDbProcessor.SUFFIX_DEFAULT_RECEIVEVIEW}"
-    val sql = receiveViewAnn?.value ?: """
-            SELECT ${entityKSClass.entityTableName}.*, 0 AS fromNodeId
-              FROM ${entityKSClass.entityTableName}
-        """.minifySql()
-    add("$sqlListVar += %S\n", "CREATE VIEW $viewName AS $sql")
-    return this
-}
 
 fun TypeSpec.Builder.addCreateAllTablesFunction(
     dbKSClass: KSClassDeclaration,
@@ -1327,8 +1309,7 @@ class DoorJdbcProcessor(
 
         val JDBC_TARGETS = listOf(DoorTarget.JVM, DoorTarget.JS)
 
-        //As it should be including the underscore - the above will be deprecated
-        const val SUFFIX_JDBC_KT2 = "_JdbcKt"
+        const val SUFFIX_JDBC_KT2 = "_JdbcImpl"
 
         const val SUFFIX_JS_IMPLEMENTATION_CLASSES = "JsImplementations"
     }

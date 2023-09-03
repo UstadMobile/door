@@ -3,8 +3,10 @@ package com.ustadmobile.door.ext
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.DoorConstants
 import com.ustadmobile.door.DoorDatabaseRepository
+import com.ustadmobile.door.RepositoryConfig
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.header
+import io.ktor.http.*
 
 fun HttpRequestBuilder.dbVersionHeader(db: RoomDatabase) {
     this.header(DoorConstants.HEADER_DBVERSION, db.dbSchemaVersion())
@@ -23,4 +25,20 @@ fun HttpRequestBuilder.doorNodeIdHeader(repo: DoorDatabaseRepository) {
 fun HttpRequestBuilder.doorNodeAndVersionHeaders(repo: DoorDatabaseRepository) {
     dbVersionHeader(repo.db)
     doorNodeIdHeader(repo)
+}
+
+/**
+ * For use by repositories - set the url
+ *
+ * @param repositoryConfig the repository config that specifies the endpoint
+ * @param repoPath the path within the repository to use for the URL e.g. DaoName/functionName etc.
+ */
+fun HttpRequestBuilder.setRepoUrl(
+    repositoryConfig: RepositoryConfig,
+    repoPath: String
+) {
+    url {
+        takeFrom(repositoryConfig.endpoint) //repositoryConfig.endpoint will always end with '/'
+        encodedPath = "${encodedPath}$repoPath"
+    }
 }

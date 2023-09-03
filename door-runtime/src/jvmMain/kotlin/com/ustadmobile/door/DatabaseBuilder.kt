@@ -5,7 +5,6 @@ import com.ustadmobile.door.DoorConstants.DBINFO_TABLENAME
 import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.dbType
 import com.ustadmobile.door.ext.doorDatabaseMetadata
-import com.ustadmobile.door.ext.wrap
 import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.migration.DoorMigrationAsync
 import com.ustadmobile.door.migration.DoorMigrationStatementList
@@ -117,7 +116,7 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
         dataSource.connection.use { connection ->
             val dbType = DoorDbType.typeIntFromProductName(connection.metaData?.databaseProductName ?: "")
 
-            val dbImplClass = Class.forName("${dbClass.java.canonicalName}_JdbcKt") as Class<T>
+            val dbImplClass = Class.forName("${dbClass.java.canonicalName}_JdbcImpl") as Class<T>
 
             val doorDb = dbImplClass.getConstructor(RoomDatabase::class.java, DataSource::class.java,
                 String::class.java, File::class.java, List::class.java, Int::class.javaPrimitiveType,

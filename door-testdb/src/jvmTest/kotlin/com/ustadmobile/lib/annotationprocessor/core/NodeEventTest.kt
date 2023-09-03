@@ -6,7 +6,7 @@ import com.ustadmobile.door.DoorDatabaseWrapper
 import com.ustadmobile.door.ext.withDoorTransactionAsync
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.message.DoorMessage.Companion.WHAT_REPLICATION
-import com.ustadmobile.door.replication.selectNodeEventMessageReplications
+import com.ustadmobile.door.replication.selectDoorReplicationEntitiesForEvents
 import db3.ExampleDb3
 import db3.ExampleEntity3
 import kotlinx.coroutines.flow.filter
@@ -46,7 +46,7 @@ class NodeEventTest {
                 assertEquals(insertedUid, nodeEvents.first().key1)
                 assertEquals(ExampleEntity3.TABLE_ID, nodeEvents.first().tableId)
 
-                val eventReplication = db.selectNodeEventMessageReplications(nodeEvents).first()
+                val eventReplication = db.selectDoorReplicationEntitiesForEvents(nodeEvents).first()
                 assertEquals(ExampleEntity3.TABLE_ID, eventReplication.tableId)
                 assertEquals(insertedUid, eventReplication.entity.get("eeUid")?.jsonPrimitive?.long)
 
@@ -83,7 +83,7 @@ class NodeEventTest {
                 val replicationEvent = awaitItem().first()
 
                 val eventReplication = db1
-                    .selectNodeEventMessageReplications(listOf(replicationEvent))
+                    .selectDoorReplicationEntitiesForEvents(listOf(replicationEvent))
                     .first()
 
                 (db2 as DoorDatabaseWrapper<*>).nodeEventManager.onIncomingMessageReceived(

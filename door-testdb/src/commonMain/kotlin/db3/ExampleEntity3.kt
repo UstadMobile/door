@@ -3,6 +3,7 @@ package db3
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.ustadmobile.door.annotation.*
+import kotlinx.serialization.Serializable
 
 @Entity
 @ReplicateEntity(
@@ -30,6 +31,8 @@ import com.ustadmobile.door.annotation.*
         )
     )
 )
+
+@Serializable
 data class ExampleEntity3(
     @PrimaryKey(autoGenerate = true)
     var eeUid: Long = 0,

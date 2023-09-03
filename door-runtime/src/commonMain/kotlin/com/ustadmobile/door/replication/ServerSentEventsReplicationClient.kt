@@ -20,7 +20,7 @@ import kotlinx.coroutines.launch
  *
  */
 class ServerSentEventsReplicationClient(
-    private val repositoryConfig: RepositoryConfig,
+    repositoryConfig: RepositoryConfig,
     private val doorWrappedDb:  RoomDatabase,
     scope: CoroutineScope? = null,
 ): DoorEventListener {
@@ -79,6 +79,8 @@ class ServerSentEventsReplicationClient(
     companion object {
 
         const val EVT_INIT = "init"
+
+        const val EVT_PENDING_REPLICATION = "pending-replication"
 
     }
 }

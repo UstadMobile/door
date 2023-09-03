@@ -20,7 +20,7 @@ class OutgoingReplication(
     @PrimaryKey(autoGenerate = true)
     var orUid: Long = 0,
     var destNodeId: Long = 0,
-    var orTableId: Long = 0,
+    var orTableId: Int = 0,
     var orPk1: Long = 0,
     var orPk2: Long = 0,
 ) {
