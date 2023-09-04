@@ -69,7 +69,7 @@ actual suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<E
                     val urlConnection = url.openConnection() as HttpURLConnection
                     urlConnection.setRequestProperty(DoorConstants.HEADER_DBVERSION,
                         db.dbSchemaVersion().toString())
-                    urlConnection.setRequestProperty(DoorConstants.HEADER_NODE,
+                    urlConnection.setRequestProperty(DoorConstants.HEADER_NODE_AND_AUTH,
                         "${this@downloadAttachments.config.nodeId}/${this@downloadAttachments.config.auth}")
                     urlConnection.inputStream.writeToFile(destFile)
                 }

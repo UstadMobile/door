@@ -11,7 +11,12 @@ object DoorConstants {
     /**
      * Header that should contain the node id and auth in the form of nodeId/auth e.g. 1234/secret
      */
-    val HEADER_NODE = "door-node"
+    val HEADER_NODE_AND_AUTH = "door-node"
+
+    /**
+     * Header on some responses that contains the nodeid that sent the response
+     */
+    val HEADER_NODE_ID = "door-node-id"
 
     const val DBINFO_TABLENAME = "_doorwayinfo"
 

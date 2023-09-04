@@ -2,8 +2,10 @@ package com.ustadmobile.door.replication
 
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.setRepoUrl
+import com.ustadmobile.door.ext.withDoorTransactionAsync
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.nodeevent.NodeEventManager
+import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.util.systemTimeInMillis
 import io.github.aakira.napier.Napier
 import io.ktor.client.*
@@ -21,14 +23,28 @@ import kotlin.concurrent.Volatile
  *
  * It will also collect the outgoing events flow from nodeEventManager and send messages to the
  *
+ * @param localNodeId - the Id of this node (the node we are running on) - not the id of the remote node on the other side
+ *
  */
 class DoorRepositoryReplicationClient(
+    private val localNodeId: Long,
     private val httpClient: HttpClient,
     private val repoEndpointUrl: String,
     scope: CoroutineScope,
     private val nodeEventManager: NodeEventManager<*>,
+    private val onGetPendingReplicationsForNode: OnGetPendingReplicationsForNode,
+    private val onAcknowledgeReceivedReplications: OnAcknowledgeReceivedReplications,
     private val retryInterval: Int = 10_000,
+
 ) {
+
+    interface OnGetPendingReplicationsForNode {
+        suspend operator fun invoke(nodeId: Long, batchSize: Int): List<DoorReplicationEntity>
+    }
+
+    interface OnAcknowledgeReceivedReplications {
+        suspend operator fun invoke(nodeId: Long, receivedAck: ReplicationReceivedAck)
+    }
 
     @Volatile
     var lastInvalidatedTime = systemTimeInMillis()
@@ -41,23 +57,82 @@ class DoorRepositoryReplicationClient(
 
     private val fetchPendingReplicationsJob : Job
 
-    private val channel = Channel<Unit>(capacity = 1)
+    private val sendPendingReplicationsJob: Job
+
+    private val collectEventsJob: Job
+
+    private val fetchNotifyChannel = Channel<Unit>(capacity = 1)
+
+    private val sendNotifyChannel = Channel<Unit>(capacity = 1)
+
+    private val batchSize = 1000
+
+    @Volatile
+    private var remoteNodeId = CompletableDeferred<Long>()
 
     init {
         fetchPendingReplicationsJob = scope.launch {
-            runAcknowledgeInsertLoop()
+            runFetchLoop()
         }
 
-        channel.trySend(Unit)
+        sendPendingReplicationsJob = scope.launch {
+            //runSendLoop()
+        }
+
+        collectEventsJob = scope.launch {
+            val nodeId = remoteNodeId.await()
+            nodeEventManager.outgoingEvents.collect { events ->
+                if(events.any { it.toNode == nodeId && it.what == DoorMessage.WHAT_REPLICATION }) {
+                    sendNotifyChannel.trySend(Unit)
+                }
+            }
+        }
+
+        fetchNotifyChannel.trySend(Unit)
     }
 
-    private suspend fun CoroutineScope.runAcknowledgeInsertLoop() {
+    private suspend fun CoroutineScope.runSendLoop() {
+        val remoteNodeIdVal = remoteNodeId.await()
+
+        var probablyHasMoreOutgoingReplications = true
+        while(isActive) {
+            if(!probablyHasMoreOutgoingReplications) {
+                sendNotifyChannel.receive()
+            }
+
+            val outgoingReplications = onGetPendingReplicationsForNode(remoteNodeIdVal, batchSize)
+//            db.withDoorTransactionAsync {
+//                db.selectPendingOutgoingReplicationsByDestNodeId(remoteNodeIdVal, batchSize)
+//            }
+
+            val replicationResponse = httpClient.post {
+                setRepoUrl(repoEndpointUrl, "replication/message")
+                contentType(ContentType.Application.Json)
+                setBody(DoorMessage(
+                    what = DoorMessage.WHAT_REPLICATION,
+                    fromNode = localNodeId,
+                    toNode = remoteNodeIdVal,
+                    replications = outgoingReplications,
+                ))
+            }
+
+            val replicationReceivedAck: ReplicationReceivedAck = replicationResponse.body()
+            onAcknowledgeReceivedReplications.invoke(remoteNodeIdVal, replicationReceivedAck)
+//            db.withDoorTransactionAsync {
+//                db.acknowledgeReceivedReplications(remoteNodeIdVal, replicationReceivedAck.replicationUids)
+//            }
+
+            probablyHasMoreOutgoingReplications = outgoingReplications.size == batchSize
+        }
+    }
+
+    private suspend fun CoroutineScope.runFetchLoop() {
         val acknowledgementsToSend = mutableListOf<Long>()
 
         while(isActive) {
             try {
                 if(acknowledgementsToSend.isEmpty()) {
-                    channel.receive() //wait for the invalidation signal if there is nothing we need to acknowledge
+                    fetchNotifyChannel.receive() //wait for the invalidation signal if there is nothing we need to acknowledge
                 }
 
                 val entitiesReceivedResponse = httpClient.post {
@@ -88,11 +163,12 @@ class DoorRepositoryReplicationClient(
     }
 
     /**
-     *
+     * This should be called when we get a message from the server that there is new pending replication. That can happen
+     * via different mechanisms e.g. server sent events.
      */
     fun invalidate() {
         lastInvalidatedTime = systemTimeInMillis()
-        channel.trySend(Unit)
+        fetchNotifyChannel.trySend(Unit)
     }
 
     fun close() {

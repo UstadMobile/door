@@ -32,8 +32,8 @@ fun <T: RoomDatabase> PipelineContext<Unit, ApplicationCall>.unwrappedDbOnCall(t
  * request) and the node auth. Throws an exception if this does not exist
  */
 fun PipelineContext<Unit, ApplicationCall>.requireRemoteNodeIdAndAuth(): Pair<Long, String> {
-    val header = context.request.header(DoorConstants.HEADER_NODE)
-        ?: context.request.queryParameters[DoorConstants.HEADER_NODE]
+    val header = context.request.header(DoorConstants.HEADER_NODE_AND_AUTH)
+        ?: context.request.queryParameters[DoorConstants.HEADER_NODE_AND_AUTH]
         ?: throw IllegalStateException("remoteNodeIdAndAuth: no id and auth header or query param provided")
     val (nodeIdStr, nodeAuth) = header.split('/', limit = 2)
     return Pair(nodeIdStr.toLong(), nodeAuth)

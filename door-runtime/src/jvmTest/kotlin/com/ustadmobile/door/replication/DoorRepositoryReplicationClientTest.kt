@@ -34,10 +34,14 @@ class DoorRepositoryReplicationClientTest {
 
     private val outgoingRepUid = 123L
 
+    private val clientNodeId = 1L
+
+    private val serverNodeId = 2L
+
     private val pendingReplicationMessage = DoorMessage(
         what = DoorMessage.WHAT_REPLICATION,
-        fromNode = 1L,
-        toNode = 2L,
+        fromNode = clientNodeId,
+        toNode = serverNodeId,
         replications = listOf(
             DoorReplicationEntity(
                 tableId = 42,
@@ -80,10 +84,13 @@ class DoorRepositoryReplicationClientTest {
 
         val mockEventManager = mock<NodeEventManager<*>> { }
         val repoClient = DoorRepositoryReplicationClient(
+            localNodeId = clientNodeId,
             httpClient = httpClient,
             repoEndpointUrl = mockServer.url("/").toString(),
             scope = scope,
             nodeEventManager = mockEventManager,
+            onGetPendingReplicationsForNode = mock { },
+            onAcknowledgeReceivedReplications = mock { },
         )
 
         verifyBlocking(mockEventManager, timeout(5000)) {
@@ -113,10 +120,13 @@ class DoorRepositoryReplicationClientTest {
 
         val mockEventManager = mock<NodeEventManager<*>> { }
         val repoClient = DoorRepositoryReplicationClient(
+            localNodeId = clientNodeId,
             httpClient = httpClient,
             repoEndpointUrl = mockServer.url("/").toString(),
             scope = scope,
             nodeEventManager = mockEventManager,
+            onGetPendingReplicationsForNode = mock { },
+            onAcknowledgeReceivedReplications = mock { },
         )
 
         val request1 = mockServer.takeRequest(5, TimeUnit.SECONDS)

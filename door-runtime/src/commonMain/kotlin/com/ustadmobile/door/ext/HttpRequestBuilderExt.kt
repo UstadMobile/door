@@ -15,7 +15,7 @@ fun HttpRequestBuilder.dbVersionHeader(db: RoomDatabase) {
  * Append the client ID header
  */
 fun HttpRequestBuilder.doorNodeIdHeader(repo: DoorDatabaseRepository) {
-    header(DoorConstants.HEADER_NODE, "${repo.config.nodeId}/${repo.config.auth}")
+    header(DoorConstants.HEADER_NODE_AND_AUTH, "${repo.config.nodeId}/${repo.config.auth}")
 }
 
 /**

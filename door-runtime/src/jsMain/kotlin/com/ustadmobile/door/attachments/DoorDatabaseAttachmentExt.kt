@@ -2,7 +2,7 @@ package com.ustadmobile.door.attachments
 
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.DoorConstants.HEADER_DBVERSION
-import com.ustadmobile.door.DoorConstants.HEADER_NODE
+import com.ustadmobile.door.DoorConstants.HEADER_NODE_AND_AUTH
 import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.DoorUri
@@ -86,7 +86,7 @@ actual suspend fun DoorDatabaseRepository.uploadAttachment(entityWithAttachment:
     val params = "md5=${encodeURIComponent(attachmentMd5)}&uri=${encodeURIComponent(attachmentUri)}"
     try {
         val headers = json(HEADER_DBVERSION to db.dbSchemaVersion().toString(),
-            HEADER_NODE to "${config.nodeId}/${config.auth}")
+            HEADER_NODE_AND_AUTH to "${config.nodeId}/${config.auth}")
         window.fetch("${config.endpoint}attachments/upload?$params",
             RequestInit(method = "POST", body = blob, headers = headers)).await()
     }catch(e: Exception) {
@@ -99,7 +99,7 @@ actual suspend fun DoorDatabaseRepository.downloadAttachments(entityList: List<E
     var currentAttachmentUri: String? = null
     try {
         val headers = json(HEADER_DBVERSION to db.dbSchemaVersion().toString(),
-            HEADER_NODE to "${config.nodeId}/${config.auth}")
+            HEADER_NODE_AND_AUTH to "${config.nodeId}/${config.auth}")
         val dbName = ((this as RoomDatabase).rootDatabase as DoorDatabaseJdbc).dbName
 
         val entitiesWithAttachmentData = entityList.mapNotNull { it.attachmentUri }

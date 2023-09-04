@@ -49,6 +49,8 @@ class ReplicationRouteTest {
         val client: HttpClient
     )
 
+    private val serverLocalNodeId = 8042L
+
 
     private fun testReplicationRoute(
         block: suspend ApplicationTestBuilder.(ReplicationRouteTestContext) -> Unit
@@ -77,7 +79,7 @@ class ReplicationRouteTest {
             }
 
             routing {
-                ReplicationRoute(json) { db }
+                ReplicationRoute(json, serverLocalNodeId) { db }
             }
 
             val client = createClient {
@@ -109,7 +111,7 @@ class ReplicationRouteTest {
             }
 
             val response = context.client.post("/ackAndGetPendingReplications") {
-                header(DoorConstants.HEADER_NODE, "${remoteNodeId}/secret")
+                header(DoorConstants.HEADER_NODE_AND_AUTH, "${remoteNodeId}/secret")
                 contentType(ContentType.Application.Json)
                 setBody(ReplicationReceivedAck(emptyList()))
             }
@@ -141,7 +143,7 @@ class ReplicationRouteTest {
             }
 
             val response1 = context.client.post("/ackAndGetPendingReplications") {
-                header(DoorConstants.HEADER_NODE, "${remoteNodeId}/secret")
+                header(DoorConstants.HEADER_NODE_AND_AUTH, "${remoteNodeId}/secret")
                 contentType(ContentType.Application.Json)
                 setBody(ReplicationReceivedAck(emptyList()))
             }
@@ -151,7 +153,7 @@ class ReplicationRouteTest {
                 responseDoorMessage.replications.first().entity.getOrThrow("eeUid").jsonPrimitive.long)
 
             val response2 = context.client.post("/ackAndGetPendingReplications") {
-                header(DoorConstants.HEADER_NODE, "${remoteNodeId}/secret")
+                header(DoorConstants.HEADER_NODE_AND_AUTH, "${remoteNodeId}/secret")
                 contentType(ContentType.Application.Json)
                 setBody(ReplicationReceivedAck(responseDoorMessage.replications.map { it.orUid }))
             }
@@ -187,7 +189,7 @@ class ReplicationRouteTest {
             )
 
             val response = context.client.post("/message") {
-                header(DoorConstants.HEADER_NODE, "${remoteNodeId}/secret")
+                header(DoorConstants.HEADER_NODE_AND_AUTH, "${remoteNodeId}/secret")
                 contentType(ContentType.Application.Json)
                 setBody(incomingMessage)
             }
@@ -225,7 +227,7 @@ class ReplicationRouteTest {
 
         val server = embeddedServer(Netty, 8094) {
             routing {
-                ReplicationRoute(json) { db }
+                ReplicationRoute(json, serverLocalNodeId) { db }
             }
         }
         server.start()
