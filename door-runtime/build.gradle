@@ -162,6 +162,7 @@ kotlin {
                 implementation "io.ktor:ktor-server-netty:$version_ktor"
                 implementation "io.ktor:ktor-server-content-negotiation:$version_ktor"
                 implementation "io.ktor:ktor-client-content-negotiation:$version_ktor"
+                implementation "io.ktor:ktor-serialization-kotlinx-json:$version_ktor"
                 implementation "io.ktor:ktor-serialization-gson:$version_ktor"
                 implementation "io.ktor:ktor-client-okhttp:$version_ktor"
                 implementation "io.ktor:ktor-client-gson:$version_ktor"

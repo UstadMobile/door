@@ -1,13 +1,12 @@
 package com.ustadmobile.door.replication
 
-import com.ustadmobile.door.RepositoryConfig
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.setRepoUrl
 import com.ustadmobile.door.message.DoorMessage
-import com.ustadmobile.door.nodeevent.NodeEventManagerCommon
-import com.ustadmobile.door.room.RoomDatabase
+import com.ustadmobile.door.nodeevent.NodeEventManager
 import com.ustadmobile.door.util.systemTimeInMillis
 import io.github.aakira.napier.Napier
+import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -24,10 +23,10 @@ import kotlin.concurrent.Volatile
  *
  */
 class DoorRepositoryReplicationClient(
-    private val db: RoomDatabase,
-    private val config: RepositoryConfig,
-    private val scope: CoroutineScope,
-    private val nodeEventManager: NodeEventManagerCommon<*>,
+    private val httpClient: HttpClient,
+    private val repoEndpointUrl: String,
+    scope: CoroutineScope,
+    private val nodeEventManager: NodeEventManager<*>,
     private val retryInterval: Int = 10_000,
 ) {
 
@@ -58,19 +57,25 @@ class DoorRepositoryReplicationClient(
         while(isActive) {
             try {
                 if(acknowledgementsToSend.isEmpty()) {
-                    channel.receive() //wait for the invalidation signal
+                    channel.receive() //wait for the invalidation signal if there is nothing we need to acknowledge
                 }
 
-                val entitiesReceivedResponse = config.httpClient.post {
-                    setRepoUrl(config, "replication/ackAndGetPendingReplications")
+                val entitiesReceivedResponse = httpClient.post {
+                    setRepoUrl(repoEndpointUrl, "replication/ackAndGetPendingReplications")
                     contentType(ContentType.Application.Json)
                     setBody(ReplicationReceivedAck(acknowledgementsToSend))
                 }
                 acknowledgementsToSend.clear()
 
-                val entitiesReceivedMessage: DoorMessage = entitiesReceivedResponse.body()
-                nodeEventManager.onIncomingMessageReceived(entitiesReceivedMessage)
-                acknowledgementsToSend.addAll(entitiesReceivedMessage.replications.map { it.orUid })
+                if(entitiesReceivedResponse.status == HttpStatusCode.OK) {
+                    val entitiesReceivedMessage: DoorMessage = entitiesReceivedResponse.body()
+                    nodeEventManager.onIncomingMessageReceived(entitiesReceivedMessage)
+                    acknowledgementsToSend.addAll(entitiesReceivedMessage.replications.map { it.orUid })
+                }
+
+                if(entitiesReceivedResponse.status == HttpStatusCode.NoContent) {
+                    lastReceiveCompleteTime = entitiesReceivedResponse.responseTime.timestamp // to be 100% sure - would be better to timestamp the transaction
+                }
             }catch(e: Exception) {
                 Napier.v(
                     tag= DoorTag.LOG_TAG,
@@ -79,9 +84,7 @@ class DoorRepositoryReplicationClient(
                 )
                 delay(retryInterval.toLong())
             }
-
         }
-
     }
 
     /**
