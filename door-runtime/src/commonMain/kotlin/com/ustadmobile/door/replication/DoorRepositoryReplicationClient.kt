@@ -114,6 +114,7 @@ class DoorRepositoryReplicationClient(
     @Volatile
     var lastReceiveCompleteTime: Long = 0
 
+
     private val fetchPendingReplicationsJob : Job
 
     private val sendPendingReplicationsJob: Job
@@ -126,13 +127,12 @@ class DoorRepositoryReplicationClient(
 
     private val batchSize = 1000
 
-    @Volatile
-    private var remoteNodeId = CompletableDeferred<Long>()
+    private val remoteNodeId = CompletableDeferred<Long>()
 
     init {
         //Get the door node id of the remote endpoint.
         scope.launch {
-            while(!remoteNodeId.isCompleted) {
+            while(!remoteNodeId.isCompleted && !remoteNodeId.isCancelled) {
                 try {
                     val remoteNodeIdReq = httpClient.get {
                         setRepoUrl(repoEndpointUrl, "replication/nodeId")
@@ -141,10 +141,12 @@ class DoorRepositoryReplicationClient(
                         remoteNodeId.complete(it)
                     }
                 }catch(e: Exception) {
-                    delay(retryInterval.toLong())
+                    if(e !is CancellationException)
+                        delay(retryInterval.toLong())
                 }
             }
         }
+
         fetchPendingReplicationsJob = scope.launch {
             runFetchLoop()
         }
@@ -155,13 +157,11 @@ class DoorRepositoryReplicationClient(
 
         collectEventsJob = scope.launch {
             val nodeId = remoteNodeId.await()
-            /*
             nodeEventManager.outgoingEvents.collect { events ->
                 if(events.any { it.toNode == nodeId && it.what == DoorMessage.WHAT_REPLICATION }) {
                     sendNotifyChannel.trySend(Unit)
                 }
             }
-             */
         }
 
         fetchNotifyChannel.trySend(Unit)
@@ -260,7 +260,12 @@ class DoorRepositoryReplicationClient(
     }
 
     fun close() {
+        sendNotifyChannel.cancel()
         fetchPendingReplicationsJob.cancel()
+        collectEventsJob.cancel()
+        fetchNotifyChannel.close()
+        sendNotifyChannel.close()
+        remoteNodeId.cancel()
     }
 
 }
