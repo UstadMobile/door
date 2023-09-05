@@ -1,5 +1,6 @@
 package com.ustadmobile.door.replication
 
+import app.cash.turbine.test
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.nodeevent.NodeEventManager
 import io.ktor.client.*
@@ -10,15 +11,16 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.Test
 import io.ktor.serialization.kotlinx.json.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
+import okhttp3.mockwebserver.Dispatcher
+import okhttp3.mockwebserver.RecordedRequest
 import org.mockito.kotlin.*
-import java.util.concurrent.TimeUnit
 import kotlin.test.BeforeTest
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kotlin.test.assertNotNull
+import kotlin.time.Duration.Companion.seconds
 
 class DoorRepositoryReplicationClientTest {
 
@@ -73,14 +75,31 @@ class DoorRepositoryReplicationClientTest {
         scope.cancel()
     }
 
+    /**
+     * When the client receives an invalidation it should make another request to the server for any pending outgoing
+     * replications it has that are destined for this node. When there are entities they should be fetched and delivered
+     * to the NodeEventManager
+     */
     @Test
-    fun givenEntitiesArePending_whenClientInitialized_thenShouldRequestPendingReplications() {
-        mockServer.enqueue(MockResponse()
-            .setHeader("content-type", "application/json")
-            .setBody(json.encodeToString(DoorMessage.serializer(), pendingReplicationMessage)))
-        mockServer.enqueue(MockResponse()
-            .setResponseCode(204)
-        )
+    fun givenIncomingEntitiesArePending_whenClientInitialized_thenShouldRequestPendingReplications() {
+        var ackAndGetPendingRequestCount = 0
+        val ackRequests = MutableSharedFlow<RecordedRequest>(replay = 10)
+        mockServer.dispatcher = object: Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                if(request.path == "/replication/ackAndGetPendingReplications") {
+                    ackRequests.tryEmit(request)
+                    ackAndGetPendingRequestCount++
+                    return if(ackAndGetPendingRequestCount <= 1)
+                        MockResponse()
+                            .setHeader("content-type", "application/json")
+                            .setBody(json.encodeToString(DoorMessage.serializer(), pendingReplicationMessage))
+                    else
+                        MockResponse().setResponseCode(204)
+                }
+
+                return MockResponse().setResponseCode(404)
+            }
+        }
 
         val mockEventManager = mock<NodeEventManager<*>> { }
         val repoClient = DoorRepositoryReplicationClient(
@@ -89,34 +108,53 @@ class DoorRepositoryReplicationClientTest {
             repoEndpointUrl = mockServer.url("/").toString(),
             scope = scope,
             nodeEventManager = mockEventManager,
-            onGetPendingReplicationsForNode = mock { },
-            onAcknowledgeReceivedReplications = mock { },
+            onMarkAcknowledgedAndGetNextOutgoingReplications = mock { },
         )
 
         verifyBlocking(mockEventManager, timeout(5000)) {
             onIncomingMessageReceived(eq(pendingReplicationMessage))
         }
-        val request1 = mockServer.takeRequest()
-        assertEquals("/replication/ackAndGetPendingReplications", request1.path)
-        assertEquals("post", request1.method?.lowercase())
 
-        val request2 = mockServer.takeRequest(5, TimeUnit.SECONDS)
-        assertEquals("/replication/ackAndGetPendingReplications", request2?.path)
-        val request2Ack: ReplicationReceivedAck = json.decodeFromString(request2?.body?.readString(Charsets.UTF_8)!!)
-        assertTrue(outgoingRepUid in request2Ack.replicationUids)
+        runBlocking {
+            ackRequests.filter {
+                it.path == "/replication/ackAndGetPendingReplications" &&
+                        outgoingRepUid in json.decodeFromString<ReplicationReceivedAck>(it.body.readString(Charsets.UTF_8))
+                            .replicationUids
+            }.test(name = "Acknowledgement was sent to server", timeout = 5.seconds) {
+                assertNotNull(awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 
         repoClient.close()
     }
 
-    @Test
-    fun givenNoEntitiesPending_whenClientReceivesInvalidation_thenShouldRequestPendingEntities() {
-        mockServer.enqueue(MockResponse()
-            .setResponseCode(204))
-        mockServer.enqueue(MockResponse()
-            .setHeader("content-type", "application/json")
-            .setBody(json.encodeToString(DoorMessage.serializer(), pendingReplicationMessage)))
-        mockServer.enqueue(MockResponse()
-            .setResponseCode(204))
+    /**
+     * When the client receives an invalidation it should make another request to the server for any pending outgoing
+     * replications it has that are destined for this node. If there is nothing initially, another request should be
+     * made when the invalidate function is called.
+     */
+    @Test(timeout = 10000)
+    fun givenNoIncomingEntitiesPending_whenClientReceivesInvalidation_thenShouldRequestPendingEntities() {
+        var ackAndGetPendingRequestCount = 0
+        val ackRequests = MutableSharedFlow<RecordedRequest>(replay = 10)
+        mockServer.dispatcher = object: Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                return if(request.path == "/replication/ackAndGetPendingReplications") {
+                    ackAndGetPendingRequestCount++
+                    ackRequests.tryEmit(request)
+                    if(ackAndGetPendingRequestCount == 2) {
+                        MockResponse()
+                            .setHeader("content-type", "application/json")
+                            .setBody(json.encodeToString(DoorMessage.serializer(), pendingReplicationMessage))
+                    }else {
+                        MockResponse().setResponseCode(204)
+                    }
+                }else {
+                    MockResponse().setResponseCode(404)
+                }
+            }
+        }
 
         val mockEventManager = mock<NodeEventManager<*>> { }
         val repoClient = DoorRepositoryReplicationClient(
@@ -125,27 +163,36 @@ class DoorRepositoryReplicationClientTest {
             repoEndpointUrl = mockServer.url("/").toString(),
             scope = scope,
             nodeEventManager = mockEventManager,
-            onGetPendingReplicationsForNode = mock { },
-            onAcknowledgeReceivedReplications = mock { },
+            onMarkAcknowledgedAndGetNextOutgoingReplications = mock { },
         )
 
-        val request1 = mockServer.takeRequest(5, TimeUnit.SECONDS)
-        assertEquals("/replication/ackAndGetPendingReplications", request1?.path)
-        assertEquals("post", request1?.method?.lowercase())
+        //wait for the first request
+        runBlocking { ackRequests.filter { it.path == "/replication/ackAndGetPendingReplications" }.first() }
 
         repoClient.invalidate()
-        val request2 = mockServer.takeRequest(5, TimeUnit.SECONDS)
-        assertEquals("/replication/ackAndGetPendingReplications", request2?.path)
+
         verifyBlocking(mockEventManager, timeout(5000)) {
             onIncomingMessageReceived(eq(pendingReplicationMessage))
         }
-        val request3 = mockServer.takeRequest(5, TimeUnit.SECONDS)
-        assertEquals("/replication/ackAndGetPendingReplications", request3?.path)
-        assertEquals("post", request3?.method?.lowercase())
-        val request3Ack: ReplicationReceivedAck = json.decodeFromString(request3?.body?.readString(Charsets.UTF_8)!!)
-        assertTrue(outgoingRepUid in request3Ack.replicationUids)
+
+        runBlocking {
+            ackRequests.filter {
+                it.path == "/replication/ackAndGetPendingReplications" &&
+                        outgoingRepUid in json.decodeFromString<ReplicationReceivedAck>(it.body.readString(Charsets.UTF_8)).replicationUids
+            }.test(timeout = 5.seconds, name = "") {
+                assertNotNull(awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
         repoClient.close()
     }
+
+    @Test
+    fun givenOutgoingEntitiesPending_whenClientReceivesNodeEvent_thenShouldSendPendingOutgoingEntities() {
+
+    }
+
 
 
 

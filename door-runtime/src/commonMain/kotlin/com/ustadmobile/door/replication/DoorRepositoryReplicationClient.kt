@@ -1,6 +1,8 @@
 package com.ustadmobile.door.replication
 
+import com.ustadmobile.door.RepositoryConfig
 import com.ustadmobile.door.ext.DoorTag
+import com.ustadmobile.door.ext.doorWrapperNodeId
 import com.ustadmobile.door.ext.setRepoUrl
 import com.ustadmobile.door.ext.withDoorTransactionAsync
 import com.ustadmobile.door.message.DoorMessage
@@ -18,13 +20,24 @@ import kotlin.concurrent.Volatile
 
 
 /**
- * The repository replication client will fetch replications from another node (as per the repository config) using
- * the ackAndGetPendingReplications endpoint.
+ * The DoorRepositoryReplicationClient will connect with another Door node via HTTP to:
  *
- * It will also collect the outgoing events flow from nodeEventManager and send messages to the
+ *  - send outgoing replications from this node which are destined for the remote node we are connected to
+ *  - receive outgoing replications from the other remote node which are destined for this node
+ *
+ * Replications are sent and received STRICTLY in the order that they were inserted into the OutgoingReplication table.
+ *
+ * DoorRepositoryReplicationClient relies on the nodeEventManager to know when it needs to query for pending outgoing or
+ * incoming replication
  *
  * @param localNodeId - the Id of this node (the node we are running on) - not the id of the remote node on the other side
- *
+ * @param httpClient Ktor HTTP Client (MUST be using Kotlinx Json serializer)
+ * @param repoEndpointUrl the url of the other node as per RepositoryConfig.endpoint
+ * @param scope CoroutineScope for the repository
+ * @param nodeEventManager the NodeEventManager for the local database that we will use to watch for pending
+ *        incoming/outgoing replication
+ * @param onMarkAcknowledgedAndGetNextOutgoingReplications a function that will mark
+ * @param retryInterval the auto retry period
  */
 class DoorRepositoryReplicationClient(
     private val localNodeId: Long,
@@ -32,19 +45,61 @@ class DoorRepositoryReplicationClient(
     private val repoEndpointUrl: String,
     scope: CoroutineScope,
     private val nodeEventManager: NodeEventManager<*>,
-    private val onGetPendingReplicationsForNode: OnGetPendingReplicationsForNode,
-    private val onAcknowledgeReceivedReplications: OnAcknowledgeReceivedReplications,
+    private val onMarkAcknowledgedAndGetNextOutgoingReplications: OnMarkAcknowledgedAndGetNextOutgoingReplications,
     private val retryInterval: Int = 10_000,
-
 ) {
 
-    interface OnGetPendingReplicationsForNode {
-        suspend operator fun invoke(nodeId: Long, batchSize: Int): List<DoorReplicationEntity>
+    constructor(
+        db: RoomDatabase,
+        repositoryConfig: RepositoryConfig,
+        scope: CoroutineScope,
+        nodeEventManager: NodeEventManager<*>,
+        retryInterval: Int,
+    ): this (
+        localNodeId = db.doorWrapperNodeId,
+        httpClient = repositoryConfig.httpClient,
+        repoEndpointUrl = repositoryConfig.endpoint,
+        scope = scope,
+        nodeEventManager = nodeEventManager,
+        onMarkAcknowledgedAndGetNextOutgoingReplications = DefaultOnMarkAcknowledgedAndGetNextOutgoingReplications(db),
+        retryInterval = retryInterval,
+    )
+
+    /**
+     * Functional interface that will run a transaction to acknowledge entities received by the remote node and then
+     * query for remaining pending replications.
+     */
+    interface OnMarkAcknowledgedAndGetNextOutgoingReplications {
+
+        /**
+         * @param nodeId the id of the remote node that we want to get outgoing replications for
+         * @param batchSize
+         *
+         */
+        suspend operator fun invoke(
+            nodeId: Long,
+            receivedAck: ReplicationReceivedAck,
+            batchSize: Int
+        ): List<DoorReplicationEntity>
     }
 
-    interface OnAcknowledgeReceivedReplications {
-        suspend operator fun invoke(nodeId: Long, receivedAck: ReplicationReceivedAck)
+    class DefaultOnMarkAcknowledgedAndGetNextOutgoingReplications(
+        private val db: RoomDatabase,
+    ) : OnMarkAcknowledgedAndGetNextOutgoingReplications{
+        override suspend fun invoke(
+            nodeId: Long,
+            receivedAck: ReplicationReceivedAck,
+            batchSize: Int
+        ): List<DoorReplicationEntity> {
+            return db.withDoorTransactionAsync {
+                if(receivedAck.replicationUids.isNotEmpty())
+                    db.acknowledgeReceivedReplications(nodeId, receivedAck.replicationUids)
+
+                db.selectPendingOutgoingReplicationsByDestNodeId(nodeId, batchSize)
+            }
+        }
     }
+
 
     @Volatile
     var lastInvalidatedTime = systemTimeInMillis()
@@ -76,7 +131,7 @@ class DoorRepositoryReplicationClient(
         }
 
         sendPendingReplicationsJob = scope.launch {
-            //runSendLoop()
+            runSendLoop()
         }
 
         collectEventsJob = scope.launch {
@@ -94,35 +149,38 @@ class DoorRepositoryReplicationClient(
     private suspend fun CoroutineScope.runSendLoop() {
         val remoteNodeIdVal = remoteNodeId.await()
 
-        var probablyHasMoreOutgoingReplications = true
+        val outgoingReplicationsToAck = mutableListOf<Long>()
         while(isActive) {
-            if(!probablyHasMoreOutgoingReplications) {
+            if(outgoingReplicationsToAck.isEmpty()) {
                 sendNotifyChannel.receive()
             }
 
-            val outgoingReplications = onGetPendingReplicationsForNode(remoteNodeIdVal, batchSize)
-//            db.withDoorTransactionAsync {
-//                db.selectPendingOutgoingReplicationsByDestNodeId(remoteNodeIdVal, batchSize)
-//            }
+            val outgoingReplications = onMarkAcknowledgedAndGetNextOutgoingReplications(
+                nodeId = remoteNodeIdVal,
+                receivedAck = ReplicationReceivedAck(
+                    replicationUids = outgoingReplicationsToAck,
+                ),
+                batchSize = batchSize
+            )
+            outgoingReplicationsToAck.clear()
 
-            val replicationResponse = httpClient.post {
-                setRepoUrl(repoEndpointUrl, "replication/message")
-                contentType(ContentType.Application.Json)
-                setBody(DoorMessage(
-                    what = DoorMessage.WHAT_REPLICATION,
-                    fromNode = localNodeId,
-                    toNode = remoteNodeIdVal,
-                    replications = outgoingReplications,
-                ))
+            if(outgoingReplications.isNotEmpty()) {
+                val replicationResponse = httpClient.post {
+                    setRepoUrl(repoEndpointUrl, "replication/message")
+                    contentType(ContentType.Application.Json)
+                    setBody(DoorMessage(
+                        what = DoorMessage.WHAT_REPLICATION,
+                        fromNode = localNodeId,
+                        toNode = remoteNodeIdVal,
+                        replications = outgoingReplications,
+                    ))
+                }
+
+                val replicationReceivedAck: ReplicationReceivedAck = replicationResponse.body()
+
+                outgoingReplicationsToAck.addAll(replicationReceivedAck.replicationUids)
             }
 
-            val replicationReceivedAck: ReplicationReceivedAck = replicationResponse.body()
-            onAcknowledgeReceivedReplications.invoke(remoteNodeIdVal, replicationReceivedAck)
-//            db.withDoorTransactionAsync {
-//                db.acknowledgeReceivedReplications(remoteNodeIdVal, replicationReceivedAck.replicationUids)
-//            }
-
-            probablyHasMoreOutgoingReplications = outgoingReplications.size == batchSize
         }
     }
 
