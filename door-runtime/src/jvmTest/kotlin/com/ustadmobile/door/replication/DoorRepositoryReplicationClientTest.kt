@@ -1,6 +1,7 @@
 package com.ustadmobile.door.replication
 
 import app.cash.turbine.test
+import com.ustadmobile.door.DoorConstants
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.nodeevent.NodeEventManager
 import io.ktor.client.*
@@ -190,7 +191,75 @@ class DoorRepositoryReplicationClientTest {
 
     @Test
     fun givenOutgoingEntitiesPending_whenClientReceivesNodeEvent_thenShouldSendPendingOutgoingEntities() {
+        val messagesReceived = MutableSharedFlow<DoorMessage>(replay = 10)
+        val allAckedEntities =  MutableSharedFlow<List<Long>>(replay = 10)
 
+        mockServer.dispatcher = object: Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                return when(request.path) {
+                    "/replication/nodeId" -> MockResponse()
+                        .setHeader(DoorConstants.HEADER_NODE_ID, serverNodeId)
+                    "/replication/message" -> {
+                        val message = json.decodeFromString<DoorMessage>(request.body.readString(Charsets.UTF_8))
+                        messagesReceived.tryEmit(message)
+                        MockResponse()
+                            .setHeader("content-type", "application/json")
+                            .setBody(
+                                json.encodeToString(
+                                    ReplicationReceivedAck.serializer(),
+                                    ReplicationReceivedAck(message.replications.map { it.orUid })
+                                )
+                            )
+                    }
+                    else -> MockResponse().setResponseCode(404)
+                }
+            }
+        }
+
+        val mockEventManager = mock<NodeEventManager<*>> { }
+        val pendingEntities = buildList {
+            addAll(pendingReplicationMessage.replications)
+        }
+        val ackedReplications = mutableListOf<Long>()
+
+        val onMarkAcknowledgedAndGetNextOutgoingReplications: DoorRepositoryReplicationClient.OnMarkAcknowledgedAndGetNextOutgoingReplications = mock {
+            onBlocking {
+                invoke(eq(serverNodeId), any(), any())
+            }.thenAnswer {
+                val ackedEntities = it.arguments[1] as ReplicationReceivedAck
+                ackedReplications.addAll(ackedEntities.replicationUids)
+                allAckedEntities.tryEmit(ackedReplications.toList())
+                pendingEntities.filter { it.orUid !in ackedReplications }
+            }
+
+        }
+
+        val repoClient = DoorRepositoryReplicationClient(
+            localNodeId = clientNodeId,
+            httpClient = httpClient,
+            repoEndpointUrl = mockServer.url("/").toString(),
+            scope = scope,
+            nodeEventManager = mockEventManager,
+            onMarkAcknowledgedAndGetNextOutgoingReplications = onMarkAcknowledgedAndGetNextOutgoingReplications,
+        )
+
+        runBlocking {
+            messagesReceived.filter {
+                pendingReplicationMessage.replications == it.replications
+            }.test(timeout = 5.seconds, name = "pending replications were sent to remote message endpoint") {
+                assertNotNull(awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            allAckedEntities.filter {  ackedList ->
+                ackedList.containsAll(pendingEntities.map { it.orUid })
+            }.test(timeout = 5.seconds) {
+                assertNotNull(awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+        repoClient.close()
     }
 
 

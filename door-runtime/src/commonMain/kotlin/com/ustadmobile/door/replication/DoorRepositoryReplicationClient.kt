@@ -1,5 +1,6 @@
 package com.ustadmobile.door.replication
 
+import com.ustadmobile.door.DoorConstants
 import com.ustadmobile.door.RepositoryConfig
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.doorWrapperNodeId
@@ -66,15 +67,16 @@ class DoorRepositoryReplicationClient(
     )
 
     /**
-     * Functional interface that will run a transaction to acknowledge entities received by the remote node and then
-     * query for remaining pending replications.
+     * Functional interface that will run one (single) transaction to acknowledge entities received by the remote node
+     * and then query for remaining pending replications (if any, up to the batch size)
      */
     interface OnMarkAcknowledgedAndGetNextOutgoingReplications {
 
         /**
+         * @param receivedAck replicated entities that have been acknowledged by the remote node that should be marked
+         *        as processed in our database (e.g. deleted from OutgoingReplication).
          * @param nodeId the id of the remote node that we want to get outgoing replications for
-         * @param batchSize
-         *
+         * @param batchSize the maximum number of pending replication entities to return
          */
         suspend operator fun invoke(
             nodeId: Long,
@@ -101,6 +103,8 @@ class DoorRepositoryReplicationClient(
     }
 
 
+    private val logPrefix = "[DoorRepositoryReplicationClient from=$localNodeId endpoint=$repoEndpointUrl]"
+
     @Volatile
     var lastInvalidatedTime = systemTimeInMillis()
 
@@ -126,6 +130,21 @@ class DoorRepositoryReplicationClient(
     private var remoteNodeId = CompletableDeferred<Long>()
 
     init {
+        //Get the door node id of the remote endpoint.
+        scope.launch {
+            while(!remoteNodeId.isCompleted) {
+                try {
+                    val remoteNodeIdReq = httpClient.get {
+                        setRepoUrl(repoEndpointUrl, "replication/nodeId")
+                    }
+                    remoteNodeIdReq.headers[DoorConstants.HEADER_NODE_ID]?.toLong()?.also {
+                        remoteNodeId.complete(it)
+                    }
+                }catch(e: Exception) {
+                    delay(retryInterval.toLong())
+                }
+            }
+        }
         fetchPendingReplicationsJob = scope.launch {
             runFetchLoop()
         }
@@ -136,14 +155,17 @@ class DoorRepositoryReplicationClient(
 
         collectEventsJob = scope.launch {
             val nodeId = remoteNodeId.await()
+            /*
             nodeEventManager.outgoingEvents.collect { events ->
                 if(events.any { it.toNode == nodeId && it.what == DoorMessage.WHAT_REPLICATION }) {
                     sendNotifyChannel.trySend(Unit)
                 }
             }
+             */
         }
 
         fetchNotifyChannel.trySend(Unit)
+        sendNotifyChannel.trySend(Unit)
     }
 
     private suspend fun CoroutineScope.runSendLoop() {
@@ -151,36 +173,44 @@ class DoorRepositoryReplicationClient(
 
         val outgoingReplicationsToAck = mutableListOf<Long>()
         while(isActive) {
-            if(outgoingReplicationsToAck.isEmpty()) {
-                sendNotifyChannel.receive()
-            }
-
-            val outgoingReplications = onMarkAcknowledgedAndGetNextOutgoingReplications(
-                nodeId = remoteNodeIdVal,
-                receivedAck = ReplicationReceivedAck(
-                    replicationUids = outgoingReplicationsToAck,
-                ),
-                batchSize = batchSize
-            )
-            outgoingReplicationsToAck.clear()
-
-            if(outgoingReplications.isNotEmpty()) {
-                val replicationResponse = httpClient.post {
-                    setRepoUrl(repoEndpointUrl, "replication/message")
-                    contentType(ContentType.Application.Json)
-                    setBody(DoorMessage(
-                        what = DoorMessage.WHAT_REPLICATION,
-                        fromNode = localNodeId,
-                        toNode = remoteNodeIdVal,
-                        replications = outgoingReplications,
-                    ))
+            try {
+                if(outgoingReplicationsToAck.isEmpty()) {
+                    sendNotifyChannel.receive()
                 }
 
-                val replicationReceivedAck: ReplicationReceivedAck = replicationResponse.body()
+                val outgoingReplications = onMarkAcknowledgedAndGetNextOutgoingReplications(
+                    nodeId = remoteNodeIdVal,
+                    receivedAck = ReplicationReceivedAck(
+                        replicationUids = outgoingReplicationsToAck,
+                    ),
+                    batchSize = batchSize
+                )
+                outgoingReplicationsToAck.clear()
 
-                outgoingReplicationsToAck.addAll(replicationReceivedAck.replicationUids)
+                if(outgoingReplications.isNotEmpty()) {
+                    val replicationResponse = httpClient.post {
+                        setRepoUrl(repoEndpointUrl, "replication/message")
+                        contentType(ContentType.Application.Json)
+                        setBody(DoorMessage(
+                            what = DoorMessage.WHAT_REPLICATION,
+                            fromNode = localNodeId,
+                            toNode = remoteNodeIdVal,
+                            replications = outgoingReplications,
+                        ))
+                    }
+
+                    val replicationReceivedAck: ReplicationReceivedAck = replicationResponse.body()
+
+                    outgoingReplicationsToAck.addAll(replicationReceivedAck.replicationUids)
+                }
+            }catch(e: Exception) {
+                Napier.d(
+                    tag = DoorTag.LOG_TAG,
+                    message =  { "$logPrefix exception sending outgoing replications" },
+                    throwable = e
+                )
+                delay(retryInterval.toLong())
             }
-
         }
     }
 
