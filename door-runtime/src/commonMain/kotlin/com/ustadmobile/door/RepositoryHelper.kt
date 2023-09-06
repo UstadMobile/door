@@ -4,6 +4,7 @@ import kotlinx.coroutines.*
 import com.ustadmobile.door.ext.concurrentSafeListOf
 import com.ustadmobile.door.ext.doorWrapper
 import com.ustadmobile.door.nodeevent.NodeEventManager
+import com.ustadmobile.door.nodeevent.NodeEventSseClient
 import com.ustadmobile.door.replication.DoorRepositoryReplicationClient
 import com.ustadmobile.door.room.RoomDatabase
 import kotlinx.atomicfu.atomic
@@ -37,6 +38,8 @@ class RepositoryHelper(
         retryInterval = 1_000 //This could/should be added to repositoryconfig
     )
 
+    private val eventClient = NodeEventSseClient(repoConfig, nodeEventManager, scope)
+
     val clientState: Flow<DoorRepositoryReplicationClient.ClientState>
         get() = client.state
 
@@ -62,6 +65,7 @@ class RepositoryHelper(
 
     fun close() {
         client.close()
+        eventClient.close()
         scope.cancel()
     }
 

@@ -164,11 +164,41 @@ class PushIntegrationTest {
 
             serverDb.exampleEntity3Dao.findByUidAsFlow(insertedEntity.eeUid).filter {
                 it != null
-            }.test(timeout = 5.seconds, name = "Entity is replicated from client to server as expected") {
+            }.test(timeout = 5.seconds, name = "Entity created after connection is replicated from client to server as expected") {
                 assertNotNull(awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
         }
+    }
+
+    @Test
+    fun givenBlankServerDatabase_whenEntityCreatedOnServerAfterconnection_thenShouldReplicateToClient() {
+        val clientRepo = clientDb.asClientNodeRepository()
+        val clientRepoClientState = (clientRepo as DoorDatabaseRepository).clientState
+
+        runBlocking {
+            clientRepoClientState.filter { it.initialized }.first()
+
+            //This is not ideal, but we want to be sure that the first connection has been made. That isn't something that
+            // any normal use case would need to know
+            delay(500)
+
+            val insertedEntity = ExampleEntity3(lastUpdatedTime = systemTimeInMillis(), cardNumber = 123)
+
+            serverDb.withDoorTransactionAsync {
+                insertedEntity.eeUid = serverDb.exampleEntity3Dao.insertAsync(insertedEntity)
+                serverDb.exampleEntity3Dao.insertOutgoingReplication(insertedEntity.eeUid, clientNodeId)
+            }
+
+            clientDb.exampleEntity3Dao.findByUidAsFlow(insertedEntity.eeUid).filter {
+                it != null
+            }.test(timeout = 5.seconds, name = "Entity created after connection is replicated from server to client as expected") {
+                assertNotNull(awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+        (clientRepo as DoorDatabaseRepository).close()
     }
 
 

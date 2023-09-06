@@ -74,7 +74,7 @@ class DoorRepositoryReplicationClientTest {
         }
 
         override suspend fun onIncomingMessageReceived(message: DoorMessage) {
-
+            _incomingMessages.emit(message)
         }
 
     }
@@ -127,6 +127,7 @@ class DoorRepositoryReplicationClientTest {
         val mockEventManager = spy<NodeEventManager<*>>(TestEventManager(scope))
         val repoClient = DoorRepositoryReplicationClient(
             localNodeId = clientNodeId,
+            localNodeAuth = "secret",
             httpClient = httpClient,
             repoEndpointUrl = mockServer.url("/").toString(),
             scope = scope,
@@ -163,25 +164,33 @@ class DoorRepositoryReplicationClientTest {
         val ackRequests = MutableSharedFlow<RecordedRequest>(replay = 10)
         mockServer.dispatcher = object: Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
-                return if(request.path == "/replication/ackAndGetPendingReplications") {
-                    ackAndGetPendingRequestCount++
-                    ackRequests.tryEmit(request)
-                    if(ackAndGetPendingRequestCount == 2) {
-                        MockResponse()
-                            .setHeader("content-type", "application/json")
-                            .setBody(json.encodeToString(DoorMessage.serializer(), pendingReplicationMessage))
-                    }else {
-                        MockResponse().setResponseCode(204)
+                return when(request.path) {
+                    "/replication/nodeId" -> {
+                        MockResponse().setHeader(DoorConstants.HEADER_NODE_ID, serverNodeId.toString())
+                            .setResponseCode(204)
                     }
-                }else {
-                    MockResponse().setResponseCode(404)
+
+                    "/replication/ackAndGetPendingReplications" -> {
+                        ackAndGetPendingRequestCount++
+                        ackRequests.tryEmit(request)
+                        if(ackAndGetPendingRequestCount == 2) {
+                            MockResponse()
+                                .setHeader("content-type", "application/json")
+                                .setBody(json.encodeToString(DoorMessage.serializer(), pendingReplicationMessage))
+                        }else {
+                            MockResponse().setResponseCode(204)
+                        }
+                    }
+
+                    else -> MockResponse().setResponseCode(404)
                 }
             }
         }
 
-        val mockEventManager = spy<NodeEventManager<*>>(TestEventManager(scope))
+        val mockEventManager = spy(TestEventManager(scope))
         val repoClient = DoorRepositoryReplicationClient(
             localNodeId = clientNodeId,
+            localNodeAuth = "secret",
             httpClient = httpClient,
             repoEndpointUrl = mockServer.url("/").toString(),
             scope = scope,
@@ -192,7 +201,17 @@ class DoorRepositoryReplicationClientTest {
         //wait for the first request
         runBlocking { ackRequests.filter { it.path == "/replication/ackAndGetPendingReplications" }.first() }
 
-        repoClient.invalidate()
+        runBlocking {
+            mockEventManager.onIncomingMessageReceived(
+                DoorMessage(
+                    what = DoorMessage.WHAT_REPLICATION,
+                    fromNode = serverNodeId,
+                    toNode = clientNodeId,
+                    replications = emptyList()
+                )
+            )
+        }
+
 
         verifyBlocking(mockEventManager, timeout(5000)) {
             onIncomingMessageReceived(eq(pendingReplicationMessage))
@@ -264,6 +283,7 @@ class DoorRepositoryReplicationClientTest {
 
         val repoClient = DoorRepositoryReplicationClient(
             localNodeId = clientNodeId,
+            localNodeAuth = "secret",
             httpClient = httpClient,
             repoEndpointUrl = mockServer.url("/").toString(),
             scope = scope,
@@ -314,6 +334,7 @@ class DoorRepositoryReplicationClientTest {
 
         val repoClient = DoorRepositoryReplicationClient(
             localNodeId = clientNodeId,
+            localNodeAuth = "secret",
             httpClient = httpClient,
             repoEndpointUrl = mockServer.url("/").toString(),
             scope = scope,

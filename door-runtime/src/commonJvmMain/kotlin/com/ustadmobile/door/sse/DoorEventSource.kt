@@ -17,6 +17,7 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
+import kotlin.concurrent.Volatile
 
 actual class DoorEventSource actual constructor(
     repoConfig: RepositoryConfig,
@@ -34,19 +35,24 @@ actual class DoorEventSource actual constructor(
 
     private val retryJob = atomic(null as Job?)
 
+    @Volatile
+    private var isClosed: Boolean = false
+
     private val eventSourceListener = object:  EventSourceListener() {
         override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
             listener.onMessage(DoorServerSentEvent.parse(data))
         }
 
         override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
-            val err = (t as? Exception) ?: IOException("other event source error")
-            listener.onError(err)
-            retryJob.value = GlobalScope.launch {
-                Napier.e("$logPrefix error: $err . Attempting to reconnect after ${retry}ms")
-                delay(retry.toLong())
-                retryJob.value = null
-                connectToEventSource()
+            if(!isClosed) {
+                val err = (t as? Exception) ?: IOException("other event source error")
+                listener.onError(err)
+                retryJob.value = GlobalScope.launch {
+                    Napier.e("$logPrefix error: $err . Attempting to reconnect after ${retry}ms")
+                    delay(retry.toLong())
+                    retryJob.value = null
+                    connectToEventSource()
+                }
             }
         }
 
@@ -71,6 +77,7 @@ actual class DoorEventSource actual constructor(
     }
 
     actual fun close() {
+        isClosed = true
         retryJob.value?.cancel()
         eventSource.cancel()
         Napier.d("$logPrefix close", tag = DoorTag.LOG_TAG)

@@ -77,10 +77,15 @@ internal fun TypeSpec.Builder.addRepositoryHelperDelegateCalls(delegatePropName:
             Flow::class.parameterizedBy(DoorRepositoryReplicationClient.ClientState::class),
             KModifier.OVERRIDE
         ).getter(FunSpec.getterBuilder()
-            .addCode("return $delegatePropName.clientState")
+            .addCode("return $delegatePropName.clientState\n")
             .build())
         .build()
     )
+
+    addFunction(FunSpec.builder("close")
+        .addModifiers(KModifier.OVERRIDE)
+        .addCode("$delegatePropName.close()\n")
+        .build())
 
     return this
 }

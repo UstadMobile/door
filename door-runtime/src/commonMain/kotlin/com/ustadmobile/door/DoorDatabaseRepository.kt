@@ -24,6 +24,8 @@ interface DoorDatabaseRepository {
 
     val clientState: Flow<DoorRepositoryReplicationClient.ClientState>
 
+    fun close()
+
     companion object {
 
         const val STATUS_CONNECTED = 1

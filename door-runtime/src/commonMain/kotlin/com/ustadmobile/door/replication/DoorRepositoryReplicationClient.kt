@@ -29,10 +29,14 @@ import kotlin.concurrent.Volatile
  *
  * Replications are sent and received STRICTLY in the order that they were inserted into the OutgoingReplication table.
  *
- * DoorRepositoryReplicationClient relies on the nodeEventManager to know when it needs to query for pending outgoing or
- * incoming replication
+ * DoorRepositoryReplicationClient relies on the nodeEventManager to know when it needs to re-query for pending outgoing or
+ * incoming replication. It will observe the incomingMessages, if the message comes from the remote node and indicates
+ * that there are new replications to fetch, then fetching replications from the remote node will be initiated. It will
+ * also observe outgoingEvents. If an event indicates that there are new replications to send to the remote node, then
+ * sending replications to the remote node will be initiated.
  *
  * @param localNodeId - the Id of this node (the node we are running on) - not the id of the remote node on the other side
+ * @param localNodeAuth - the auth string for this node that is required for requests to the remote node.
  * @param httpClient Ktor HTTP Client (MUST be using Kotlinx Json serializer)
  * @param repoEndpointUrl the url of the other node as per RepositoryConfig.endpoint
  * @param scope CoroutineScope for the repository
@@ -192,12 +196,23 @@ class DoorRepositoryReplicationClient(
         }
 
         collectEventsJob = scope.launch {
-            val nodeId = remoteNodeId.await()
-            nodeEventManager.outgoingEvents.collect { events ->
-                if(events.any { it.toNode == nodeId && it.what == DoorMessage.WHAT_REPLICATION }) {
-                    sendNotifyChannel.trySend(Unit)
+            val remoteNodeIdVal = remoteNodeId.await()
+            launch {
+                nodeEventManager.outgoingEvents.collect { events ->
+                    if(events.any { it.toNode == remoteNodeIdVal && it.what == DoorMessage.WHAT_REPLICATION }) {
+                        sendNotifyChannel.trySend(Unit)
+                    }
                 }
             }
+
+            launch {
+                nodeEventManager.incomingMessages.collect { message ->
+                    if(message.fromNode == remoteNodeIdVal && message.what == DoorMessage.WHAT_REPLICATION) {
+                        fetchNotifyChannel.trySend(Unit)
+                    }
+                }
+            }
+
         }
 
         fetchNotifyChannel.trySend(Unit)
@@ -309,24 +324,18 @@ class DoorRepositoryReplicationClient(
                     lastReceiveCompleteTime = entitiesReceivedResponse.responseTime.timestamp // to be 100% sure - would be better to timestamp the transaction
                 }
             }catch(e: Exception) {
-                Napier.v(
-                    tag= DoorTag.LOG_TAG,
-                    message = { "DoorRepositoryReplicationClient: : runFetchLoop: exception (probably offline): $e"},
-                    throwable = e
-                )
-                delay(retryInterval.toLong())
+                if(e !is CancellationException) {
+                    Napier.v(
+                        tag= DoorTag.LOG_TAG,
+                        message = { "DoorRepositoryReplicationClient: : runFetchLoop: exception (probably offline): $e"},
+                        throwable = e
+                    )
+                    delay(retryInterval.toLong())
+                }
             }
         }
     }
 
-    /**
-     * This should be called when we get a message from the server that there is new pending replication. That can happen
-     * via different mechanisms e.g. server sent events.
-     */
-    fun invalidate() {
-        lastInvalidatedTime = systemTimeInMillis()
-        fetchNotifyChannel.trySend(Unit)
-    }
 
     fun close() {
         sendNotifyChannel.cancel()
