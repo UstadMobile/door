@@ -1,11 +1,9 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
+import app.cash.paging.*
 import com.ustadmobile.door.DatabaseBuilder
 import com.ustadmobile.door.DoorDatabaseCallbackStatementList
 import com.ustadmobile.door.DoorSqlDatabase
-import com.ustadmobile.door.paging.LoadParams
-import com.ustadmobile.door.paging.LoadResult
-import com.ustadmobile.door.paging.PagingSource
 import db2.ExampleDatabase2
 import db2.ExampleEntity2
 import db2.ExampleLinkEntity
@@ -260,14 +258,14 @@ class TestDbBuilderKt {
         val pagingSource: PagingSource<Int, ExampleEntity2> = exampleDb2.exampleDao2()
             .findAllWithRewardNumberAsPagingSource(minRewardNum)
 
-        val allPages = mutableListOf<LoadResult.Page<Int, ExampleEntity2>>()
+        val allPages = mutableListOf<PagingSourceLoadResultPage<Int, ExampleEntity2>>()
         runBlocking {
-            var loadResultPage: LoadResult.Page<Int, ExampleEntity2>? = null
+            var loadResultPage: PagingSourceLoadResultPage<Int, ExampleEntity2>? = null
             while(loadResultPage == null || loadResultPage.nextKey != null) {
-                val loadParams: LoadParams<Int> = loadResultPage?.let { LoadParams.Append(
+                val loadParams: PagingSourceLoadParams<Int> = loadResultPage?.let { PagingSourceLoadParamsAppend(
                     it.nextKey ?: 0, loadSize, true)
-                } ?: LoadParams.Refresh(null, loadSize, true)
-                loadResultPage = pagingSource.load(loadParams) as LoadResult.Page<Int, ExampleEntity2>
+                } ?: PagingSourceLoadParamsRefresh(null, loadSize, true)
+                loadResultPage = pagingSource.load(loadParams) as PagingSourceLoadResultPage<Int, ExampleEntity2>
                 allPages += loadResultPage
             }
         }

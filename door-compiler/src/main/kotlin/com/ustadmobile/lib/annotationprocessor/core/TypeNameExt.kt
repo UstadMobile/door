@@ -1,5 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
+import app.cash.paging.PagingSource
 import com.squareup.kotlinpoet.*
 import com.ustadmobile.door.jdbc.TypesKmp
 import kotlinx.coroutines.flow.Flow
@@ -20,8 +21,7 @@ fun TypeName.toSqlTypesInt() = when {
 }
 
 internal fun TypeName.isPagingSource(): Boolean {
-    return this is ParameterizedTypeName
-            && this.rawType == com.ustadmobile.door.paging.PagingSource::class.asClassName()
+    return this is ParameterizedTypeName && this.rawType == PagingSource::class.asClassName()
 }
 
 internal fun TypeName.isFlow(): Boolean {

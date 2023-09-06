@@ -1,7 +1,7 @@
 package com.ustadmobile.lib.annotationprocessor.core.ext
 
+import app.cash.paging.PagingSource
 import com.google.devtools.ksp.symbol.*
-import com.ustadmobile.door.paging.PagingSource
 import kotlinx.coroutines.flow.Flow
 
 fun KSDeclaration.propertyOrReturnType(): KSTypeReference? {

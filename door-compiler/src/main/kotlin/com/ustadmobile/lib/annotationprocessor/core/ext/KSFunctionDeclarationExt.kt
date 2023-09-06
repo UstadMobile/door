@@ -100,7 +100,7 @@ fun KSFunctionDeclaration.hasAnyListOrArrayParams(resolver: Resolver): Boolean {
 val KSFunctionDeclaration.useSuspendedQuery: Boolean
     get() {
         val returnTypeDecl: KSDeclaration? by lazy {
-            returnType?.resolve()?.declaration
+            returnType?.resolve()?.resolveActualTypeIfAliased()?.declaration
         }
 
         return isSuspended ||

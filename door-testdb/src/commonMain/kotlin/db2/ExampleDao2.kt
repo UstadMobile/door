@@ -1,9 +1,9 @@
 package db2
 
 import androidx.room.*
+import app.cash.paging.PagingSource
 import com.ustadmobile.door.*
 import com.ustadmobile.door.annotation.DoorDao
-import com.ustadmobile.door.paging.PagingSource
 import kotlinx.coroutines.flow.Flow
 
 @Suppress("unused") //Even if functions here are unused, they are still testing that the generated code compiles

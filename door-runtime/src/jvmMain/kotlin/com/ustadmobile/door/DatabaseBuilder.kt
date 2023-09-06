@@ -10,7 +10,6 @@ import com.ustadmobile.door.migration.DoorMigrationStatementList
 import com.ustadmobile.door.migration.DoorMigrationSync
 import com.ustadmobile.door.util.PostgresChangeTracker
 import kotlinx.coroutines.runBlocking
-import java.io.Fil
 import java.lang.IllegalStateException
 import java.sql.ResultSet
 import java.sql.SQLException

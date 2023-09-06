@@ -9,17 +9,25 @@ Door is a Kotlin Symbol Processor that builds on [Room](https://developer.androi
 generate a complete full-stack offline-first database system, including HTTP REST server endpoints, local data sources 
 and client repositories. Door supports both pull and push operations.
 
-Door supports:
+Platforms supported:
 * **Android**: Door will generate the actual class for Android, which in turn is then used by Room to generate the
   implementation (the same implementation if you had used Room itself). Full support for auto-generation of offline-first
   repository.
 * **JVM**: Door supports SQLite and PostgreSQL using JDBC. Door will generate the entire implementation for you to run
   queries using JDBC and return results. Full support for auto-generation of offline-first repository.
-* **Javascript**: Door can automatically generate an implementation that makes HTTP calls direct to the generated REST 
-  server.
+* **Javascript**: Door uses SQLite.js to run SQLite within the web browser. Full support for auto-generation of 
+  offline-first repository.
 
 No support for iOS/Native (yet - pull request would be welcome. Happy to help support anyone who would like to work on
 this).
+
+Return types supported:
+ * Blocking queries (except on JS)
+ * Async queries (e.g. using suspend)
+ * Flow results
+ * PagingSource using [multiplatform-paging](https://github.com/cashapp/multiplatform-paging) - ready to go for compose
+   multiplatform.
+
 
 Example Entity:
 ```

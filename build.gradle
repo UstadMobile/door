@@ -64,7 +64,7 @@ ext {
     version_mockwebserver = "4.11.0"
     version_android_room = "2.5.2"
     version_androidx_lifecycle = "2.6.1"
-    version_androidx_paging = "3.1.1"
+    version_androidx_paging = "3.2.0-alpha05"
     version_androidx_core = '1.9.0'
     version_kotlinpoet = "1.14.2"
     version_jsqlparser = "4.6"
@@ -83,6 +83,7 @@ ext {
     version_androidx_test_rules = "1.5.0"
     version_androidx_test_junit_ext = "1.1.5"
     version_espresso = "3.5.1"
+    version_paging_multiplatform = "3.2.0-alpha05-0.2.3"
 
 
     version_kotlinx_metadata = "0.4.2"
@@ -102,8 +103,6 @@ ext {
     version_kotlin_wrappers_bom = "1.0.0-pre.619"
 
     version_kotlin_extensions = "1.0.1-pre.619"
-
-    version_npm_sparkmd5 = "^3.0.2"
 
 }
 

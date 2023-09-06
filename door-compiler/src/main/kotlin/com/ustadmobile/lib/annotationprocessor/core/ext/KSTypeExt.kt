@@ -1,12 +1,12 @@
 package com.ustadmobile.lib.annotationprocessor.core.ext
 
+import app.cash.paging.PagingSource
 import com.google.devtools.ksp.findActualType
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.CodeBlock
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.jdbc.TypesKmp
-import com.ustadmobile.door.paging.PagingSource
 import kotlinx.coroutines.flow.Flow
 
 fun KSType.unwrapComponentTypeIfListOrArray(
@@ -37,7 +37,7 @@ fun KSType.unwrapComponentTypeIfListOrArray(
 fun KSType.unwrapResultType(
     resolver: Resolver,
 ): KSType {
-    val qualifiedName = this.declaration.qualifiedName?.asString()
+    val qualifiedName = this.resolveActualTypeIfAliased().declaration.qualifiedName?.asString()
     return when (qualifiedName) {
         PagingSource::class.qualifiedName -> {
             val entityTypeRef = arguments.get(1).type ?: throw IllegalArgumentException("PagingSource has no type argument")
@@ -174,9 +174,9 @@ fun KSType.isIntArray(): Boolean {
     return (declaration as? KSClassDeclaration)?.qualifiedName?.asString() == "kotlin.IntArray"
 }
 
-fun KSType.isPagingSource() = declaration.isPagingSource()
+fun KSType.isPagingSource(): Boolean = resolveActualTypeIfAliased().declaration.isPagingSource()
 
-fun KSType.isPagingSourceOrFlow() = declaration.isPagingSourceOrFlow()
+fun KSType.isPagingSourceOrFlow() = resolveActualTypeIfAliased().declaration.isPagingSourceOrFlow()
 
 fun KSType.isFlow() = declaration.isFlow()
 

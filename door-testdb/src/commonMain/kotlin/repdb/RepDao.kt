@@ -4,9 +4,9 @@ import com.ustadmobile.door.annotation.DoorDao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
+import app.cash.paging.PagingSource
 import com.ustadmobile.door.annotation.*
 import com.ustadmobile.door.entities.DoorNode
-import com.ustadmobile.door.paging.PagingSource
 import kotlinx.coroutines.flow.Flow
 
 @Suppress("unused") //Some functions are not used directly, but we still want to make sure they compile

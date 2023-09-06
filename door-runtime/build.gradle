@@ -77,6 +77,7 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
+                api "app.cash.paging:paging-common:$version_paging_multiplatform"
                 implementation project(":room-annotations")
                 implementation kotlin("stdlib-common")
                 implementation "io.ktor:ktor-client-core:$version_ktor"
@@ -181,7 +182,6 @@ kotlin {
 
             dependencies {
                 implementation "org.jetbrains.kotlin-wrappers:kotlin-extensions:$version_kotlin_extensions"
-                implementation npm("spark-md5","$version_npm_sparkmd5")
             }
         }
         jsTest {
