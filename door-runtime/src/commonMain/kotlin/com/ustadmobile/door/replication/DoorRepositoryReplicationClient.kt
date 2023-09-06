@@ -14,6 +14,10 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlin.concurrent.Volatile
 
 
@@ -48,6 +52,10 @@ class DoorRepositoryReplicationClient(
     private val retryInterval: Int = 10_000,
 ) {
 
+    data class ClientState(
+        val initialized: Boolean = false,
+    )
+
     constructor(
         db: RoomDatabase,
         repositoryConfig: RepositoryConfig,
@@ -66,6 +74,10 @@ class DoorRepositoryReplicationClient(
     )
 
     private val logPrefix = "[DoorRepositoryReplicationClient localNodeId=$localNodeId endpoint=$repoEndpointUrl]"
+
+    private val _state = MutableStateFlow(ClientState())
+
+    val state: Flow<ClientState> = _state.asStateFlow()
 
     init {
         Napier.d(
@@ -152,6 +164,10 @@ class DoorRepositoryReplicationClient(
                         "$logPrefix getRemoteNodeId : got server node id: status=${remoteNodeIdResponse.status} $nodeIdHeaderVal"
                     }
                     if(nodeIdHeaderVal != null) {
+                        _state.update { prev ->
+                            prev.copy(initialized = true)
+                        }
+
                         remoteNodeId.complete(nodeIdHeaderVal)
                     }else {
                         throw IllegalStateException("$logPrefix getRemoteNodeId : server did not provide node id")

@@ -1,6 +1,8 @@
 package com.ustadmobile.door
 
+import com.ustadmobile.door.replication.DoorRepositoryReplicationClient
 import com.ustadmobile.door.room.RoomDatabase
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Common interface that is implemented by any repository. Can be used to get info including
@@ -19,6 +21,8 @@ interface DoorDatabaseRepository {
     val dbName: String
 
     var connectivityStatus: Int
+
+    val clientState: Flow<DoorRepositoryReplicationClient.ClientState>
 
     companion object {
 

@@ -2,6 +2,7 @@ package com.ustadmobile.door.replication
 
 import app.cash.turbine.test
 import com.ustadmobile.door.DatabaseBuilder
+import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.RepositoryConfig
 import com.ustadmobile.door.ext.asRepository
 import com.ustadmobile.door.ext.withDoorTransactionAsync
@@ -16,7 +17,9 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.routing.*
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
@@ -46,10 +49,10 @@ class PushIntegrationTest {
         encodeDefaults = true
     }
 
-
-
     @BeforeTest
     fun setup() {
+        Napier.takeLogarithm()
+        Napier.base(DebugAntilog())
         serverDb = DatabaseBuilder.databaseBuilder(ExampleDb3::class, "jdbc:sqlite::memory:", serverNodeId)
             .build()
         serverDb.clearAllTables()
@@ -97,7 +100,6 @@ class PushIntegrationTest {
 
     @Test
     fun givenEntityWithOutgoingReplicationCreatedOnServerBeforeClientConnects_whenClientConnects_thenShouldReplicateToClient() {
-        Napier.base(DebugAntilog())
         val insertedEntity = ExampleEntity3(lastUpdatedTime = systemTimeInMillis(), cardNumber = 123)
         runBlocking {
             serverDb.withDoorTransactionAsync {
@@ -119,8 +121,7 @@ class PushIntegrationTest {
     }
 
     @Test
-    fun givenEntityWithOutgoingReplicationCreatedOnClientBeforeClientConnects_whenClientCnonects_thenShouldReplicateToSerer() {
-        Napier.base(DebugAntilog())
+    fun givenEntityWithOutgoingReplicationCreatedOnClientBeforeClientConnects_whenClientCnonects_thenShouldReplicateToServer() {
         val insertedEntity = ExampleEntity3(lastUpdatedTime = systemTimeInMillis(), cardNumber = 123)
         runBlocking {
             clientDb.withDoorTransactionAsync {
@@ -142,6 +143,34 @@ class PushIntegrationTest {
 
         //clientRepo.close should happen here
     }
+
+    @Test(timeout = 10000)
+    fun givenBlankClientDatabase_whenEntityCreatedOnClientAfterConnection_thenShouldReplicateToServer() {
+        val clientRepo = clientDb.asClientNodeRepository()
+        val clientRepoClientState = (clientRepo as DoorDatabaseRepository).clientState
+        runBlocking {
+            clientRepoClientState.filter { it.initialized }.first()
+
+            //This is not ideal, but we want to be sure that the first connection has been made. That isn't something that
+            // any normal use case would need to know
+            delay(500)
+
+            val insertedEntity = ExampleEntity3(lastUpdatedTime = systemTimeInMillis(), cardNumber = 123)
+
+            clientRepo.withDoorTransactionAsync {
+                insertedEntity.eeUid = clientDb.exampleEntity3Dao.insertAsync(insertedEntity)
+                clientDb.exampleEntity3Dao.insertOutgoingReplication(insertedEntity.eeUid, serverNodeId)
+            }
+
+            serverDb.exampleEntity3Dao.findByUidAsFlow(insertedEntity.eeUid).filter {
+                it != null
+            }.test(timeout = 5.seconds, name = "Entity is replicated from client to server as expected") {
+                assertNotNull(awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+    }
+
 
 
 }

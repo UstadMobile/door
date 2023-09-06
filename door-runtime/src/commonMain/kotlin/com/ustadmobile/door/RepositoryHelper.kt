@@ -7,6 +7,7 @@ import com.ustadmobile.door.nodeevent.NodeEventManager
 import com.ustadmobile.door.replication.DoorRepositoryReplicationClient
 import com.ustadmobile.door.room.RoomDatabase
 import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.flow.Flow
 
 /**
  * The RepositoryHelper has common implementation logic needed by repositories. This can't be done using inheritance
@@ -35,6 +36,9 @@ class RepositoryHelper(
         nodeEventManager = nodeEventManager,
         retryInterval = 1_000 //This could/should be added to repositoryconfig
     )
+
+    val clientState: Flow<DoorRepositoryReplicationClient.ClientState>
+        get() = client.state
 
     var connectivityStatus: Int
         get() = connectivityStatusAtomic.value

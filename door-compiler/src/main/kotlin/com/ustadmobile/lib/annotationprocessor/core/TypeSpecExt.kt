@@ -2,14 +2,17 @@ package com.ustadmobile.lib.annotationprocessor.core
 
 import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.*
+import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.ustadmobile.door.annotation.DoorDatabase
+import com.ustadmobile.door.replication.DoorRepositoryReplicationClient
 import com.ustadmobile.door.room.InvalidationTracker
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_ILLEGALSTATEEXCEPTION
 import com.ustadmobile.lib.annotationprocessor.core.ext.getAnnotation
 import com.ustadmobile.lib.annotationprocessor.core.ext.propertyOrReturnType
 import com.ustadmobile.lib.annotationprocessor.core.ext.toPropertyOrEmptyFunctionCaller
+import kotlinx.coroutines.flow.Flow
 import kotlin.IllegalArgumentException
 
 fun TypeSpec.Builder.addDaoPropOrGetterOverride(
@@ -68,6 +71,16 @@ internal fun TypeSpec.Builder.addRepositoryHelperDelegateCalls(delegatePropName:
                     .addCode("$delegatePropName.connectivityStatus = newValue\n")
                     .build())
             .build())
+    addProperty(
+        PropertySpec.builder(
+        "clientState",
+            Flow::class.parameterizedBy(DoorRepositoryReplicationClient.ClientState::class),
+            KModifier.OVERRIDE
+        ).getter(FunSpec.getterBuilder()
+            .addCode("return $delegatePropName.clientState")
+            .build())
+        .build()
+    )
 
     return this
 }
