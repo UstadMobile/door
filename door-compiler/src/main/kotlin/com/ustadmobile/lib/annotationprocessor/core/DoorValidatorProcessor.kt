@@ -7,14 +7,10 @@ import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSAnnotated
-import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.squareup.kotlinpoet.asTypeName
-import com.squareup.kotlinpoet.metadata.toKmClass
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.DoorDbType.Companion.productNameForDbType
 import com.ustadmobile.door.PreparedStatementConfig
 import com.ustadmobile.door.annotation.*
-import com.ustadmobile.door.entities.ZombieAttachmentData
 import com.ustadmobile.door.ext.prepareStatement
 import com.ustadmobile.door.ext.sqlToPostgresSql
 import com.ustadmobile.door.jdbc.Connection
@@ -216,32 +212,6 @@ class DoorValidatorProcessor(
             }
     }
 
-    private fun validateEntitiesWithAttachments(resolver: Resolver) {
-        val entities = resolver.getSymbolsWithAnnotation("androidx.room.Entity")
-            .filterIsInstance<KSClassDeclaration>()
-        entities.filter { it.getAllProperties().any { it.hasAnnotation(AttachmentUri::class) } }.forEach { entity ->
-            if(entity.getAllProperties().filter { it.hasAnnotation(AttachmentMd5::class) }.toList().size != 1)
-                logger.error("Has AttachmentUri field, must have exactly one AttachmentMd5 field",
-                    entity)
-
-            if(entity.getAllProperties().filter { it.hasAnnotation(AttachmentSize::class) }.toList().size != 1) {
-                logger.error("Has AttachmentUri field, must have exactly one AttachmentSize field", entity)
-            }
-
-            if(!entity.hasAnnotation(ReplicateEntity::class)) {
-                logger.error("Has AttachmentUri field, MUST be annotated with @ReplicateEntity", entity)
-            }
-        }
-
-        val dbs = resolver.getDatabaseSymbolsToProcess()
-        dbs.filter { db ->
-           db.allDbEntities().any { it.entityHasAttachments() } &&
-                   !db.allDbEntities().any { it.qualifiedName?.asString() == ZombieAttachmentData::class.qualifiedName }
-        }.forEach { db ->
-            logger.error("Database has entities with attachments, must have ZombieAttachmentData entity", db)
-        }
-    }
-
     private fun validateDaos(resolver: Resolver) {
         val daos = resolver.getDaoSymbolsToProcess()
         daos.forEach { dao ->
@@ -319,7 +289,6 @@ class DoorValidatorProcessor(
         createAllTables(resolver)
         validateReplicateEntities(resolver)
         validateTriggers(resolver)
-        validateEntitiesWithAttachments(resolver)
         validateDaos(resolver)
 
         return emptyList()

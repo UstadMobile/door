@@ -172,7 +172,7 @@ class PushIntegrationTest {
     }
 
     @Test
-    fun givenBlankServerDatabase_whenEntityCreatedOnServerAfterconnection_thenShouldReplicateToClient() {
+    fun givenBlankServerDatabase_whenEntityCreatedOnServerAfterConnection_thenShouldReplicateToClient() {
         val clientRepo = clientDb.asClientNodeRepository()
         val clientRepoClientState = (clientRepo as DoorDatabaseRepository).clientState
 

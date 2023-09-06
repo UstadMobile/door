@@ -52,30 +52,6 @@ fun TypeSpec.Builder.addDbDaoWrapperPropOrGetter(
     return this
 }
 
-
-fun CodeBlock.Builder.beginAttachmentStorageFlow(daoFunSpec: FunSpec) {
-    val entityParam = daoFunSpec.parameters.first()
-    val isList = entityParam.type.isListOrArray()
-
-    if(!daoFunSpec.isSuspended)
-        beginRunBlockingControlFlow()
-
-    if(isList)
-        beginControlFlow("${entityParam.name}.forEach")
-}
-
-fun CodeBlock.Builder.endAttachmentStorageFlow(daoFunSpec: FunSpec) {
-    val entityParam = daoFunSpec.parameters.first()
-    val isList = entityParam.type.isListOrArray()
-
-    if(!daoFunSpec.isSuspended)
-        endControlFlow()
-
-    if(isList)
-        endControlFlow()
-}
-
-
 /**
  * Adds a function that will delegate to the real DAO, or throw an exception if the function is
  * modifying an entity annotated with SyncableEntity
@@ -124,20 +100,6 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(
                         throw IllegalArgumentException("${daoFunDeclaration.simpleName.asString()} has " +
                                 "insert/update/delete annotation, but no entity component type")
 
-
-                    if(daoFunDeclaration.hasAnyAnnotation(Update::class, Insert::class)
-                            && entityComponentClassDecl.entityHasAttachments()) {
-                        val isList = functionResolved.parameterTypes.first()?.isListOrArrayType(resolver) == true
-
-                        beginAttachmentStorageFlow(overridingFunction)
-
-                        add("_db.%M(%L.%M())\n",
-                            MemberName("com.ustadmobile.door.attachments", "storeAttachment"),
-                            if(isList) "it" else entityParam?.name,
-                            MemberName(entityComponentClassDecl.packageName.asString(), "asEntityWithAttachment"))
-
-                        endAttachmentStorageFlow(overridingFunction)
-                    }
 
                     pkProp = entityComponentClassDecl.entityPrimaryKeyProps.first()
 

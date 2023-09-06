@@ -2,7 +2,6 @@ package com.ustadmobile.door
 
 import com.ustadmobile.door.room.InvalidationTracker
 import com.ustadmobile.door.room.RoomDatabase
-import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.SQLException
@@ -35,7 +34,7 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
         register(builderOptions.dbImplClasses)
 
         val dbImpl = builderOptions.dbImplClasses.dbImplKClass.js.createInstance(null, dataSource,
-            builderOptions.dbUrl, listOf<AttachmentFilter>(), builderOptions.jdbcQueryTimeout, DoorDbType.SQLITE) as T
+            builderOptions.dbUrl, builderOptions.jdbcQueryTimeout, DoorDbType.SQLITE) as T
         val exists = IndexedDb.checkIfExists(indexeddbStoreName)
         val connection = dataSource.getConnection()
         val sqlDatabase = DoorSqlDatabaseConnectionImpl(connection, DoorDbType.SQLITE)

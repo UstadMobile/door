@@ -32,11 +32,6 @@ abstract class DoorDatabaseMetadata<T: RoomDatabase> {
 
     abstract val version: Int
 
-    /**
-     * If true, there are entities with attachment on this database
-     */
-    abstract val hasAttachments: Boolean
-
     fun requireReplicateEntityMetaData(tableId: Int) = replicateEntities[tableId]
         ?: throw IllegalArgumentException("No metadata for table id $tableId")
 

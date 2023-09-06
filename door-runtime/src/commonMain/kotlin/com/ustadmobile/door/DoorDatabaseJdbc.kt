@@ -1,7 +1,6 @@
 package com.ustadmobile.door
 
 import com.ustadmobile.door.room.RoomDatabase
-import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.util.NodeIdAuthCache
 
@@ -36,10 +35,6 @@ interface DoorDatabaseJdbc {
     val dbName: String
 
     val realNodeIdAuthCache: NodeIdAuthCache
-
-    val realAttachmentStorageUri: DoorUri?
-
-    val realAttachmentFilters: List<AttachmentFilter>
 
     /**
      * The query timeout to use: in seconds

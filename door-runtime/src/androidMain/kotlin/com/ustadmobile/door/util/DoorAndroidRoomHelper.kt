@@ -2,11 +2,9 @@ package com.ustadmobile.door.util
 
 import android.content.Context
 import androidx.room.RoomDatabase
-import com.ustadmobile.door.attachments.AttachmentFilter
 import java.util.*
 import com.ustadmobile.door.ext.rootDatabase
 import java.io.Closeable
-import java.io.File
 
 /**
  * A DoorAndroidRoomHelper is created for every RoomDatabase built and retrieved using a
@@ -16,9 +14,6 @@ import java.io.File
 class DoorAndroidRoomHelper(
     val db: RoomDatabase,
     val context: Context,
-    val attachmentsDir: File?,
-    val attachmentFilters: List<AttachmentFilter>,
-    private val deleteZombieAttachmentsListener: DeleteZombieAttachmentsListener,
 ) : Closeable {
 
     val nodeIdAndAuthCache: NodeIdAuthCache by lazy {
@@ -26,7 +21,7 @@ class DoorAndroidRoomHelper(
     }
 
     override fun close() {
-        deleteZombieAttachmentsListener.close()
+
     }
 
     companion object {
@@ -42,12 +37,9 @@ class DoorAndroidRoomHelper(
         internal fun createAndRegisterHelper(
             db: RoomDatabase,
             context: Context,
-            attachmentsDir: File?,
-            attachmentFilters: List<AttachmentFilter>,
-            deleteZombieAttachmentsListener: DeleteZombieAttachmentsListener
         ) {
             doorAndroidRoomHelperMap.getOrPut(db) {
-                DoorAndroidRoomHelper(db, context, attachmentsDir, attachmentFilters, deleteZombieAttachmentsListener)
+                DoorAndroidRoomHelper(db, context)
             }
         }
 

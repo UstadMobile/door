@@ -9,7 +9,10 @@ import repdb.RepEntity.Companion.TABLE_ID
 
 @Serializable
 @Entity
-@ReplicateEntity(tableId = TABLE_ID)
+@ReplicateEntity(
+    tableId = TABLE_ID,
+    remoteInsertStrategy = ReplicateEntity.RemoteInsertStrategy.INSERT_INTO_VIEW
+)
 @Triggers(arrayOf(
     Trigger(name = "repent_remote_insert",
         order = Trigger.Order.INSTEAD_OF,

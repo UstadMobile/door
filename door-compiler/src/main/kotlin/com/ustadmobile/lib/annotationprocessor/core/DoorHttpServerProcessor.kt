@@ -307,7 +307,7 @@ fun CodeBlock.Builder.addHttpServerPassToDaoCodeBlock(
     val getVarsCodeBlock = CodeBlock.builder()
     val callCodeBlock = CodeBlock.builder()
 
-    val returnType = daoMethod.returnType ?: UNIT
+    val returnType = daoMethod.returnType
     if(returnType != UNIT) {
         callCodeBlock.add("val _result = ")
     }
@@ -512,9 +512,6 @@ fun FileSpec.Builder.addDbKtorRouteFunction(
                 }.forEach {
                     addDbDaoRouteCall(it)
                 }
-            }.applyIf(dbClassDeclaration.allDbEntities().any { it.entityHasAttachments() }) {
-                add("%M(%S, _typeToken)\n", MemberName("com.ustadmobile.door.attachments",
-                    "doorAttachmentsRoute"), "attachments")
             }
             .build())
         .build())

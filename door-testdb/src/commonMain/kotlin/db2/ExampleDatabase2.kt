@@ -15,7 +15,6 @@ import db2.ExampleDatabase2.Companion.DB_VERSION
     OtherSyncableEntity::class,
     ChangeLog::class,
     AccessGrant::class,
-    ZombieAttachmentData::class,
     DoorNode::class,
 ])
 @MinReplicationVersion(1)

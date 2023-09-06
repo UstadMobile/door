@@ -24,13 +24,6 @@ fun CodeBlock.Builder.addDelegateFunctionCall(varName: String, funSpec: FunSpec)
             .add(")")
 }
 
-fun CodeBlock.Builder.addDelegateFunctionCall(varName: String, daoFun: KSFunctionDeclaration) : CodeBlock.Builder {
-    return add("$varName.${daoFun.simpleName.asString()}(")
-        .add(daoFun.parameters.joinToString { it.name?.asString() ?: "" } )
-        .add(")")
-
-}
-
 
 /**
  * Add SQL to the output. This could be done as appending to a list variable, or this can be done as a function call
@@ -214,72 +207,6 @@ fun CodeBlock.Builder.beginRunBlockingControlFlow() =
         add("%M·{\n", MemberName("kotlinx.coroutines", "runBlocking"))
                 .indent()
 
-/**
- * Generate the SQL that will be used to insert into the Zombie SQL trigger where an old attachment md5 is no longer in
- * use
- */
-private fun KSClassDeclaration.generateZombieAttachmentInsertSql(): String {
-    val attachmentInfo = EntityAttachmentInfo(this)
-    val pkFieldName = entityPrimaryKeyProps.first().simpleName.asString()
-
-    return """
-        INSERT INTO ZombieAttachmentData(zaUri) 
-        SELECT OLD.${attachmentInfo.uriPropertyName} AS zaUri
-          FROM $entityTableName   
-         WHERE ${entityTableName}.$pkFieldName = OLD.$pkFieldName
-           AND (SELECT COUNT(*) 
-                  FROM $entityTableName
-                 WHERE ${attachmentInfo.md5PropertyName} = OLD.${attachmentInfo.md5PropertyName}) = 0
-    """
-}
-
-
-/**
- * Add code that will generate triggers to catch Zombie attachment uris on SQLite
- */
-fun CodeBlock.Builder.addGenerateAttachmentTriggerSqlite(
-    entity: KSClassDeclaration,
-    execSqlFn: String,
-    stmtListVar: String? = null
-) : CodeBlock.Builder{
-    val attachmentInfo = EntityAttachmentInfo(entity)
-    addSql(execSqlFn, stmtListVar, """
-        CREATE TRIGGER ATTUPD_${entity.entityTableName}
-        AFTER UPDATE ON ${entity.entityTableName} FOR EACH ROW WHEN
-        OLD.${attachmentInfo.md5PropertyName} IS NOT NULL
-        BEGIN
-        ${entity.generateZombieAttachmentInsertSql()}; 
-        END
-    """)
-
-    return this
-}
-
-/**
- * Add code that will generate triggers to catch Zombie attachment uris on Postgres
- */
-fun CodeBlock.Builder.addGenerateAttachmentTriggerPostgres(
-    entity: KSClassDeclaration,
-    stmtListVar: String
-) : CodeBlock.Builder {
-    val attachmentInfo = EntityAttachmentInfo(entity)
-    add("$stmtListVar += %S\n", """
-        CREATE OR REPLACE FUNCTION attach_${entity.entityTableName}_fn() RETURNS trigger AS ${'$'}${'$'}
-        BEGIN
-        ${entity.generateZombieAttachmentInsertSql()};
-        RETURN NEW;
-        END ${'$'}${'$'}
-        LANGUAGE plpgsql
-    """.trimIndent())
-    add("$stmtListVar += %S\n", """
-        CREATE TRIGGER attach_${entity.entityTableName}_trig
-        AFTER UPDATE ON ${entity.entityTableName}
-        FOR EACH ROW WHEN (OLD.${attachmentInfo.md5PropertyName} IS NOT NULL)
-        EXECUTE PROCEDURE attach_${entity.entityTableName}_fn();
-    """.trimIndent())
-
-    return this
-}
 
 enum class PreparedStatementOp() {
     GET, SET;

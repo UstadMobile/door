@@ -100,7 +100,12 @@ kotlin {
         }
 
         commonJvmMain {
+            dependsOn commonMain
+
             dependencies {
+                implementation "com.squareup.okhttp3:okhttp:$version_okhttp"
+                implementation "com.squareup.okhttp3:okhttp-sse:$version_okhttp"
+
                 compileOnly "org.nanohttpd:nanohttpd:$version_nanohttpd"
                 compileOnly "org.nanohttpd:nanohttpd-nanolets:$version_nanohttpd"
             }

@@ -17,7 +17,6 @@ import kotlin.reflect.jvm.internal.impl.name.FqName
 import kotlin.reflect.jvm.internal.impl.builtins.jvm.JavaToKotlinClassMap
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.annotation.*
-import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.DoorDatabaseMetadata
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
 import com.ustadmobile.door.ext.sqlToPostgresSql
@@ -25,7 +24,6 @@ import com.ustadmobile.door.paging.DoorLimitOffsetPagingSource
 import com.ustadmobile.door.replication.ReplicationEntityMetaData
 import com.ustadmobile.door.replication.ReplicationFieldMetaData
 import com.ustadmobile.door.room.RoomJdbcImpl
-import com.ustadmobile.door.util.DeleteZombieAttachmentsListener
 import kotlin.reflect.KClass
 import com.ustadmobile.door.util.NodeIdAuthCache
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.MEMBERNAME_EXEC_UPDATE_ASYNC
@@ -35,7 +33,6 @@ import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Comp
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.DelicateCoroutinesApi
-import java.io.File
 import kotlin.math.abs
 
 val QUERY_SINGULAR_TYPES = listOf(INT, LONG, SHORT, BYTE, BOOLEAN, FLOAT, DOUBLE,
@@ -124,12 +121,6 @@ private fun FileSpec.Builder.addDatabaseMetadataType(
             .addModifiers(KModifier.OVERRIDE)
             .getter(FunSpec.getterBuilder()
                 .addCode("return %L\n", dbKSClass.dbHasReplicationEntities())
-                .build())
-            .build())
-        .addProperty(PropertySpec.builder("hasAttachments", Boolean::class)
-            .addModifiers(KModifier.OVERRIDE)
-            .getter(FunSpec.getterBuilder()
-                .addCode("return %L\n", dbKSClass.allDbEntities().any { it.entityHasAttachments() })
                 .build())
             .build())
         .addProperty(PropertySpec.builder("version", INT)
@@ -299,9 +290,6 @@ private fun CodeBlock.Builder.addReplicateEntityMetaDataCode(
     add("entityPrimaryKeyFieldName = %S, \n", entity.entityPrimaryKeyProps.first().simpleName.asString())
     add("entityVersionIdFieldName = %S, \n", entity.firstPropWithAnnotation(ReplicationVersionId::class).simpleName.asString())
     addFieldsCodeBlock(entity).add(",\n")
-    add("attachmentUriField = ").add(entity.firstPropNameWithAnnotationOrNull(AttachmentUri::class)).add(",\n")
-    add("attachmentMd5SumField = ").add(entity.firstPropNameWithAnnotationOrNull(AttachmentMd5::class)).add(",\n")
-    add("attachmentSizeField = ").add(entity.firstPropNameWithAnnotationOrNull(AttachmentSize::class)).add(",\n")
     add("batchSize = ").add("%L", repEntityAnnotation?.batchSize ?: 1000).add(",\n")
     add("remoteInsertStrategy = %T.%L,\n", ReplicateEntity.RemoteInsertStrategy::class.java,
         repEntityAnnotation?.remoteInsertStrategy?.name)
@@ -353,10 +341,6 @@ fun FileSpec.Builder.addJdbcDbImplType(
             .addParameter("doorJdbcSourceDatabase", RoomDatabase::class.asTypeName().copy(nullable = true))
             .addParameter(ParameterSpec("dataSource", AbstractDbProcessor.CLASSNAME_DATASOURCE))
             .addParameter("dbName", String::class)
-            .applyIf(target == DoorTarget.JVM) {
-                addParameter("attachmentDir", File::class.asTypeName().copy(nullable = true))
-            }
-            .addParameter("realAttachmentFilters", List::class.parameterizedBy(AttachmentFilter::class))
             .addParameter("jdbcQueryTimeout", Int::class)
             .addParameter("jdbcDbType", Int::class)
             .build())
@@ -372,26 +356,6 @@ fun FileSpec.Builder.addJdbcDbImplType(
                 MemberName("com.ustadmobile.door.ext", "doorDatabaseMetadata"),
                 )
             .build())
-        .applyIf(target == DoorTarget.JVM) {
-            addProperty(PropertySpec.builder("realAttachmentStorageUri",
-                DoorUri::class.asTypeName().copy(nullable = true))
-                .addModifiers(KModifier.OVERRIDE)
-                .initializer("attachmentDir?.%M()\n",
-                    MemberName("com.ustadmobile.door.ext", "toDoorUri"))
-                .build())
-        }
-        .applyIf(target == DoorTarget.JS) {
-            addProperty(PropertySpec.builder("realAttachmentStorageUri",
-                DoorUri::class.asTypeName().copy(nullable = true))
-                .addModifiers(KModifier.OVERRIDE)
-                .initializer("null")
-                .build())
-        }
-        .addProperty(PropertySpec.builder("realAttachmentFilters",
-            List::class.parameterizedBy(AttachmentFilter::class))
-            .addModifiers(KModifier.OVERRIDE)
-            .initializer("realAttachmentFilters")
-            .build())
         .addProperty(PropertySpec.builder("doorJdbcSourceDatabase",
             RoomDatabase::class.asTypeName().copy(nullable = true), KModifier.OVERRIDE)
             .initializer("doorJdbcSourceDatabase")
@@ -401,13 +365,6 @@ fun FileSpec.Builder.addJdbcDbImplType(
             .build())
         .addProperty(PropertySpec.builder("jdbcQueryTimeout", Int::class, KModifier.OVERRIDE)
             .initializer("jdbcQueryTimeout")
-            .build())
-        .addProperty(PropertySpec.builder("_deleteZombieAttachmentsListener",
-            DeleteZombieAttachmentsListener::class.asTypeName().copy(nullable = true))
-            .addModifiers(KModifier.PRIVATE)
-            .initializer("if(this == %M) { %T(this) } else { null }",
-                MemberName("com.ustadmobile.door.ext", "rootDatabase"),
-                DeleteZombieAttachmentsListener::class)
             .build())
         .addProperty(PropertySpec.builder("realNodeIdAuthCache", NodeIdAuthCache::class,
             KModifier.OVERRIDE)

@@ -2,7 +2,6 @@ package com.ustadmobile.door
 
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.DoorConstants.DBINFO_TABLENAME
-import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.dbType
 import com.ustadmobile.door.ext.doorDatabaseMetadata
 import com.ustadmobile.door.migration.DoorMigration
@@ -11,7 +10,7 @@ import com.ustadmobile.door.migration.DoorMigrationStatementList
 import com.ustadmobile.door.migration.DoorMigrationSync
 import com.ustadmobile.door.util.PostgresChangeTracker
 import kotlinx.coroutines.runBlocking
-import java.io.File
+import java.io.Fil
 import java.lang.IllegalStateException
 import java.sql.ResultSet
 import java.sql.SQLException
@@ -37,8 +36,6 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
     private var nodeId: Long,
     private var dbUsername: String?,
     private var dbPassword: String?,
-    private var attachmentDir: File? = null,
-    private var attachmentFilters: List<AttachmentFilter> = mutableListOf(),
     private var queryTimeout: Int = PreparedStatementConfig.STATEMENT_DEFAULT_TIMEOUT_SECS,
     private var messageCallback: DoorMessageCallback<T> = DefaultDoorMessageCallback(),
 ){
@@ -54,11 +51,8 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
             nodeId: Long,
             dbUsername: String? = null,
             dbPassword: String? = null,
-            attachmentDir: File? = null,
-            attachmentFilters: List<AttachmentFilter> = listOf(),
             queryTimeout: Int = PreparedStatementConfig.STATEMENT_DEFAULT_TIMEOUT_SECS,
-        ): DatabaseBuilder<T> = DatabaseBuilder(dbClass, dbUrl, nodeId, dbUsername, dbPassword, attachmentDir,
-            attachmentFilters, queryTimeout)
+        ): DatabaseBuilder<T> = DatabaseBuilder(dbClass, dbUrl, nodeId, dbUsername, dbPassword, queryTimeout)
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -119,10 +113,9 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
             val dbImplClass = Class.forName("${dbClass.java.canonicalName}_JdbcImpl") as Class<T>
 
             val doorDb = dbImplClass.getConstructor(RoomDatabase::class.java, DataSource::class.java,
-                String::class.java, File::class.java, List::class.java, Int::class.javaPrimitiveType,
-                Int::class.javaPrimitiveType)
-                .newInstance(null, dataSource, dbUrl, attachmentDir, attachmentFilters, queryTimeout,
-                    dbType)
+                    String::class.java, Int::class.javaPrimitiveType,
+                    Int::class.javaPrimitiveType)
+                .newInstance(null, dataSource, dbUrl, queryTimeout, dbType)
 
 
             val sqlDatabase = DoorSqlDatabaseConnectionImpl(connection, dbType)

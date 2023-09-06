@@ -5,14 +5,10 @@ import androidx.room.Room
 import kotlin.reflect.KClass
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
-import com.ustadmobile.door.attachments.AttachmentFilter
 import com.ustadmobile.door.ext.execSqlBatch
 import com.ustadmobile.door.ext.isWrappable
 import com.ustadmobile.door.ext.wrap
 import com.ustadmobile.door.migration.DoorMigration
-import com.ustadmobile.door.util.DeleteZombieAttachmentsListener
-import com.ustadmobile.door.util.DoorAndroidRoomHelper
-import java.io.File
 
 @Suppress("UNCHECKED_CAST", "unused") //This is used as an API
 class DatabaseBuilder<T: RoomDatabase>(
@@ -20,8 +16,6 @@ class DatabaseBuilder<T: RoomDatabase>(
     private val dbClass: KClass<T>,
     private val appContext: Context,
     private val nodeId: Long,
-    private val attachmentsDir: File?,
-    private val attachmentFilters: List<AttachmentFilter>,
 ) {
 
     companion object {
@@ -30,12 +24,10 @@ class DatabaseBuilder<T: RoomDatabase>(
             dbClass: KClass<T>,
             dbName: String,
             nodeId: Long,
-            attachmentsDir: File? = null,
-            attachmentFilters: List<AttachmentFilter> = listOf(),
         ): DatabaseBuilder<T> {
             val applicationContext = (context as Context).applicationContext
             val builder = DatabaseBuilder(Room.databaseBuilder(applicationContext, dbClass.java, dbName),
-                dbClass, applicationContext, nodeId, attachmentsDir, attachmentFilters)
+                dbClass, applicationContext, nodeId)
 
             val callbackClassName = "${dbClass.java.canonicalName}_AndroidReplicationCallback"
             println("Attempt to load callback $callbackClassName")
@@ -52,8 +44,6 @@ class DatabaseBuilder<T: RoomDatabase>(
 
     fun build(): T {
         val db = roomBuilder.build()
-        DoorAndroidRoomHelper.createAndRegisterHelper(db, appContext, attachmentsDir, attachmentFilters,
-            DeleteZombieAttachmentsListener(db))
         return if(db.isWrappable(dbClass)) {
             db.wrap(dbClass, nodeId)
         }else {

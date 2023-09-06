@@ -1,21 +1,17 @@
 package com.ustadmobile.door.ext
 
-import android.net.Uri
 import androidx.room.RoomDatabase
 import androidx.room.*
 import com.ustadmobile.door.*
-import com.ustadmobile.door.DoorDatabaseRepository.Companion.DOOR_ATTACHMENT_URI_PREFIX
 import com.ustadmobile.door.jdbc.PreparedStatement
 import com.ustadmobile.door.PreparedStatementConfig
 import com.ustadmobile.door.roomjdbc.ConnectionRoomJdbc
 import com.ustadmobile.door.util.DoorAndroidRoomHelper
 import com.ustadmobile.door.util.NodeIdAuthCache
 import io.github.aakira.napier.Napier
-import java.io.File
 import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KClass
-import com.ustadmobile.door.attachments.requireAttachmentStorageUri
 import com.ustadmobile.door.util.TransactionMode
 
 actual fun RoomDatabase.dbType(): Int = DoorDbType.SQLITE
@@ -40,22 +36,6 @@ actual fun <T: RoomDatabase, R> T.withDoorTransaction(
     return runInTransaction(Callable {
         block(this)
     })
-}
-
-/**
- * The DoorDatabase
- */
-fun RoomDatabase.resolveAttachmentAndroidUri(attachmentUri: String): Uri {
-    val attachmentsDir = requireAttachmentStorageUri().toFile()
-
-    return if(attachmentUri.startsWith(DOOR_ATTACHMENT_URI_PREFIX)) {
-        val attachmentFile = File(attachmentsDir,
-            attachmentUri.substringAfter(DOOR_ATTACHMENT_URI_PREFIX))
-
-        Uri.fromFile(attachmentFile)
-    }else {
-        Uri.parse(attachmentUri)
-    }
 }
 
 
@@ -125,7 +105,7 @@ actual val RoomDatabase.sourceDatabase: RoomDatabase?
     get() {
         return when {
             (this is DoorDatabaseRepository) -> this.db
-            (this is DoorDatabaseWrapper) -> this.realDatabase
+            (this is DoorDatabaseWrapper<*>) -> this.realDatabase
             else -> null
         }
     }
@@ -151,7 +131,7 @@ actual val RoomDatabase.doorPrimaryKeyManager : DoorPrimaryKeyManager
 //succeed
 @Suppress("UNCHECKED_CAST")
 actual inline fun <reified  T: RoomDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T {
-    val dbUnwrapped = if(this is DoorDatabaseWrapper) {
+    val dbUnwrapped = if(this is DoorDatabaseWrapper<*>) {
         this.unwrap(T::class)
     }else {
         this
@@ -192,7 +172,7 @@ actual fun <T: RoomDatabase> T.wrap(
 
 @Suppress("UNCHECKED_CAST")
 actual fun <T: RoomDatabase> T.unwrap(dbClass: KClass<T>): T {
-    if(this is DoorDatabaseWrapper) {
+    if(this is DoorDatabaseWrapper<*>) {
         return this.realDatabase as T
     }else {
         return this

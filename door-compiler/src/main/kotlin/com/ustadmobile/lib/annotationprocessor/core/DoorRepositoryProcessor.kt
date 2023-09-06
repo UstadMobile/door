@@ -7,15 +7,12 @@ import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
-import com.squareup.kotlinpoet.ksp.addOriginatingKSFile
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.writeTo
 import com.ustadmobile.door.*
 import com.ustadmobile.door.annotation.RepoHttpAccessible
 import com.ustadmobile.door.annotation.Repository
-import com.ustadmobile.door.attachments.EntityWithAttachment
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_ILLEGALSTATEEXCEPTION
-import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER
 import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.SUFFIX_REPOSITORY2
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
 import io.ktor.client.*
@@ -119,77 +116,6 @@ fun FileSpec.Builder.addDbRepoType(
                 .mutable(false).build())
             .build())
 
-        .build())
-    return this
-}
-
-
-/**
- * Generate an EntityWithAttachment inline adapter class
- */
-fun FileSpec.Builder.addEntityWithAttachmentAdapterType(
-    entityKSClass: KSClassDeclaration,
-) : FileSpec.Builder {
-    val attachmentInfo = EntityAttachmentInfo(entityKSClass)
-    val nullableStringClassName = String::class.asClassName().copy(nullable = true)
-    addType(TypeSpec.classBuilder(entityKSClass.toClassNameWithSuffix(SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER))
-        .addOriginatingKSClass(entityKSClass)
-        .addModifiers(KModifier.INLINE)
-        .addSuperinterface(EntityWithAttachment::class)
-        .primaryConstructor(
-            FunSpec.constructorBuilder()
-                .addParameter("entity", entityKSClass.toClassName())
-                .build())
-        .addProperty(
-            PropertySpec.builder("entity", entityKSClass.toClassName())
-                .addModifiers(KModifier.PRIVATE)
-                .initializer("entity")
-                .build())
-        .addProperty(
-            PropertySpec.builder("attachmentUri", nullableStringClassName, KModifier.OVERRIDE)
-                .mutable(mutable = true)
-                .delegateGetterAndSetter("entity.${attachmentInfo.uriPropertyName}")
-                .build())
-        .addProperty(
-            PropertySpec.builder("attachmentMd5", nullableStringClassName, KModifier.OVERRIDE)
-                .mutable(true)
-                .delegateGetterAndSetter("entity.${attachmentInfo.md5PropertyName}")
-                .build())
-        .addProperty(
-            PropertySpec.builder("attachmentSize", INT, KModifier.OVERRIDE)
-                .mutable(true)
-                .delegateGetterAndSetter("entity.${attachmentInfo.sizePropertyName}")
-                .build())
-        .addProperty(
-            PropertySpec.builder("tableName", String::class, KModifier.OVERRIDE)
-                .getter(FunSpec.getterBuilder()
-                    .addCode("return %S\n", entityKSClass.simpleName.asString())
-                    .build())
-                .build()
-        )
-        .build())
-
-    return this
-}
-
-/**
- * Generate an extension function that will return the entitywithadapter
- * e.g. EntityName.asEntityWithAttachment()
- */
-fun FileSpec.Builder.addAsEntityWithAttachmentAdapterExtensionFun(
-    entityWithAttachment: KSClassDeclaration
-): FileSpec.Builder {
-    addFunction(FunSpec.builder("asEntityWithAttachment")
-        .addModifiers(KModifier.INLINE)
-        .apply {
-            entityWithAttachment.containingFile?.also {
-                addOriginatingKSFile(it)
-            }
-        }
-        .receiver(entityWithAttachment.toClassName())
-        .returns(EntityWithAttachment::class)
-        .addCode("return %T(this)\n",
-            entityWithAttachment.toClassNameWithSuffix(SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER))
         .build())
     return this
 }
@@ -408,12 +334,6 @@ class DoorRepositoryProcessor(
                 dbKSClassDecl.dbEnclosedDaos().any { it.hasAnnotation(Repository::class) }
             }
 
-        val entitiesWithAttachments = resolver.getSymbolsWithAnnotation("com.ustadmobile.door.annotation.AttachmentUri")
-            .filterIsInstance<KSPropertyDeclaration>()
-            .mapNotNull {
-                it.parentDeclaration as? KSClassDeclaration
-            }
-
         val daoSymbols = resolver.getDaoSymbolsToProcess().filter { it.hasAnnotation(Repository::class) }
 
         val target = environment.doorTarget(resolver)
@@ -422,15 +342,6 @@ class DoorRepositoryProcessor(
             FileSpec.builder(dbKSClass.packageName.asString(),
                 "${dbKSClass.simpleName.asString()}$SUFFIX_REPOSITORY2")
                 .addDbRepoType(dbKSClass, target)
-                .build()
-                .writeTo(environment.codeGenerator, false)
-        }
-
-        entitiesWithAttachments.forEach { entityWithAttachment ->
-            FileSpec.builder(entityWithAttachment.packageName.asString(),
-                "${entityWithAttachment.simpleName.asString()}$SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER")
-                .addEntityWithAttachmentAdapterType(entityWithAttachment)
-                .addAsEntityWithAttachmentAdapterExtensionFun(entityWithAttachment)
                 .build()
                 .writeTo(environment.codeGenerator, false)
         }
@@ -450,8 +361,6 @@ class DoorRepositoryProcessor(
     companion object {
         //including the underscore as it should
         const val SUFFIX_REPOSITORY2 = "_Repo"
-
-        const val SUFFIX_ENTITY_WITH_ATTACHMENTS_ADAPTER = "_EwaAdapter"
 
         /**
          * A static string which is generated for the database name part of the http path, which is

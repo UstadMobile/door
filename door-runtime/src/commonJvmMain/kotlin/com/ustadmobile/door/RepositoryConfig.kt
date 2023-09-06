@@ -1,6 +1,5 @@
 package com.ustadmobile.door
 
-import com.ustadmobile.door.attachments.AttachmentFilter
 import io.ktor.client.*
 import okhttp3.OkHttpClient
 import kotlinx.serialization.json.Json
@@ -27,10 +26,6 @@ actual class RepositoryConfig internal constructor(
             val okHttpClient: OkHttpClient,
             val json: Json,
         ) {
-
-            var attachmentsDir: String? = null
-
-            val attachmentFilters = mutableListOf<AttachmentFilter>()
 
             fun build() : RepositoryConfig{
                 return RepositoryConfig(

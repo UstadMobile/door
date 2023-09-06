@@ -67,16 +67,6 @@ fun KSClassDeclaration.dbHasReplicationEntities() : Boolean {
     return allDbEntities().any { it.hasAnnotation(ReplicateEntity::class) }
 }
 
-/**
- * Determines if this database has any DAOs that contain RunOnChange or RunOnNewNode triggers. This determines
- * if the DAO should have a ReplicationRunOnChange_Runner generated.
- */
-fun KSClassDeclaration.dbHasRunOnChangeTriggers() = allDbDaos().any {
-    it.getAllFunctions().any {
-        it.hasAnyAnnotation(ReplicationRunOnChange::class, ReplicationRunOnNewNode::class)
-    }
-}
-
 
 fun KSClassDeclaration.allDbClassDaoGetters(): List<KSDeclaration> {
     return getAllFunctions().filter {
@@ -130,11 +120,6 @@ fun KSClassDeclaration.isArrayDeclaration(): Boolean {
 fun KSClassDeclaration.toClassNameWithSuffix(
     suffix: String
 ) = ClassName(packageName.asString(), simpleName.asString() + suffix)
-
-/**
- * Where this KSClassDeclaration represents an
- */
-fun KSClassDeclaration.entityHasAttachments() =  getDeclaredProperties().any { it.hasAnnotation(AttachmentUri::class) }
 
 /**
  * Where this KSClassDeclaration represents an entity, get a list of the primary keys for this entity.
