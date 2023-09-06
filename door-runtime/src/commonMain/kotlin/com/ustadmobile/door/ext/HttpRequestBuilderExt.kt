@@ -18,6 +18,10 @@ fun HttpRequestBuilder.doorNodeIdHeader(repo: DoorDatabaseRepository) {
     header(DoorConstants.HEADER_NODE_AND_AUTH, "${repo.config.nodeId}/${repo.config.auth}")
 }
 
+fun HttpRequestBuilder.doorNodeIdHeader(nodeId: Long, auth: String) {
+    header(DoorConstants.HEADER_NODE_AND_AUTH, "$nodeId/$auth")
+}
+
 /**
  * Add required headers: version and nodeid / auth
  */

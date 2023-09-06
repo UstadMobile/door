@@ -3,12 +3,18 @@ package db3
 import androidx.room.Insert
 import androidx.room.Query
 import com.ustadmobile.door.annotation.DoorDao
+import com.ustadmobile.door.annotation.Repository
+import kotlinx.coroutines.flow.Flow
 
 @DoorDao
+@Repository
 abstract class ExampleEntity3Dao {
 
     @Insert
     abstract suspend fun insertAsync(exampleEntity3: ExampleEntity3): Long
+
+    @Insert
+    abstract fun insert(exampleEntity3: ExampleEntity3): Long
 
     @Query("""
         INSERT INTO OutgoingReplication(destNodeId, orTableId, orPk1, orPk2)
@@ -25,4 +31,12 @@ abstract class ExampleEntity3Dao {
          WHERE ExampleEntity3.eeUid = :uid 
     """)
     abstract suspend fun findByUid(uid: Long): ExampleEntity3?
+
+    @Query("""
+        SELECT ExampleEntity3.*
+          FROM ExampleEntity3
+         WHERE ExampleEntity3.eeUid = :uid 
+    """)
+    abstract fun findByUidAsFlow(uid: Long): Flow<ExampleEntity3?>
+
 }

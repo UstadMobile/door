@@ -66,8 +66,8 @@ actual inline fun <reified  T: RoomDatabase> T.asRepository(repositoryConfig: Re
     }
 
     val repo = repoImplClass
-        .getConstructor(dbClass.java, dbClass.java, RepositoryConfig::class.java, Boolean::class.javaPrimitiveType)
-        .newInstance(this, dbUnwrapped, repositoryConfig, true)
+        .getConstructor(dbClass.java, dbClass.java, RepositoryConfig::class.java)
+        .newInstance(this, dbUnwrapped, repositoryConfig)
     return repo
 }
 

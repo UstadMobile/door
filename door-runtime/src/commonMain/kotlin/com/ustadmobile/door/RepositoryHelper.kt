@@ -2,17 +2,39 @@ package com.ustadmobile.door
 
 import kotlinx.coroutines.*
 import com.ustadmobile.door.ext.concurrentSafeListOf
+import com.ustadmobile.door.ext.doorWrapper
+import com.ustadmobile.door.nodeevent.NodeEventManager
+import com.ustadmobile.door.replication.DoorRepositoryReplicationClient
+import com.ustadmobile.door.room.RoomDatabase
 import kotlinx.atomicfu.atomic
 
 /**
- * This implements common repository functions such as addMirror, removeMirror, setMirrorPriority
- * setConnectivityStatus and val connectivityStatus
+ * The RepositoryHelper has common implementation logic needed by repositories. This can't be done using inheritance
+ * because the superclass is the Database itself. It hosts the DoorRepositoryReplicationClient,
+ *
+ * @param db The underlying database: MUST be the DoorWrapper version
+ * @param repoConfig the RepositoryConfig being used (that should contain the endpoint etc).
  */
-class RepositoryHelper() {
+class RepositoryHelper(
+    private val db: RoomDatabase,
+    private val repoConfig: RepositoryConfig,
+) {
 
     private val connectivityStatusAtomic = atomic(0)
 
     private val connectivityListeners: MutableList<RepositoryConnectivityListener> = concurrentSafeListOf()
+
+    val scope = CoroutineScope(Dispatchers.Default + Job())
+
+    private val nodeEventManager: NodeEventManager<*> = db.doorWrapper.nodeEventManager
+
+    private val client = DoorRepositoryReplicationClient(
+        db = db,
+        repositoryConfig = repoConfig,
+        scope = scope,
+        nodeEventManager = nodeEventManager,
+        retryInterval = 1_000 //This could/should be added to repositoryconfig
+    )
 
     var connectivityStatus: Int
         get() = connectivityStatusAtomic.value
@@ -34,13 +56,9 @@ class RepositoryHelper() {
         }
 
 
-    fun addWeakConnectivityListener(listener: RepositoryConnectivityListener) {
-        connectivityListeners.add(listener)
+    fun close() {
+        client.close()
+        scope.cancel()
     }
-
-    fun removeWeakConnectivityListener(listener: RepositoryConnectivityListener) {
-        connectivityListeners.remove(listener)
-    }
-
 
 }

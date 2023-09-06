@@ -68,27 +68,37 @@ fun Route.ReplicationRoute(
      * RoomDatabase#acknowledgeReceivedReplicationsAndSelectNextPendingBatch
      */
     post("ackAndGetPendingReplications") {
-        val receivedAck : ReplicationReceivedAck = json.decodeFromString(
-            ReplicationReceivedAck.serializer(), call.receiveText()
-        )
-        val nodeIdAndAuth = requireRemoteNodeIdAndAuth()
-        val remoteNodeId = nodeIdAndAuth.first
+        try {
+            val receivedAck : ReplicationReceivedAck = json.decodeFromString(
+                ReplicationReceivedAck.serializer(), call.receiveText()
+            )
+            val nodeIdAndAuth = requireRemoteNodeIdAndAuth()
+            val remoteNodeId = nodeIdAndAuth.first
 
-        val db = adapter(call)
+            val db = adapter(call)
 
-        val responseMessage = db.acknowledgeReceivedReplicationsAndSelectNextPendingBatch(
-            nodeId = remoteNodeId,
-            receivedAck = receivedAck,
-        )
+            val responseMessage = db.acknowledgeReceivedReplicationsAndSelectNextPendingBatch(
+                nodeId = remoteNodeId,
+                receivedAck = receivedAck,
+            )
 
 
-        if(responseMessage.replications.isNotEmpty()) {
-            call.respondText(contentType = ContentType.Application.Json) {
-                json.encodeToString(DoorMessage.serializer(), responseMessage)
+            if(responseMessage.replications.isNotEmpty()) {
+                call.respondText(contentType = ContentType.Application.Json) {
+                    json.encodeToString(DoorMessage.serializer(), responseMessage)
+                }
+            }else {
+                call.respondBytes(byteArrayOf(), ContentType.Text.Plain, HttpStatusCode.NoContent)
             }
-        }else {
-            call.respondBytes(byteArrayOf(), ContentType.Text.Plain, HttpStatusCode.NoContent)
+        }catch(e: Exception) {
+            Napier.e(
+                tag = DoorTag.LOG_TAG,
+                message = "ReplicationRoute: ackAndGetPendingReplications: exception handling request",
+                throwable = e
+            )
+            call.respondText(ContentType.Text.Plain) { "Internal Error - see server log" }
         }
+
     }
 
     /**
@@ -114,7 +124,7 @@ fun Route.ReplicationRoute(
         }
     }
 
-    post("nodeId") {
+    get("nodeId") {
         call.response.header(HEADER_NODE_ID, localNodeId.toString())
         call.respondBytes(
             bytes = byteArrayOf(),

@@ -2,10 +2,7 @@ package com.ustadmobile.door.replication
 
 import com.ustadmobile.door.DoorConstants
 import com.ustadmobile.door.RepositoryConfig
-import com.ustadmobile.door.ext.DoorTag
-import com.ustadmobile.door.ext.doorWrapperNodeId
-import com.ustadmobile.door.ext.setRepoUrl
-import com.ustadmobile.door.ext.withDoorTransactionAsync
+import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.nodeevent.NodeEventManager
 import com.ustadmobile.door.room.RoomDatabase
@@ -42,6 +39,7 @@ import kotlin.concurrent.Volatile
  */
 class DoorRepositoryReplicationClient(
     private val localNodeId: Long,
+    private val localNodeAuth: String,
     private val httpClient: HttpClient,
     private val repoEndpointUrl: String,
     scope: CoroutineScope,
@@ -58,6 +56,7 @@ class DoorRepositoryReplicationClient(
         retryInterval: Int,
     ): this (
         localNodeId = db.doorWrapperNodeId,
+        localNodeAuth = repositoryConfig.auth,
         httpClient = repositoryConfig.httpClient,
         repoEndpointUrl = repositoryConfig.endpoint,
         scope = scope,
@@ -65,6 +64,15 @@ class DoorRepositoryReplicationClient(
         onMarkAcknowledgedAndGetNextOutgoingReplications = DefaultOnMarkAcknowledgedAndGetNextOutgoingReplications(db),
         retryInterval = retryInterval,
     )
+
+    private val logPrefix = "[DoorRepositoryReplicationClient localNodeId=$localNodeId endpoint=$repoEndpointUrl]"
+
+    init {
+        Napier.d(
+            tag = DoorTag.LOG_TAG,
+            message = "$logPrefix init"
+        )
+    }
 
     /**
      * Functional interface that will run one (single) transaction to acknowledge entities received by the remote node
@@ -102,9 +110,6 @@ class DoorRepositoryReplicationClient(
         }
     }
 
-
-    private val logPrefix = "[DoorRepositoryReplicationClient from=$localNodeId endpoint=$repoEndpointUrl]"
-
     @Volatile
     var lastInvalidatedTime = systemTimeInMillis()
 
@@ -132,17 +137,32 @@ class DoorRepositoryReplicationClient(
     init {
         //Get the door node id of the remote endpoint.
         scope.launch {
-            while(!remoteNodeId.isCompleted && !remoteNodeId.isCancelled) {
+            while(isActive && !remoteNodeId.isCompleted && !remoteNodeId.isCancelled) {
                 try {
-                    val remoteNodeIdReq = httpClient.get {
+                    Napier.v(tag = DoorTag.LOG_TAG) {
+                        "$logPrefix getRemoteNodeId : requesting node id of server"
+                    }
+                    val remoteNodeIdResponse = httpClient.get {
+                        doorNodeIdHeader(localNodeId, localNodeAuth)
                         setRepoUrl(repoEndpointUrl, "replication/nodeId")
                     }
-                    remoteNodeIdReq.headers[DoorConstants.HEADER_NODE_ID]?.toLong()?.also {
-                        remoteNodeId.complete(it)
+
+                    val nodeIdHeaderVal = remoteNodeIdResponse.headers[DoorConstants.HEADER_NODE_ID]?.toLong()
+                    Napier.v(tag = DoorTag.LOG_TAG) {
+                        "$logPrefix getRemoteNodeId : got server node id: status=${remoteNodeIdResponse.status} $nodeIdHeaderVal"
+                    }
+                    if(nodeIdHeaderVal != null) {
+                        remoteNodeId.complete(nodeIdHeaderVal)
+                    }else {
+                        throw IllegalStateException("$logPrefix getRemoteNodeId : server did not provide node id")
                     }
                 }catch(e: Exception) {
-                    if(e !is CancellationException)
+                    if(e !is CancellationException) {
+                        Napier.w(tag = DoorTag.LOG_TAG, throwable = e) {
+                            "$logPrefix getRemoteNodeId : exception getting remote node id"
+                        }
                         delay(retryInterval.toLong())
+                    }
                 }
             }
         }
@@ -178,6 +198,10 @@ class DoorRepositoryReplicationClient(
                     sendNotifyChannel.receive()
                 }
 
+                Napier.v(tag = DoorTag.LOG_TAG) {
+                    "$logPrefix : runSendLoop : querying db to mark ${outgoingReplicationsToAck.size} entities as " +
+                            "acknowledged by server and get next batch of replications to send"
+                }
                 val outgoingReplications = onMarkAcknowledgedAndGetNextOutgoingReplications(
                     nodeId = remoteNodeIdVal,
                     receivedAck = ReplicationReceivedAck(
@@ -185,11 +209,19 @@ class DoorRepositoryReplicationClient(
                     ),
                     batchSize = batchSize
                 )
+                Napier.v(tag = DoorTag.LOG_TAG) {
+                    "$logPrefix : runSendLoop : found ${outgoingReplications.size} pending outgoing replications " +
+                            "to send"
+                }
                 outgoingReplicationsToAck.clear()
 
                 if(outgoingReplications.isNotEmpty()) {
+                    Napier.v(tag = DoorTag.LOG_TAG) {
+                        "$logPrefix : runSendLoop : sending ${outgoingReplications.size} to server "
+                    }
                     val replicationResponse = httpClient.post {
                         setRepoUrl(repoEndpointUrl, "replication/message")
+                        doorNodeIdHeader(localNodeId, localNodeAuth)
                         contentType(ContentType.Application.Json)
                         setBody(DoorMessage(
                             what = DoorMessage.WHAT_REPLICATION,
@@ -201,15 +233,22 @@ class DoorRepositoryReplicationClient(
 
                     val replicationReceivedAck: ReplicationReceivedAck = replicationResponse.body()
 
+                    Napier.v(tag = DoorTag.LOG_TAG) {
+                        "$logPrefix : runSendLoop : received reply from server status= ${replicationResponse.status} " +
+                                " acknowledges ${replicationReceivedAck.replicationUids.size} entities"
+                    }
+
                     outgoingReplicationsToAck.addAll(replicationReceivedAck.replicationUids)
                 }
             }catch(e: Exception) {
-                Napier.d(
-                    tag = DoorTag.LOG_TAG,
-                    message =  { "$logPrefix exception sending outgoing replications" },
-                    throwable = e
-                )
-                delay(retryInterval.toLong())
+                if(e !is CancellationException) {
+                    Napier.d(
+                        tag = DoorTag.LOG_TAG,
+                        message =  { "$logPrefix exception sending outgoing replications" },
+                        throwable = e
+                    )
+                    delay(retryInterval.toLong())
+                }
             }
         }
     }
@@ -223,17 +262,31 @@ class DoorRepositoryReplicationClient(
                     fetchNotifyChannel.receive() //wait for the invalidation signal if there is nothing we need to acknowledge
                 }
 
+                Napier.v(tag = DoorTag.LOG_TAG) {
+                    "$logPrefix : runFetchLoop: acknowledging ${acknowledgementsToSend.size} entities received and " +
+                            "request next batch of pending replications"
+                }
                 val entitiesReceivedResponse = httpClient.post {
+                    doorNodeIdHeader(localNodeId, localNodeAuth)
                     setRepoUrl(repoEndpointUrl, "replication/ackAndGetPendingReplications")
                     contentType(ContentType.Application.Json)
                     setBody(ReplicationReceivedAck(acknowledgementsToSend))
+                }
+                Napier.v(tag = DoorTag.LOG_TAG) {
+                    "$logPrefix : runFetchLoop: received response status = ${entitiesReceivedResponse.status}"
                 }
                 acknowledgementsToSend.clear()
 
                 if(entitiesReceivedResponse.status == HttpStatusCode.OK) {
                     val entitiesReceivedMessage: DoorMessage = entitiesReceivedResponse.body()
+                    Napier.v(tag = DoorTag.LOG_TAG) {
+                        "$logPrefix : runFetchLoop: received ${entitiesReceivedMessage.replications.size} replications incoming"
+                    }
                     nodeEventManager.onIncomingMessageReceived(entitiesReceivedMessage)
                     acknowledgementsToSend.addAll(entitiesReceivedMessage.replications.map { it.orUid })
+                    Napier.v(tag = DoorTag.LOG_TAG) {
+                        "$logPrefix : runFetchLoop: delivered ${entitiesReceivedMessage.replications.size} replications to node event manager"
+                    }
                 }
 
                 if(entitiesReceivedResponse.status == HttpStatusCode.NoContent) {
@@ -242,7 +295,7 @@ class DoorRepositoryReplicationClient(
             }catch(e: Exception) {
                 Napier.v(
                     tag= DoorTag.LOG_TAG,
-                    message = { "DoorRepositoryReplicationClient: exception (probably offline): $e"},
+                    message = { "DoorRepositoryReplicationClient: : runFetchLoop: exception (probably offline): $e"},
                     throwable = e
                 )
                 delay(retryInterval.toLong())

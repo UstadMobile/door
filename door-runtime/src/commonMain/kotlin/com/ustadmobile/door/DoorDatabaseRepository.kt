@@ -18,24 +18,6 @@ interface DoorDatabaseRepository {
 
     val dbName: String
 
-    /**
-     * Indicates whether this is the root repository that corresponds to the root database. This is used on
-     * initialization by the repo code to determine if it should create a ReplicationSubscriptionManager
-     */
-    val isRootRepository: Boolean
-
-    /**
-     * Adds a weak reference to the given connectivity listener - useful for RepositoryLoadHelper
-     * so it can automatically retry requests when connectivity is restored or when a mirror
-     * becomes available.
-     */
-    fun addWeakConnectivityListener(listener: RepositoryConnectivityListener)
-
-    /**
-     *
-     */
-    fun removeWeakConnectivityListener(listener: RepositoryConnectivityListener)
-
     var connectivityStatus: Int
 
     companion object {

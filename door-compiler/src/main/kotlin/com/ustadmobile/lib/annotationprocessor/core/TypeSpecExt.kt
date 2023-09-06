@@ -4,7 +4,6 @@ import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
-import com.ustadmobile.door.RepositoryConnectivityListener
 import com.ustadmobile.door.annotation.DoorDatabase
 import com.ustadmobile.door.room.InvalidationTracker
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_ILLEGALSTATEEXCEPTION
@@ -20,22 +19,28 @@ fun TypeSpec.Builder.addDaoPropOrGetterOverride(
     val daoType = daoPropOrGetterDeclaration.propertyOrReturnType()?.resolve()
         ?: throw IllegalArgumentException("Dao getter given ${daoPropOrGetterDeclaration.simpleName.asString()} has no type!")
 
-    if(daoPropOrGetterDeclaration is KSFunctionDeclaration) {
-        addFunction(FunSpec.builder(daoPropOrGetterDeclaration.simpleName.asString())
-            .addModifiers(KModifier.OVERRIDE)
-            .returns(daoType.toTypeName())
-            .addCode(codeBlock)
-            .build())
-    }else if(daoPropOrGetterDeclaration is KSPropertyDeclaration) {
-        addProperty(PropertySpec.builder(daoPropOrGetterDeclaration.simpleName.asString(),
-                daoType.toTypeName())
-            .addModifiers(KModifier.OVERRIDE)
-            .getter(FunSpec.getterBuilder()
+    when (daoPropOrGetterDeclaration) {
+        is KSFunctionDeclaration -> {
+            addFunction(FunSpec.builder(daoPropOrGetterDeclaration.simpleName.asString())
+                .addModifiers(KModifier.OVERRIDE)
+                .returns(daoType.toTypeName())
                 .addCode(codeBlock)
                 .build())
-            .build())
-    }else {
-        throw IllegalArgumentException("${daoPropOrGetterDeclaration.simpleName} is not property or function!")
+        }
+
+        is KSPropertyDeclaration -> {
+            addProperty(PropertySpec.builder(daoPropOrGetterDeclaration.simpleName.asString(),
+                daoType.toTypeName())
+                .addModifiers(KModifier.OVERRIDE)
+                .getter(FunSpec.getterBuilder()
+                    .addCode(codeBlock)
+                    .build())
+                .build())
+        }
+
+        else -> {
+            throw IllegalArgumentException("${daoPropOrGetterDeclaration.simpleName} is not property or function!")
+        }
     }
 
     return this
@@ -62,16 +67,6 @@ internal fun TypeSpec.Builder.addRepositoryHelperDelegateCalls(delegatePropName:
                     .addParameter("newValue", INT)
                     .addCode("$delegatePropName.connectivityStatus = newValue\n")
                     .build())
-            .build())
-    addFunction(FunSpec.builder("addWeakConnectivityListener")
-            .addModifiers(KModifier.OVERRIDE)
-            .addParameter("listener", RepositoryConnectivityListener::class)
-            .addCode("$delegatePropName.addWeakConnectivityListener(listener)\n")
-            .build())
-    addFunction(FunSpec.builder("removeWeakConnectivityListener")
-            .addModifiers(KModifier.OVERRIDE)
-            .addParameter("listener", RepositoryConnectivityListener::class)
-            .addCode("$delegatePropName.removeWeakConnectivityListener(listener)\n")
             .build())
 
     return this

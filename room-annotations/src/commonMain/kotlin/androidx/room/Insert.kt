@@ -29,7 +29,7 @@ package androidx.room
  * @see Delete
  */
 @Target(AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY_GETTER, AnnotationTarget.PROPERTY_SETTER)
-@Retention(AnnotationRetention.BINARY)
+@Retention(AnnotationRetention.SOURCE)
 annotation class Insert(
         /**
          * What to do if a conflict happens.
