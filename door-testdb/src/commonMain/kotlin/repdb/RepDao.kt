@@ -67,8 +67,8 @@ expect interface RepDao: RepDaoInterface<RepEntity> {
     suspend fun findAllAsync(): List<RepEntity>
 
 
-    @RepoHttpAccessible
-    @Repository(Repository.METHOD_DELEGATE_TO_WEB)
+//    @RepoHttpAccessible
+//    @Repository(Repository.METHOD_DELEGATE_TO_WEB)
     @Insert
     suspend fun insertHttp(entity: RepEntity) : Long
 

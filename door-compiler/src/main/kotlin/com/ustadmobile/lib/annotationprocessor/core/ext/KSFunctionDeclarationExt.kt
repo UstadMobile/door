@@ -11,6 +11,7 @@ import com.squareup.kotlinpoet.ksp.toKModifier
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.toTypeParameterResolver
 import com.ustadmobile.door.annotation.QueryLiveTables
+import com.ustadmobile.door.annotation.RepoHttpAccessible
 import com.ustadmobile.lib.annotationprocessor.core.applyIf
 import net.sf.jsqlparser.parser.CCJSqlParserUtil
 import net.sf.jsqlparser.statement.select.Select
@@ -107,3 +108,14 @@ val KSFunctionDeclaration.useSuspendedQuery: Boolean
                 returnTypeDecl?.isFlow() == true ||
                 returnTypeDecl?.isPagingSource() == true
     }
+
+fun KSFunctionDeclaration.getDaoFunHttpAccessibleDoorReplicationEntities(
+    resolver: Resolver
+): List<EmbeddedEntityAndPath> {
+    if(!hasAnnotation(RepoHttpAccessible::class))
+        return emptyList()
+
+    val resultClassDeclaration = returnType?.resolve()?.unwrapResultType(resolver)?.unwrapComponentTypeIfListOrArray(resolver)
+        ?.declaration as? KSClassDeclaration
+    return resultClassDeclaration?.getDoorReplicateEntityComponents() ?: emptyList()
+}

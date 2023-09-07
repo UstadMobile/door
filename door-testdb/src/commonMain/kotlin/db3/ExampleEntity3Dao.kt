@@ -3,6 +3,7 @@ package db3
 import androidx.room.Insert
 import androidx.room.Query
 import com.ustadmobile.door.annotation.DoorDao
+import com.ustadmobile.door.annotation.RepoHttpAccessible
 import com.ustadmobile.door.annotation.Repository
 import kotlinx.coroutines.flow.Flow
 
@@ -38,5 +39,13 @@ abstract class ExampleEntity3Dao {
          WHERE ExampleEntity3.eeUid = :uid 
     """)
     abstract fun findByUidAsFlow(uid: Long): Flow<ExampleEntity3?>
+
+    @RepoHttpAccessible
+    @Query("""
+        SELECT ExampleEntity3.*
+          FROM ExampleEntity3
+         WHERE ExampleEntity3.cardNumber >= :minCardNum 
+    """)
+    abstract suspend fun findAllWithCardNumAbove(minCardNum: Int): List<ExampleEntity3>
 
 }

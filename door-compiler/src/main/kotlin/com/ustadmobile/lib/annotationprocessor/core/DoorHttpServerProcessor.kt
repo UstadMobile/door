@@ -24,6 +24,8 @@ import com.ustadmobile.door.annotation.MinReplicationVersion
 import com.ustadmobile.door.annotation.RepoHttpAccessible
 import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.ext.DoorTag
+import com.ustadmobile.door.http.DoorJsonRequest
+import com.ustadmobile.door.replication.DoorReplicationEntity
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.CALL_MEMBER
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.CODEBLOCK_KTOR_NO_CONTENT_RESPOND
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.CODEBLOCK_NANOHTTPD_NO_CONTENT_RESPONSE
@@ -558,6 +560,83 @@ fun FileSpec.Builder.addDbNanoHttpdMapperFunction(
     return this
 }
 
+fun FileSpec.Builder.addHttpServerExtensionFun(
+    resolver: Resolver,
+    daoKSClassDeclaration: KSClassDeclaration,
+    daoFunDecl: KSFunctionDeclaration
+): FileSpec.Builder {
+    val returnsReplicationEntities = daoFunDecl.getDaoFunHttpAccessibleDoorReplicationEntities(resolver).isNotEmpty()
+    //Should add originating ks class for all entities used here.
+
+    addFunction(
+        FunSpec.builder(daoFunDecl.simpleName.asString() + "_DoorHttp")
+            .addModifiers(KModifier.SUSPEND)
+            .addOriginatingKSClass(daoKSClassDeclaration)
+            .receiver(daoKSClassDeclaration.toClassName())
+            .addParameter("json", Json::class)
+            .addParameter("request", DoorJsonRequest::class)
+            .addCode(CodeBlock.builder()
+                .apply {
+                    daoFunDecl.parameters.forEach { param ->
+                        add("val _${param.name?.asString()} = request.require${param.type.resolve().declaration.simpleName.asString()}Param(%S)\n",
+                            param.name?.asString())
+                    }
+                }
+                .applyIf(returnsReplicationEntities) {
+                    beginControlFlow("val replicationEntities = %M<%T>",
+                        MemberName("kotlin.collections", "buildList"),
+                        DoorReplicationEntity::class
+                        )
+
+                    //Next: we can add list of functions e.g. replicateData = ["selectAllSalesPeople", "selectAllSalesByType"]
+                    // that are going to generate data to replicate
+                    listOf(daoFunDecl).forEach { funDeclaration ->
+                        val resultType = funDeclaration.returnType?.resolve()?.unwrapResultType(resolver)
+                        val resultComponentType = resultType?.unwrapComponentTypeIfListOrArray(resolver)
+                        val resultValName = "_result_${funDeclaration.simpleName.asString()}"
+
+                        add("val $resultValName = ${funDeclaration.simpleName.asString()}(\n")
+                        indent()
+                        funDeclaration.parameters.forEach { param ->
+                            val paramNameStr = param.name?.asString()
+                            add("$paramNameStr = _$paramNameStr,\n")
+                        }
+                        unindent()
+                        add(")\n")
+
+                        val replicationEntitiesOnResult = (resultComponentType?.declaration as? KSClassDeclaration)
+                            ?.getDoorReplicateEntityComponents()
+
+                        if(resultType?.isListOrArrayType(resolver) == true) {
+                            replicationEntitiesOnResult?.forEach { replicateEntityAndPath ->
+                                add("addAll(\n")
+                                indent()
+                                beginControlFlow("$resultValName.map")
+                                addCreateDoorReplicationCodeBlock(
+                                    entityKSClass = replicateEntityAndPath.entity,
+                                    entityValName = replicateEntityAndPath.propertyPathFrom("it"),
+                                    jsonVarName = "json",
+                                )
+                                add("\n") // new line won't be automatically added by addCreateDoorReplicationCodeBlock
+                                endControlFlow()
+                                unindent()
+                                add(")\n")
+                            }
+                        }
+                    }
+
+
+
+
+
+
+                    endControlFlow()
+                }
+                .build())
+            .build()
+    )
+    return this
+}
 
 
 /**
@@ -639,6 +718,21 @@ class DoorHttpServerProcessor(
             }
         }
 
+        daoSymbols.forEach { daoDecl ->
+            val httpAccessibleFunctions = daoDecl.getAllFunctions().filter { it.hasAnnotation(RepoHttpAccessible::class) }.toList()
+            if(httpAccessibleFunctions.isNotEmpty()) {
+                FileSpec.builder(daoDecl.packageName.asString(), "${daoDecl.simpleName.asString()}$SUFFIX_HTTP_SERVER_EXTENSION_FUNS")
+                    .apply {
+                        httpAccessibleFunctions.forEach { daoFun ->
+                            addHttpServerExtensionFun(resolver, daoDecl, daoFun)
+                        }
+                    }
+                    .build()
+                    .writeTo(environment.codeGenerator, false)
+            }
+
+        }
+
         return emptyList()
     }
 
@@ -649,6 +743,8 @@ class DoorHttpServerProcessor(
         const val SUFFIX_NANOHTTPD_URIRESPONDER = "_UriResponder"
 
         const val SUFFIX_NANOHTTPD_ADDURIMAPPING = "_AddUriMapping"
+
+        const val SUFFIX_HTTP_SERVER_EXTENSION_FUNS = "_HttpServerExt"
 
         val GET_MEMBER = MemberName("io.ktor.server.routing", "get")
 

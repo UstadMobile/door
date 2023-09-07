@@ -7,4 +7,11 @@ package com.ustadmobile.door.annotation
  */
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.BINARY)
-annotation class RepoHttpAccessible()
+annotation class RepoHttpAccessible(
+    val repoStrategy: Strategy = Strategy.AUTO
+) {
+
+    enum class Strategy {
+        AUTO, HTTP_ONLY, LOCAL_DB_ONLY
+    }
+}

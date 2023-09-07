@@ -4,6 +4,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.ustadmobile.door.annotation.*
+import kotlinx.serialization.Serializable
 import repdb.RepEntityWithAttachment.Companion.TABLE_ID
 
 @Entity
@@ -24,7 +25,7 @@ import repdb.RepEntityWithAttachment.Companion.TABLE_ID
                        waSize = EXCLUDED.waSize
                        */
             """])))
-
+@Serializable
 class RepEntityWithAttachment {
 
     @PrimaryKey(autoGenerate = true)

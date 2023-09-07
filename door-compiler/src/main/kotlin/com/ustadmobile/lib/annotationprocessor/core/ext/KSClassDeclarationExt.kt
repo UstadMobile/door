@@ -277,13 +277,91 @@ fun KSClassDeclaration.getAllColumnProperties(
     return getAllProperties().filter { !it.isIgnored && it.type.resolve() in resolver.querySingularTypes() }.toList()
 }
 
+data class EmbeddedEntityAndPath(
+    val entity: KSClassDeclaration,
+    val propertyPath: List<KSPropertyDeclaration>
+) {
+    val propertyPathAsString: String
+        get() = propertyPath.joinToString(separator = ".") { it.simpleName.asString() }
+
+    /**
+     * Property path from base is useful if there is an existing variable (e.g. it) . Where the propertyPath is empty
+     * (e.g. root entity itself has the target annotation etc), then it returns the baseValName. If propertyPath is
+     * not empty, then return baseValName.propertyPathAsString
+     */
+    fun propertyPathFrom(baseValName: String): String {
+        return if(propertyPath.isEmpty())
+            baseValName
+        else
+            "$baseValName.$propertyPathAsString"
+    }
+
+}
+
+/**
+ * Get a list of all embedded entities and the property "path" to them
+ *
+ * e.g.
+ *
+ * class JourneyOffer {
+ *     var offerId: Int = 0
+ *
+ *     var price: Float = 0.0
+ *
+ *     @Embedded
+ *     var journey: Journey? = null
+ * }
+ *
+ * class Journey {
+ *     @Embedded
+ *     var destination:  Location? = null
+ *
+ *     @Embedded
+ *     var vehicle: Vehicle? = null
+ * }
+ *
+ * @Entity
+ * class Location {
+ *     var locationName: String? = null
+ *     var latitude : Double = 0.0
+ *     var longitude: Double = 0.0
+ * }
+ *
+ * @Entity
+ * class Vehicle {
+ *     var name: String? = null
+ *     var maxSpeed: Float = 0.0
+ * }
+ *
+ * will return a list of
+ * entity=Journey,path=[JourneyOffer#journey property declaration]
+ * entity=Location,path=[JourneyOffer#journey property declaration,Journey#destination property declaration]
+ * entity=Vehicle,path=[JourneyOffer#journey property declaration,Journey#vehicle property declaration]
+ */
+fun KSClassDeclaration.entityEmbeddedEntitiesAndPath(
+    basePath: List<KSPropertyDeclaration>
+) : List<EmbeddedEntityAndPath> {
+    return getAllProperties().toList()
+        .filter {
+            it.hasAnnotation(Embedded::class)
+        }.flatMap { embeddedProperty ->
+            val propertyPath = basePath + embeddedProperty
+            val embeddedClassDecl = embeddedProperty.type.resolve().declaration as KSClassDeclaration
+            listOf(EmbeddedEntityAndPath(embeddedClassDecl, propertyPath)) +
+                    embeddedClassDecl.entityEmbeddedEntitiesAndPath(propertyPath)
+        }
+}
+
 fun KSClassDeclaration.entityEmbeddedEntities(
     resolver: Resolver
 ): List<KSClassDeclaration> {
-    return getAllProperties().toList().filter { it.hasAnnotation(Embedded::class) }.flatMap {
-        val embeddedClassDecl = it.type.resolve().declaration as KSClassDeclaration
-        listOf(embeddedClassDecl) + embeddedClassDecl.entityEmbeddedEntities(resolver)
-    }
+    return getAllProperties().toList()
+        .filter {
+            it.hasAnnotation(Embedded::class)
+        }.flatMap {
+            val embeddedClassDecl = it.type.resolve().declaration as KSClassDeclaration
+            listOf(embeddedClassDecl) + embeddedClassDecl.entityEmbeddedEntities(resolver)
+        }
 }
 
 /**
@@ -310,3 +388,43 @@ fun KSClassDeclaration.allDaoEntities(resolver: Resolver): List<KSClassDeclarati
     return entityList
 }
 
+
+fun <A:Annotation> KSClassDeclaration.hasAnnotationOrSuperTypesHasAnnotation(
+    annotationClass: KClass<A>
+) : Boolean {
+    return hasAnnotation(annotationClass) || superTypes.any { it.resolve().declaration.hasAnnotation(annotationClass) }
+}
+
+fun KSClassDeclaration.isReplicateEntityOrChildThereOf(): Boolean {
+    return hasAnnotationOrSuperTypesHasAnnotation(ReplicateEntity::class)
+}
+
+/**
+ *
+ */
+fun KSClassDeclaration.inheritedOrDeclaredDoorReplicateEntity(): EmbeddedEntityAndPath? {
+    return if(hasAnnotation(ReplicateEntity::class)) {
+        EmbeddedEntityAndPath(this, emptyList())
+    } else {
+        superTypes.firstOrNull { it.hasAnnotation(ReplicateEntity::class) }?.resolve()?.declaration?.let {
+            EmbeddedEntityAndPath(it as KSClassDeclaration, emptyList())
+        }
+    }
+}
+
+/**
+ * Where this KSClassDeclaration represents the component result type of a query (e.g. unwrapped from flow, pagingsource,
+ * list, array) get the DoorReplicateEntities that are used including:
+ *   Declared (e.g. if this KSClassDeclaration itself is annotated as @DoorReplicateEntity)
+ *   Inherited (the nearest supertype if any that is annotated as @DoorReplicateEntity)
+ *   Embedded properties: the same logic applied to properties that are annotated as @Embedded
+ *
+ * @return List of all DoorReplicateEntities used in the class represented by this KSClassDeclaration
+ */
+fun KSClassDeclaration.getDoorReplicateEntityComponents(): List<EmbeddedEntityAndPath> {
+    val embeddedReplicateEntities = entityEmbeddedEntitiesAndPath(basePath = emptyList()).filter {
+        it.entity.isReplicateEntityOrChildThereOf()
+    }
+
+    return (inheritedOrDeclaredDoorReplicateEntity()?.let { listOf(it) } ?: emptyList()) + embeddedReplicateEntities
+}

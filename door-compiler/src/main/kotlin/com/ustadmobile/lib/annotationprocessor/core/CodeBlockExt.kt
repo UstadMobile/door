@@ -7,6 +7,9 @@ import io.ktor.content.*
 import io.ktor.http.*
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
+import com.squareup.kotlinpoet.ksp.toClassName
+import com.ustadmobile.door.annotation.ReplicateEntity
+import com.ustadmobile.door.replication.DoorReplicationEntity
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.MEMBERNAME_CLIENT_SET_BODY
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.MEMBERNAME_ENCODED_PATH
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
@@ -274,3 +277,49 @@ fun CodeBlock.Builder.addPreparedStatementSetCall(
     type: KSType,
     resolver: Resolver
 ) = addGetResultOrSetQueryParamCall(type, PreparedStatementOp.SET, resolver)
+
+
+
+/**
+ * Generate a code block that will create a DoorReplicationEntity for a given type e.g.
+ * Given
+ * \@ReplicateEntity
+ * class MyReplicateEntity { ... }
+ *
+ * val anEntity: MyReplicateEntity
+ *
+ * Can generate:
+ *
+ * DoorReplicationEntity(
+ *    tableId = TABLEID,
+ *    orUid = 0,
+ *    entity = json.encodeToJsonElement(MyReplicateEntity.serializer(), anEntity).jsonObject
+ * )
+ *
+ * @param entityKSClass The KSClassDeclaration for the entity that is annotated with @ReplicateEntity
+ * @param entityValName the name of the entity in the codeblock
+ * @param outgoingReplicationUidValue the value to assign for orUid on DoorReplicationEntity
+ * @param jsonVarName the kotlinx serialization Json object val name in the codeblock
+ */
+fun CodeBlock.Builder.addCreateDoorReplicationCodeBlock(
+    entityKSClass: KSClassDeclaration,
+    entityValName: String,
+    outgoingReplicationUidValue: String = "0",
+    jsonVarName: String,
+): CodeBlock.Builder {
+    val repEntityAnnotation = entityKSClass.getAnnotation(ReplicateEntity::class)
+        ?: throw IllegalArgumentException("addToDoorReplicationEntityExtensionFn : " +
+                "${entityKSClass.qualifiedName?.asString()} does not have ReplicateEntity annotation")
+
+    add("%T(", DoorReplicationEntity::class)
+    indent()
+    add("tableId = %L,\n", repEntityAnnotation.tableId)
+    add("orUid = %L,\n", outgoingReplicationUidValue)
+    add("entity = $jsonVarName.encodeToJsonElement(%T.serializer(), $entityValName).%M,\n",
+        entityKSClass.toClassName(),
+        MemberName("kotlinx.serialization.json", "jsonObject"))
+    unindent()
+    add(")")
+
+    return this
+}
