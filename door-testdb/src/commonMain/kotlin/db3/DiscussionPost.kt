@@ -20,8 +20,8 @@ import kotlinx.serialization.Serializable
             on = Trigger.On.RECEIVEVIEW,
             sqlStatements = arrayOf(
                 """
-                REPLACE INTO DiscussionPost(postUid, postTitle, postText, postLastModified)
-                      SELECT NEW.postUid, NEW.postTitle, NEW.postText, NEW.postLastModified
+                REPLACE INTO DiscussionPost(postUid, postReplyToPostUid, postTitle, postText, postLastModified)
+                      SELECT NEW.postUid, NEW.postReplyToPostUid, NEW.postTitle, NEW.postText, NEW.postLastModified
                        WHERE NEW.postLastModified !=
                              COALESCE((SELECT DiscussionPost_Internal.postLastModified
                                          FROM DiscussionPost DiscussionPost_Internal
@@ -37,6 +37,8 @@ class DiscussionPost {
 
     @PrimaryKey(autoGenerate = true)
     var postUid: Long = 0
+
+    var postReplyToPostUid: Long = 0
 
     var postTitle: String? = null
 

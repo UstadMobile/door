@@ -61,9 +61,9 @@ abstract class ExampleSyncableDao {
     }
 
 
-    @Repository(methodType = Repository.METHOD_DELEGATE_TO_WEB)
+    //@Repository(methodType = Repository.METHOD_DELEGATE_TO_WEB)
     @Query("SELECT * FROM ExampleSyncableEntity LIMIT 1")
-    @RepoHttpAccessible
+    //@RepoHttpAccessible
     abstract suspend fun findOneFromWeb(): ExampleSyncableEntity?
 
     @Query("SELECT esNumber FROM ExampleSyncableEntity LIMIT 1")

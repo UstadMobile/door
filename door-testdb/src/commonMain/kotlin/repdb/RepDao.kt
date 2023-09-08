@@ -37,7 +37,7 @@ expect interface RepDao: RepDaoInterface<RepEntity> {
     @Update
     suspend fun updateAsync(repEntity: RepEntity)
 
-    @RepoHttpAccessible
+    //@RepoHttpAccessible
     @Query("""
     SELECT COUNT(*)
       FROM RepEntity

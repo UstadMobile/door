@@ -25,6 +25,8 @@ import com.ustadmobile.door.annotation.RepoHttpAccessible
 import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.http.DoorJsonRequest
+import com.ustadmobile.door.http.DoorJsonResponse
+import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.replication.DoorReplicationEntity
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.CALL_MEMBER
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.CODEBLOCK_KTOR_NO_CONTENT_RESPOND
@@ -566,6 +568,18 @@ fun FileSpec.Builder.addHttpServerExtensionFun(
     daoFunDecl: KSFunctionDeclaration
 ): FileSpec.Builder {
     val returnsReplicationEntities = daoFunDecl.getDaoFunHttpAccessibleDoorReplicationEntities(resolver).isNotEmpty()
+    val repoHttpAccessibleAnnotation = daoFunDecl.getAnnotation(RepoHttpAccessible::class)
+        ?: throw IllegalArgumentException("addHttpServerExtensionFun for " +
+                "${daoKSClassDeclaration.simpleName.asString()}#${daoFunDecl.simpleName.asString()} has no RepoHttpAccessible")
+    val effectiveStrategy = if(repoHttpAccessibleAnnotation.clientStrategy == RepoHttpAccessible.ClientStrategy.AUTO) {
+        if(returnsReplicationEntities)
+            RepoHttpAccessible.ClientStrategy.PULL_REPLICATE_ENTITIES
+        else
+            RepoHttpAccessible.ClientStrategy.HTTP_WITH_FALLBACK
+    }else {
+        repoHttpAccessibleAnnotation.clientStrategy
+    }
+
     //Should add originating ks class for all entities used here.
 
     addFunction(
@@ -573,72 +587,129 @@ fun FileSpec.Builder.addHttpServerExtensionFun(
             .addModifiers(KModifier.SUSPEND)
             .addOriginatingKSClass(daoKSClassDeclaration)
             .receiver(daoKSClassDeclaration.toClassName())
+            .returns(DoorJsonResponse::class)
             .addParameter("json", Json::class)
             .addParameter("request", DoorJsonRequest::class)
             .addCode(CodeBlock.builder()
                 .apply {
                     daoFunDecl.parameters.forEach { param ->
-                        add("val _${param.name?.asString()} = request.require${param.type.resolve().declaration.simpleName.asString()}Param(%S)\n",
+                        add("val _arg_${param.name?.asString()} = request.require${param.type.resolve().declaration.simpleName.asString()}Param(%S)\n",
                             param.name?.asString())
                     }
-                }
-                .applyIf(returnsReplicationEntities) {
-                    beginControlFlow("val replicationEntities = %M<%T>",
-                        MemberName("kotlin.collections", "buildList"),
-                        DoorReplicationEntity::class
-                        )
 
-                    //Next: we can add list of functions e.g. replicateData = ["selectAllSalesPeople", "selectAllSalesByType"]
-                    // that are going to generate data to replicate
-                    listOf(daoFunDecl).forEach { funDeclaration ->
-                        val resultType = funDeclaration.returnType?.resolve()?.unwrapResultType(resolver)
-                        val resultComponentType = resultType?.unwrapComponentTypeIfListOrArray(resolver)
-                        val resultValName = "_result_${funDeclaration.simpleName.asString()}"
-
-                        add("val $resultValName = ${funDeclaration.simpleName.asString()}(\n")
-                        indent()
-                        funDeclaration.parameters.forEach { param ->
-                            val paramNameStr = param.name?.asString()
-                            add("$paramNameStr = _$paramNameStr,\n")
-                        }
-                        unindent()
-                        add(")\n")
-
-                        val replicationEntitiesOnResult = (resultComponentType?.declaration as? KSClassDeclaration)
-                            ?.getDoorReplicateEntityComponents()
-
-                        if(resultType?.isListOrArrayType(resolver) == true) {
-                            replicationEntitiesOnResult?.forEach { replicateEntityAndPath ->
-                                add("addAll(\n")
-                                indent()
-                                val propertyIsNullable = replicateEntityAndPath.propertyPathIsNullable
-                                val mapFunName = if(propertyIsNullable) "mapNotNull" else "map"
-                                beginControlFlow("$resultValName.$mapFunName")
-                                add("_row ->\n")
-                                addCreateDoorReplicationCodeBlock(
-                                    entityKSClass = replicateEntityAndPath.entity,
-                                    entityNullable = replicateEntityAndPath.propertyPathIsNullable,
-                                    entityValName = replicateEntityAndPath.propertyPathFrom("_row"),
-                                    jsonVarName = "json",
-                                )
-                                add("\n") // new line won't be automatically added by addCreateDoorReplicationCodeBlock
-                                endControlFlow()
-                                unindent()
-                                add(")\n")
-                            }
-                        }
+                    if(effectiveStrategy == RepoHttpAccessible.ClientStrategy.PULL_REPLICATE_ENTITIES) {
+                        addHttpReplicationEntityServerExtension(resolver, daoKSClassDeclaration, daoFunDecl)
+                    }else {
+                        //Run the query and return JSON
                     }
-
-
-
-
-
-
-                    endControlFlow()
                 }
                 .build())
             .build()
     )
+    return this
+}
+
+
+fun CodeBlock.Builder.addHttpReplicationEntityServerExtension(
+    resolver: Resolver,
+    daoKSClassDeclaration: KSClassDeclaration,
+    daoFunDecl: KSFunctionDeclaration
+) : CodeBlock.Builder {
+    beginControlFlow("val replicationEntities = %M<%T>",
+        MemberName("kotlin.collections", "buildList"),
+        DoorReplicationEntity::class
+    )
+
+    //Next: we can add list of functions e.g. replicateData = ["selectAllSalesPeople", "selectAllSalesByType"]
+    // that are going to generate data to replicate
+    listOf(daoFunDecl).forEach { funDeclaration ->
+        val resultType = funDeclaration.returnType?.resolve()?.unwrapResultType(resolver)
+        val resultComponentType = resultType?.unwrapComponentTypeIfListOrArray(resolver)
+        val resultValName = "_result_${funDeclaration.simpleName.asString()}"
+
+        add("val $resultValName = ${funDeclaration.simpleName.asString()}(\n")
+        indent()
+        funDeclaration.parameters.forEach { param ->
+            val paramNameStr = param.name?.asString()
+            add("$paramNameStr = _arg_$paramNameStr,\n")
+        }
+        unindent()
+        add(")\n")
+
+        val replicationEntitiesOnResult = (resultComponentType?.declaration as? KSClassDeclaration)
+            ?.getDoorReplicateEntityComponents()
+
+        if(resultType?.isListOrArrayType(resolver) == true) {
+            replicationEntitiesOnResult?.forEach { replicateEntityAndPath ->
+                add("addAll(\n")
+                indent()
+                val propertyIsNullable = replicateEntityAndPath.propertyPathIsNullable
+                val mapFunName = if(propertyIsNullable) "mapNotNull" else "map"
+                beginControlFlow("$resultValName.$mapFunName")
+                add("_row ->\n")
+                addCreateDoorReplicationCodeBlock(
+                    entityKSClass = replicateEntityAndPath.entity,
+                    entityNullable = replicateEntityAndPath.propertyPathIsNullable,
+                    entityValName = replicateEntityAndPath.propertyPathFrom("_row"),
+                    jsonVarName = "json",
+                )
+                add("\n") // new line won't be automatically added by addCreateDoorReplicationCodeBlock
+                endControlFlow()
+                unindent()
+                add(")\n")
+            }
+        }else {
+            replicationEntitiesOnResult?.forEach { replicateEntityAndPath ->
+                val isNullable = resultType.isMarkedNullable || replicateEntityAndPath.propertyPathIsNullable
+                var effectiveValName = replicateEntityAndPath.propertyPathFrom(resultValName)
+                if(isNullable) {
+                    beginControlFlow(replicateEntityAndPath.propertyPathFrom(
+                        baseValName = resultValName,
+                        fromNullable = true
+                    ) + "?.also")
+                    add("_row -> \n")
+                    effectiveValName = "_row"
+                }
+
+                add("add(\n")
+                indent()
+                addCreateDoorReplicationCodeBlock(
+                    entityKSClass = replicateEntityAndPath.entity,
+                    entityNullable = false,
+                    entityValName = effectiveValName,
+                    jsonVarName = "json"
+                )
+                unindent()
+                add("\n)\n")
+
+                if(isNullable) {
+                    endControlFlow()
+                }
+            }
+        }
+    }
+
+
+    endControlFlow()
+
+    add("return %T(\n", DoorJsonResponse::class)
+    indent()
+    add("bodyText = json.encodeToString(\n")
+    indent()
+    add("%T.serializer(),\n", DoorMessage::class)
+    add("%T(\n", DoorMessage::class)
+    indent()
+    add("what = %T.WHAT_REPLICATION,\n", DoorMessage::class)
+    add("fromNode = request.db.%M,\n", MemberName("com.ustadmobile.door.ext", "doorWrapperNodeId"))
+    add("toNode = request.requireNodeId(),\n")
+    add("replications = replicationEntities,\n")
+    unindent()
+    add(")\n")//end DoorMessage constructor
+    unindent()
+    add(")\n")//end json.encodetoString
+    unindent()
+    add(")\n")//end DoorJsonResponse constructor
+
     return this
 }
 

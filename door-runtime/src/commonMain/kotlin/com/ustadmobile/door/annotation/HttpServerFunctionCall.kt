@@ -10,6 +10,6 @@ package com.ustadmobile.door.annotation
  *                       annotation or be listed as part of this function (the types must match), or the parameters
  *                       must be part of this annotation (e.g. literals, headers, etc)
  */
-annotation class HttpReplicateData(
+annotation class HttpServerFunctionCall(
     val functionName: String,
 )

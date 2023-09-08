@@ -3,7 +3,7 @@ package db3
 import androidx.room.Insert
 import androidx.room.Query
 import com.ustadmobile.door.annotation.DoorDao
-import com.ustadmobile.door.annotation.HttpReplicateData
+import com.ustadmobile.door.annotation.HttpServerFunctionCall
 import com.ustadmobile.door.annotation.RepoHttpAccessible
 import com.ustadmobile.door.annotation.Repository
 import kotlinx.coroutines.flow.Flow
@@ -43,8 +43,8 @@ abstract class ExampleEntity3Dao {
 
 
     @RepoHttpAccessible(
-        replicateData = arrayOf(
-            HttpReplicateData(functionName = "findAllWithCardNumAbove")
+        pullQueriesToReplicate = arrayOf(
+            HttpServerFunctionCall(functionName = "findAllWithCardNumAbove")
         )
     )
     @Query("""

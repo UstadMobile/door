@@ -305,11 +305,20 @@ data class EmbeddedEntityAndPath(
      * (e.g. root entity itself has the target annotation etc), then it returns the baseValName. If propertyPath is
      * not empty, then return baseValName.propertyPathAsString
      */
-    fun propertyPathFrom(baseValName: String): String {
-        return if(propertyPath.isEmpty())
+    fun propertyPathFrom(
+        baseValName: String,
+        fromNullable : Boolean = false,
+    ): String {
+        return if(propertyPath.isEmpty()) {
             baseValName
-        else
-            "$baseValName.$propertyPathAsString"
+        }else {
+            buildString {
+                append(baseValName)
+                if(fromNullable)
+                    append("?")
+                append(".$propertyPathAsString")
+            }
+        }
     }
 
 }
