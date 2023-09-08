@@ -13,6 +13,7 @@ import com.squareup.kotlinpoet.ksp.toTypeParameterResolver
 import com.ustadmobile.door.annotation.QueryLiveTables
 import com.ustadmobile.door.annotation.RepoHttpAccessible
 import com.ustadmobile.lib.annotationprocessor.core.applyIf
+import com.ustadmobile.lib.annotationprocessor.core.isHttpQueryQueryParam
 import net.sf.jsqlparser.parser.CCJSqlParserUtil
 import net.sf.jsqlparser.statement.select.Select
 import net.sf.jsqlparser.util.TablesNamesFinder
@@ -119,3 +120,22 @@ fun KSFunctionDeclaration.getDaoFunHttpAccessibleDoorReplicationEntities(
         ?.declaration as? KSClassDeclaration
     return resultClassDeclaration?.getDoorReplicateEntityComponents() ?: emptyList()
 }
+
+/**
+ * Where the receiver KSFunctionDeclaration represents a function on a DAO, this returns the Http method that should be
+ * used. GET will be used where all parameters are either primitives or lists/arrays thereof (and would be sent in the
+ * query parameters of the request).
+ */
+fun KSFunctionDeclaration.daoFunHttpMethod(
+    daoClassDecl: KSClassDeclaration,
+): String {
+    val funAsMember = asMemberOf(daoClassDecl.asType(emptyList()))
+    return if(funAsMember.parameterTypes.any {
+        it?.toTypeName()?.isHttpQueryQueryParam() == false
+    }) {
+        "POST"
+    }else {
+        "GET"
+    }
+}
+

@@ -15,7 +15,7 @@ interface DoorJsonRequest {
 
     fun requireStringParam(paramName: String): String
 
-    fun requireBodyAsString(): String
+    suspend fun requireBodyAsString(): String
 
     fun requireHeader(header: String): String
 

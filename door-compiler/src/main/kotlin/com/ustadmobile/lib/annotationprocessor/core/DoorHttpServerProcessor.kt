@@ -24,8 +24,10 @@ import com.ustadmobile.door.annotation.MinReplicationVersion
 import com.ustadmobile.door.annotation.RepoHttpAccessible
 import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.ext.DoorTag
+import com.ustadmobile.door.http.DoorHttpServerConfig
 import com.ustadmobile.door.http.DoorJsonRequest
 import com.ustadmobile.door.http.DoorJsonResponse
+import com.ustadmobile.door.ktor.KtorCallDaoAdapter
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.replication.DoorReplicationEntity
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.CALL_MEMBER
@@ -87,8 +89,16 @@ fun CodeBlock.Builder.addRequestDi(diVarName: String = "_di", dbVarName: String 
 /**
  * Adds a KTOR Route function for the given DAO to the FileSpec
  *
- * e.g. route("DaoName") {
- * ...
+ * fun Route.DaoName_KtorRoute(
+ *   serverConfig: DoorHttpServerConfig,
+ *   callAdapter: KtorCallDaoAdapter,
+ * ) {
+ *    get("functionName") {
+ *        val daoAndDb = callAdapter(call)
+ *        call.respondDoorJson(
+ *            daoAndDb.dao.functionName_DoorHttp(serverConfig, call.request.toDoorJsonRequest()
+ *        )
+ *    }
  * }
  */
 fun FileSpec.Builder.addDaoKtorRouteFun(
@@ -99,28 +109,41 @@ fun FileSpec.Builder.addDaoKtorRouteFun(
 ) : FileSpec.Builder {
 
     addFunction(FunSpec.builder("${daoClassDecl.simpleName.asString()}$SUFFIX_KTOR_ROUTE")
-        .addOriginatingKSClass(daoClassDecl)
-        .addTypeVariable(TypeVariableName.invoke("T", RoomDatabase::class))
-        .receiver(Route::class)
-        .addParameter("_typeToken",
-            org.kodein.type.TypeToken::class.asClassName().parameterizedBy(TypeVariableName("T")))
-        .addParameter("_daoFn",
-            LambdaTypeName.get(parameters = arrayOf(TypeVariableName("T")),
-                returnType = daoClassName))
-        .addCode(CodeBlock.builder()
-            .beginControlFlow("%M(%S)",
-                MemberName("io.ktor.server.routing", "route"),
-                daoClassName.simpleName)
-            .apply {
-                daoClassDecl.getAllFunctions().filter {
-                    it.hasAnnotation(RepoHttpAccessible::class)
-                }.forEach {
-                    addKtorDaoMethodCode(it.toFunSpecBuilder(resolver, daoClassDecl.asType(emptyList()), logger).build())
-                }
-            }
-            .endControlFlow()
+        .addAnnotation(AnnotationSpec.builder(Suppress::class)
+            .addMember("%S, %S, %S, %S", "LocalVariableName", "RedundantSuppression", "FunctionName", "RedundantVisibilityModifier")
             .build())
+        .addOriginatingKSClass(daoClassDecl)
+        .receiver(Route::class)
+        .addParameter("serverConfig", DoorHttpServerConfig::class)
+        .addParameter("callAdapter", KtorCallDaoAdapter::class.asClassName().parameterizedBy(daoClassName))
+        .addCode(CodeBlock.builder()
+        .apply {
+            daoClassDecl.getAllFunctions().filter {
+                it.hasAnnotation(RepoHttpAccessible::class)
+            }.forEach {funDecl ->
+                val httpMethodMember = if(funDecl.daoFunHttpMethod(daoClassDecl) == "GET") {
+                    GET_MEMBER
+                }else {
+                    POST_MEMBER
+                }
+
+                beginControlFlow("%M(%S)", httpMethodMember, funDecl.simpleName.asString())
+                add("val _daoAndDb = callAdapter(call)\n")
+                add("%M.%M(\n", CALL_MEMBER, MemberName("com.ustadmobile.door.ktor", "respondDoorJson"))
+                indent()
+                add(
+                    "_daoAndDb.dao.%M(serverConfig, %M.%M(_daoAndDb.db))\n",
+                    MemberName(daoClassDecl.packageName.asString(), "${funDecl.simpleName.asString()}_DoorHttp"),
+                    CALL_MEMBER,
+                    MemberName("com.ustadmobile.door.ktor", "toDoorRequest")
+                )
+                unindent()
+                add(")\n")
+                endControlFlow()
+            }
+        }
         .build())
+    .build())
 
 
     return this
@@ -585,12 +608,16 @@ fun FileSpec.Builder.addHttpServerExtensionFun(
     addFunction(
         FunSpec.builder(daoFunDecl.simpleName.asString() + "_DoorHttp")
             .addModifiers(KModifier.SUSPEND)
+            .addAnnotation(AnnotationSpec.builder(Suppress::class)
+                .addMember("%S, %S, %S, %S", "LocalVariableName", "RedundantSuppression", "FunctionName", "RedundantVisibilityModifier")
+                .build())
             .addOriginatingKSClass(daoKSClassDeclaration)
             .receiver(daoKSClassDeclaration.toClassName())
             .returns(DoorJsonResponse::class)
-            .addParameter("json", Json::class)
+            .addParameter("serverConfig", DoorHttpServerConfig::class)
             .addParameter("request", DoorJsonRequest::class)
             .addCode(CodeBlock.builder()
+                .add("val json = serverConfig.json\n")
                 .apply {
                     daoFunDecl.parameters.forEach { param ->
                         add("val _arg_${param.name?.asString()} = request.require${param.type.resolve().declaration.simpleName.asString()}Param(%S)\n",
@@ -750,6 +777,7 @@ class DoorHttpServerProcessor(
 
         when(target) {
             DoorTarget.JVM -> {
+                /*
                 dbSymbols.forEach { dbClassDecl ->
                     if (dbClassDecl.dbEnclosedDaos().any { it.hasAnnotation(Repository::class) }) {
                         FileSpec.builder(
@@ -760,6 +788,7 @@ class DoorHttpServerProcessor(
                             .writeTo(environment.codeGenerator, false)
                     }
                 }
+                 */
 
                 daoSymbols.forEach { daoClassDecl ->
                     FileSpec.builder(daoClassDecl.packageName.asString(), "${daoClassDecl.simpleName.asString()}$SUFFIX_KTOR_ROUTE")
