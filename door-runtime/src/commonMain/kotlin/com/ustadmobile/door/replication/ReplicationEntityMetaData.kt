@@ -7,7 +7,6 @@ import com.ustadmobile.door.replication.ReplicationConstants.RECEIVE_VIEW_FROM_N
 
 class ReplicationEntityMetaData(
     val tableId: Int,
-    val priority: Int,
     val entityTableName: String,
     val receiveViewName: String,
     val entityPrimaryKeyFieldName: String,

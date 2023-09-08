@@ -143,7 +143,7 @@ dependencies {
 }
 ```
 
-On your Android application module (e.g. the one building the APK), you must exclude room-annotations to avoid a
+On your Android application module (e.g. the one building the APK), you **must** exclude Door's room-annotations to avoid a
 duplicate class error. This is required due to a Kotlin/JS bug as per this [README](room-annotations/).
 
 ```

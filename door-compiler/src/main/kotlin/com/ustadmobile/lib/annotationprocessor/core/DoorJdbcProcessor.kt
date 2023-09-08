@@ -284,11 +284,10 @@ private fun CodeBlock.Builder.addReplicateEntityMetaDataCode(
     val triggersAnnotation = entity.getAnnotation(Triggers::class)
     add("%T(", ReplicationEntityMetaData::class)
     add("tableId = %L, \n", repEntityAnnotation?.tableId)
-    add("priority = %L, \n", repEntityAnnotation?.priority)
     add("entityTableName = %S, \n", entity.entityTableName)
     add("receiveViewName = %S, \n", entity.replicationEntityReceiveViewName)
     add("entityPrimaryKeyFieldName = %S, \n", entity.entityPrimaryKeyProps.first().simpleName.asString())
-    add("entityVersionIdFieldName = %S, \n", entity.firstPropWithAnnotation(ReplicationVersionId::class).simpleName.asString())
+    add("entityVersionIdFieldName = %S, \n", entity.firstPropWithAnnotation(ReplicateEtag::class).simpleName.asString())
     addFieldsCodeBlock(entity).add(",\n")
     add("batchSize = ").add("%L", repEntityAnnotation?.batchSize ?: 1000).add(",\n")
     add("remoteInsertStrategy = %T.%L,\n", ReplicateEntity.RemoteInsertStrategy::class.java,

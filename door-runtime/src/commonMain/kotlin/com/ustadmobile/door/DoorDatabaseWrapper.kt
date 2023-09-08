@@ -4,10 +4,12 @@ import com.ustadmobile.door.nodeevent.NodeEventManagerCommon
 import com.ustadmobile.door.room.RoomDatabase
 
 /**
- * The DoorDatabaseWrapper takes care of door-specific behaviors e.g.
- *   Setting @LastChangedTime
- *   Using doorPrimaryKeyManager to set the primarykey on replicate entities
- *   Running the NodeEventManager
+ * The DoorDatabaseWrapper takes care of door-specific behaviors when data is modified:
+ *
+ *   Setting @LastChangedTime fields on Insert and Update functions
+ *   Using doorPrimaryKeyManager to set the primarykey on replicate entities on Insert functions
+ *
+ * DoorDatabaseWrapper also hosts the NodeEventManager
  */
 interface DoorDatabaseWrapper<T: RoomDatabase> {
 

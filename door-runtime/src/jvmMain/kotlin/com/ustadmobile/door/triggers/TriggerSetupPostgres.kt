@@ -11,7 +11,7 @@ fun DoorSqlDatabase.setupTriggersPostgres(
     dbMetadata: DoorDatabaseMetadata<*>
 ) {
     dbMetadata.replicateEntities.values.forEach { entity ->
-        if(entity.remoteInsertStrategy == ReplicateEntity.RemoteInsertStrategy.INSERT_INTO_VIEW) {
+        if(entity.remoteInsertStrategy == ReplicateEntity.RemoteInsertStrategy.INSERT_INTO_RECEIVE_VIEW) {
             createReceiveView(entity)
         }
 

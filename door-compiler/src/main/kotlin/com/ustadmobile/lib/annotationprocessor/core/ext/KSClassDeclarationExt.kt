@@ -277,12 +277,28 @@ fun KSClassDeclaration.getAllColumnProperties(
     return getAllProperties().filter { !it.isIgnored && it.type.resolve() in resolver.querySingularTypes() }.toList()
 }
 
+/**
+ *
+ */
 data class EmbeddedEntityAndPath(
     val entity: KSClassDeclaration,
     val propertyPath: List<KSPropertyDeclaration>
 ) {
     val propertyPathAsString: String
-        get() = propertyPath.joinToString(separator = ".") { it.simpleName.asString() }
+        get() = buildString {
+            for(i in propertyPath.indices) {
+                append(propertyPath[i].simpleName.asString())
+
+                if(i < (propertyPath.size -1)) {
+                    if(propertyPath[i].type.resolve().isMarkedNullable)
+                        append("?")
+                    append(".")
+                }
+            }
+        }
+
+    val propertyPathIsNullable: Boolean
+        get() = propertyPath.any { it.type.resolve().isMarkedNullable }
 
     /**
      * Property path from base is useful if there is an existing variable (e.g. it) . Where the propertyPath is empty

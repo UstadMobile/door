@@ -123,7 +123,7 @@ class DoorValidatorProcessor(
         allReplicateEntities.forEach { entity ->
             try {
 
-                val entityVersionIdField = entity.getAllProperties().filter { it.hasAnnotation(ReplicationVersionId::class) }.toList()
+                val entityVersionIdField = entity.getAllProperties().filter { it.hasAnnotation(ReplicateEtag::class) }.toList()
                 if(entityVersionIdField.size != 1) {
                     logger.error(
                         "@ReplicateEntity ${entity.qualifiedName?.asString()} must have exactly one field annotated @ReplicationVersionId",

@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 import repdb.RepEntityWithAttachment.Companion.TABLE_ID
 
 @Entity
-@ReplicateEntity(tableId = TABLE_ID, batchSize = 5, remoteInsertStrategy = ReplicateEntity.RemoteInsertStrategy.INSERT_INTO_VIEW)
+@ReplicateEntity(tableId = TABLE_ID, batchSize = 5, remoteInsertStrategy = ReplicateEntity.RemoteInsertStrategy.INSERT_INTO_RECEIVE_VIEW)
 @Triggers(arrayOf(
     Trigger(name = "repentwithattachment_remote_insert",
         order = Trigger.Order.INSTEAD_OF,
@@ -26,13 +26,14 @@ import repdb.RepEntityWithAttachment.Companion.TABLE_ID
                        */
             """])))
 @Serializable
+@Suppress("unused")
 class RepEntityWithAttachment {
 
     @PrimaryKey(autoGenerate = true)
     var waUid: Long = 0
 
-    @ReplicationVersionId
-    @LastChangedTime
+    @ReplicateEtag
+    @ReplicateLastModified
     var waVersionId: Long = 0
 
     @AttachmentUri

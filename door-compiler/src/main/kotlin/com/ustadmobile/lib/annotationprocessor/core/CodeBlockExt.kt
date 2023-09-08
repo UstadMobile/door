@@ -304,6 +304,7 @@ fun CodeBlock.Builder.addPreparedStatementSetCall(
 fun CodeBlock.Builder.addCreateDoorReplicationCodeBlock(
     entityKSClass: KSClassDeclaration,
     entityValName: String,
+    entityNullable: Boolean = false,
     outgoingReplicationUidValue: String = "0",
     jsonVarName: String,
 ): CodeBlock.Builder {
@@ -311,15 +312,26 @@ fun CodeBlock.Builder.addCreateDoorReplicationCodeBlock(
         ?: throw IllegalArgumentException("addToDoorReplicationEntityExtensionFn : " +
                 "${entityKSClass.qualifiedName?.asString()} does not have ReplicateEntity annotation")
 
+    var effectiveEntityValName = entityValName
+    if(entityNullable) {
+        beginControlFlow("$entityValName?.let")
+        effectiveEntityValName = "it"
+    }
+
     add("%T(", DoorReplicationEntity::class)
     indent()
     add("tableId = %L,\n", repEntityAnnotation.tableId)
     add("orUid = %L,\n", outgoingReplicationUidValue)
-    add("entity = $jsonVarName.encodeToJsonElement(%T.serializer(), $entityValName).%M,\n",
+    add("entity = $jsonVarName.encodeToJsonElement(%T.serializer(), $effectiveEntityValName).%M,\n",
         entityKSClass.toClassName(),
         MemberName("kotlinx.serialization.json", "jsonObject"))
     unindent()
     add(")")
+
+    if(entityNullable) {
+        add("\n")
+        endControlFlow()
+    }
 
     return this
 }

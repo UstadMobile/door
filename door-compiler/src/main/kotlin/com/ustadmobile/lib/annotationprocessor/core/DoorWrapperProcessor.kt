@@ -14,7 +14,7 @@ import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.writeTo
 import com.ustadmobile.door.DoorDatabaseWrapper
-import com.ustadmobile.door.annotation.LastChangedTime
+import com.ustadmobile.door.annotation.ReplicateLastModified
 import com.ustadmobile.door.annotation.ReplicateEntity
 import com.ustadmobile.door.message.DoorMessageCallback
 import com.ustadmobile.door.nodeevent.NodeEventManagerCommon
@@ -109,7 +109,7 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(
                             && entityComponentClassDecl.isReplicateEntityWithAutoIncPrimaryKey
 
                     val setLastChangedProp = entityComponentClassDecl.getAllProperties().firstOrNull {
-                        it.hasAnnotation(LastChangedTime::class)
+                        it.hasAnnotation(ReplicateLastModified::class)
                     }
 
                     if(setPk || setLastChangedProp != null) {

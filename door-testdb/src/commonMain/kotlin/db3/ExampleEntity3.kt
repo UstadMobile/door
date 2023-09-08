@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 @Entity
 @ReplicateEntity(
     tableId = 542,
-    remoteInsertStrategy = ReplicateEntity.RemoteInsertStrategy.INSERT_INTO_VIEW
+    remoteInsertStrategy = ReplicateEntity.RemoteInsertStrategy.INSERT_INTO_RECEIVE_VIEW
 )
 
 @Triggers(
@@ -41,8 +41,8 @@ data class ExampleEntity3(
 
     var name: String? = null,
 
-    @LastChangedTime
-    @ReplicationVersionId
+    @ReplicateLastModified
+    @ReplicateEtag
     var lastUpdatedTime: Long = 0
 
 ) {

@@ -177,7 +177,7 @@ suspend fun RoomDatabase.insertEntitiesFromMessage(
     message.replications.runningSplitBy { it.tableId }.forEach { tableEntities ->
         val tableId = tableEntities.first().tableId
         val entityMetaData = this::class.doorDatabaseMetadata().requireReplicateEntityMetaData(tableId)
-        if(entityMetaData.remoteInsertStrategy == ReplicateEntity.RemoteInsertStrategy.INSERT_INTO_VIEW) {
+        if(entityMetaData.remoteInsertStrategy == ReplicateEntity.RemoteInsertStrategy.INSERT_INTO_RECEIVE_VIEW) {
             prepareAndUseStatementAsync(entityMetaData.insertIntoReceiveViewSql) { stmt ->
                 tableEntities.forEach { entity ->
                     stmt.setAllFromJsonObject(entity.entity, entityMetaData.entityFields)

@@ -15,14 +15,6 @@ annotation class ReplicateEntity(
     val tableId: Int,
 
     /**
-     * Lower priority replications will not proceed if there are any higher priority replications pending. This allows
-     * one entity to depend on another (e.g. for permission management purposes etc).
-     *
-     * Lower values are higher priority.
-     */
-    val priority: Int = DEFAULT_PRIORITY,
-
-    /**
      * The number of entities to transfer at a time. By default, 1000.
      */
     val batchSize: Int = 1000,
@@ -39,15 +31,24 @@ annotation class ReplicateEntity(
          * The EventManager will emit an event and nothing more.
          */
         CALLBACK,
-        INSERT_DIRECT,
-        INSERT_INTO_VIEW
+
+        /**
+         * Any received entity will be directly inserted. This should be used with caution
+         */
+        INSERT,
+
+        /**
+         * The received entity will be inserted into a View. Triggers can then be used to determine if/how to accept
+         * the received data (e.g. permission checks, conflict checks, etc). The ReceiveView is simply:
+         *
+         * CREATE VIEW Entity_ReceiveView AS
+         *      SELECT Entity.*, 0 AS fromNodeId
+         *        FROM Entity
+         *
+         * When the insert into the ReceiveView is run, the fromNodeId will be set as the nodeId of the node from which
+         * the entities are being received (e.g. so this can be used as part of permission checks etc).
+         */
+        INSERT_INTO_RECEIVE_VIEW
     }
 
-    companion object {
-        const val HIGHEST_PRIORITY = 0
-
-        const val DEFAULT_PRIORITY = 100
-
-        const val LOWEST_PRIORITY = 50000
-    }
 }

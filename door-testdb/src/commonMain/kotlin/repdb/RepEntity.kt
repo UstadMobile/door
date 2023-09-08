@@ -11,7 +11,7 @@ import repdb.RepEntity.Companion.TABLE_ID
 @Entity
 @ReplicateEntity(
     tableId = TABLE_ID,
-    remoteInsertStrategy = ReplicateEntity.RemoteInsertStrategy.INSERT_INTO_VIEW
+    remoteInsertStrategy = ReplicateEntity.RemoteInsertStrategy.INSERT_INTO_RECEIVE_VIEW
 )
 @Triggers(arrayOf(
     Trigger(name = "repent_remote_insert",
@@ -39,8 +39,8 @@ class RepEntity {
     var reLastChangedBy: Long = 0
 
     @ColumnInfo(defaultValue = "0")
-    @ReplicationVersionId
-    @LastChangedTime
+    @ReplicateEtag
+    @ReplicateLastModified
     var reLastChangeTime: Long = 0
 
     var reNumField: Int = 0

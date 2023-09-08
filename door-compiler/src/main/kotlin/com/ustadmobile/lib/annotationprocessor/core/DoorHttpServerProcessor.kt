@@ -611,10 +611,14 @@ fun FileSpec.Builder.addHttpServerExtensionFun(
                             replicationEntitiesOnResult?.forEach { replicateEntityAndPath ->
                                 add("addAll(\n")
                                 indent()
-                                beginControlFlow("$resultValName.map")
+                                val propertyIsNullable = replicateEntityAndPath.propertyPathIsNullable
+                                val mapFunName = if(propertyIsNullable) "mapNotNull" else "map"
+                                beginControlFlow("$resultValName.$mapFunName")
+                                add("_row ->\n")
                                 addCreateDoorReplicationCodeBlock(
                                     entityKSClass = replicateEntityAndPath.entity,
-                                    entityValName = replicateEntityAndPath.propertyPathFrom("it"),
+                                    entityNullable = replicateEntityAndPath.propertyPathIsNullable,
+                                    entityValName = replicateEntityAndPath.propertyPathFrom("_row"),
                                     jsonVarName = "json",
                                 )
                                 add("\n") // new line won't be automatically added by addCreateDoorReplicationCodeBlock

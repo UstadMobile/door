@@ -6,7 +6,12 @@ import com.ustadmobile.door.room.RoomDatabase
 
 @DoorDatabase(
     version = 1,
-    entities = arrayOf(ExampleEntity3::class, OutgoingReplication::class)
+    entities = arrayOf(
+        ExampleEntity3::class,
+        DiscussionPost::class,
+        Member::class,
+        OutgoingReplication::class
+    )
 )
 abstract class ExampleDb3: RoomDatabase() {
 
