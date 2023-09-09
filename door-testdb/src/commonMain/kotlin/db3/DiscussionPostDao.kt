@@ -1,5 +1,6 @@
 package db3
 
+import androidx.room.Insert
 import androidx.room.Query
 import com.ustadmobile.door.annotation.DoorDao
 import com.ustadmobile.door.annotation.RepoHttpAccessible
@@ -8,6 +9,9 @@ import com.ustadmobile.door.annotation.Repository
 @DoorDao
 @Repository
 expect abstract class DiscussionPostDao {
+
+    @Insert
+    abstract suspend fun insertAsync(post: DiscussionPost): Long
 
     @RepoHttpAccessible()
     @Query("""

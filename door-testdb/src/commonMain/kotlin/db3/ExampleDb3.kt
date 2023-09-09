@@ -17,4 +17,9 @@ abstract class ExampleDb3: RoomDatabase() {
 
     abstract val exampleEntity3Dao: ExampleEntity3Dao
 
+    abstract val discussionPostDao: DiscussionPostDao
+
+    abstract val memberDao: MemberDao
+
+
 }

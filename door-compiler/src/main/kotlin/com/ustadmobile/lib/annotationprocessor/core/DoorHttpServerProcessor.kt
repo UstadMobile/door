@@ -115,7 +115,7 @@ fun FileSpec.Builder.addDaoKtorRouteFun(
         .addOriginatingKSClass(daoClassDecl)
         .receiver(Route::class)
         .addParameter("serverConfig", DoorHttpServerConfig::class)
-        .addParameter("callAdapter", KtorCallDaoAdapter::class.asClassName().parameterizedBy(daoClassName))
+        .addParameter("daoCallAdapter", KtorCallDaoAdapter::class.asClassName().parameterizedBy(daoClassName))
         .addCode(CodeBlock.builder()
         .apply {
             daoClassDecl.getAllFunctions().filter {
@@ -128,7 +128,7 @@ fun FileSpec.Builder.addDaoKtorRouteFun(
                 }
 
                 beginControlFlow("%M(%S)", httpMethodMember, funDecl.simpleName.asString())
-                add("val _daoAndDb = callAdapter(call)\n")
+                add("val _daoAndDb = daoCallAdapter(call)\n")
                 add("%M.%M(\n", CALL_MEMBER, MemberName("com.ustadmobile.door.ktor", "respondDoorJson"))
                 indent()
                 add(
@@ -625,7 +625,7 @@ fun FileSpec.Builder.addHttpServerExtensionFun(
                     }
 
                     if(effectiveStrategy == RepoHttpAccessible.ClientStrategy.PULL_REPLICATE_ENTITIES) {
-                        addHttpReplicationEntityServerExtension(resolver, daoKSClassDeclaration, daoFunDecl)
+                        addHttpReplicationEntityServerExtension(resolver, daoFunDecl)
                     }else {
                         //Run the query and return JSON
                     }
@@ -639,7 +639,6 @@ fun FileSpec.Builder.addHttpServerExtensionFun(
 
 fun CodeBlock.Builder.addHttpReplicationEntityServerExtension(
     resolver: Resolver,
-    daoKSClassDeclaration: KSClassDeclaration,
     daoFunDecl: KSFunctionDeclaration
 ) : CodeBlock.Builder {
     beginControlFlow("val replicationEntities = %M<%T>",

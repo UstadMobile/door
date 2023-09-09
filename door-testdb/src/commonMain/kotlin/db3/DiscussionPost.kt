@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
 
 @Entity
 @ReplicateEntity(
-    tableId = 543,
+    tableId = DiscussionPost.TABLE_ID,
     remoteInsertStrategy = ReplicateEntity.RemoteInsertStrategy.INSERT_INTO_RECEIVE_VIEW
 )
 
@@ -33,21 +33,27 @@ import kotlinx.serialization.Serializable
 )
 @Serializable
 @Suppress("unused")
-class DiscussionPost {
-
+data class DiscussionPost(
     @PrimaryKey(autoGenerate = true)
-    var postUid: Long = 0
+    var postUid: Long = 0,
 
-    var postReplyToPostUid: Long = 0
+    var postReplyToPostUid: Long = 0,
 
-    var postTitle: String? = null
+    var postTitle: String? = null,
 
-    var postText: String? = null
+    var postText: String? = null,
 
     @ReplicateLastModified
     @ReplicateEtag
-    var postLastModified: Long = 0
+    var postLastModified: Long = 0,
 
-    var posterMemberUid: Long = 0
+    var posterMemberUid: Long = 0,
+) {
+
+    companion object {
+
+        const val TABLE_ID = 543
+
+    }
 
 }
