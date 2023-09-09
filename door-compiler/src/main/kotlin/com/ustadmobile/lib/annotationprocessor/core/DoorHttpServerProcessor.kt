@@ -24,10 +24,12 @@ import com.ustadmobile.door.annotation.MinReplicationVersion
 import com.ustadmobile.door.annotation.RepoHttpAccessible
 import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.ext.DoorTag
+import com.ustadmobile.door.http.DbAndDao
 import com.ustadmobile.door.http.DoorHttpServerConfig
 import com.ustadmobile.door.http.DoorJsonRequest
 import com.ustadmobile.door.http.DoorJsonResponse
 import com.ustadmobile.door.ktor.KtorCallDaoAdapter
+import com.ustadmobile.door.ktor.KtorCallDbAdapter
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.replication.DoorReplicationEntity
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.CALL_MEMBER
@@ -498,27 +500,14 @@ fun FileSpec.Builder.addDbKtorRouteFunction(
     dbClassDeclaration: KSClassDeclaration,
 ) : FileSpec.Builder {
 
-    fun CodeBlock.Builder.addDbDaoRouteCall(
-        daoClassDecl: KSClassDeclaration
-    ) : CodeBlock.Builder {
-        add("%M(\n_typeToken, \n", MemberName(daoClassDecl.packageName.asString(),
-            "${daoClassDecl.simpleName.asString()}$SUFFIX_KTOR_ROUTE"))
-        beginControlFlow("")
-            .add("it.%L\n",
-                dbClassDeclaration.findDbGetterForDao(daoClassDecl)?.toPropertyOrEmptyFunctionCaller())
-            .endControlFlow()
-
-        add(")\n\n")
-        return this
-    }
-
     val dbClassName = dbClassDeclaration.toClassName()
     addFunction(FunSpec.builder("${dbClassName.simpleName}$SUFFIX_KTOR_ROUTE")
         .addOriginatingKSClass(dbClassDeclaration)
         .receiver(Route::class)
-        .addParameter(ParameterSpec.builder("json", Json::class)
-            .defaultValue(CodeBlock.of("%T { encodeDefaults = true } ", Json::class))
-            .build())
+        .addParameter("serverConfig", DoorHttpServerConfig::class)
+        .addParameter("dbCallAdapter", KtorCallDbAdapter::class.asClassName().parameterizedBy(
+            dbClassName
+        ))
         .addCode(CodeBlock.builder()
             .apply {
                 dbClassDeclaration.getAnnotation(MinReplicationVersion::class)?.also {
@@ -531,13 +520,33 @@ fun FileSpec.Builder.addDbKtorRouteFunction(
                     add("%M()\n", MemberName("com.ustadmobile.door.ktor", "addNodeIdAndAuthCheckInterceptor"))
                 }
 
-                add("val _typeToken: %T<%T> = %M()\n", org.kodein.type.TypeToken::class.java,
-                    dbClassDeclaration.toClassName(), DI_ERASED_MEMBER)
-            }.apply {
-                dbClassDeclaration.dbEnclosedDaos().filter {
-                    it.hasAnnotation(Repository::class)
-                }.forEach {
-                    addDbDaoRouteCall(it)
+                add("%M(serverConfig, dbCallAdapter)\n",
+                    MemberName("com.ustadmobile.door.ktor.routes", "ReplicationRoute")
+                )
+
+                dbClassDeclaration.dbEnclosedDaos().filter {daoKsClass ->
+                    daoKsClass.getAllFunctions().any { it.hasAnnotation(RepoHttpAccessible::class) }
+                }.forEach { daoKsClass ->
+                    beginControlFlow("%M(%S)",
+                        MemberName("io.ktor.server.routing", "route"),
+                        daoKsClass.simpleName.asString()
+                    )
+
+                    add("%M(\n", MemberName(daoKsClass.packageName.asString(),
+                        "${daoKsClass.simpleName.asString()}$SUFFIX_KTOR_ROUTE"))
+                    indent()
+                    add("serverConfig = serverConfig,\n")
+                    beginControlFlow("daoCallAdapter = ")
+                    add("call -> ")
+                    add("dbCallAdapter(call).let { %T(it, it.%L) }\n",
+                        DbAndDao::class.asClassName().parameterizedBy(daoKsClass.toClassName()),
+                        dbClassDeclaration.findDbGetterForDao(daoKsClass)?.toPropertyOrEmptyFunctionCaller()
+                    )
+                    endControlFlow()
+                    unindent()
+                    add(")\n")
+
+                    endControlFlow()
                 }
             }
             .build())
@@ -776,7 +785,6 @@ class DoorHttpServerProcessor(
 
         when(target) {
             DoorTarget.JVM -> {
-                /*
                 dbSymbols.forEach { dbClassDecl ->
                     if (dbClassDecl.dbEnclosedDaos().any { it.hasAnnotation(Repository::class) }) {
                         FileSpec.builder(
@@ -787,7 +795,6 @@ class DoorHttpServerProcessor(
                             .writeTo(environment.codeGenerator, false)
                     }
                 }
-                 */
 
                 daoSymbols.forEach { daoClassDecl ->
                     FileSpec.builder(daoClassDecl.packageName.asString(), "${daoClassDecl.simpleName.asString()}$SUFFIX_KTOR_ROUTE")

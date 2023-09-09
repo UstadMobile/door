@@ -126,9 +126,6 @@ class DoorRepositoryReplicationClient(
         }
     }
 
-    @Volatile
-    var lastInvalidatedTime = systemTimeInMillis()
-
     /**
      * The time (as per the other node) that we have most recently received all pending outgoing replications
      */
@@ -160,7 +157,7 @@ class DoorRepositoryReplicationClient(
                     }
                     val remoteNodeIdResponse = httpClient.get {
                         doorNodeIdHeader(localNodeId, localNodeAuth)
-                        setRepoUrl(repoEndpointUrl, "replication/nodeId")
+                        setRepoUrl(repoEndpointUrl, "$REPLICATION_PATH/nodeId")
                     }
 
                     val nodeIdHeaderVal = remoteNodeIdResponse.headers[DoorConstants.HEADER_NODE_ID]?.toLong()
@@ -251,7 +248,7 @@ class DoorRepositoryReplicationClient(
                         "$logPrefix : runSendLoop : sending ${outgoingReplications.size} to server "
                     }
                     val replicationResponse = httpClient.post {
-                        setRepoUrl(repoEndpointUrl, "replication/message")
+                        setRepoUrl(repoEndpointUrl, "$REPLICATION_PATH/message")
                         doorNodeIdHeader(localNodeId, localNodeAuth)
                         contentType(ContentType.Application.Json)
                         setBody(DoorMessage(
@@ -299,7 +296,7 @@ class DoorRepositoryReplicationClient(
                 }
                 val entitiesReceivedResponse = httpClient.post {
                     doorNodeIdHeader(localNodeId, localNodeAuth)
-                    setRepoUrl(repoEndpointUrl, "replication/ackAndGetPendingReplications")
+                    setRepoUrl(repoEndpointUrl, "$REPLICATION_PATH/ackAndGetPendingReplications")
                     contentType(ContentType.Application.Json)
                     setBody(ReplicationReceivedAck(acknowledgementsToSend))
                 }
@@ -344,6 +341,14 @@ class DoorRepositoryReplicationClient(
         fetchNotifyChannel.close()
         sendNotifyChannel.close()
         remoteNodeId.cancel()
+    }
+
+    companion object {
+
+        /**
+         * The path from the database endpoint e.g. https://server.com/DbName/ to the replication endpoint
+         */
+        const val REPLICATION_PATH = "replication"
     }
 
 }

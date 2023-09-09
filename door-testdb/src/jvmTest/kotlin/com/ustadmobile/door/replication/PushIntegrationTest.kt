@@ -6,6 +6,7 @@ import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.RepositoryConfig
 import com.ustadmobile.door.ext.asRepository
 import com.ustadmobile.door.ext.withDoorTransactionAsync
+import com.ustadmobile.door.http.DoorHttpServerConfig
 import com.ustadmobile.door.ktor.routes.ReplicationRoute
 import com.ustadmobile.door.util.systemTimeInMillis
 import db3.ExampleDb3
@@ -69,12 +70,12 @@ class PushIntegrationTest {
             }
         }
 
+        val serverConfig = DoorHttpServerConfig(json)
         server = embeddedServer(Netty, 8094) {
             routing {
                 route("replication") {
-                    ReplicationRoute(json, serverNodeId) { serverDb }
+                    ReplicationRoute(serverConfig) { serverDb }
                 }
-
             }
         }
         server.start()

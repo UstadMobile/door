@@ -6,6 +6,7 @@ import com.ustadmobile.door.RepositoryConfig
 import com.ustadmobile.door.ext.doorWrapperNodeId
 import com.ustadmobile.door.ext.getOrThrow
 import com.ustadmobile.door.ext.withDoorTransactionAsync
+import com.ustadmobile.door.http.DoorHttpServerConfig
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.replication.DoorReplicationEntity
 import com.ustadmobile.door.replication.ReplicationReceivedAck
@@ -49,13 +50,15 @@ class ReplicationRouteTest {
         val client: HttpClient
     )
 
-    private val serverLocalNodeId = 8042L
+    private val serverNodeId = 8042L
+
+    private val clientNodeId = 123L
 
 
     private fun testReplicationRoute(
         block: suspend ApplicationTestBuilder.(ReplicationRouteTestContext) -> Unit
     ) {
-        val db = DatabaseBuilder.databaseBuilder(ExampleDb3::class, "jdbc:sqlite::memory:", 1L)
+        val db = DatabaseBuilder.databaseBuilder(ExampleDb3::class, "jdbc:sqlite::memory:", serverNodeId)
             .build()
         db.clearAllTables()
 
@@ -63,6 +66,7 @@ class ReplicationRouteTest {
             encodeDefaults = true
         }
 
+        val serverConfig = DoorHttpServerConfig(json)
 
         testApplication {
             environment {
@@ -79,7 +83,7 @@ class ReplicationRouteTest {
             }
 
             routing {
-                ReplicationRoute(json, serverLocalNodeId) { db }
+                ReplicationRoute(serverConfig) { db }
             }
 
             val client = createClient {
@@ -99,19 +103,18 @@ class ReplicationRouteTest {
     @Test
     fun givenReplicationsArePendingForNode_whenAckAndGetPendingReplicationsCalled_thenShouldReturnPendingReplications() {
         testReplicationRoute {context ->
-            val remoteNodeId = 123L
             val insertedUid = runBlocking {
                 context.db.withDoorTransactionAsync {
                     val uid = context.db.exampleEntity3Dao.insertAsync(ExampleEntity3(
                         lastUpdatedTime = systemTimeInMillis()
                     ))
-                    context.db.exampleEntity3Dao.insertOutgoingReplication(uid, remoteNodeId)
+                    context.db.exampleEntity3Dao.insertOutgoingReplication(uid, clientNodeId)
                     uid
                 }
             }
 
             val response = context.client.post("/ackAndGetPendingReplications") {
-                header(DoorConstants.HEADER_NODE_AND_AUTH, "${remoteNodeId}/secret")
+                header(DoorConstants.HEADER_NODE_AND_AUTH, "${clientNodeId}/secret")
                 contentType(ContentType.Application.Json)
                 setBody(ReplicationReceivedAck(emptyList()))
             }
@@ -131,19 +134,18 @@ class ReplicationRouteTest {
     @Test
     fun givenReplicationsPendingForNode_whenReplicationsAreAcknowledged_thenNextResultShouldReturnNoContent() {
         testReplicationRoute { context ->
-            val remoteNodeId = 123L
             val insertedUid = runBlocking {
                 context.db.withDoorTransactionAsync {
                     val uid = context.db.exampleEntity3Dao.insertAsync(ExampleEntity3(
                         lastUpdatedTime = systemTimeInMillis()
                     ))
-                    context.db.exampleEntity3Dao.insertOutgoingReplication(uid, remoteNodeId)
+                    context.db.exampleEntity3Dao.insertOutgoingReplication(uid, clientNodeId)
                     uid
                 }
             }
 
             val response1 = context.client.post("/ackAndGetPendingReplications") {
-                header(DoorConstants.HEADER_NODE_AND_AUTH, "${remoteNodeId}/secret")
+                header(DoorConstants.HEADER_NODE_AND_AUTH, "${clientNodeId}/secret")
                 contentType(ContentType.Application.Json)
                 setBody(ReplicationReceivedAck(emptyList()))
             }
@@ -153,7 +155,7 @@ class ReplicationRouteTest {
                 responseDoorMessage.replications.first().entity.getOrThrow("eeUid").jsonPrimitive.long)
 
             val response2 = context.client.post("/ackAndGetPendingReplications") {
-                header(DoorConstants.HEADER_NODE_AND_AUTH, "${remoteNodeId}/secret")
+                header(DoorConstants.HEADER_NODE_AND_AUTH, "${clientNodeId}/secret")
                 contentType(ContentType.Application.Json)
                 setBody(ReplicationReceivedAck(responseDoorMessage.replications.map { it.orUid }))
             }
@@ -168,8 +170,6 @@ class ReplicationRouteTest {
                 eeUid = 1042,
                 lastUpdatedTime = systemTimeInMillis(), //Required due do the trigger condition
             )
-
-            val remoteNodeId = 123L
 
             val outgoingReplicationUid = 10420L
 
@@ -189,7 +189,7 @@ class ReplicationRouteTest {
             )
 
             val response = context.client.post("/message") {
-                header(DoorConstants.HEADER_NODE_AND_AUTH, "${remoteNodeId}/secret")
+                header(DoorConstants.HEADER_NODE_AND_AUTH, "${clientNodeId}/secret")
                 contentType(ContentType.Application.Json)
                 setBody(incomingMessage)
             }
@@ -211,27 +211,27 @@ class ReplicationRouteTest {
      */
     @Test
     fun givenServerSentEventsClientConnected_whenNewOutgoingReplicationIsPending_thenWillReceiveEvent() {
-        val db = DatabaseBuilder.databaseBuilder(ExampleDb3::class, "jdbc:sqlite::memory:", 1L)
+        val db = DatabaseBuilder.databaseBuilder(ExampleDb3::class, "jdbc:sqlite::memory:", serverNodeId)
             .build()
         db.clearAllTables()
-        val remoteNodeId = 123L
 
         val json = Json {
             encodeDefaults = true
         }
+        val serverConfig = DoorHttpServerConfig(json)
 
         val okHttpClient = OkHttpClient.Builder().build()
         val httpClient = HttpClient {  }
-        val repoConfig = RepositoryConfig.repositoryConfig(Any(), "http://localhost:8094", remoteNodeId,
+        val repoConfig = RepositoryConfig.repositoryConfig(Any(), "http://localhost:8094", clientNodeId,
                 "secret", httpClient, okHttpClient)
 
         val server = embeddedServer(Netty, 8094) {
             routing {
-                ReplicationRoute(json, serverLocalNodeId) { db }
+                ReplicationRoute(serverConfig) { db }
             }
         }
         server.start()
-        val url = "http://localhost:8094/sse?door-node=${URLEncoder.encode("$remoteNodeId/secret", "UTF-8")}"
+        val url = "http://localhost:8094/sse?door-node=${URLEncoder.encode("$clientNodeId/secret", "UTF-8")}"
 
         val eventChannel = Channel<DoorServerSentEvent>(capacity = Channel.UNLIMITED)
         val listener = object: DoorEventListener {
@@ -266,7 +266,7 @@ class ReplicationRouteTest {
                             lastUpdatedTime = systemTimeInMillis()
                         )
                     )
-                    db.exampleEntity3Dao.insertOutgoingReplication(uid, remoteNodeId)
+                    db.exampleEntity3Dao.insertOutgoingReplication(uid, clientNodeId)
                 }
 
                 val replicationPendingEvt = withTimeout(5000) { eventChannel.receive() }

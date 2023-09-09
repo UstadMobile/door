@@ -4,6 +4,7 @@ import com.ustadmobile.door.DoorConstants.HEADER_NODE_ID
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.ext.doorWrapper
 import com.ustadmobile.door.ext.doorWrapperNodeId
+import com.ustadmobile.door.http.DoorHttpServerConfig
 import com.ustadmobile.door.ktor.KtorCallDbAdapter
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.replication.ReplicationReceivedAck
@@ -19,13 +20,11 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.flow.filter
-import kotlinx.serialization.json.Json
 import java.io.Writer
 
 
 fun Route.ReplicationRoute(
-    json: Json,
-    localNodeId: Long,
+    serverConfig: DoorHttpServerConfig,
     adapter: KtorCallDbAdapter<*>,
 ) {
     fun Writer.writeDoorEvent(event: DoorServerSentEvent) {
@@ -69,7 +68,7 @@ fun Route.ReplicationRoute(
      */
     post("ackAndGetPendingReplications") {
         try {
-            val receivedAck : ReplicationReceivedAck = json.decodeFromString(
+            val receivedAck : ReplicationReceivedAck = serverConfig.json.decodeFromString(
                 ReplicationReceivedAck.serializer(), call.receiveText()
             )
             val nodeIdAndAuth = requireRemoteNodeIdAndAuth()
@@ -85,7 +84,7 @@ fun Route.ReplicationRoute(
 
             if(responseMessage.replications.isNotEmpty()) {
                 call.respondText(contentType = ContentType.Application.Json) {
-                    json.encodeToString(DoorMessage.serializer(), responseMessage)
+                    serverConfig.json.encodeToString(DoorMessage.serializer(), responseMessage)
                 }
             }else {
                 call.respondBytes(byteArrayOf(), ContentType.Text.Plain, HttpStatusCode.NoContent)
@@ -107,7 +106,7 @@ fun Route.ReplicationRoute(
     post("message") {
         val db = adapter(call)
         val nodeIdAndAuth = requireRemoteNodeIdAndAuth()
-        val message = json.decodeFromString(DoorMessage.serializer(), call.receiveText())
+        val message = serverConfig.json.decodeFromString(DoorMessage.serializer(), call.receiveText())
 
         if(message.fromNode != nodeIdAndAuth.first) {
             call.respondBytes(byteArrayOf(), ContentType.Text.Plain, HttpStatusCode.Forbidden)
@@ -120,12 +119,13 @@ fun Route.ReplicationRoute(
         )
 
         call.respondText(contentType = ContentType.Application.Json) {
-            json.encodeToString(ReplicationReceivedAck.serializer(), receivedAck)
+            serverConfig.json.encodeToString(ReplicationReceivedAck.serializer(), receivedAck)
         }
     }
 
     get("nodeId") {
-        call.response.header(HEADER_NODE_ID, localNodeId.toString())
+        val db = adapter(call)
+        call.response.header(HEADER_NODE_ID, db.doorWrapperNodeId)
         call.respondBytes(
             bytes = byteArrayOf(),
             contentType = ContentType.Text.Plain,
