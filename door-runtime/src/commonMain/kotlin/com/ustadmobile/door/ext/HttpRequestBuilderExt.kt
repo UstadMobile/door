@@ -3,6 +3,7 @@ package com.ustadmobile.door.ext
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.DoorConstants
 import com.ustadmobile.door.DoorDatabaseRepository
+import com.ustadmobile.door.RepositoryConfig
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.header
 import io.ktor.http.*
@@ -45,3 +46,9 @@ fun HttpRequestBuilder.setRepoUrl(
         encodedPath = "${encodedPath}$repoPath"
     }
 }
+
+fun HttpRequestBuilder.setRepoUrl(
+    repositoryConfig: RepositoryConfig,
+    repoPath: String
+) = setRepoUrl(repositoryConfig.endpoint, repoPath)
+

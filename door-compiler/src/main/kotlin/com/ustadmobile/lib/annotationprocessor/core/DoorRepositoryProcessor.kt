@@ -209,6 +209,41 @@ fun FileSpec.Builder.addDaoRepoType(
 }
 
 /**
+ * For a given DAO function where the ClientStrategy is to use replicate entities - generate code that will make the
+ * http request and pass the received entities to the NodeEventManager (which is responsible
+ * to insert them via receive view, directly, or triggering the callback).
+ */
+fun CodeBlock.Builder.addMakeHttpRequestAndInsertReplicationsCode(
+    daoKSFun: KSFunctionDeclaration,
+    daoKSClass: KSClassDeclaration,
+    repoValName: String = "_repo",
+    dbValName: String = "_db",
+) {
+    val httpMethod = daoKSFun.getDaoFunHttpMethodToUse(daoKSClass)
+    //Will be used shortly
+    //val funAsMember = daoKSFun.asMemberOf(daoKSClass.asType(emptyList()))
+    beginControlFlow("val _response = _httpClient.%M",
+        MemberName("io.ktor.client.request", httpMethod.lowercase()))
+    add("%M($repoValName.config, %S)\n",
+        MemberName("com.ustadmobile.door.ext", "setRepoUrl"),
+        "${daoKSClass.simpleName.asString()}/${daoKSFun.simpleName.asString()}")
+    add("%M($repoValName)\n",
+        MemberName("com.ustadmobile.door.ext", "doorNodeIdHeader"))
+    daoKSFun.parameters.forEachIndexed { _, ksValueParameter ->
+        //Type will be used here
+        add("%M(%S, %L)\n",
+            MemberName("io.ktor.client.request", "parameter"),
+            ksValueParameter.name?.asString(),
+            ksValueParameter.name?.asString()
+        )
+    }
+
+    endControlFlow()
+    add("$dbValName.%M(_response)\n",
+        MemberName("com.ustadmobile.door.replication","onClientRepoDoorMessageHttpResponse"))
+}
+
+/**
  * Add a repo implementation of the given DAO FunSpec
  * @param daoKSFun the function spec for which an implementation is being generated
  * @param daoName the name of the DAO class (simple name e.g. SomeDao)
@@ -222,7 +257,34 @@ fun TypeSpec.Builder.addDaoRepoFun(
     environment: SymbolProcessorEnvironment,
     resolver: Resolver,
 ) : TypeSpec.Builder {
+    val clientStrategy = daoKSFun.getDaoFunHttpAccessibleEffectiveStrategy(resolver)
+    val daoFunSpec = daoKSFun.toFunSpecBuilder(resolver, daoKSClass.asType(emptyList()), environment.logger)
+        .build()
 
+    addFunction(daoFunSpec.toBuilder()
+        .removeAbstractModifier()
+        .removeAnnotations()
+        .addModifiers(KModifier.OVERRIDE)
+        .addCode(
+            CodeBlock.builder().apply {
+                when(clientStrategy) {
+                    RepoHttpAccessible.ClientStrategy.PULL_REPLICATE_ENTITIES -> {
+                        addMakeHttpRequestAndInsertReplicationsCode(daoKSFun, daoKSClass)
+                        addRepoDelegateToDaoCode(daoKSFun, resolver)
+                    }
+
+                    else -> {
+                        addRepoDelegateToDaoCode(daoKSFun, resolver)
+                    }
+                }
+            }
+            .build()
+        )
+        .build())
+
+
+    /*
+    To be adapted shortly to handle where the repository will delegate to HTTP
     var repoMethodType = daoKSFun.getAnnotation(Repository::class)?.methodType ?: Repository.METHOD_AUTO
 
     if(repoMethodType == Repository.METHOD_AUTO) {
@@ -259,7 +321,7 @@ fun TypeSpec.Builder.addDaoRepoFun(
             }
         }.build())
         .build())
-
+    */
     return this
 }
 

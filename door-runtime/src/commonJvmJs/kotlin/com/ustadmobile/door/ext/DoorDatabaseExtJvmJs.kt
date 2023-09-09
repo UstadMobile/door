@@ -27,7 +27,7 @@ actual suspend fun <R> RoomDatabase.prepareAndUseStatementAsync(
             }
         }
     }catch(e: Exception) {
-        Napier.e("prepareAndUseStatement: Exception running SQL: '${stmtConfig.sqlToUse(this.dbType())}' on DB $this", e, tag = DoorTag.LOG_TAG)
+        Napier.e("prepareAndUseStatementAsync: Exception running SQL: '${stmtConfig.sqlToUse(this.dbType())}' on DB $this allocated = $stmtAllocated", e, tag = DoorTag.LOG_TAG)
         throw e
     }
 }

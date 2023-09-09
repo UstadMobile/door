@@ -122,11 +122,31 @@ fun KSFunctionDeclaration.getDaoFunHttpAccessibleDoorReplicationEntities(
 }
 
 /**
+ * Where the receiver KSFunctionDeclaration represents a DAO function with the @RepoHttpAccessible annotation, determine
+ * the applicable RepoHttpAccessible.ClientStrategy that will be used.
+ */
+fun KSFunctionDeclaration.getDaoFunHttpAccessibleEffectiveStrategy(
+    resolver: Resolver
+): RepoHttpAccessible.ClientStrategy {
+    val repoHttpAccessibleAnnotation = getAnnotation(RepoHttpAccessible::class)
+
+    return if(repoHttpAccessibleAnnotation?.clientStrategy == RepoHttpAccessible.ClientStrategy.AUTO) {
+        if(getDaoFunHttpAccessibleDoorReplicationEntities(resolver).isNotEmpty())
+            RepoHttpAccessible.ClientStrategy.PULL_REPLICATE_ENTITIES
+        else
+            RepoHttpAccessible.ClientStrategy.HTTP_WITH_FALLBACK
+    }else {
+        repoHttpAccessibleAnnotation?.clientStrategy ?: RepoHttpAccessible.ClientStrategy.LOCAL_DB_ONLY
+    }
+}
+
+
+/**
  * Where the receiver KSFunctionDeclaration represents a function on a DAO, this returns the Http method that should be
  * used. GET will be used where all parameters are either primitives or lists/arrays thereof (and would be sent in the
  * query parameters of the request).
  */
-fun KSFunctionDeclaration.daoFunHttpMethod(
+fun KSFunctionDeclaration.getDaoFunHttpMethodToUse(
     daoClassDecl: KSClassDeclaration,
 ): String {
     val funAsMember = asMemberOf(daoClassDecl.asType(emptyList()))

@@ -2,21 +2,21 @@ package com.ustadmobile.door
 
 object DoorConstants {
 
-    val MIME_TYPE_PLAIN = "text/plain"
+    const val MIME_TYPE_PLAIN = "text/plain"
 
-    val MIME_TYPE_JSON = "application/json"
+    const val MIME_TYPE_JSON = "application/json"
 
-    val HEADER_DBVERSION = "door-dbversion"
+    const val HEADER_DBVERSION = "door-dbversion"
 
     /**
      * Header that should contain the node id and auth in the form of nodeId/auth e.g. 1234/secret
      */
-    val HEADER_NODE_AND_AUTH = "door-node"
+    const val HEADER_NODE_AND_AUTH = "door-node"
 
     /**
-     * Header on some responses that contains the nodeid that sent the response
+     * Header on some responses (including data pull) that contains the nodeid that sent the response
      */
-    val HEADER_NODE_ID = "door-node-id"
+    const val HEADER_NODE_ID = "door-node-id"
 
     const val DBINFO_TABLENAME = "_doorwayinfo"
 

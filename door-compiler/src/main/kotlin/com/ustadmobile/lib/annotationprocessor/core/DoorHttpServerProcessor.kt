@@ -32,10 +32,10 @@ import com.ustadmobile.door.ktor.KtorCallDaoAdapter
 import com.ustadmobile.door.ktor.KtorCallDbAdapter
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.replication.DoorReplicationEntity
+import com.ustadmobile.door.replication.DoorRepositoryReplicationClient
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.CALL_MEMBER
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.CODEBLOCK_KTOR_NO_CONTENT_RESPOND
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.CODEBLOCK_NANOHTTPD_NO_CONTENT_RESPONSE
-import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.DI_ERASED_MEMBER
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.DI_INSTANCE_MEMBER
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.DI_INSTANCE_TYPETOKEN_MEMBER
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.DI_ON_MEMBER
@@ -52,7 +52,6 @@ import fi.iki.elonen.NanoHTTPD
 import fi.iki.elonen.router.RouterNanoHTTPD
 import io.ktor.http.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.json.Json
 import org.kodein.di.DI
 
 fun CodeBlock.Builder.addNanoHttpdResponse(varName: String, addNonNullOperator: Boolean = false,
@@ -123,7 +122,7 @@ fun FileSpec.Builder.addDaoKtorRouteFun(
             daoClassDecl.getAllFunctions().filter {
                 it.hasAnnotation(RepoHttpAccessible::class)
             }.forEach {funDecl ->
-                val httpMethodMember = if(funDecl.daoFunHttpMethod(daoClassDecl) == "GET") {
+                val httpMethodMember = if(funDecl.getDaoFunHttpMethodToUse(daoClassDecl) == "GET") {
                     GET_MEMBER
                 }else {
                     POST_MEMBER
@@ -520,9 +519,14 @@ fun FileSpec.Builder.addDbKtorRouteFunction(
                     add("%M()\n", MemberName("com.ustadmobile.door.ktor", "addNodeIdAndAuthCheckInterceptor"))
                 }
 
+                beginControlFlow("%M(%T.REPLICATION_PATH)",
+                    MemberName("io.ktor.server.routing", "route"),
+                    DoorRepositoryReplicationClient::class,
+                )
                 add("%M(serverConfig, dbCallAdapter)\n",
                     MemberName("com.ustadmobile.door.ktor.routes", "ReplicationRoute")
                 )
+                endControlFlow()
 
                 dbClassDeclaration.dbEnclosedDaos().filter {daoKsClass ->
                     daoKsClass.getAllFunctions().any { it.hasAnnotation(RepoHttpAccessible::class) }
@@ -599,18 +603,7 @@ fun FileSpec.Builder.addHttpServerExtensionFun(
     daoKSClassDeclaration: KSClassDeclaration,
     daoFunDecl: KSFunctionDeclaration
 ): FileSpec.Builder {
-    val returnsReplicationEntities = daoFunDecl.getDaoFunHttpAccessibleDoorReplicationEntities(resolver).isNotEmpty()
-    val repoHttpAccessibleAnnotation = daoFunDecl.getAnnotation(RepoHttpAccessible::class)
-        ?: throw IllegalArgumentException("addHttpServerExtensionFun for " +
-                "${daoKSClassDeclaration.simpleName.asString()}#${daoFunDecl.simpleName.asString()} has no RepoHttpAccessible")
-    val effectiveStrategy = if(repoHttpAccessibleAnnotation.clientStrategy == RepoHttpAccessible.ClientStrategy.AUTO) {
-        if(returnsReplicationEntities)
-            RepoHttpAccessible.ClientStrategy.PULL_REPLICATE_ENTITIES
-        else
-            RepoHttpAccessible.ClientStrategy.HTTP_WITH_FALLBACK
-    }else {
-        repoHttpAccessibleAnnotation.clientStrategy
-    }
+    val effectiveStrategy = daoFunDecl.getDaoFunHttpAccessibleEffectiveStrategy(resolver)
 
     //Should add originating ks class for all entities used here.
 
@@ -727,15 +720,18 @@ fun CodeBlock.Builder.addHttpReplicationEntityServerExtension(
 
     endControlFlow()
 
+    add("val _thisNodeId = request.db.%M\n",
+        MemberName("com.ustadmobile.door.ext", "doorWrapperNodeId"))
     add("return %T(\n", DoorJsonResponse::class)
     indent()
+    add("headers = listOf(%T.HEADER_NODE_ID to _thisNodeId.toString()),\n", DoorConstants::class)
     add("bodyText = json.encodeToString(\n")
     indent()
     add("%T.serializer(),\n", DoorMessage::class)
     add("%T(\n", DoorMessage::class)
     indent()
     add("what = %T.WHAT_REPLICATION,\n", DoorMessage::class)
-    add("fromNode = request.db.%M,\n", MemberName("com.ustadmobile.door.ext", "doorWrapperNodeId"))
+    add("fromNode = _thisNodeId,\n",)
     add("toNode = request.requireNodeId(),\n")
     add("replications = replicationEntities,\n")
     unindent()
@@ -871,8 +867,6 @@ class DoorHttpServerProcessor(
         val DI_INSTANCE_MEMBER = MemberName("org.kodein.di", "instance")
 
         val DI_INSTANCE_TYPETOKEN_MEMBER = MemberName("org.kodein.di", "Instance")
-
-        val DI_ERASED_MEMBER = MemberName("org.kodein.type", "erased")
 
         const val SERVER_TYPE_KTOR = 1
 

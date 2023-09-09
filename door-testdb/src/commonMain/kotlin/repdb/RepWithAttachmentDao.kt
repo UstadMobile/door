@@ -26,6 +26,7 @@ expect abstract class RepWithAttachmentDao {
     """)
     abstract fun findByUid(uid: Long): RepEntityWithAttachment?
 
+    /*
     @Query("""
         SELECT RepEntityWithAttachment.*
           FROM RepEntityWithAttachment
@@ -34,7 +35,7 @@ expect abstract class RepWithAttachmentDao {
     @RepoHttpAccessible
     @Repository(Repository.METHOD_DELEGATE_TO_WEB)
     abstract fun findByUidDelegateToWebSync(uid: Long): RepEntityWithAttachment?
-
+    */
 
     @Update
     abstract fun update(entity: RepEntityWithAttachment)

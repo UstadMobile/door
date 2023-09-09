@@ -8,7 +8,12 @@ import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.ext.*
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.nodeevent.NodeEvent
+import com.ustadmobile.door.nodeevent.NodeEventManager
 import com.ustadmobile.door.util.TransactionMode
+import io.github.aakira.napier.Napier
+import io.ktor.client.call.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
 
 private data class ReplicateEntityPrimaryKeys(
     val pk1: Long,
@@ -226,3 +231,30 @@ internal suspend fun RoomDatabase.selectDoorNodeExists(nodeId: Long): Boolean {
         } }.first()
     }
 }
+
+
+
+/**
+ * Handle a pull replication response received. This function is used by generated repositories.
+ */
+@Suppress("unused")
+suspend fun RoomDatabase.onClientRepoDoorMessageHttpResponse(
+    httpResponse: HttpResponse
+) {
+    val nodeEventManager: NodeEventManager<*> = doorWrapper.nodeEventManager
+    when (httpResponse.status) {
+        HttpStatusCode.OK -> {
+            val message: DoorMessage = httpResponse.body()
+            nodeEventManager.onIncomingMessageReceived(message)
+        }
+        HttpStatusCode.NotModified, HttpStatusCode.NoContent -> {
+            Napier.v(tag = DoorTag.LOG_TAG) {
+                "$this - http response was not modified or no content, no need to do anything"
+            }
+        }
+        else -> {
+            throw IllegalStateException("$this - unexpected response status - ${httpResponse.status}")
+        }
+    }
+}
+

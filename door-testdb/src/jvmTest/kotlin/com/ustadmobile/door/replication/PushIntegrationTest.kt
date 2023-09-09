@@ -73,7 +73,7 @@ class PushIntegrationTest {
         val serverConfig = DoorHttpServerConfig(json)
         server = embeddedServer(Netty, 8094) {
             routing {
-                route("replication") {
+                route(DoorRepositoryReplicationClient.REPLICATION_PATH) {
                     ReplicationRoute(serverConfig) { serverDb }
                 }
             }
