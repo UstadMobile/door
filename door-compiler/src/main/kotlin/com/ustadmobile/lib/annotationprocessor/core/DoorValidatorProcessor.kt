@@ -2,11 +2,13 @@ package com.ustadmobile.lib.annotationprocessor.core
 
 import androidx.room.Entity
 import androidx.room.Query
+import androidx.room.RawQuery
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.DoorDbType.Companion.productNameForDbType
 import com.ustadmobile.door.PreparedStatementConfig
@@ -212,6 +214,14 @@ class DoorValidatorProcessor(
             }
     }
 
+    private fun validateHttpAccessibleDaoFunction(daoFunDecl: KSFunctionDeclaration) {
+        daoFunDecl.getAnnotation(RepoHttpAccessible::class) ?: return
+        if(daoFunDecl.hasAnnotation(RawQuery::class)) {
+            logger.error("HttpAccessible function cannot use RawQuery! This would be a major security risk",
+                daoFunDecl)
+        }
+    }
+
     private fun validateDaos(resolver: Resolver) {
         val daos = resolver.getDaoSymbolsToProcess()
         daos.forEach { dao ->
@@ -275,6 +285,11 @@ class DoorValidatorProcessor(
                     }
                 }
             }
+
+            dao.getAllFunctions().forEach {  daoFun ->
+                validateHttpAccessibleDaoFunction(daoFun)
+            }
+
         }
     }
 
