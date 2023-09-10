@@ -343,31 +343,47 @@ fun CodeBlock.Builder.addCreateDoorReplicationCodeBlock(
  * ksType = Int, then add Int.serializer()
  * ksType = Int?, then add Int.serializer().nullable
  * ksType = List<Int> - then add ListSerializer(Int.serializer())
- * ksType = List<Int?> - then add ListSerializer(Int.serializer().nullable))
+ * ksType = List<Int?> - then add ListSerializer(Int.serializer().nullable))'
+ * ksType = LongArray - then add LongArraySerializer()
+ * ksType = String - then add String.serializer()
+ * ksType = MyEntity - then add MyEntity.serializer()
  *
- * When ksType is not a builtin (e.g. not a string, primitive type, or array/list thereof), then add Type.serializer()
- * e.g. for an entity class. The class MUST be annotated as @Serializable
+ * When ksType is not handled by Kotlinx serialization builtins (e.g. not a string, primitive type), then add
+ * Type.serializer() e.g. for an entity class. The class MUST be annotated as @Serializable
  */
 fun CodeBlock.Builder.addKotlinxSerializationStrategy(
     ksType: KSType,
     resolver: Resolver,
 ) : CodeBlock.Builder {
+    fun addNullableExtensionIfRequired() {
+        if(ksType.isMarkedNullable)
+            add("%M", MemberName("kotlinx.serialization.builtins", "nullable"))
+    }
+
+
     when {
-        ksType.isJavaPrimitiveOrString(resolver) -> {
+        //Use builtin serializers for builtin supported types e.g. Int, IntArray, String etc.
+        ksType.isKotlinxSerializationBuiltInType(resolver) -> {
             add("%T.%M()", ksType.toTypeName(),
                 MemberName("kotlinx.serialization.builtins", "serializer"))
-            if(ksType.isMarkedNullable)
-                add("%M", MemberName("kotlinx.serialization.builtins", "nullable"))
+            addNullableExtensionIfRequired()
         }
-        ksType.isList() -> {
+
+        //Use ListSerializer / ArraySerializer for kotlin.Array and List
+        ksType.isListOrArrayType(resolver) -> {
             val componentType = ksType.unwrapComponentTypeIfListOrArray(resolver)
-            add("%M(", MemberName("kotlinx.serialization.builtins", "ListSerializer"))
+            val builtInTypeName = if(ksType.isArrayType())  "ArraySerializer"  else "ListSerializer"
+            add("%M(", MemberName("kotlinx.serialization.builtins", builtInTypeName))
             add(CodeBlock.builder()
                 .addKotlinxSerializationStrategy(componentType, resolver)
                 .build())
             add(")")
-            if(ksType.isMarkedNullable)
-                add("%M", MemberName("kotlinx.serialization.builtins", "nullable"))
+            addNullableExtensionIfRequired()
+        }
+
+        //Use Type.serializer() otherwise e.g. for entity classes.
+        else -> {
+            add("%T.serializer()", ksType.toTypeName())
         }
     }
 

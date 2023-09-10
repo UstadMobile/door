@@ -215,3 +215,34 @@ fun KSType.isJavaPrimitiveOrString(
 ): Boolean {
     return isJavaPrimitive(resolver) || this.makeNotNullable() == resolver.builtIns.stringType
 }
+
+private val javaPrimitiveArrayClassNames = listOf(
+    "BooleanArray",
+    "ByteArray",
+    "ShortArray",
+    "IntArray",
+    "LongArray",
+    "FloatArray",
+    "DoubleArray"
+).map {
+    "kotlin.$it"
+}
+
+/**
+ * Determine if the receiver KSType is Java Primitive Array e.g. BooleanArray, ByteArray etc. This does NOT include
+ * Array<Boolean>
+ */
+fun KSType.isJavaPrimitiveArray() : Boolean {
+    return declaration.qualifiedName?.asString()?.let {
+        it in javaPrimitiveArrayClassNames
+    } ?: false
+}
+
+/**
+ * Determine if the receiver KSType is one that is handled by Kotlinx Serialization builtins - this includes java
+ * primitives e.g. Boolean, Int, Long, Float etc, their respective array types e.g. BooleanArray, IntArray, LongArray,
+ * FloatArray, etc. and String
+ */
+fun KSType.isKotlinxSerializationBuiltInType(resolver: Resolver): Boolean {
+    return isJavaPrimitiveOrString(resolver) || isJavaPrimitiveArray()
+}

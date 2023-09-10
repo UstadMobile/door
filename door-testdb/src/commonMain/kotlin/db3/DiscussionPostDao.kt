@@ -34,4 +34,14 @@ expect abstract class DiscussionPostDao {
     abstract suspend fun findByUidWithPosterMember(postUid: Long): DiscussionPostAndPosterMember?
 
 
+    @RepoHttpAccessible()
+    @Query("""
+        SELECT DiscussionPost.*, Member.*
+          FROM DiscussionPost
+               LEFT JOIN Member
+                     ON Member.memberUid = DiscussionPost.posterMemberUid
+         WHERE DiscussionPost.postUid IN (:postUids)    
+    """)
+    abstract suspend fun findByUidList(postUids: List<Long>): List<DiscussionPostAndPosterMember>
+
 }

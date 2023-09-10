@@ -52,7 +52,6 @@ import fi.iki.elonen.NanoHTTPD
 import fi.iki.elonen.router.RouterNanoHTTPD
 import io.ktor.http.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.json.Json
 import org.kodein.di.DI
 
 fun CodeBlock.Builder.addNanoHttpdResponse(varName: String, addNonNullOperator: Boolean = false,
