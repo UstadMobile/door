@@ -8,7 +8,7 @@ import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSAnnotated
-import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.DoorDbType.Companion.productNameForDbType
 import com.ustadmobile.door.PreparedStatementConfig
@@ -214,11 +214,38 @@ class DoorValidatorProcessor(
             }
     }
 
-    private fun validateHttpAccessibleDaoFunction(daoFunDecl: KSFunctionDeclaration) {
-        daoFunDecl.getAnnotation(RepoHttpAccessible::class) ?: return
-        if(daoFunDecl.hasAnnotation(RawQuery::class)) {
-            logger.error("HttpAccessible function cannot use RawQuery! This would be a major security risk",
-                daoFunDecl)
+    private fun validateDaoHttpAccessibleFunctions(dao: KSClassDeclaration) {
+        val allHttpAccessibleFunctions = dao.getAllFunctions().toList()
+            .filter { it.hasAnnotation(RepoHttpAccessible::class) }
+
+        val duplciateNameFunctions = allHttpAccessibleFunctions.filter { daoFun ->
+            allHttpAccessibleFunctions.any { otherDaoFun ->
+                otherDaoFun != daoFun && otherDaoFun.simpleName.asString() == daoFun.simpleName.asString()
+            }
+        }.map { it.simpleName.asString() }.toSet()
+        if(duplciateNameFunctions.isNotEmpty()) {
+            logger.error("RepoHttpAccessible DAO functions must have unique names. They cannot be overriden " +
+                    "by parameters. Duplicates are: ${duplciateNameFunctions.joinToString()}", dao)
+        }
+
+        allHttpAccessibleFunctions.forEach { daoFun ->
+            val httpAccessibleAnnotation = daoFun.getAnnotation(RepoHttpAccessible::class)
+            if(daoFun.hasAnnotation(RawQuery::class)) {
+                logger.error("HttpAccessible function cannot use RawQuery! This would be a major security risk",
+                    daoFun)
+            }
+
+            if(daoFun.parameters.count { it.hasAnnotation(RepoHttpBodyParam::class) } > 1) {
+                logger.error("HttpAccessible function: only one parameter can be annotated @RepoHttpBodyParam",
+                    daoFun)
+            }
+
+            if(daoFun.parameters.any { it.hasAnnotation(RepoHttpBodyParam::class) } &&
+                httpAccessibleAnnotation?.httpMethod == RepoHttpAccessible.HttpMethod.GET
+            ) {
+                logger.error("HttAccessible function: if @RepoHttpBodyParam then http method MUST be AUTO or POST",
+                    daoFun)
+            }
         }
     }
 
@@ -286,10 +313,7 @@ class DoorValidatorProcessor(
                 }
             }
 
-            dao.getAllFunctions().forEach {  daoFun ->
-                validateHttpAccessibleDaoFunction(daoFun)
-            }
-
+            validateDaoHttpAccessibleFunctions(dao)
         }
     }
 

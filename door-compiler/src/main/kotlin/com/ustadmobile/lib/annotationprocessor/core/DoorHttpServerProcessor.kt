@@ -19,10 +19,7 @@ import com.ustadmobile.door.AbstractDoorUriResponder
 import com.ustadmobile.door.DoorConstants
 import com.ustadmobile.door.DoorDaoProvider
 import com.ustadmobile.door.NanoHttpdCall
-import com.ustadmobile.door.annotation.DoorNodeIdAuthRequired
-import com.ustadmobile.door.annotation.MinReplicationVersion
-import com.ustadmobile.door.annotation.RepoHttpAccessible
-import com.ustadmobile.door.annotation.Repository
+import com.ustadmobile.door.annotation.*
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.http.DbAndDao
 import com.ustadmobile.door.http.DoorHttpServerConfig
@@ -122,7 +119,7 @@ fun FileSpec.Builder.addDaoKtorRouteFun(
             daoClassDecl.getAllFunctions().filter {
                 it.hasAnnotation(RepoHttpAccessible::class)
             }.forEach {funDecl ->
-                val httpMethodMember = if(funDecl.getDaoFunHttpMethodToUse(daoClassDecl) == "GET") {
+                val httpMethodMember = if(funDecl.getDaoFunHttpMethodToUse() == "GET") {
                     GET_MEMBER
                 }else {
                     POST_MEMBER
@@ -625,7 +622,12 @@ fun FileSpec.Builder.addHttpServerExtensionFun(
                         add("val _arg_${param.name?.asString()} : %T = ", funAsMemberOfDao.parameterTypes[index]?.toTypeName())
                         add("json.decodeFromString(")
                         addKotlinxSerializationStrategy(funAsMemberOfDao.parameterTypes[index]!!, resolver)
-                        add(", request.requireParam(%S))\n", param.name?.asString())
+                        if(param.hasAnnotation(RepoHttpBodyParam::class)) {
+                            add(", request.requireBodyAsString())\n")
+                        }else {
+                            add(", request.requireParam(%S))\n", param.name?.asString())
+                        }
+
                     }
 
                     if(effectiveStrategy == RepoHttpAccessible.ClientStrategy.PULL_REPLICATE_ENTITIES) {

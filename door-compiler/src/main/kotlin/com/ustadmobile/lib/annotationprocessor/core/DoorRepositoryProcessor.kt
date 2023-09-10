@@ -11,12 +11,13 @@ import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.writeTo
 import com.ustadmobile.door.*
 import com.ustadmobile.door.annotation.RepoHttpAccessible
+import com.ustadmobile.door.annotation.RepoHttpBodyParam
 import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_ILLEGALSTATEEXCEPTION
 import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.SUFFIX_REPOSITORY2
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
 import io.ktor.client.*
-import kotlinx.serialization.builtins.serializer
+import io.ktor.http.*
 
 /**
  * Add a TypeSpec to the given FileSpec Builder that is an implementation of the repository for a
@@ -221,7 +222,7 @@ fun CodeBlock.Builder.addMakeHttpRequestAndInsertReplicationsCode(
     repoValName: String = "_repo",
     dbValName: String = "_db",
 ) {
-    val httpMethod = daoKSFun.getDaoFunHttpMethodToUse(daoKSClass)
+    val httpMethod = daoKSFun.getDaoFunHttpMethodToUse()
     val funAsMemberOfDao = daoKSFun.asMemberOf(daoKSClass.asType(emptyList()))
     beginControlFlow("val _response = _httpClient.%M",
         MemberName("io.ktor.client.request", httpMethod.lowercase()))
@@ -231,12 +232,23 @@ fun CodeBlock.Builder.addMakeHttpRequestAndInsertReplicationsCode(
     add("%M($repoValName)\n",
         MemberName("com.ustadmobile.door.ext", "doorNodeIdHeader"))
     daoKSFun.parameters.forEachIndexed { index, ksValueParameter ->
-        //Type will be used here
-        add("%M(%S, _repo.config.json.encodeToString(",
-            MemberName("io.ktor.client.request", "parameter"),
-            ksValueParameter.name?.asString())
-        addKotlinxSerializationStrategy(funAsMemberOfDao.parameterTypes[index]!!, resolver)
-        add(", %L))\n", ksValueParameter.name?.asString())
+        if(ksValueParameter.hasAnnotation(RepoHttpBodyParam::class)) {
+            add("%M(%T.Application.Json)\n",
+                MemberName("io.ktor.http", "contentType"),
+                ContentType::class
+            )
+            add("%M(%L)\n",
+                MemberName("io.ktor.client.request", "setBody"),
+                ksValueParameter.name?.asString()
+                )
+        }else {
+            add("%M(%S, _repo.config.json.encodeToString(",
+                MemberName("io.ktor.client.request", "parameter"),
+                ksValueParameter.name?.asString())
+            addKotlinxSerializationStrategy(funAsMemberOfDao.parameterTypes[index]!!, resolver)
+            add(", %L))\n", ksValueParameter.name?.asString())
+        }
+
     }
 
     endControlFlow()

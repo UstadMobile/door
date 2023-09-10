@@ -4,11 +4,18 @@ package com.ustadmobile.door.annotation
  * Indicates that the given function will have an endpoint that will be accessible by http. The endpoint will respond to
  * get if all parameters are primitives/strings and/or arrays thereof. If any parameter is an object, it will be a post
  * endpoint (where the body of the request should be the object in json form).
+ *
+ * @param clientStrategy - the strategy that the generated repository client (created by .asRepository(..) and
+ *        generated endpoints will use.
+ * @param httpMethod - the HTTP method (GET or POST) that will be used by the generated repository client (created by
+ *        .asRepository(..)) and generated http endpoints will use.
+ *
  */
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.BINARY)
 annotation class RepoHttpAccessible(
     val clientStrategy: ClientStrategy = ClientStrategy.AUTO,
+    val httpMethod: HttpMethod = HttpMethod.AUTO,
     val pullQueriesToReplicate: Array<HttpServerFunctionCall> = arrayOf(),
 ) {
 
@@ -48,4 +55,23 @@ annotation class RepoHttpAccessible(
          */
         LOCAL_DB_ONLY
     }
+
+    enum class HttpMethod {
+        /**
+         *  When AUTO is used (or applied by default), then Http POST will be used if any function parameter is annotated
+         *  @RequestBody , otherwise GET will be used
+         */
+        AUTO,
+
+        /**
+         * Explicitly use http get. This is not allowed if there is a request body param.
+         */
+        GET,
+
+        /**
+         * Explicitly use http post. This can be used even if there is no http http request body param.
+         */
+        POST
+    }
+
 }

@@ -12,6 +12,7 @@ import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.toTypeParameterResolver
 import com.ustadmobile.door.annotation.QueryLiveTables
 import com.ustadmobile.door.annotation.RepoHttpAccessible
+import com.ustadmobile.door.annotation.RepoHttpBodyParam
 import com.ustadmobile.lib.annotationprocessor.core.applyIf
 import com.ustadmobile.lib.annotationprocessor.core.isHttpQueryQueryParam
 import net.sf.jsqlparser.parser.CCJSqlParserUtil
@@ -146,16 +147,18 @@ fun KSFunctionDeclaration.getDaoFunHttpAccessibleEffectiveStrategy(
  * used. GET will be used where all parameters are either primitives or lists/arrays thereof (and would be sent in the
  * query parameters of the request).
  */
-fun KSFunctionDeclaration.getDaoFunHttpMethodToUse(
-    daoClassDecl: KSClassDeclaration,
-): String {
-    val funAsMember = asMemberOf(daoClassDecl.asType(emptyList()))
-    return if(funAsMember.parameterTypes.any {
-        it?.toTypeName()?.isHttpQueryQueryParam() == false
-    }) {
-        "POST"
-    }else {
-        "GET"
+fun KSFunctionDeclaration.getDaoFunHttpMethodToUse(): String {
+    val httpAccessibleAnnotation = getAnnotation(RepoHttpAccessible::class)
+        ?: throw IllegalArgumentException("function ${simpleName.asString()} is not annotated RepoHttpAccessible")
+    return when {
+        httpAccessibleAnnotation.httpMethod == RepoHttpAccessible.HttpMethod.AUTO &&
+                parameters.any { param -> param.hasAnnotation(RepoHttpBodyParam::class) } -> {
+                    RepoHttpAccessible.HttpMethod.POST.name
+        }
+        httpAccessibleAnnotation.httpMethod == RepoHttpAccessible.HttpMethod.AUTO -> {
+            RepoHttpAccessible.HttpMethod.GET.name
+        }
+        else -> httpAccessibleAnnotation.httpMethod.name
     }
 }
 

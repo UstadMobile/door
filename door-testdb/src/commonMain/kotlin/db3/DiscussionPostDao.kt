@@ -4,6 +4,7 @@ import androidx.room.Insert
 import androidx.room.Query
 import com.ustadmobile.door.annotation.DoorDao
 import com.ustadmobile.door.annotation.RepoHttpAccessible
+import com.ustadmobile.door.annotation.RepoHttpBodyParam
 import com.ustadmobile.door.annotation.Repository
 
 @DoorDao
@@ -34,7 +35,9 @@ expect abstract class DiscussionPostDao {
     abstract suspend fun findByUidWithPosterMember(postUid: Long): DiscussionPostAndPosterMember?
 
 
-    @RepoHttpAccessible()
+    @RepoHttpAccessible(
+        httpMethod = RepoHttpAccessible.HttpMethod.POST
+    )
     @Query("""
         SELECT DiscussionPost.*, Member.*
           FROM DiscussionPost
@@ -42,6 +45,8 @@ expect abstract class DiscussionPostDao {
                      ON Member.memberUid = DiscussionPost.posterMemberUid
          WHERE DiscussionPost.postUid IN (:postUids)    
     """)
-    abstract suspend fun findByUidList(postUids: List<Long>): List<DiscussionPostAndPosterMember>
+    abstract suspend fun findByUidList(
+        @RepoHttpBodyParam postUids: List<Long>
+    ): List<DiscussionPostAndPosterMember>
 
 }
