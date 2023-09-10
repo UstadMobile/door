@@ -49,4 +49,12 @@ expect abstract class DiscussionPostDao {
         @RepoHttpBodyParam postUids: List<Long>
     ): List<DiscussionPostAndPosterMember>
 
+    @RepoHttpAccessible
+    @Query("""
+        SELECT COUNT(*) 
+          FROM DiscussionPost
+         WHERE DiscussionPost.postLastModified >= :since 
+    """)
+    abstract suspend fun getNumPostsSinceTime(since: Long): Int
+
 }

@@ -634,6 +634,28 @@ fun FileSpec.Builder.addHttpServerExtensionFun(
                         addHttpReplicationEntityServerExtension(resolver, daoFunDecl)
                     }else {
                         //Run the query and return JSON
+                        add("val _result = %L(", daoFunDecl.simpleName.asString())
+                        daoFunDecl.parameters.forEach { param ->
+                            add("_arg_${param.name?.asString()},")
+                        }
+                        add(")\n")
+
+                        add("val _thisNodeId = request.db.%M\n",
+                            MemberName("com.ustadmobile.door.ext", "doorWrapperNodeId"))
+                        add("return %T(", DoorJsonResponse::class)
+                        indent()
+                        add("\n")
+                        val returnType = funAsMemberOfDao.returnType
+                        if(returnType != null && returnType.toTypeName() != UNIT) {
+                            add("bodyText = json.encodeToString(")
+                            addKotlinxSerializationStrategy(returnType, resolver)
+                            add(", _result),\n")
+                        }else {
+                            add("bodyText = %S,\n", "")
+                        }
+                        add("headers = listOf(%T.HEADER_NODE_ID to _thisNodeId.toString()),\n", DoorConstants::class)
+                        unindent()
+                        add(")\n")
                     }
                 }
                 .build())
