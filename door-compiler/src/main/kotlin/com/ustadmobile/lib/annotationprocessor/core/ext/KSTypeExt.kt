@@ -76,8 +76,15 @@ private fun Resolver.sqliteRealTypes(): List<KSType> {
     return listOf(builtIns.floatType, builtIns.doubleType).flatMap { listOf(it, it.makeNullable()) }
 }
 
-fun KSType.equalsIgnoreNullable(otherType: KSType) : Boolean {
-    return this == otherType || this == otherType.makeNullable()
+fun KSType.equalsIgnoreNullable(
+    other: KSType,
+    ignoreNullability: Boolean = true
+): Boolean {
+    return if(ignoreNullability) {
+        this.makeNotNullable() == other.makeNotNullable()
+    }else {
+        this == other
+    }
 }
 
 fun KSType.toSqlType(
@@ -186,4 +193,25 @@ fun KSType.resolveActualTypeIfAliased(): KSType {
     }else {
         this
     }
+}
+
+fun KSType.isJavaPrimitive(
+    resolver: Resolver
+) : Boolean {
+    val builtIns = resolver.builtIns
+    return equalsIgnoreNullable(builtIns.booleanType)
+            || equalsIgnoreNullable(builtIns.byteType)
+            || equalsIgnoreNullable(builtIns.shortType)
+            || equalsIgnoreNullable(builtIns.intType)
+            || equalsIgnoreNullable(builtIns.longType)
+            || equalsIgnoreNullable(builtIns.floatType)
+            || equalsIgnoreNullable(builtIns.charType)
+            || equalsIgnoreNullable(builtIns.floatType)
+            || equalsIgnoreNullable(builtIns.doubleType)
+}
+
+fun KSType.isJavaPrimitiveOrString(
+    resolver: Resolver
+): Boolean {
+    return isJavaPrimitive(resolver) || this.makeNotNullable() == resolver.builtIns.stringType
 }

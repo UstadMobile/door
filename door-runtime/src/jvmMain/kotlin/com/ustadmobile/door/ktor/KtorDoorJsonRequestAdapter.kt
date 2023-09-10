@@ -11,17 +11,7 @@ class KtorDoorJsonRequestAdapter(
     override val db: RoomDatabase,
 ) : DoorJsonRequest {
 
-    override fun requireIntParam(paramName: String): Int {
-        return call.request.queryParameters[paramName]?.toInt()
-            ?: throw IllegalStateException("requireIntParam $paramName not found")
-    }
-
-    override fun requireLongParam(paramName: String): Long {
-        return call.request.queryParameters[paramName]?.toLong()
-            ?: throw IllegalStateException("requireLongParam: $paramName not found")
-    }
-
-    override fun requireStringParam(paramName: String): String {
+    override fun requireParam(paramName: String): String {
         return call.request.queryParameters[paramName]
             ?: throw IllegalStateException("requireStringParam: $paramName not found")
     }

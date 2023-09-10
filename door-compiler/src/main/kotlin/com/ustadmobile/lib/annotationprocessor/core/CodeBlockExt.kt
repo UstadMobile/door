@@ -8,6 +8,7 @@ import io.ktor.http.*
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.ksp.toClassName
+import com.squareup.kotlinpoet.ksp.toTypeName
 import com.ustadmobile.door.annotation.ReplicateEntity
 import com.ustadmobile.door.replication.DoorReplicationEntity
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.MEMBERNAME_CLIENT_SET_BODY
@@ -331,6 +332,43 @@ fun CodeBlock.Builder.addCreateDoorReplicationCodeBlock(
     if(entityNullable) {
         add("\n")
         endControlFlow()
+    }
+
+    return this
+}
+
+/**
+ * Add a Kotlinx Serialization strategy to the code block for the given type e.g.
+ *
+ * ksType = Int, then add Int.serializer()
+ * ksType = Int?, then add Int.serializer().nullable
+ * ksType = List<Int> - then add ListSerializer(Int.serializer())
+ * ksType = List<Int?> - then add ListSerializer(Int.serializer().nullable))
+ *
+ * When ksType is not a builtin (e.g. not a string, primitive type, or array/list thereof), then add Type.serializer()
+ * e.g. for an entity class. The class MUST be annotated as @Serializable
+ */
+fun CodeBlock.Builder.addKotlinxSerializationStrategy(
+    ksType: KSType,
+    resolver: Resolver,
+) : CodeBlock.Builder {
+    when {
+        ksType.isJavaPrimitiveOrString(resolver) -> {
+            add("%T.%M()", ksType.toTypeName(),
+                MemberName("kotlinx.serialization.builtins", "serializer"))
+            if(ksType.isMarkedNullable)
+                add("%M", MemberName("kotlinx.serialization.builtins", "nullable"))
+        }
+        ksType.isList() -> {
+            val componentType = ksType.unwrapComponentTypeIfListOrArray(resolver)
+            add("%M(", MemberName("kotlinx.serialization.builtins", "ListSerializer"))
+            add(CodeBlock.builder()
+                .addKotlinxSerializationStrategy(componentType, resolver)
+                .build())
+            add(")")
+            if(ksType.isMarkedNullable)
+                add("%M", MemberName("kotlinx.serialization.builtins", "nullable"))
+        }
     }
 
     return this

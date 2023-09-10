@@ -52,6 +52,7 @@ import fi.iki.elonen.NanoHTTPD
 import fi.iki.elonen.router.RouterNanoHTTPD
 import io.ktor.http.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.json.Json
 import org.kodein.di.DI
 
 fun CodeBlock.Builder.addNanoHttpdResponse(varName: String, addNonNullOperator: Boolean = false,
@@ -291,7 +292,6 @@ fun CodeBlock.Builder.addKtorDaoMethodCode(daoFunSpec: FunSpec) : CodeBlock.Buil
     }else {
         GET_MEMBER
     }
-
 
     beginControlFlow("%M(%S)", memberFn, daoFunSpec.name)
             .addRequestDi()
@@ -606,6 +606,7 @@ fun FileSpec.Builder.addHttpServerExtensionFun(
     val effectiveStrategy = daoFunDecl.getDaoFunHttpAccessibleEffectiveStrategy(resolver)
 
     //Should add originating ks class for all entities used here.
+    val funAsMemberOfDao = daoFunDecl.asMemberOf(daoKSClassDeclaration.asType(emptyList()))
 
     addFunction(
         FunSpec.builder(daoFunDecl.simpleName.asString() + "_DoorHttp")
@@ -621,9 +622,11 @@ fun FileSpec.Builder.addHttpServerExtensionFun(
             .addCode(CodeBlock.builder()
                 .add("val json = serverConfig.json\n")
                 .apply {
-                    daoFunDecl.parameters.forEach { param ->
-                        add("val _arg_${param.name?.asString()} = request.require${param.type.resolve().declaration.simpleName.asString()}Param(%S)\n",
-                            param.name?.asString())
+                    daoFunDecl.parameters.forEachIndexed { index, param ->
+                        add("val _arg_${param.name?.asString()} : %T = ", funAsMemberOfDao.parameterTypes[index]?.toTypeName())
+                        add("json.decodeFromString(")
+                        addKotlinxSerializationStrategy(funAsMemberOfDao.parameterTypes[index]!!, resolver)
+                        add(", request.requireParam(%S))\n", param.name?.asString())
                     }
 
                     if(effectiveStrategy == RepoHttpAccessible.ClientStrategy.PULL_REPLICATE_ENTITIES) {

@@ -16,6 +16,7 @@ import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companio
 import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.SUFFIX_REPOSITORY2
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
 import io.ktor.client.*
+import kotlinx.serialization.builtins.serializer
 
 /**
  * Add a TypeSpec to the given FileSpec Builder that is an implementation of the repository for a
@@ -216,12 +217,12 @@ fun FileSpec.Builder.addDaoRepoType(
 fun CodeBlock.Builder.addMakeHttpRequestAndInsertReplicationsCode(
     daoKSFun: KSFunctionDeclaration,
     daoKSClass: KSClassDeclaration,
+    resolver: Resolver,
     repoValName: String = "_repo",
     dbValName: String = "_db",
 ) {
     val httpMethod = daoKSFun.getDaoFunHttpMethodToUse(daoKSClass)
-    //Will be used shortly
-    //val funAsMember = daoKSFun.asMemberOf(daoKSClass.asType(emptyList()))
+    val funAsMemberOfDao = daoKSFun.asMemberOf(daoKSClass.asType(emptyList()))
     beginControlFlow("val _response = _httpClient.%M",
         MemberName("io.ktor.client.request", httpMethod.lowercase()))
     add("%M($repoValName.config, %S)\n",
@@ -229,13 +230,13 @@ fun CodeBlock.Builder.addMakeHttpRequestAndInsertReplicationsCode(
         "${daoKSClass.simpleName.asString()}/${daoKSFun.simpleName.asString()}")
     add("%M($repoValName)\n",
         MemberName("com.ustadmobile.door.ext", "doorNodeIdHeader"))
-    daoKSFun.parameters.forEachIndexed { _, ksValueParameter ->
+    daoKSFun.parameters.forEachIndexed { index, ksValueParameter ->
         //Type will be used here
-        add("%M(%S, %L)\n",
+        add("%M(%S, _repo.config.json.encodeToString(",
             MemberName("io.ktor.client.request", "parameter"),
-            ksValueParameter.name?.asString(),
-            ksValueParameter.name?.asString()
-        )
+            ksValueParameter.name?.asString())
+        addKotlinxSerializationStrategy(funAsMemberOfDao.parameterTypes[index]!!, resolver)
+        add(", %L))\n", ksValueParameter.name?.asString())
     }
 
     endControlFlow()
@@ -269,7 +270,7 @@ fun TypeSpec.Builder.addDaoRepoFun(
             CodeBlock.builder().apply {
                 when(clientStrategy) {
                     RepoHttpAccessible.ClientStrategy.PULL_REPLICATE_ENTITIES -> {
-                        addMakeHttpRequestAndInsertReplicationsCode(daoKSFun, daoKSClass)
+                        addMakeHttpRequestAndInsertReplicationsCode(daoKSFun, daoKSClass, resolver)
                         addRepoDelegateToDaoCode(daoKSFun, resolver)
                     }
 
