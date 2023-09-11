@@ -2,6 +2,7 @@ package db3
 
 import androidx.room.Insert
 import androidx.room.Query
+import app.cash.paging.PagingSource
 import com.ustadmobile.door.RepositoryFlowLoadingStatusProvider
 import com.ustadmobile.door.annotation.DoorDao
 import com.ustadmobile.door.annotation.HttpAccessible
@@ -87,5 +88,13 @@ expect abstract class DiscussionPostDao : RepositoryFlowLoadingStatusProvider {
          WHERE DiscussionPost.postLastModified >= :since 
     """)
     abstract suspend fun getNumPostsSinceTimeHttpOnly(since: Long): Int
+
+    @HttpAccessible
+    @Query("""
+        SELECT DiscussionPost.*
+          FROM DiscussionPost 
+         WHERE DiscussionPost.postLastModified >= :since 
+    """)
+    abstract fun findAllPostAsPagingSource(since: Long): PagingSource<Int, DiscussionPost>
 
 }

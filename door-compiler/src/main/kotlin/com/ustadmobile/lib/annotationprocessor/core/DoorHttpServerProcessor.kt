@@ -1,5 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
+import app.cash.paging.PagingSourceLoadParamsRefresh
 import com.google.devtools.ksp.processing.KSPLogger
 import com.ustadmobile.door.room.RoomDatabase
 import com.google.devtools.ksp.processing.Resolver
@@ -28,6 +29,7 @@ import com.ustadmobile.door.http.DoorJsonResponse
 import com.ustadmobile.door.ktor.KtorCallDaoAdapter
 import com.ustadmobile.door.ktor.KtorCallDbAdapter
 import com.ustadmobile.door.message.DoorMessage
+import com.ustadmobile.door.paging.DoorRepositoryPagingSource
 import com.ustadmobile.door.replication.DoorReplicationEntity
 import com.ustadmobile.door.replication.DoorRepositoryReplicationClient
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.CALL_MEMBER
@@ -627,7 +629,22 @@ fun FileSpec.Builder.addHttpServerExtensionFun(
                         }else {
                             add(", request.requireParam(%S))\n", param.name?.asString())
                         }
+                    }
 
+                    if(daoFunDecl.returnType?.resolve()?.isPagingSource() == true) {
+                        add("val _pagingLoadParams = %T(\n",
+                            ClassName("app.cash.paging","PagingSourceLoadParamsRefresh"))
+                        indent()
+                        add("key = json.decodeFromString(")
+                        addKotlinxSerializationStrategy(resolver.builtIns.intType.makeNullable(), resolver)
+                        add(", request.requireParam(%S)),\n", DoorRepositoryPagingSource.PARAM_KEY)
+                        add("loadSize = ")
+                        add("json.decodeFromString(")
+                        addKotlinxSerializationStrategy(resolver.builtIns.intType, resolver)
+                        add(", request.requireParam(%S)),\n", DoorRepositoryPagingSource.PARAM_BATCHSIZE)
+                        add("placeholdersEnabled = false,\n")
+                        unindent()
+                        add(")\n")
                     }
 
                     if(effectiveStrategy == HttpAccessible.ClientStrategy.PULL_REPLICATE_ENTITIES) {
@@ -691,8 +708,9 @@ fun CodeBlock.Builder.addHttpReplicationEntityServerExtension(
         unindent()
         add(")")
         if(returnType?.isFlow() == true) {
-            add(".")
-            add("%M()", MemberName("kotlinx.coroutines.flow", "first"))
+            add(".%M()", MemberName("kotlinx.coroutines.flow", "first"))
+        }else if(returnType?.isPagingSource() == true) {
+            add(".load(_pagingLoadParams).%M()", MemberName("com.ustadmobile.door.paging", "pageDataOrEmpty"))
         }
         add("\n")
 

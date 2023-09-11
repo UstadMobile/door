@@ -357,14 +357,14 @@ fun CodeBlock.Builder.addKotlinxSerializationStrategy(
 ) : CodeBlock.Builder {
     fun addNullableExtensionIfRequired() {
         if(ksType.isMarkedNullable)
-            add("%M", MemberName("kotlinx.serialization.builtins", "nullable"))
+            add(".%M", MemberName("kotlinx.serialization.builtins", "nullable"))
     }
 
 
     when {
         //Use builtin serializers for builtin supported types e.g. Int, IntArray, String etc.
         ksType.isKotlinxSerializationBuiltInType(resolver) -> {
-            add("%T.%M()", ksType.toTypeName(),
+            add("%T.%M()", ksType.makeNotNullable().toTypeName(),
                 MemberName("kotlinx.serialization.builtins", "serializer"))
             addNullableExtensionIfRequired()
         }

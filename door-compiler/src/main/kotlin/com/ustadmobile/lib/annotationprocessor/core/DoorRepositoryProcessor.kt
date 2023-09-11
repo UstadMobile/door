@@ -15,6 +15,7 @@ import com.ustadmobile.door.annotation.RepoHttpBodyParam
 import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.http.RepoDaoFlowHelper
 import com.ustadmobile.door.http.RepositoryDaoWithFlowHelper
+import com.ustadmobile.door.paging.DoorRepositoryPagingSource
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_ILLEGALSTATEEXCEPTION
 import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.SUFFIX_REPOSITORY2
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
@@ -238,6 +239,7 @@ fun CodeBlock.Builder.addRepoHttpClientRequestForFunction(
     daoKSClass: KSClassDeclaration,
     resolver: Resolver,
     repoValName: String = "_repo",
+    pagingParamsValName: String? = null,
 ) : CodeBlock.Builder {
     val httpMethod = daoKSFun.getDaoFunHttpMethodToUse()
     val funAsMemberOfDao = daoKSFun.asMemberOf(daoKSClass.asType(emptyList()))
@@ -266,6 +268,20 @@ fun CodeBlock.Builder.addRepoHttpClientRequestForFunction(
             add(", %L))\n", ksValueParameter.name?.asString())
         }
     }
+
+    if(pagingParamsValName != null) {
+        add("%M(%T.PARAM_BATCHSIZE, _repo.config.json.encodeToString(",
+            MemberName("io.ktor.client.request", "parameter"),
+            DoorRepositoryPagingSource::class)
+        addKotlinxSerializationStrategy(resolver.builtIns.intType, resolver)
+        add(", $pagingParamsValName.loadSize))\n")
+        add("%M(%T.PARAM_KEY, _repo.config.json.encodeToString(",
+            MemberName("io.ktor.client.request", "parameter"),
+            DoorRepositoryPagingSource::class)
+        addKotlinxSerializationStrategy(resolver.builtIns.intType.makeNullable(), resolver)
+        add(", $pagingParamsValName.key))\n")
+    }
+
     endControlFlow()
 
     return this
@@ -282,9 +298,16 @@ fun CodeBlock.Builder.addMakeHttpRequestAndInsertReplicationsCode(
     resolver: Resolver,
     repoValName: String = "_repo",
     dbValName: String = "_db",
+    pagingParamsValName: String? = null,
 ) {
     add("val _response = _httpClient.")
-    addRepoHttpClientRequestForFunction(daoKSFun, daoKSClass, resolver, repoValName)
+    addRepoHttpClientRequestForFunction(
+        daoKSFun = daoKSFun,
+        daoKSClass = daoKSClass,
+        resolver = resolver,
+        repoValName = repoValName,
+        pagingParamsValName = pagingParamsValName
+    )
     add("\n")
 
     add("$dbValName.%M(_response)\n",
@@ -328,7 +351,20 @@ fun TypeSpec.Builder.addDaoRepoFun(
                             unindent().add("},")//endControlFlow
                             unindent()//unindent for asRepoFlow
                             add("\n)")
-                        }else {
+                        }else if(funResolved.returnType?.isPagingSource() == true) {
+                            add("return %T(", DoorRepositoryPagingSource::class)
+                            indent()
+                            add("\nrepo = _repo,\n")
+                            add("repoPath = %S,\n", functionPath)
+                            add("dbPagingSource = _dao.").addDelegateFunctionCall(daoKSFun).add(",\n")
+                            beginControlFlow("onLoadHttp = ")
+                            add("_pagingParams -> \n")
+                            addMakeHttpRequestAndInsertReplicationsCode(daoKSFun, daoKSClass, resolver,
+                                pagingParamsValName = "_pagingParams")
+                            unindent().add("},")//endControlFlow
+                            unindent()//unindent for asRepoFlow
+                            add("\n)")
+                        } else {
                             addMakeHttpRequestAndInsertReplicationsCode(daoKSFun, daoKSClass, resolver)
                             addRepoDelegateToDaoCode(daoKSFun, resolver)
                         }
@@ -377,46 +413,6 @@ fun TypeSpec.Builder.addDaoRepoFun(
         )
         .build())
 
-
-    /*
-    To be adapted shortly to handle where the repository will delegate to HTTP
-    var repoMethodType = daoKSFun.getAnnotation(Repository::class)?.methodType ?: Repository.METHOD_AUTO
-
-    if(repoMethodType == Repository.METHOD_AUTO) {
-        repoMethodType = Repository.METHOD_DELEGATE_TO_DAO
-    }
-
-    //Here: in future, if needed, generate a boundary callback or something to load data in batches.
-
-    val daoFunSpec = daoKSFun.toFunSpecBuilder(resolver, daoKSClass.asType(emptyList()), environment.logger)
-        .build()
-    addFunction(daoFunSpec.toBuilder()
-        .removeAbstractModifier()
-        .removeAnnotations()
-        .addModifiers(KModifier.OVERRIDE)
-        .addCode(CodeBlock.builder().apply {
-            when(repoMethodType) {
-                Repository.METHOD_DELEGATE_TO_DAO -> {
-                    addRepoDelegateToDaoCode(daoKSFun, resolver)
-                }
-                Repository.METHOD_DELEGATE_TO_WEB -> {
-                    //check that this is http accessible, if not, emit error
-                    if(!daoKSFun.hasAnnotation(RepoHttpAccessible::class))
-                        environment.logger.error("Uses delegate to web, but is not marked as http accessible",
-                            daoKSFun)
-
-                    if(doorTarget == DoorTarget.JS && daoKSFun.modifiers.contains(Modifier.SUSPEND)) {
-                        add("throw %T(%S)\n", ClassName("kotlin", "IllegalStateException"),
-                            "Synchronous HTTP is not supported on Door/Javascript!")
-                    }else {
-                        addDelegateToWebCode(daoFunSpec, daoName, doorTarget)
-                    }
-                }
-
-            }
-        }.build())
-        .build())
-    */
     return this
 }
 

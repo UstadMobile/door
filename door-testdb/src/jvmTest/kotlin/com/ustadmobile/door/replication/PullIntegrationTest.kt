@@ -1,5 +1,6 @@
 package com.ustadmobile.door.replication
 
+import app.cash.paging.PagingSourceLoadParamsRefresh
 import app.cash.turbine.ReceiveTurbine
 import app.cash.turbine.test
 import com.ustadmobile.door.DatabaseBuilder
@@ -22,6 +23,7 @@ import io.ktor.server.netty.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -284,6 +286,36 @@ class PullIntegrationTest {
                 assertEquals(memberInServerDb, postInClientDb?.posterMember)
                 cancelAndIgnoreRemainingEvents()
             }
+        }
+    }
+
+    @Test
+    fun givenEntitiesCreatedOnServer_whenClientUsesPagingSource_thenWillLoad() {
+        clientServerIntegrationTest {
+            val memberInServerDb = Member().apply {
+                firstName = "Roger"
+                lastName = "Rabbit"
+                memberUid = serverDb.memberDao.insertAsync(this)
+            }
+
+            val post = DiscussionPost().apply {
+                postTitle = "I like hay"
+                postText = "Mmm... Hay..."
+                posterMemberUid = memberInServerDb.memberUid
+                postUid = serverDb.discussionPostDao.insertAsync(this)
+            }
+
+            val clientRepo = makeClientRepo()
+
+            clientRepo.discussionPostDao.findAllPostAsPagingSource(0).load(PagingSourceLoadParamsRefresh(
+                key = 0, loadSize = 50, placeholdersEnabled = false
+            ))
+
+            clientDb.discussionPostDao.findByUidWithPosterMemberAsFlow(post.postUid)
+                .filter { it != null }
+                .test(timeout = 5.seconds) {
+                    awaitItem()
+                }
         }
     }
 
