@@ -13,6 +13,7 @@ import com.ustadmobile.door.*
 import com.ustadmobile.door.annotation.HttpAccessible
 import com.ustadmobile.door.annotation.RepoHttpBodyParam
 import com.ustadmobile.door.annotation.Repository
+import com.ustadmobile.door.http.RepoDaoFlowHelper
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_ILLEGALSTATEEXCEPTION
 import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.SUFFIX_REPOSITORY2
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
@@ -200,6 +201,16 @@ fun FileSpec.Builder.addDaoRepoType(
             }
             .build())
         .apply {
+            val needsRepoFlowHelper = daoKSClass.getAllDaoFunctionsIncSuperTypesToGenerate().any {
+                it.getDaoFunHttpAccessibleEffectiveStrategy(resolver) == HttpAccessible.ClientStrategy.PULL_REPLICATE_ENTITIES
+                        && it.asMemberOf(daoKSClass.asType(emptyList())).returnType?.isFlow() == true
+            }
+            if(needsRepoFlowHelper) {
+                addProperty(PropertySpec.builder("_repoFlowHelper", RepoDaoFlowHelper::class)
+                    .initializer("%T(_repo)\n", RepoDaoFlowHelper::class)
+                    .build())
+            }
+
             daoKSClass.getAllDaoFunctionsIncSuperTypesToGenerate().forEach { daoFun ->
                 //If this is OK, then remove the name param - no need for that...
                 addDaoRepoFun(daoFun, daoKSClass, daoKSClass.simpleName.asString(), target, environment, resolver)
@@ -295,6 +306,7 @@ fun TypeSpec.Builder.addDaoRepoFun(
     val daoFunSpec = daoKSFun.toFunSpecBuilder(resolver, daoKSClass.asType(emptyList()), environment.logger)
         .build()
     val functionPath = "${daoKSClass.simpleName.asString()}/${daoKSFun.simpleName.asString()}"
+    val funResolved = daoKSFun.asMemberOf(daoKSClass.asType(emptyList()))
 
     addFunction(daoFunSpec.toBuilder()
         .removeAbstractModifier()
@@ -304,8 +316,21 @@ fun TypeSpec.Builder.addDaoRepoFun(
             CodeBlock.builder().apply {
                 when(clientStrategy) {
                     HttpAccessible.ClientStrategy.PULL_REPLICATE_ENTITIES -> {
-                        addMakeHttpRequestAndInsertReplicationsCode(daoKSFun, daoKSClass, resolver)
-                        addRepoDelegateToDaoCode(daoKSFun, resolver)
+                        if(funResolved.returnType?.isFlow() == true) {
+                            add("return _repoFlowHelper.asRepoFlow(\n")
+                            indent()
+                            add("dbFlow = _dao.").addDelegateFunctionCall(daoKSFun).add(",\n")
+                            beginControlFlow("onMakeHttpRequest = ")
+                            addMakeHttpRequestAndInsertReplicationsCode(daoKSFun, daoKSClass, resolver)
+                            unindent().add("},")//endControlFlow
+                            unindent()//unindent for asRepoFlow
+                            add("\n)")
+                        }else {
+                            addMakeHttpRequestAndInsertReplicationsCode(daoKSFun, daoKSClass, resolver)
+                            addRepoDelegateToDaoCode(daoKSFun, resolver)
+                        }
+
+
                     }
                     HttpAccessible.ClientStrategy.HTTP_OR_THROW -> {
                         if(daoKSFun.hasReturnType(resolver))

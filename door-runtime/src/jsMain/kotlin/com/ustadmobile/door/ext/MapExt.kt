@@ -5,3 +5,7 @@ actual fun <K, V> concurrentSafeMapOf(vararg items: Pair<K, V>) : MutableMap<K, 
         it.putAll(items)
     }
 }
+
+actual fun <K, V> weakMapOf(): MutableMap<K, V> {
+    TODO()
+}

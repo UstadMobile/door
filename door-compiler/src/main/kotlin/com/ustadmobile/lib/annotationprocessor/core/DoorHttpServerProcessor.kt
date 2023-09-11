@@ -677,6 +677,7 @@ fun CodeBlock.Builder.addHttpReplicationEntityServerExtension(
     //Next: we can add list of functions e.g. replicateData = ["selectAllSalesPeople", "selectAllSalesByType"]
     // that are going to generate data to replicate
     listOf(daoFunDecl).forEach { funDeclaration ->
+        val returnType = funDeclaration.returnType?.resolve()
         val resultType = funDeclaration.returnType?.resolve()?.unwrapResultType(resolver)
         val resultComponentType = resultType?.unwrapComponentTypeIfListOrArray(resolver)
         val resultValName = "_result_${funDeclaration.simpleName.asString()}"
@@ -688,7 +689,12 @@ fun CodeBlock.Builder.addHttpReplicationEntityServerExtension(
             add("$paramNameStr = _arg_$paramNameStr,\n")
         }
         unindent()
-        add(")\n")
+        add(")")
+        if(returnType?.isFlow() == true) {
+            add(".")
+            add("%M()", MemberName("kotlinx.coroutines.flow", "first"))
+        }
+        add("\n")
 
         val replicationEntitiesOnResult = (resultComponentType?.declaration as? KSClassDeclaration)
             ?.getDoorReplicateEntityComponents()

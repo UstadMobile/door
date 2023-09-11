@@ -1,5 +1,7 @@
 package com.ustadmobile.door.replication
 
+import app.cash.turbine.ReceiveTurbine
+import app.cash.turbine.test
 import com.ustadmobile.door.DatabaseBuilder
 import com.ustadmobile.door.RepositoryConfig
 import com.ustadmobile.door.ext.asRepository
@@ -16,12 +18,16 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.routing.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import org.junit.Assert
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.seconds
 
 class PullIntegrationTest {
 
@@ -118,10 +124,10 @@ class PullIntegrationTest {
 
             val clientRepo = makeClientRepo()
 
-            val discussionAndMember = clientRepo.discussionPostDao.findByUidWithPosterMember(discussionPostInServerDb.postUid)
+            val discussionAndMemberInClientDb = clientRepo.discussionPostDao.findByUidWithPosterMember(discussionPostInServerDb.postUid)
 
-            Assert.assertEquals(memberInServerDb, discussionAndMember?.posterMember)
-            Assert.assertEquals(discussionPostInServerDb, discussionAndMember?.discussionPost)
+            Assert.assertEquals(memberInServerDb, discussionAndMemberInClientDb?.posterMember)
+            Assert.assertEquals(discussionPostInServerDb, discussionAndMemberInClientDb?.discussionPost)
         }
     }
 
@@ -198,5 +204,52 @@ class PullIntegrationTest {
 
         }
     }
+
+    suspend fun <T> ReceiveTurbine<T>.awaitItemWhere(
+        block: (T) -> Boolean
+    ) : T {
+        while(currentCoroutineContext().isActive) {
+            val item = awaitItem()
+            if(block(item))
+                return item
+        }
+
+        throw CancellationException("Item not received and no longer active")
+    }
+
+    @Test
+    fun givenEntitiesCreatedOnServer_whenClientUsesFlow_thenFlowWillUpdateAndEntitiesWillBeCopiedToLocalDb() {
+        Napier.base(DebugAntilog())
+        clientServerIntegrationTest {
+            val memberInServerDb = Member().apply {
+                firstName = "Roger"
+                lastName = "Rabbit"
+                memberUid = serverDb.memberDao.insertAsync(this)
+            }
+
+            val post = DiscussionPost().apply {
+                postTitle = "I like hay"
+                postText = "Mmm... Hay..."
+                posterMemberUid = memberInServerDb.memberUid
+                postUid = serverDb.discussionPostDao.insertAsync(this)
+            }
+
+            val clientRepo = makeClientRepo()
+
+            clientRepo.discussionPostDao.findByUidWithPosterMemberAsFlow(
+                post.postUid
+            ).test(timeout = 5.seconds) {
+                val itemLoaded = awaitItemWhere { it != null }
+                assertEquals(post, itemLoaded?.discussionPost)
+                assertEquals(memberInServerDb, itemLoaded?.posterMember)
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            val postInClientDb = clientDb.discussionPostDao.findByUidWithPosterMember(post.postUid)
+            assertEquals(post, postInClientDb?.discussionPost)
+            assertEquals(memberInServerDb, postInClientDb?.posterMember)
+        }
+    }
+
 
 }

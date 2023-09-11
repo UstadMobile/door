@@ -245,6 +245,10 @@ suspend fun RoomDatabase.onClientRepoDoorMessageHttpResponse(
     when (httpResponse.status) {
         HttpStatusCode.OK -> {
             val message: DoorMessage = httpResponse.body()
+            Napier.v(tag = DoorTag.LOG_TAG) {
+                "$this : onClientRepoDoorMessageHttpResponse : handle message with " +
+                        "${message.replications.size} replications"
+            }
             nodeEventManager.onIncomingMessageReceived(message)
         }
         HttpStatusCode.NotModified, HttpStatusCode.NoContent -> {

@@ -6,6 +6,7 @@ import com.ustadmobile.door.annotation.DoorDao
 import com.ustadmobile.door.annotation.HttpAccessible
 import com.ustadmobile.door.annotation.RepoHttpBodyParam
 import com.ustadmobile.door.annotation.Repository
+import kotlinx.coroutines.flow.Flow
 
 @DoorDao
 @Repository
@@ -30,10 +31,31 @@ expect abstract class DiscussionPostDao {
           FROM DiscussionPost
                LEFT JOIN Member
                      ON Member.memberUid = DiscussionPost.posterMemberUid
+         WHERE DiscussionPost.postReplyToPostUid = :postUid
+    """)
+    abstract suspend fun findAllRepliesWithPosterMemberAsFlow(postUid : Long): Flow<List<DiscussionPostAndPosterMember>>
+
+
+    @HttpAccessible()
+    @Query("""
+        SELECT DiscussionPost.*, Member.*
+          FROM DiscussionPost
+               LEFT JOIN Member
+                     ON Member.memberUid = DiscussionPost.posterMemberUid
          WHERE DiscussionPost.postUid = :postUid            
     """)
     abstract suspend fun findByUidWithPosterMember(postUid: Long): DiscussionPostAndPosterMember?
 
+
+    @HttpAccessible()
+    @Query("""
+        SELECT DiscussionPost.*, Member.*
+          FROM DiscussionPost
+               LEFT JOIN Member
+                     ON Member.memberUid = DiscussionPost.posterMemberUid
+         WHERE DiscussionPost.postUid = :postUid            
+    """)
+    abstract suspend fun findByUidWithPosterMemberAsFlow(postUid: Long): Flow<DiscussionPostAndPosterMember?>
 
     @HttpAccessible(
         httpMethod = HttpAccessible.HttpMethod.POST
