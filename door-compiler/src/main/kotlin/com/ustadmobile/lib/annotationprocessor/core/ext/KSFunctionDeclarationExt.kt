@@ -11,10 +11,9 @@ import com.squareup.kotlinpoet.ksp.toKModifier
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.toTypeParameterResolver
 import com.ustadmobile.door.annotation.QueryLiveTables
-import com.ustadmobile.door.annotation.RepoHttpAccessible
+import com.ustadmobile.door.annotation.HttpAccessible
 import com.ustadmobile.door.annotation.RepoHttpBodyParam
 import com.ustadmobile.lib.annotationprocessor.core.applyIf
-import com.ustadmobile.lib.annotationprocessor.core.isHttpQueryQueryParam
 import net.sf.jsqlparser.parser.CCJSqlParserUtil
 import net.sf.jsqlparser.statement.select.Select
 import net.sf.jsqlparser.util.TablesNamesFinder
@@ -114,7 +113,7 @@ val KSFunctionDeclaration.useSuspendedQuery: Boolean
 fun KSFunctionDeclaration.getDaoFunHttpAccessibleDoorReplicationEntities(
     resolver: Resolver
 ): List<EmbeddedEntityAndPath> {
-    if(!hasAnnotation(RepoHttpAccessible::class))
+    if(!hasAnnotation(HttpAccessible::class))
         return emptyList()
 
     val resultClassDeclaration = returnType?.resolve()?.unwrapResultType(resolver)?.unwrapComponentTypeIfListOrArray(resolver)
@@ -128,16 +127,16 @@ fun KSFunctionDeclaration.getDaoFunHttpAccessibleDoorReplicationEntities(
  */
 fun KSFunctionDeclaration.getDaoFunHttpAccessibleEffectiveStrategy(
     resolver: Resolver
-): RepoHttpAccessible.ClientStrategy {
-    val repoHttpAccessibleAnnotation = getAnnotation(RepoHttpAccessible::class)
+): HttpAccessible.ClientStrategy {
+    val repoHttpAccessibleAnnotation = getAnnotation(HttpAccessible::class)
 
-    return if(repoHttpAccessibleAnnotation?.clientStrategy == RepoHttpAccessible.ClientStrategy.AUTO) {
+    return if(repoHttpAccessibleAnnotation?.clientStrategy == HttpAccessible.ClientStrategy.AUTO) {
         if(getDaoFunHttpAccessibleDoorReplicationEntities(resolver).isNotEmpty())
-            RepoHttpAccessible.ClientStrategy.PULL_REPLICATE_ENTITIES
+            HttpAccessible.ClientStrategy.PULL_REPLICATE_ENTITIES
         else
-            RepoHttpAccessible.ClientStrategy.HTTP_WITH_FALLBACK
+            HttpAccessible.ClientStrategy.HTTP_WITH_FALLBACK
     }else {
-        repoHttpAccessibleAnnotation?.clientStrategy ?: RepoHttpAccessible.ClientStrategy.LOCAL_DB_ONLY
+        repoHttpAccessibleAnnotation?.clientStrategy ?: HttpAccessible.ClientStrategy.LOCAL_DB_ONLY
     }
 }
 
@@ -148,15 +147,15 @@ fun KSFunctionDeclaration.getDaoFunHttpAccessibleEffectiveStrategy(
  * query parameters of the request).
  */
 fun KSFunctionDeclaration.getDaoFunHttpMethodToUse(): String {
-    val httpAccessibleAnnotation = getAnnotation(RepoHttpAccessible::class)
+    val httpAccessibleAnnotation = getAnnotation(HttpAccessible::class)
         ?: throw IllegalArgumentException("function ${simpleName.asString()} is not annotated RepoHttpAccessible")
     return when {
-        httpAccessibleAnnotation.httpMethod == RepoHttpAccessible.HttpMethod.AUTO &&
+        httpAccessibleAnnotation.httpMethod == HttpAccessible.HttpMethod.AUTO &&
                 parameters.any { param -> param.hasAnnotation(RepoHttpBodyParam::class) } -> {
-                    RepoHttpAccessible.HttpMethod.POST.name
+                    HttpAccessible.HttpMethod.POST.name
         }
-        httpAccessibleAnnotation.httpMethod == RepoHttpAccessible.HttpMethod.AUTO -> {
-            RepoHttpAccessible.HttpMethod.GET.name
+        httpAccessibleAnnotation.httpMethod == HttpAccessible.HttpMethod.AUTO -> {
+            HttpAccessible.HttpMethod.GET.name
         }
         else -> httpAccessibleAnnotation.httpMethod.name
     }

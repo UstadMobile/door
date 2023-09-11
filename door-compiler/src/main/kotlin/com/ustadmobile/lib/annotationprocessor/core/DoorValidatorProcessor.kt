@@ -216,7 +216,7 @@ class DoorValidatorProcessor(
 
     private fun validateDaoHttpAccessibleFunctions(dao: KSClassDeclaration) {
         val allHttpAccessibleFunctions = dao.getAllFunctions().toList()
-            .filter { it.hasAnnotation(RepoHttpAccessible::class) }
+            .filter { it.hasAnnotation(HttpAccessible::class) }
 
         val duplciateNameFunctions = allHttpAccessibleFunctions.filter { daoFun ->
             allHttpAccessibleFunctions.any { otherDaoFun ->
@@ -229,7 +229,7 @@ class DoorValidatorProcessor(
         }
 
         allHttpAccessibleFunctions.forEach { daoFun ->
-            val httpAccessibleAnnotation = daoFun.getAnnotation(RepoHttpAccessible::class)
+            val httpAccessibleAnnotation = daoFun.getAnnotation(HttpAccessible::class)
             if(daoFun.hasAnnotation(RawQuery::class)) {
                 logger.error("HttpAccessible function cannot use RawQuery! This would be a major security risk",
                     daoFun)
@@ -241,7 +241,7 @@ class DoorValidatorProcessor(
             }
 
             if(daoFun.parameters.any { it.hasAnnotation(RepoHttpBodyParam::class) } &&
-                httpAccessibleAnnotation?.httpMethod == RepoHttpAccessible.HttpMethod.GET
+                httpAccessibleAnnotation?.httpMethod == HttpAccessible.HttpMethod.GET
             ) {
                 logger.error("HttAccessible function: if @RepoHttpBodyParam then http method MUST be AUTO or POST",
                     daoFun)

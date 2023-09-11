@@ -3,7 +3,7 @@ package db3
 import androidx.room.Insert
 import androidx.room.Query
 import com.ustadmobile.door.annotation.DoorDao
-import com.ustadmobile.door.annotation.RepoHttpAccessible
+import com.ustadmobile.door.annotation.HttpAccessible
 import com.ustadmobile.door.annotation.RepoHttpBodyParam
 import com.ustadmobile.door.annotation.Repository
 
@@ -14,7 +14,7 @@ expect abstract class DiscussionPostDao {
     @Insert
     abstract suspend fun insertAsync(post: DiscussionPost): Long
 
-    @RepoHttpAccessible()
+    @HttpAccessible()
     @Query("""
         SELECT DiscussionPost.*, Member.*
           FROM DiscussionPost
@@ -24,7 +24,7 @@ expect abstract class DiscussionPostDao {
     """)
     abstract suspend fun findAllRepliesWithPosterMember(postUid : Long): List<DiscussionPostAndPosterMember>
 
-    @RepoHttpAccessible()
+    @HttpAccessible()
     @Query("""
         SELECT DiscussionPost.*, Member.*
           FROM DiscussionPost
@@ -35,8 +35,8 @@ expect abstract class DiscussionPostDao {
     abstract suspend fun findByUidWithPosterMember(postUid: Long): DiscussionPostAndPosterMember?
 
 
-    @RepoHttpAccessible(
-        httpMethod = RepoHttpAccessible.HttpMethod.POST
+    @HttpAccessible(
+        httpMethod = HttpAccessible.HttpMethod.POST
     )
     @Query("""
         SELECT DiscussionPost.*, Member.*
@@ -49,12 +49,20 @@ expect abstract class DiscussionPostDao {
         @RepoHttpBodyParam postUids: List<Long>
     ): List<DiscussionPostAndPosterMember>
 
-    @RepoHttpAccessible
+    @HttpAccessible(clientStrategy = HttpAccessible.ClientStrategy.HTTP_WITH_FALLBACK)
     @Query("""
         SELECT COUNT(*) 
           FROM DiscussionPost
          WHERE DiscussionPost.postLastModified >= :since 
     """)
     abstract suspend fun getNumPostsSinceTime(since: Long): Int
+
+    @HttpAccessible(clientStrategy = HttpAccessible.ClientStrategy.HTTP_OR_THROW)
+    @Query("""
+        SELECT COUNT(*) 
+          FROM DiscussionPost
+         WHERE DiscussionPost.postLastModified >= :since 
+    """)
+    abstract suspend fun getNumPostsSinceTimeHttpOnly(since: Long): Int
 
 }

@@ -10,7 +10,7 @@ import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.writeTo
 import com.ustadmobile.door.*
-import com.ustadmobile.door.annotation.RepoHttpAccessible
+import com.ustadmobile.door.annotation.HttpAccessible
 import com.ustadmobile.door.annotation.RepoHttpBodyParam
 import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_ILLEGALSTATEEXCEPTION
@@ -211,20 +211,23 @@ fun FileSpec.Builder.addDaoRepoType(
 }
 
 /**
- * For a given DAO function where the ClientStrategy is to use replicate entities - generate code that will make the
- * http request and pass the received entities to the NodeEventManager (which is responsible
- * to insert them via receive view, directly, or triggering the callback).
+ * Add a block of code to make an http request for a given function within a repo: e.g.
+ *
+ * .get {
+ *     setRepoUrl(config, "DaoName/functionName")
+ *     doorNodeIdHeader(repo)
+ *     param("paramName", _repo.config.json.encodeToString(Type.serializer(), paramName)
+ * }
  */
-fun CodeBlock.Builder.addMakeHttpRequestAndInsertReplicationsCode(
+fun CodeBlock.Builder.addRepoHttpClientRequestForFunction(
     daoKSFun: KSFunctionDeclaration,
     daoKSClass: KSClassDeclaration,
     resolver: Resolver,
     repoValName: String = "_repo",
-    dbValName: String = "_db",
-) {
+) : CodeBlock.Builder {
     val httpMethod = daoKSFun.getDaoFunHttpMethodToUse()
     val funAsMemberOfDao = daoKSFun.asMemberOf(daoKSClass.asType(emptyList()))
-    beginControlFlow("val _response = _httpClient.%M",
+    beginControlFlow("%M",
         MemberName("io.ktor.client.request", httpMethod.lowercase()))
     add("%M($repoValName.config, %S)\n",
         MemberName("com.ustadmobile.door.ext", "setRepoUrl"),
@@ -240,7 +243,7 @@ fun CodeBlock.Builder.addMakeHttpRequestAndInsertReplicationsCode(
             add("%M(%L)\n",
                 MemberName("io.ktor.client.request", "setBody"),
                 ksValueParameter.name?.asString()
-                )
+            )
         }else {
             add("%M(%S, _repo.config.json.encodeToString(",
                 MemberName("io.ktor.client.request", "parameter"),
@@ -248,10 +251,28 @@ fun CodeBlock.Builder.addMakeHttpRequestAndInsertReplicationsCode(
             addKotlinxSerializationStrategy(funAsMemberOfDao.parameterTypes[index]!!, resolver)
             add(", %L))\n", ksValueParameter.name?.asString())
         }
-
     }
-
     endControlFlow()
+
+    return this
+}
+
+/**
+ * For a given DAO function where the ClientStrategy is to use replicate entities - generate code that will make the
+ * http request and pass the received entities to the NodeEventManager (which is responsible
+ * to insert them via receive view, directly, or triggering the callback).
+ */
+fun CodeBlock.Builder.addMakeHttpRequestAndInsertReplicationsCode(
+    daoKSFun: KSFunctionDeclaration,
+    daoKSClass: KSClassDeclaration,
+    resolver: Resolver,
+    repoValName: String = "_repo",
+    dbValName: String = "_db",
+) {
+    add("val _response = _httpClient.")
+    addRepoHttpClientRequestForFunction(daoKSFun, daoKSClass, resolver, repoValName)
+    add("\n")
+
     add("$dbValName.%M(_response)\n",
         MemberName("com.ustadmobile.door.replication","onClientRepoDoorMessageHttpResponse"))
 }
@@ -273,6 +294,7 @@ fun TypeSpec.Builder.addDaoRepoFun(
     val clientStrategy = daoKSFun.getDaoFunHttpAccessibleEffectiveStrategy(resolver)
     val daoFunSpec = daoKSFun.toFunSpecBuilder(resolver, daoKSClass.asType(emptyList()), environment.logger)
         .build()
+    val functionPath = "${daoKSClass.simpleName.asString()}/${daoKSFun.simpleName.asString()}"
 
     addFunction(daoFunSpec.toBuilder()
         .removeAbstractModifier()
@@ -281,9 +303,41 @@ fun TypeSpec.Builder.addDaoRepoFun(
         .addCode(
             CodeBlock.builder().apply {
                 when(clientStrategy) {
-                    RepoHttpAccessible.ClientStrategy.PULL_REPLICATE_ENTITIES -> {
+                    HttpAccessible.ClientStrategy.PULL_REPLICATE_ENTITIES -> {
                         addMakeHttpRequestAndInsertReplicationsCode(daoKSFun, daoKSClass, resolver)
                         addRepoDelegateToDaoCode(daoKSFun, resolver)
+                    }
+                    HttpAccessible.ClientStrategy.HTTP_OR_THROW -> {
+                        if(daoKSFun.hasReturnType(resolver))
+                            add("return ")
+                        beginControlFlow("_repo.%M(repoPath = %S)",
+                            MemberName("com.ustadmobile.door.http", "repoHttpRequest"),
+                           functionPath)
+                        add("_repo.config.httpClient.")
+                        addRepoHttpClientRequestForFunction(daoKSFun, daoKSClass, resolver)
+                        add(".%M()\n", MemberName("io.ktor.client.call", "body"))
+                        endControlFlow()
+                    }
+                    HttpAccessible.ClientStrategy.HTTP_WITH_FALLBACK -> {
+                        if(daoKSFun.hasReturnType(resolver))
+                            add("return ")
+
+                        add("_repo.%M(\n",
+                            MemberName("com.ustadmobile.door.http", "repoHttpRequestWithFallback"),
+                        )
+                        indent()
+                        add("repoPath = %S,\n", functionPath)
+                        beginControlFlow("http = ")
+                        add("_repo.config.httpClient.")
+                        addRepoHttpClientRequestForFunction(daoKSFun, daoKSClass, resolver)
+                        add(".%M()\n", MemberName("io.ktor.client.call", "body"))
+                        nextControlFlow(",\nfallback = ")
+                        add("_dao.")
+                        addDelegateFunctionCall(daoKSFun)
+                        add("\n")
+                        endControlFlow()
+                        unindent()
+                        add("\n)\n")
                     }
 
                     else -> {
@@ -338,7 +392,17 @@ fun TypeSpec.Builder.addDaoRepoFun(
     return this
 }
 
-
+/**
+ * Write a simple function call - assuming that all the same parameters are present
+ */
+fun CodeBlock.Builder.addDelegateFunctionCall(
+    daoFun: KSFunctionDeclaration,
+) : CodeBlock.Builder{
+    add("${daoFun.simpleName.asString()}(")
+    add(daoFun.parameters.joinToString { it.name?.asString() ?: "" })
+    add(")")
+    return this
+}
 
 /**
  * Add a CodeBlock for a repo delegate to DAO function. This will
@@ -357,11 +421,9 @@ fun CodeBlock.Builder.addRepoDelegateToDaoCode(
     if(daoFun.hasReturnType(resolver))
         add("val _result = ")
 
-    add("_dao.${daoFun.simpleName.asString()}(")
-            .add(daoFun.parameters.joinToString { it.name?.asString() ?: "" })
-            .add(")\n")
-
-
+    add("_dao.")
+    addDelegateFunctionCall(daoFun)
+    add("\n")
 
     if(daoFun.hasReturnType(resolver)) {
         add("return _result\n")

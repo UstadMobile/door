@@ -4,7 +4,7 @@ import androidx.room.Insert
 import androidx.room.Query
 import com.ustadmobile.door.annotation.DoorDao
 import com.ustadmobile.door.annotation.HttpServerFunctionCall
-import com.ustadmobile.door.annotation.RepoHttpAccessible
+import com.ustadmobile.door.annotation.HttpAccessible
 import com.ustadmobile.door.annotation.Repository
 import kotlinx.coroutines.flow.Flow
 
@@ -42,7 +42,7 @@ abstract class ExampleEntity3Dao {
     abstract fun findByUidAsFlow(uid: Long): Flow<ExampleEntity3?>
 
 
-    @RepoHttpAccessible(
+    @HttpAccessible(
         pullQueriesToReplicate = arrayOf(
             HttpServerFunctionCall(functionName = "findAllWithCardNumAbove")
         )

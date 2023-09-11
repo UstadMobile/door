@@ -117,7 +117,7 @@ fun FileSpec.Builder.addDaoKtorRouteFun(
         .addCode(CodeBlock.builder()
         .apply {
             daoClassDecl.getAllFunctions().filter {
-                it.hasAnnotation(RepoHttpAccessible::class)
+                it.hasAnnotation(HttpAccessible::class)
             }.forEach {funDecl ->
                 val httpMethodMember = if(funDecl.getDaoFunHttpMethodToUse() == "GET") {
                     GET_MEMBER
@@ -158,7 +158,7 @@ fun FileSpec.Builder.addNanoHttpdResponder(
         .superclass(AbstractDoorUriResponder::class)
         .apply {
             daoKSClassDeclaration.getAllFunctions()
-                .filter { it.hasAnnotation(RepoHttpAccessible::class) }
+                .filter { it.hasAnnotation(HttpAccessible::class) }
                 .forEach { daoFun ->
                     addNanoHttpDaoFun(daoFun, daoKSClassDeclaration, resolver, logger)
                 }
@@ -218,7 +218,7 @@ fun TypeSpec.Builder.addNanoHttpdResponderFun(
     val isPostFn = methodName.lowercase() == "post"
 
     val daoFunsToRespond = daoClassDecl.getAllFunctions().filter { daoFun ->
-        daoFun.hasAnnotation(RepoHttpAccessible::class)
+        daoFun.hasAnnotation(HttpAccessible::class)
     }.filter { daoFun ->
         val funResolved = daoFun.asMemberOf(daoClassDecl.asType(emptyList()))
         funResolved.parameterTypes.any { it?.toTypeName()?.isHttpQueryQueryParam() == false } == isPostFn
@@ -525,7 +525,7 @@ fun FileSpec.Builder.addDbKtorRouteFunction(
                 endControlFlow()
 
                 dbClassDeclaration.dbEnclosedDaos().filter {daoKsClass ->
-                    daoKsClass.getAllFunctions().any { it.hasAnnotation(RepoHttpAccessible::class) }
+                    daoKsClass.getAllFunctions().any { it.hasAnnotation(HttpAccessible::class) }
                 }.forEach { daoKsClass ->
                     beginControlFlow("%M(%S)",
                         MemberName("io.ktor.server.routing", "route"),
@@ -630,7 +630,7 @@ fun FileSpec.Builder.addHttpServerExtensionFun(
 
                     }
 
-                    if(effectiveStrategy == RepoHttpAccessible.ClientStrategy.PULL_REPLICATE_ENTITIES) {
+                    if(effectiveStrategy == HttpAccessible.ClientStrategy.PULL_REPLICATE_ENTITIES) {
                         addHttpReplicationEntityServerExtension(resolver, daoFunDecl)
                     }else {
                         //Run the query and return JSON
@@ -851,7 +851,7 @@ class DoorHttpServerProcessor(
         }
 
         daoSymbols.forEach { daoDecl ->
-            val httpAccessibleFunctions = daoDecl.getAllFunctions().filter { it.hasAnnotation(RepoHttpAccessible::class) }.toList()
+            val httpAccessibleFunctions = daoDecl.getAllFunctions().filter { it.hasAnnotation(HttpAccessible::class) }.toList()
             if(httpAccessibleFunctions.isNotEmpty()) {
                 FileSpec.builder(daoDecl.packageName.asString(), "${daoDecl.simpleName.asString()}$SUFFIX_HTTP_SERVER_EXTENSION_FUNS")
                     .apply {

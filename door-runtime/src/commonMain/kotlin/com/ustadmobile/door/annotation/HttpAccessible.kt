@@ -13,7 +13,7 @@ package com.ustadmobile.door.annotation
  */
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.BINARY)
-annotation class RepoHttpAccessible(
+annotation class HttpAccessible(
     val clientStrategy: ClientStrategy = ClientStrategy.AUTO,
     val httpMethod: HttpMethod = HttpMethod.AUTO,
     val pullQueriesToReplicate: Array<HttpServerFunctionCall> = arrayOf(),
@@ -41,7 +41,7 @@ annotation class RepoHttpAccessible(
          * client will return the result as delivered from the server. The local database of the client will not be
          * queried. If the server is not reachable an exception will be thrown.
          */
-        HTTP_ONLY,
+        HTTP_OR_THROW,
 
         /**
          * As per HTTP_ONLY, however, if the server is not reachable, then the query will be run locally

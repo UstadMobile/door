@@ -6,7 +6,6 @@ import androidx.room.Query
 import androidx.room.Update
 import com.ustadmobile.door.SyncNode
 import com.ustadmobile.door.annotation.ParamName
-import com.ustadmobile.door.annotation.RepoHttpAccessible
 import com.ustadmobile.door.annotation.Repository
 
 
