@@ -21,6 +21,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import org.junit.Assert
 import org.junit.Test
+import kotlin.test.assertEquals
 
 class PullIntegrationTest {
 
@@ -31,6 +32,7 @@ class PullIntegrationTest {
         val okHttpClient: OkHttpClient,
         val serverEndpointUrl: String,
         val json: Json,
+        val server: ApplicationEngine,
     ) {
 
         fun makeClientRepo(): ExampleDb3 {
@@ -87,6 +89,7 @@ class PullIntegrationTest {
                         okHttpClient = okHttpClient,
                         serverEndpointUrl = "http://localhost:8094/",
                         json = json,
+                        server = server,
                     )
                 )
             }finally {
@@ -122,6 +125,78 @@ class PullIntegrationTest {
         }
     }
 
+    @Test
+    fun givenEntitiesCreatedOnServer_whenClientUsesHttpWithFallbackFunction_thenWillReturnAnswersAndNotCopyToLocalDatabase() {
+        clientServerIntegrationTest {
+            val memberInServerDb = Member().apply {
+                firstName = "Roger"
+                lastName = "Rabbit"
+                memberUid = serverDb.memberDao.insertAsync(this)
+            }
 
+            DiscussionPost().apply {
+                postTitle = "I like hay"
+                postText = "Mmm... Hay..."
+                posterMemberUid = memberInServerDb.memberUid
+                postUid = serverDb.discussionPostDao.insertAsync(this)
+            }
+
+            val clientRepo = makeClientRepo()
+
+            val numPostsFromServer = clientRepo.discussionPostDao.getNumPostsSinceTime(0)
+            Assert.assertEquals(1, numPostsFromServer)
+            val numPostsLocally = clientDb.discussionPostDao.getNumPostsSinceTime(0)
+            assertEquals(0, numPostsLocally)
+        }
+    }
+
+    @Test
+    fun givenEntitiesCreatedOnServer_whenClientUsesHttpWithoutFallback_thenWillReturnAnswersAndNotCopyToLocalDatabase() {
+        clientServerIntegrationTest {
+            val memberInServerDb = Member().apply {
+                firstName = "Roger"
+                lastName = "Rabbit"
+                memberUid = serverDb.memberDao.insertAsync(this)
+            }
+
+            DiscussionPost().apply {
+                postTitle = "I like hay"
+                postText = "Mmm... Hay..."
+                posterMemberUid = memberInServerDb.memberUid
+                postUid = serverDb.discussionPostDao.insertAsync(this)
+            }
+
+            val clientRepo = makeClientRepo()
+
+            val numPostsFromServer = clientRepo.discussionPostDao.getNumPostsSinceTimeHttpOnly(0)
+            Assert.assertEquals(1, numPostsFromServer)
+            val numPostsLocally = clientDb.discussionPostDao.getNumPostsSinceTimeHttpOnly(0)
+            assertEquals(0, numPostsLocally)
+        }
+    }
+
+    @Test(expected = Exception::class)
+    fun givenEntitiesCreatedOnServer_whenClientUsesHttpWithoutFallbackAndServerIsUnreachable_thenWillThrowException(){
+        clientServerIntegrationTest {
+            val memberInServerDb = Member().apply {
+                firstName = "Roger"
+                lastName = "Rabbit"
+                memberUid = serverDb.memberDao.insertAsync(this)
+            }
+
+            DiscussionPost().apply {
+                postTitle = "I like hay"
+                postText = "Mmm... Hay..."
+                posterMemberUid = memberInServerDb.memberUid
+                postUid = serverDb.discussionPostDao.insertAsync(this)
+            }
+
+            val clientRepo = makeClientRepo()
+
+            server.stop()
+            clientRepo.discussionPostDao.getNumPostsSinceTimeHttpOnly(0)
+
+        }
+    }
 
 }
