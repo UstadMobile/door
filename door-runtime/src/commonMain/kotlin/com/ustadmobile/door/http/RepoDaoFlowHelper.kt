@@ -18,6 +18,15 @@ class RepoDaoFlowHelper(
      */
     private val flowToStatusMap: MutableMap<Flow<*>, Flow<LoadingState>> = weakMapOf()
 
+    /**
+     * This is used by generated code to create an offline-first flow where the flow will immediately load from the
+     * local database. Collecting the flow will trigger an http request in the background to pull updates from the
+     * server (if any). This will run an insert, which would trigger the flow to update with the new data automatically.
+     *
+     * @param dbFlow the flow from the database DAO
+     * @param onMakeHttpRequest a function that will make the http request to fetch replicate entities and insert them
+     *        into the database
+     */
     fun <T> asRepoFlow(
         dbFlow: Flow<T>,
         onMakeHttpRequest: suspend () -> Unit,

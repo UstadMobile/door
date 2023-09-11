@@ -7,6 +7,8 @@ import com.ustadmobile.door.RepositoryConfig
 import com.ustadmobile.door.ext.asRepository
 import com.ustadmobile.door.ext.doorWrapperNodeId
 import com.ustadmobile.door.http.DoorHttpServerConfig
+import com.ustadmobile.door.http.LoadingState
+import com.ustadmobile.door.http.repoFlowWithLoadingState
 import db3.DiscussionPost
 import db3.ExampleDb3
 import db3.ExampleDb3_KtorRoute
@@ -219,7 +221,6 @@ class PullIntegrationTest {
 
     @Test
     fun givenEntitiesCreatedOnServer_whenClientUsesFlow_thenFlowWillUpdateAndEntitiesWillBeCopiedToLocalDb() {
-        Napier.base(DebugAntilog())
         clientServerIntegrationTest {
             val memberInServerDb = Member().apply {
                 firstName = "Roger"
@@ -248,6 +249,41 @@ class PullIntegrationTest {
             val postInClientDb = clientDb.discussionPostDao.findByUidWithPosterMember(post.postUid)
             assertEquals(post, postInClientDb?.discussionPost)
             assertEquals(memberInServerDb, postInClientDb?.posterMember)
+        }
+    }
+
+    @Test
+    fun givenEntitiesCreatedOnServer_whenClientUsesFlowWithLoadingStatus_thenWillUpdateLoadingStatusAndWillBeCopiedToDb() {
+        clientServerIntegrationTest {
+            val memberInServerDb = Member().apply {
+                firstName = "Roger"
+                lastName = "Rabbit"
+                memberUid = serverDb.memberDao.insertAsync(this)
+            }
+
+            val post = DiscussionPost().apply {
+                postTitle = "I like hay"
+                postText = "Mmm... Hay..."
+                posterMemberUid = memberInServerDb.memberUid
+                postUid = serverDb.discussionPostDao.insertAsync(this)
+            }
+
+            val clientRepo = makeClientRepo()
+
+            clientRepo.discussionPostDao.repoFlowWithLoadingState {
+                it.findByUidWithPosterMemberAsFlow(post.postUid)
+            }.test(timeout = 500.seconds) {
+                val initialState = awaitItemWhere { it.loadingState?.status == LoadingState.Status.LOADING }
+
+                val loadedState = awaitItemWhere { it.loadingState?.status == LoadingState.Status.DONE }
+
+                val postInClientDb = clientDb.discussionPostDao.findByUidWithPosterMember(post.postUid)
+
+                assertEquals(LoadingState.Status.LOADING, initialState.loadingState?.status)
+                assertEquals(post, postInClientDb?.discussionPost)
+                assertEquals(memberInServerDb, postInClientDb?.posterMember)
+                cancelAndIgnoreRemainingEvents()
+            }
         }
     }
 

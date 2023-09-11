@@ -2,6 +2,7 @@ package db3
 
 import androidx.room.Insert
 import androidx.room.Query
+import com.ustadmobile.door.RepositoryFlowLoadingStatusProvider
 import com.ustadmobile.door.annotation.DoorDao
 import com.ustadmobile.door.annotation.HttpAccessible
 import com.ustadmobile.door.annotation.RepoHttpBodyParam
@@ -10,7 +11,7 @@ import kotlinx.coroutines.flow.Flow
 
 @DoorDao
 @Repository
-expect abstract class DiscussionPostDao {
+expect abstract class DiscussionPostDao : RepositoryFlowLoadingStatusProvider {
 
     @Insert
     abstract suspend fun insertAsync(post: DiscussionPost): Long
@@ -33,7 +34,7 @@ expect abstract class DiscussionPostDao {
                      ON Member.memberUid = DiscussionPost.posterMemberUid
          WHERE DiscussionPost.postReplyToPostUid = :postUid
     """)
-    abstract suspend fun findAllRepliesWithPosterMemberAsFlow(postUid : Long): Flow<List<DiscussionPostAndPosterMember>>
+    abstract fun findAllRepliesWithPosterMemberAsFlow(postUid : Long): Flow<List<DiscussionPostAndPosterMember>>
 
 
     @HttpAccessible()
@@ -55,7 +56,7 @@ expect abstract class DiscussionPostDao {
                      ON Member.memberUid = DiscussionPost.posterMemberUid
          WHERE DiscussionPost.postUid = :postUid            
     """)
-    abstract suspend fun findByUidWithPosterMemberAsFlow(postUid: Long): Flow<DiscussionPostAndPosterMember?>
+    abstract fun findByUidWithPosterMemberAsFlow(postUid: Long): Flow<DiscussionPostAndPosterMember?>
 
     @HttpAccessible(
         httpMethod = HttpAccessible.HttpMethod.POST

@@ -14,6 +14,7 @@ import com.ustadmobile.door.annotation.HttpAccessible
 import com.ustadmobile.door.annotation.RepoHttpBodyParam
 import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.http.RepoDaoFlowHelper
+import com.ustadmobile.door.http.RepositoryDaoWithFlowHelper
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_ILLEGALSTATEEXCEPTION
 import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.SUFFIX_REPOSITORY2
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
@@ -206,7 +207,9 @@ fun FileSpec.Builder.addDaoRepoType(
                         && it.asMemberOf(daoKSClass.asType(emptyList())).returnType?.isFlow() == true
             }
             if(needsRepoFlowHelper) {
-                addProperty(PropertySpec.builder("_repoFlowHelper", RepoDaoFlowHelper::class)
+                addSuperinterface(RepositoryDaoWithFlowHelper::class)
+                addProperty(PropertySpec.builder("repoDaoFlowHelper", RepoDaoFlowHelper::class)
+                    .addModifiers(KModifier.OVERRIDE)
                     .initializer("%T(_repo)\n", RepoDaoFlowHelper::class)
                     .build())
             }
@@ -317,7 +320,7 @@ fun TypeSpec.Builder.addDaoRepoFun(
                 when(clientStrategy) {
                     HttpAccessible.ClientStrategy.PULL_REPLICATE_ENTITIES -> {
                         if(funResolved.returnType?.isFlow() == true) {
-                            add("return _repoFlowHelper.asRepoFlow(\n")
+                            add("return repoDaoFlowHelper.asRepoFlow(\n")
                             indent()
                             add("dbFlow = _dao.").addDelegateFunctionCall(daoKSFun).add(",\n")
                             beginControlFlow("onMakeHttpRequest = ")

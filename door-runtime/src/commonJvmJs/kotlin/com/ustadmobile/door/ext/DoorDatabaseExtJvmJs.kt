@@ -9,6 +9,7 @@ import com.ustadmobile.door.jdbc.ext.useStatementAsync
 import com.ustadmobile.door.util.NodeIdAuthCache
 import com.ustadmobile.door.util.systemTimeInMillis
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 
 actual suspend fun <R> RoomDatabase.prepareAndUseStatementAsync(
     stmtConfig: PreparedStatementConfig,
@@ -27,7 +28,8 @@ actual suspend fun <R> RoomDatabase.prepareAndUseStatementAsync(
             }
         }
     }catch(e: Exception) {
-        Napier.e("prepareAndUseStatementAsync: Exception running SQL: '${stmtConfig.sqlToUse(this.dbType())}' on DB $this", e, tag = DoorTag.LOG_TAG)
+        if(e !is CancellationException)
+            Napier.e("prepareAndUseStatementAsync: Exception running SQL: '${stmtConfig.sqlToUse(this.dbType())}' on DB $this", e, tag = DoorTag.LOG_TAG)
         throw e
     }
 }
