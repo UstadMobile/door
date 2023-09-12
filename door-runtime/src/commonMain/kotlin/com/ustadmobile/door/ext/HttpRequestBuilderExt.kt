@@ -4,9 +4,18 @@ import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.DoorConstants
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.RepositoryConfig
-import io.ktor.client.request.HttpRequestBuilder
-import io.ktor.client.request.header
 import io.ktor.http.*
+import kotlinx.serialization.SerializationStrategy
+import app.cash.paging.PagingSourceLoadParams
+import app.cash.paging.PagingSourceLoadParamsAppend
+import app.cash.paging.PagingSourceLoadParamsPrepend
+import app.cash.paging.PagingSourceLoadParamsRefresh
+import com.ustadmobile.door.paging.DoorRepositoryReplicatePullPagingSource.Companion.PARAM_BATCHSIZE
+import com.ustadmobile.door.paging.DoorRepositoryReplicatePullPagingSource.Companion.PARAM_KEY
+import com.ustadmobile.door.paging.DoorRepositoryReplicatePullPagingSource.Companion.PARAM_LOAD_PARAM_TYPE
+import io.ktor.client.request.*
+import kotlinx.serialization.json.Json
+import kotlin.reflect.KClass
 
 fun HttpRequestBuilder.dbVersionHeader(db: RoomDatabase) {
     this.header(DoorConstants.HEADER_DBVERSION, db.dbSchemaVersion())
@@ -52,3 +61,29 @@ fun HttpRequestBuilder.setRepoUrl(
     repoPath: String
 ) = setRepoUrl(repositoryConfig.endpoint, repoPath)
 
+enum class LoadParamType(val paramClass: KClass<*>) {
+    REFRESH(PagingSourceLoadParamsRefresh::class),
+    PREPEND(PagingSourceLoadParamsPrepend::class),
+    APPEND(PagingSourceLoadParamsAppend::class);
+
+    companion object {
+        fun paramTypeFor(paramClass: KClass<*>) : LoadParamType {
+            return entries.first { it.paramClass == paramClass }
+        }
+    }
+}
+
+/**
+ * Used by generated code to send paging source load params in an http request
+ */
+@Suppress("unused")
+fun <K: Any> HttpRequestBuilder.pagingSourceLoadParameters(
+    json: Json,
+    keySerializer: SerializationStrategy<K?>,
+    loadParams: PagingSourceLoadParams<K>,
+) {
+    val loadParamType = LoadParamType.paramTypeFor(loadParams::class)
+    parameter(PARAM_LOAD_PARAM_TYPE, loadParamType.name)
+    parameter(PARAM_KEY, json.encodeToString(keySerializer, loadParams.key))
+    parameter(PARAM_BATCHSIZE, loadParams.loadSize)
+}

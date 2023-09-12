@@ -1,8 +1,11 @@
 package com.ustadmobile.door.paging
 
-import app.cash.paging.PagingSourceLoadResult
+import app.cash.paging.PagingSource
+import app.cash.paging.PagingSourceLoadParams
 import app.cash.paging.PagingSourceLoadResultPage
 
-fun <Value: Any> PagingSourceLoadResult<*, Value>.pageDataOrEmpty(): List<Value> {
-    return (this as? PagingSourceLoadResultPage<*, Value>)?.data ?: emptyList()
+suspend fun <Key: Any, Value: Any> PagingSource<Key, Value>.loadPageDataOrEmptyList(
+    loadParams: PagingSourceLoadParams<Key>
+): List<Value> {
+    return (load(loadParams) as? PagingSourceLoadResultPage<Key, Value>)?.data ?: emptyList()
 }

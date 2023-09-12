@@ -97,4 +97,20 @@ expect abstract class DiscussionPostDao : RepositoryFlowLoadingStatusProvider {
     """)
     abstract fun findAllPostAsPagingSource(since: Long): PagingSource<Int, DiscussionPost>
 
+    @HttpAccessible(clientStrategy = HttpAccessible.ClientStrategy.HTTP_OR_THROW)
+    @Query("""
+        SELECT DiscussionPost.*
+          FROM DiscussionPost 
+         WHERE DiscussionPost.postLastModified >= :since 
+    """)
+    abstract fun findAllPostAsNetworkOnlyPagingSource(since: Long): PagingSource<Int, DiscussionPost>
+    @HttpAccessible(clientStrategy = HttpAccessible.ClientStrategy.HTTP_WITH_FALLBACK)
+    @Query("""
+        SELECT DiscussionPost.*
+          FROM DiscussionPost 
+         WHERE DiscussionPost.postLastModified >= :since 
+    """)
+    abstract fun findAllPostAsNetworkWithFallbackPagingSource(since: Long): PagingSource<Int, DiscussionPost>
+
+
 }

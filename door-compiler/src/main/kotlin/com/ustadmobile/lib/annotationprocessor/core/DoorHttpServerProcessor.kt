@@ -1,8 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import app.cash.paging.PagingSourceLoadParamsRefresh
 import com.google.devtools.ksp.processing.KSPLogger
-import com.ustadmobile.door.room.RoomDatabase
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
@@ -29,9 +27,9 @@ import com.ustadmobile.door.http.DoorJsonResponse
 import com.ustadmobile.door.ktor.KtorCallDaoAdapter
 import com.ustadmobile.door.ktor.KtorCallDbAdapter
 import com.ustadmobile.door.message.DoorMessage
-import com.ustadmobile.door.paging.DoorRepositoryPagingSource
 import com.ustadmobile.door.replication.DoorReplicationEntity
 import com.ustadmobile.door.replication.DoorRepositoryReplicationClient
+import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.CALL_MEMBER
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.CODEBLOCK_KTOR_NO_CONTENT_RESPOND
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.CODEBLOCK_NANOHTTPD_NO_CONTENT_RESPONSE
@@ -596,6 +594,21 @@ fun FileSpec.Builder.addDbNanoHttpdMapperFunction(
     return this
 }
 
+fun CodeBlock.Builder.addGetRequestPagingSourceLoadParams(
+    resolver: Resolver,
+): CodeBlock.Builder {
+    add("%M(\n",
+        MemberName("com.ustadmobile.door.ext", "requirePagingSourceLoadParams"))
+    withIndent {
+        add("json = json,\n")
+        add("keyDeserializationStrategy = ").addKotlinxSerializationStrategy(
+            resolver.builtIns.intType.makeNullable(), resolver
+        ).add(",\n")
+    }
+    add(")\n")
+    return this
+}
+
 fun FileSpec.Builder.addHttpServerExtensionFun(
     resolver: Resolver,
     daoKSClassDeclaration: KSClassDeclaration,
@@ -632,47 +645,57 @@ fun FileSpec.Builder.addHttpServerExtensionFun(
                     }
 
                     if(daoFunDecl.returnType?.resolve()?.isPagingSource() == true) {
-                        add("val _pagingLoadParams = %T(\n",
-                            ClassName("app.cash.paging","PagingSourceLoadParamsRefresh"))
-                        indent()
-                        add("key = json.decodeFromString(")
-                        addKotlinxSerializationStrategy(resolver.builtIns.intType.makeNullable(), resolver)
-                        add(", request.requireParam(%S)),\n", DoorRepositoryPagingSource.PARAM_KEY)
-                        add("loadSize = ")
-                        add("json.decodeFromString(")
-                        addKotlinxSerializationStrategy(resolver.builtIns.intType, resolver)
-                        add(", request.requireParam(%S)),\n", DoorRepositoryPagingSource.PARAM_BATCHSIZE)
-                        add("placeholdersEnabled = false,\n")
-                        unindent()
-                        add(")\n")
+                        add("val _pagingLoadParams = request.").addGetRequestPagingSourceLoadParams(resolver)
+                            .add("\n")
                     }
 
                     if(effectiveStrategy == HttpAccessible.ClientStrategy.PULL_REPLICATE_ENTITIES) {
                         addHttpReplicationEntityServerExtension(resolver, daoFunDecl)
                     }else {
                         //Run the query and return JSON
+                        add("val _thisNodeId = request.db.%M\n",
+                            MemberName("com.ustadmobile.door.ext", "doorWrapperNodeId"))
                         add("val _result = %L(", daoFunDecl.simpleName.asString())
                         daoFunDecl.parameters.forEach { param ->
                             add("_arg_${param.name?.asString()},")
                         }
-                        add(")\n")
-
-                        add("val _thisNodeId = request.db.%M\n",
-                            MemberName("com.ustadmobile.door.ext", "doorWrapperNodeId"))
-                        add("return %T(", DoorJsonResponse::class)
-                        indent()
-                        add("\n")
-                        val returnType = funAsMemberOfDao.returnType
-                        if(returnType != null && returnType.toTypeName() != UNIT) {
-                            add("bodyText = json.encodeToString(")
-                            addKotlinxSerializationStrategy(returnType, resolver)
-                            add(", _result),\n")
+                        add(")")
+                        if(daoFunDecl.returnType?.resolve()?.isPagingSource() == true) {
+                            val componentType = daoFunDecl.returnType?.resolve()?.unwrapResultType(resolver)
+                                ?: throw IllegalArgumentException("Cannot determine result type for " +
+                                        daoFunDecl.simpleName.asString())
+                            add(".load(_pagingLoadParams)\n")
+                            add("return _result.%M(",
+                                MemberName("com.ustadmobile.door.ext", "toJsonResponse"))
+                            withIndent {
+                                add("json = json,\n")
+                                add("keySerializer = ").addKotlinxSerializationStrategy(
+                                    resolver.builtIns.intType.makeNullable(), resolver).add(",\n")
+                                add("valueSerializer = ").addKotlinxSerializationStrategy(componentType, resolver)
+                                    .add(",\n")
+                                add("localNodeId = _thisNodeId,\n")
+                            }
+                            add(")\n")
+                            //Add special return using extension function here.
                         }else {
-                            add("bodyText = %S,\n", "")
+                            add("\n")
+                            add("return %T(", DoorJsonResponse::class)
+                            withIndent {
+                                add("\n")
+                                val returnType = funAsMemberOfDao.returnType
+                                if(returnType != null && returnType.toTypeName() != UNIT) {
+                                    add("bodyText = json.encodeToString(")
+                                    addKotlinxSerializationStrategy(returnType, resolver)
+                                    add(", _result),\n")
+                                }else {
+                                    add("bodyText = %S,\n", "")
+                                }
+                                add("headers = listOf(%T.HEADER_NODE_ID to _thisNodeId.toString()),\n", DoorConstants::class)
+                            }
+                            add(")\n")
                         }
-                        add("headers = listOf(%T.HEADER_NODE_ID to _thisNodeId.toString()),\n", DoorConstants::class)
-                        unindent()
-                        add(")\n")
+
+
                     }
                 }
                 .build())
@@ -710,7 +733,8 @@ fun CodeBlock.Builder.addHttpReplicationEntityServerExtension(
         if(returnType?.isFlow() == true) {
             add(".%M()", MemberName("kotlinx.coroutines.flow", "first"))
         }else if(returnType?.isPagingSource() == true) {
-            add(".load(_pagingLoadParams).%M()", MemberName("com.ustadmobile.door.paging", "pageDataOrEmpty"))
+            add(".%M(_pagingLoadParams)",
+                MemberName("com.ustadmobile.door.paging", "loadPageDataOrEmptyList"))
         }
         add("\n")
 

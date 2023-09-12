@@ -1,21 +1,27 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import com.ustadmobile.door.room.*
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
-import com.google.devtools.ksp.symbol.*
+import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSDeclaration
+import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.writeTo
-import com.ustadmobile.door.*
+import com.ustadmobile.door.DoorDatabaseRepository
+import com.ustadmobile.door.RepositoryConfig
+import com.ustadmobile.door.RepositoryHelper
 import com.ustadmobile.door.annotation.HttpAccessible
 import com.ustadmobile.door.annotation.RepoHttpBodyParam
 import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.http.RepoDaoFlowHelper
 import com.ustadmobile.door.http.RepositoryDaoWithFlowHelper
-import com.ustadmobile.door.paging.DoorRepositoryPagingSource
+import com.ustadmobile.door.paging.DoorRepositoryHttpPagingSource
+import com.ustadmobile.door.paging.DoorRepositoryReplicatePullPagingSource
+import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_ILLEGALSTATEEXCEPTION
 import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.SUFFIX_REPOSITORY2
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
@@ -270,16 +276,14 @@ fun CodeBlock.Builder.addRepoHttpClientRequestForFunction(
     }
 
     if(pagingParamsValName != null) {
-        add("%M(%T.PARAM_BATCHSIZE, _repo.config.json.encodeToString(",
-            MemberName("io.ktor.client.request", "parameter"),
-            DoorRepositoryPagingSource::class)
-        addKotlinxSerializationStrategy(resolver.builtIns.intType, resolver)
-        add(", $pagingParamsValName.loadSize))\n")
-        add("%M(%T.PARAM_KEY, _repo.config.json.encodeToString(",
-            MemberName("io.ktor.client.request", "parameter"),
-            DoorRepositoryPagingSource::class)
-        addKotlinxSerializationStrategy(resolver.builtIns.intType.makeNullable(), resolver)
-        add(", $pagingParamsValName.key))\n")
+        add("%M(\n", MemberName("com.ustadmobile.door.ext", "pagingSourceLoadParameters"))
+        indent()
+        add("json = _repo.config.json, \n")
+        add("keySerializer = ")
+        addKotlinxSerializationStrategy(resolver.builtIns.intType.makeNullable(), resolver).add(",\n")
+        add("loadParams = $pagingParamsValName\n")
+        unindent()
+        add(")\n")
     }
 
     endControlFlow()
@@ -334,6 +338,32 @@ fun TypeSpec.Builder.addDaoRepoFun(
     val functionPath = "${daoKSClass.simpleName.asString()}/${daoKSFun.simpleName.asString()}"
     val funResolved = daoKSFun.asMemberOf(daoKSClass.asType(emptyList()))
 
+
+    fun CodeBlock.Builder.addHttpPagingSource(withFallback: Boolean) {
+        add("%T(\n", DoorRepositoryHttpPagingSource::class)
+        val componentType = funResolved.returnType?.unwrapResultType(resolver)
+            ?: throw IllegalArgumentException("addDaoRepoFun ${daoKSFun.simpleName.asString()} " +
+                    " cannot resolve result type")
+        withIndent {
+            add("valueDeserializationStrategy = ")
+                .addKotlinxSerializationStrategy(componentType, resolver)
+                .add(",\n")
+            add("json = _repo.config.json,\n")
+            beginControlFlow("onLoadHttp = ")
+            add("_pagingLoadParams ->\n")
+            add("_repo.config.httpClient.")
+            addRepoHttpClientRequestForFunction(daoKSFun, daoKSClass, resolver,
+                pagingParamsValName = "_pagingLoadParams")
+            endControlFlow()
+            add(",")
+            if(withFallback) {
+                add("fallbackPagingSource = _dao.").addDelegateFunctionCall(daoKSFun).add("\n")
+            }
+        }
+        add(")\n")
+    }
+
+
     addFunction(daoFunSpec.toBuilder()
         .removeAbstractModifier()
         .removeAnnotations()
@@ -352,7 +382,7 @@ fun TypeSpec.Builder.addDaoRepoFun(
                             unindent()//unindent for asRepoFlow
                             add("\n)")
                         }else if(funResolved.returnType?.isPagingSource() == true) {
-                            add("return %T(", DoorRepositoryPagingSource::class)
+                            add("return %T(", DoorRepositoryReplicatePullPagingSource::class)
                             indent()
                             add("\nrepo = _repo,\n")
                             add("repoPath = %S,\n", functionPath)
@@ -374,34 +404,44 @@ fun TypeSpec.Builder.addDaoRepoFun(
                     HttpAccessible.ClientStrategy.HTTP_OR_THROW -> {
                         if(daoKSFun.hasReturnType(resolver))
                             add("return ")
-                        beginControlFlow("_repo.%M(repoPath = %S)",
-                            MemberName("com.ustadmobile.door.http", "repoHttpRequest"),
-                           functionPath)
-                        add("_repo.config.httpClient.")
-                        addRepoHttpClientRequestForFunction(daoKSFun, daoKSClass, resolver)
-                        add(".%M()\n", MemberName("io.ktor.client.call", "body"))
-                        endControlFlow()
+
+                        if(funResolved.returnType?.isPagingSource() == true) {
+                            addHttpPagingSource(withFallback = false)
+                        }else {
+                            beginControlFlow("_repo.%M(repoPath = %S)",
+                                MemberName("com.ustadmobile.door.http", "repoHttpRequest"),
+                                functionPath)
+                            add("_repo.config.httpClient.")
+                            addRepoHttpClientRequestForFunction(daoKSFun, daoKSClass, resolver)
+                            add(".%M()\n", MemberName("io.ktor.client.call", "body"))
+                            endControlFlow()
+                        }
+
                     }
                     HttpAccessible.ClientStrategy.HTTP_WITH_FALLBACK -> {
                         if(daoKSFun.hasReturnType(resolver))
                             add("return ")
 
-                        add("_repo.%M(\n",
-                            MemberName("com.ustadmobile.door.http", "repoHttpRequestWithFallback"),
-                        )
-                        indent()
-                        add("repoPath = %S,\n", functionPath)
-                        beginControlFlow("http = ")
-                        add("_repo.config.httpClient.")
-                        addRepoHttpClientRequestForFunction(daoKSFun, daoKSClass, resolver)
-                        add(".%M()\n", MemberName("io.ktor.client.call", "body"))
-                        nextControlFlow(",\nfallback = ")
-                        add("_dao.")
-                        addDelegateFunctionCall(daoKSFun)
-                        add("\n")
-                        endControlFlow()
-                        unindent()
-                        add("\n)\n")
+                        if(funResolved.returnType?.isPagingSource() == true) {
+                            addHttpPagingSource(withFallback = true)
+                        }else{
+                            add("_repo.%M(\n",
+                                MemberName("com.ustadmobile.door.http", "repoHttpRequestWithFallback"),
+                            )
+                            indent()
+                            add("repoPath = %S,\n", functionPath)
+                            beginControlFlow("http = ")
+                            add("_repo.config.httpClient.")
+                            addRepoHttpClientRequestForFunction(daoKSFun, daoKSClass, resolver)
+                            add(".%M()\n", MemberName("io.ktor.client.call", "body"))
+                            nextControlFlow(",\nfallback = ")
+                            add("_dao.")
+                            addDelegateFunctionCall(daoKSFun)
+                            add("\n")
+                            endControlFlow()
+                            unindent()
+                            add("\n)\n")
+                        }
                     }
 
                     else -> {
