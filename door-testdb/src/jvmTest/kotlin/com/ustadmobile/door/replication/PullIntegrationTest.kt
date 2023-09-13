@@ -1,6 +1,7 @@
 package com.ustadmobile.door.replication
 
 import app.cash.paging.PagingSourceLoadParamsRefresh
+import app.cash.paging.PagingSourceLoadResultPage
 import app.cash.turbine.ReceiveTurbine
 import app.cash.turbine.test
 import com.ustadmobile.door.DatabaseBuilder
@@ -10,10 +11,7 @@ import com.ustadmobile.door.ext.doorWrapperNodeId
 import com.ustadmobile.door.http.DoorHttpServerConfig
 import com.ustadmobile.door.http.LoadingState
 import com.ustadmobile.door.http.repoFlowWithLoadingState
-import db3.DiscussionPost
-import db3.ExampleDb3
-import db3.ExampleDb3_KtorRoute
-import db3.Member
+import db3.*
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
 import io.ktor.client.*
@@ -31,6 +29,7 @@ import okhttp3.OkHttpClient
 import org.junit.Assert
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.time.Duration.Companion.seconds
 
 class PullIntegrationTest {
@@ -319,5 +318,35 @@ class PullIntegrationTest {
         }
     }
 
+
+    @Test
+    fun givenEntitiesCreatedOnServer_whenClientUsesNetworkOnlyPagingSource_thenWillLoadAndNotInsertLocally() {
+        clientServerIntegrationTest {
+            val memberInServerDb = Member().apply {
+                firstName = "Roger"
+                lastName = "Rabbit"
+                memberUid = serverDb.memberDao.insertAsync(this)
+            }
+
+            val post = DiscussionPost().apply {
+                postTitle = "I like hay"
+                postText = "Mmm... Hay..."
+                posterMemberUid = memberInServerDb.memberUid
+                postUid = serverDb.discussionPostDao.insertAsync(this)
+            }
+
+            val clientRepo = makeClientRepo()
+            val networkOnlyPagingSource = clientRepo.discussionPostDao.findAllPostAsNetworkOnlyPagingSource(0)
+            val firstLoad = networkOnlyPagingSource.load(
+                PagingSourceLoadParamsRefresh(
+                    key = 0,
+                    loadSize = 50,
+                    placeholdersEnabled = false
+                )
+            ) as PagingSourceLoadResultPage<Int, DiscussionPost>
+            assertEquals(post, firstLoad.data.first())
+            assertNull(clientDb.discussionPostDao.findByUid(post.postUid))
+        }
+    }
 
 }

@@ -22,7 +22,7 @@ import kotlinx.serialization.Serializable
                 """
                 REPLACE INTO DiscussionPost(postUid, postReplyToPostUid, postTitle, postText, postLastModified, posterMemberUid)
                       SELECT NEW.postUid, NEW.postReplyToPostUid, NEW.postTitle, NEW.postText, NEW.postLastModified, NEW.posterMemberUid
-                       WHERE NEW.postLastModified !=
+                       WHERE NEW.postLastModified >
                              COALESCE((SELECT DiscussionPost_Internal.postLastModified
                                          FROM DiscussionPost DiscussionPost_Internal
                                         WHERE DiscussionPost_Internal.postUid = NEW.postUid), 0)

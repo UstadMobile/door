@@ -17,6 +17,13 @@ expect abstract class DiscussionPostDao : RepositoryFlowLoadingStatusProvider {
     @Insert
     abstract suspend fun insertAsync(post: DiscussionPost): Long
 
+    @Query("""
+        SELECT DiscussionPost.*
+          FROM DiscussionPost
+         WHERE DiscussionPost.postUid = :postUid
+    """)
+    abstract suspend fun findByUid(postUid: Long): DiscussionPost?
+
     @HttpAccessible()
     @Query("""
         SELECT DiscussionPost.*, Member.*

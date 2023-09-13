@@ -86,7 +86,7 @@ class DoorRepositoryHttpPagingSource<Value: Any>(
             Napier.w(tag = DoorTag.LOG_TAG, throwable = e) {
                 "DoorRepositoryHttpPagingSource: could not load"
             }
-            return fallbackPagingSource?.load(params) ?: throw e
+            return fallbackPagingSource?.load(params) ?: PagingSourceLoadResultError(e)
         }
     }
 
