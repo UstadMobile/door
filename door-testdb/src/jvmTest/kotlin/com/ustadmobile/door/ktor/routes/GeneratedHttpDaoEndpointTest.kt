@@ -73,7 +73,11 @@ class GeneratedHttpDaoEndpointTest {
             }
 
             block(
-                PullReplicationTestContext(db, client, json)
+                try {
+                    PullReplicationTestContext(db, client, json)
+                }finally {
+                    db.close()
+                }
             )
         }
     }

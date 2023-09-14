@@ -7,10 +7,10 @@ import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.ext.*
 import com.ustadmobile.door.message.DoorMessageCallback
 import com.ustadmobile.door.room.RoomDatabase
+import com.ustadmobile.door.room.RoomDatabaseJdbcImplHelperCommon
 import com.ustadmobile.door.room.RoomJdbcImpl
 import com.ustadmobile.door.util.TransactionMode
 import kotlinx.coroutines.CoroutineDispatcher
-import com.ustadmobile.door.room.RoomDatabaseJdbcImplHelperCommon
 import kotlinx.coroutines.Dispatchers
 
 class NodeEventManagerJvm<T: RoomDatabase>(
@@ -106,7 +106,7 @@ class NodeEventManagerJvm<T: RoomDatabase>(
         }
     }
     
-    fun close() {
+    override fun close() {
         if(db.dbType() == DoorDbType.SQLITE) {
             (db as RoomJdbcImpl).jdbcImplHelper.removeListener(jdbcImplListener)
         }

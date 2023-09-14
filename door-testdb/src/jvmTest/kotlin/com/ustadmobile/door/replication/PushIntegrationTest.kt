@@ -11,8 +11,6 @@ import com.ustadmobile.door.ktor.routes.ReplicationRoute
 import com.ustadmobile.door.util.systemTimeInMillis
 import db3.ExampleDb3
 import db3.ExampleEntity3
-import io.github.aakira.napier.DebugAntilog
-import io.github.aakira.napier.Napier
 import io.ktor.client.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.engine.*
@@ -52,8 +50,6 @@ class PushIntegrationTest {
 
     @BeforeTest
     fun setup() {
-        Napier.takeLogarithm()
-        Napier.base(DebugAntilog())
         serverDb = DatabaseBuilder.databaseBuilder(ExampleDb3::class, "jdbc:sqlite::memory:", serverNodeId)
             .build()
         serverDb.clearAllTables()
@@ -84,6 +80,8 @@ class PushIntegrationTest {
     @AfterTest
     fun tearDown() {
         server.stop()
+        serverDb.close()
+        clientDb.close()
     }
 
     private fun ExampleDb3.asClientNodeRepository() = asRepository(
@@ -119,6 +117,7 @@ class PushIntegrationTest {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+        clientRepo.close()
     }
 
     @Test
@@ -142,7 +141,7 @@ class PushIntegrationTest {
             }
         }
 
-        //clientRepo.close should happen here
+        clientRepo.close()
     }
 
     @Test(timeout = 10000)
@@ -170,6 +169,7 @@ class PushIntegrationTest {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+        clientRepo.close()
     }
 
     @Test
@@ -199,7 +199,7 @@ class PushIntegrationTest {
             }
         }
 
-        (clientRepo as DoorDatabaseRepository).close()
+        clientRepo.close()
     }
 
 

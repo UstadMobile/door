@@ -2,8 +2,8 @@ package com.ustadmobile.door.room
 
 import com.ustadmobile.door.ext.rootDatabase
 import com.ustadmobile.door.jdbc.SQLException
-import java.util.concurrent.Callable
 import com.ustadmobile.door.jdbc.ext.useStatement
+import java.util.concurrent.Callable
 
 actual abstract class RoomDatabase actual constructor() {
 
@@ -45,6 +45,10 @@ actual abstract class RoomDatabase actual constructor() {
             }
             connection.commit()
         }
+    }
+
+    actual open fun close() {
+
     }
 
 }

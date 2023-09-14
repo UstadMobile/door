@@ -6,4 +6,6 @@ expect abstract class RoomDatabase() {
 
     open val invalidationTracker: InvalidationTracker
 
+    open fun close()
+
 }

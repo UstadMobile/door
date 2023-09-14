@@ -7,6 +7,7 @@ import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.message.DoorMessageCallback
 import com.ustadmobile.door.replication.insertEntitiesFromMessage
 import com.ustadmobile.door.room.RoomDatabase
+import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -45,11 +46,19 @@ abstract class NodeEventManagerCommon<T : RoomDatabase>(
     override val incomingMessages: Flow<DoorMessage> = _incomingMessages.asSharedFlow()
 
 
+    protected val closed = atomic(false)
+
     init {
 
     }
 
+    protected fun assertNotClosed() {
+        if(closed.value)
+            throw IllegalStateException("NodeEventManager is closed!")
+    }
+
     override suspend fun onIncomingMessageReceived(message: DoorMessage) {
+        assertNotClosed()
         try {
             //this should check what is the strategy on the replicate entity
             db.withDoorTransactionAsync {
@@ -62,6 +71,10 @@ abstract class NodeEventManagerCommon<T : RoomDatabase>(
         }catch(e: Exception){
             throw e
         }
+    }
+
+    open fun close() {
+        closed.value = true
     }
 
 }

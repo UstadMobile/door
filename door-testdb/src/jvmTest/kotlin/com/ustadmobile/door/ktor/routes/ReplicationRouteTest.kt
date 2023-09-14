@@ -18,29 +18,29 @@ import com.ustadmobile.door.sse.DoorServerSentEvent
 import com.ustadmobile.door.util.systemTimeInMillis
 import db3.ExampleDb3
 import db3.ExampleEntity3
+import io.ktor.client.*
+import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.gson.*
-import io.ktor.server.testing.*
-import org.junit.Test
-import io.ktor.server.config.*
-import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.Json
-import kotlin.test.assertEquals
-import io.ktor.client.HttpClient
-import io.ktor.client.call.*
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.config.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.routing.*
+import io.ktor.server.testing.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
 import okhttp3.OkHttpClient
+import org.junit.Test
 import java.net.URLEncoder
+import kotlin.test.assertEquals
 
 class ReplicationRouteTest {
 
@@ -86,7 +86,7 @@ class ReplicationRouteTest {
                 ReplicationRoute(serverConfig) { db }
             }
 
-            val client = createClient {
+            val httpClient = createClient {
                 @Suppress("RemoveRedundantQualifierName", "RedundantSuppression") //Ensure clarity between client and server
                 install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
                     json(json = json)
@@ -94,7 +94,11 @@ class ReplicationRouteTest {
             }
 
             block(
-                ReplicationRouteTestContext(db, json, client)
+                try {
+                    ReplicationRouteTestContext(db, json, httpClient)
+                }finally {
+                    db.close()
+                }
             )
         }
 
@@ -274,6 +278,7 @@ class ReplicationRouteTest {
             }
         }finally {
             server.stop()
+            db.close()
             serverSentEventsClient.close()
             httpClient.close()
         }

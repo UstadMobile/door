@@ -9,6 +9,7 @@ import db2.ExampleEntity2
 import db2.ExampleLinkEntity
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
+import org.junit.After
 import org.junit.Assert
 import org.junit.Before
 
@@ -36,6 +37,10 @@ class TestDbBuilderKt {
             })
             .build()
         exampleDb2.clearAllTables()
+    }
+    @After
+    fun tearDown() {
+        exampleDb2.close()
     }
 
     @Test

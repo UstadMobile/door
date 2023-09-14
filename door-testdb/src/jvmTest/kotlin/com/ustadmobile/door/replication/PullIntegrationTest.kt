@@ -104,6 +104,8 @@ class PullIntegrationTest {
             }finally {
                 httpClient.close()
                 server.stop()
+                clientDb.close()
+                serverDb.close()
             }
         }
     }
@@ -131,6 +133,7 @@ class PullIntegrationTest {
 
             Assert.assertEquals(memberInServerDb, discussionAndMemberInClientDb?.posterMember)
             Assert.assertEquals(discussionPostInServerDb, discussionAndMemberInClientDb?.discussionPost)
+            clientRepo.close()
         }
     }
 
@@ -156,6 +159,7 @@ class PullIntegrationTest {
             Assert.assertEquals(1, numPostsFromServer)
             val numPostsLocally = clientDb.discussionPostDao.getNumPostsSinceTime(0)
             assertEquals(0, numPostsLocally)
+            clientRepo.close()
         }
     }
 
@@ -181,6 +185,7 @@ class PullIntegrationTest {
             Assert.assertEquals(1, numPostsFromServer)
             val numPostsLocally = clientDb.discussionPostDao.getNumPostsSinceTimeHttpOnly(0)
             assertEquals(0, numPostsLocally)
+            clientRepo.close()
         }
     }
 
@@ -204,7 +209,7 @@ class PullIntegrationTest {
 
             server.stop()
             clientRepo.discussionPostDao.getNumPostsSinceTimeHttpOnly(0)
-
+            clientRepo.close()
         }
     }
 
@@ -250,6 +255,7 @@ class PullIntegrationTest {
             val postInClientDb = clientDb.discussionPostDao.findByUidWithPosterMember(post.postUid)
             assertEquals(post, postInClientDb?.discussionPost)
             assertEquals(memberInServerDb, postInClientDb?.posterMember)
+            clientRepo.close()
         }
     }
 
@@ -285,6 +291,7 @@ class PullIntegrationTest {
                 assertEquals(memberInServerDb, postInClientDb?.posterMember)
                 cancelAndIgnoreRemainingEvents()
             }
+            clientRepo.close()
         }
     }
 
@@ -315,6 +322,8 @@ class PullIntegrationTest {
                 .test(timeout = 5.seconds) {
                     awaitItem()
                 }
+
+            clientRepo.close()
         }
     }
 
@@ -346,6 +355,7 @@ class PullIntegrationTest {
             ) as PagingSourceLoadResultPage<Int, DiscussionPost>
             assertEquals(post, firstLoad.data.first())
             assertNull(clientDb.discussionPostDao.findByUid(post.postUid))
+            clientRepo.close()
         }
     }
 

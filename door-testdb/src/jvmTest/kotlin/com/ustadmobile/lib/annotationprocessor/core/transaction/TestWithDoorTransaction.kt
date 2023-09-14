@@ -8,6 +8,7 @@ import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.room.InvalidationTrackerObserver
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert
 import org.junit.Before
 import org.junit.Test
@@ -80,6 +81,11 @@ class TestWithDoorTransaction {
 
         invalidationObserver = spy(realInvalidationObserver)
         db.invalidationTracker.addObserver(invalidationObserver)
+    }
+
+    @After
+    fun tearDown() {
+        db.close()
     }
 
     private fun assertInvocationCounts() {

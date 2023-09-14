@@ -2,7 +2,6 @@ package com.ustadmobile.lib.annotationprocessor.core
 
 import androidx.room.Delete
 import androidx.room.Insert
-import com.ustadmobile.door.room.RoomDatabase
 import androidx.room.Update
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
@@ -14,11 +13,12 @@ import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.writeTo
 import com.ustadmobile.door.DoorDatabaseWrapper
-import com.ustadmobile.door.annotation.ReplicateLastModified
 import com.ustadmobile.door.annotation.ReplicateEntity
+import com.ustadmobile.door.annotation.ReplicateLastModified
 import com.ustadmobile.door.message.DoorMessageCallback
 import com.ustadmobile.door.nodeevent.NodeEventManagerCommon
 import com.ustadmobile.door.nodeevent.NodeEventManagerJvm
+import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
 
 /**
@@ -273,6 +273,9 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
             .applyIf(target != DoorTarget.ANDROID) {
                 addOverrideInvalidationTracker("_db")
             }
+            .addFunction(FunSpec.builder("close")
+                .addModifiers(KModifier.OVERRIDE)
+                .build())
 
             .build()
     )

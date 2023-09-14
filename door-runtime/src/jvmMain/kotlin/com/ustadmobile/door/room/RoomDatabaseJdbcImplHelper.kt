@@ -2,6 +2,7 @@ package com.ustadmobile.door.room
 
 import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.DoorDbType
+import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.concurrentSafeMapOf
 import com.ustadmobile.door.ext.rootDatabase
 import com.ustadmobile.door.jdbc.Connection
@@ -10,7 +11,6 @@ import com.ustadmobile.door.jdbc.ext.mutableLinkedListOf
 import com.ustadmobile.door.util.TransactionMode
 import com.ustadmobile.door.util.systemTimeInMillis
 import io.github.aakira.napier.Napier
-import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
@@ -29,8 +29,6 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
         invalidationTracker.setupSqliteTriggersAsync(this)
     }
 
-    //Switch this to using concurrentSafeMap
-    //Synchronous mode pending transactions
     private val pendingTransactionThreadMap = concurrentSafeMapOf<Long, PendingTransaction>()
 
     @Suppress("UNUSED_PARAMETER") //Reserved for future usage
@@ -39,6 +37,7 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
         block: (Connection) -> R,
         threadId: Long,
     ): R {
+        assertNotClosed()
         val startTime = systemTimeInMillis()
         val transaction = PendingTransaction(dataSource.connection)
         transaction.connection.autoCommit = false
@@ -105,4 +104,16 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
 
     actual fun <R> useConnection(block: (Connection) -> R) = useConnection(TransactionMode.READ_WRITE, block)
 
+    override fun onClose() {
+        pendingTransactionThreadMap.forEach {
+            try {
+                it.value.connection.close()
+            }catch(e: Exception) {
+                Napier.w(tag = DoorTag.LOG_TAG, throwable = e) {
+                    "${this.db} exception closing transactions for thread #${it.key}"
+                }
+            }
+        }
+        pendingTransactionThreadMap.clear()
+    }
 }

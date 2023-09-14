@@ -29,6 +29,7 @@ class TestDatabaseBuilderCallback {
         val createdOnCallback = exampleDb2.exampleDao2().findByUid(1)
         assertEquals(42, createdOnCallback?.rewardsCardNumber ?: -1,
             "Found entity that was created by insert using callback")
+        exampleDb2.close()
     }
 
 }

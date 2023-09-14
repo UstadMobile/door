@@ -2,6 +2,7 @@ package com.ustadmobile.door.room
 
 import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.DoorDbType
+import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.concurrentSafeListOf
 import com.ustadmobile.door.ext.concurrentSafeMapOf
 import com.ustadmobile.door.ext.rootDatabase
@@ -12,9 +13,11 @@ import com.ustadmobile.door.util.TransactionMode
 import com.ustadmobile.door.util.systemTimeInMillis
 import io.github.aakira.napier.Napier
 import kotlinx.atomicfu.atomic
-import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlin.concurrent.Volatile
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
 
@@ -32,8 +35,10 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
 
     protected val sqliteMutex = Mutex()
 
-
     private val listeners = concurrentSafeListOf<Listener>()
+
+    @Volatile
+    private var closed = atomic(false)
 
     internal interface Listener {
         suspend fun onBeforeTransactionAsync(
@@ -80,12 +85,17 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
      */
     abstract suspend fun Connection.setupSqliteTriggersAsync()
 
+    protected fun assertNotClosed() {
+        if(closed.value)
+            throw IllegalStateException("$this is closed!")
+    }
+
     @Suppress("UNUSED_PARAMETER") //Reserved for future use
     private suspend fun <R> useNewConnectionAsyncInternal(
         transactionMode: TransactionMode,
         block: suspend (Connection) -> R,
     ): R {
-
+        assertNotClosed()
         val connection = dataSource.getConnection()
         connection.setAutoCommit(false)
 
@@ -128,7 +138,7 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
             Napier.e("useConnectionAsync: transaction ERROR: useConnectionAsync (transaction #${transactionId}: " +
                     "Transactions [${openTransactions.keys.joinToString()}] are still open" +
                     "Exception", t)
-            if(!connection.getAutoCommit())
+            if(!connection.isClosed() && !connection.getAutoCommit())
                 connection.rollback()
 
             throw t
@@ -180,6 +190,30 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
 
     internal fun removeListener(listener: Listener) {
         listeners -= listener
+    }
+
+    fun close() {
+        //close connections for any open transactions
+        if(closed.getAndSet(true)) {
+            openTransactions.forEach {
+                try {
+                    it.value.connection.close()
+                }catch(e: Exception) {
+                    Napier.w(tag = DoorTag.LOG_TAG) {
+                        "${this.db} : exception closing connection for transaction #${it.key}"
+                    }
+                }
+            }
+            openTransactions.clear()
+            onClose()
+        }
+    }
+
+    /**
+     * Can be overriden by child classes to implement additional logic required when closing.
+     */
+    protected open fun onClose() {
+
     }
 
 }

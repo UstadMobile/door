@@ -1,6 +1,5 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import com.ustadmobile.door.room.*
 import androidx.room.*
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
@@ -13,8 +12,6 @@ import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.writeTo
 import com.ustadmobile.door.*
-import kotlin.reflect.jvm.internal.impl.name.FqName
-import kotlin.reflect.jvm.internal.impl.builtins.jvm.JavaToKotlinClassMap
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.annotation.*
 import com.ustadmobile.door.ext.DoorDatabaseMetadata
@@ -23,17 +20,22 @@ import com.ustadmobile.door.ext.sqlToPostgresSql
 import com.ustadmobile.door.paging.DoorLimitOffsetPagingSource
 import com.ustadmobile.door.replication.ReplicationEntityMetaData
 import com.ustadmobile.door.replication.ReplicationFieldMetaData
+import com.ustadmobile.door.room.InvalidationTracker
+import com.ustadmobile.door.room.RoomDatabase
+import com.ustadmobile.door.room.RoomDatabaseJdbcImplHelper
 import com.ustadmobile.door.room.RoomJdbcImpl
-import kotlin.reflect.KClass
 import com.ustadmobile.door.util.NodeIdAuthCache
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.MEMBERNAME_EXEC_UPDATE_ASYNC
-import com.ustadmobile.lib.annotationprocessor.core.DoorJdbcProcessor.Companion.SUFFIX_JDBC_KT2
+import com.ustadmobile.lib.annotationprocessor.core.DoorJdbcProcessor.Companion.SUFFIX_JDBC_IMPL
 import com.ustadmobile.lib.annotationprocessor.core.DoorJdbcProcessor.Companion.SUFFIX_JS_IMPLEMENTATION_CLASSES
 import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.SUFFIX_REPOSITORY2
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlin.math.abs
+import kotlin.reflect.KClass
+import kotlin.reflect.jvm.internal.impl.builtins.jvm.JavaToKotlinClassMap
+import kotlin.reflect.jvm.internal.impl.name.FqName
 
 val QUERY_SINGULAR_TYPES = listOf(INT, LONG, SHORT, BYTE, BOOLEAN, FLOAT, DOUBLE,
         String::class.asTypeName(), String::class.asTypeName().copy(nullable = true))
@@ -174,7 +176,7 @@ private fun FileSpec.Builder.addJsImplementationsClassesObject(
             .build())
         .addProperty(PropertySpec.builder("dbImplKClass", KClass::class.asTypeName().parameterizedBy(STAR))
             .addModifiers(KModifier.OVERRIDE)
-            .initializer("%T::class", dbKSClass.toClassNameWithSuffix(SUFFIX_JDBC_KT2))
+            .initializer("%T::class", dbKSClass.toClassNameWithSuffix(SUFFIX_JDBC_IMPL))
             .build())
         .addProperty(PropertySpec.builder("replicateWrapperImplClass", KClass::class.asTypeName()
             .parameterizedBy(STAR).copy(nullable = true))
@@ -331,7 +333,7 @@ fun FileSpec.Builder.addJdbcDbImplType(
     resolver: Resolver,
 ) : FileSpec.Builder {
     addImport("com.ustadmobile.door.util", "systemTimeInMillis")
-    addType(TypeSpec.classBuilder(dbKSClass.toClassNameWithSuffix(SUFFIX_JDBC_KT2))
+    addType(TypeSpec.classBuilder(dbKSClass.toClassNameWithSuffix(SUFFIX_JDBC_IMPL))
         .addOriginatingKSClasses(listOf(dbKSClass))
         .superclass(dbKSClass.toClassName())
         .addSuperinterface(DoorDatabaseJdbc::class)
@@ -402,12 +404,16 @@ fun FileSpec.Builder.addJdbcDbImplType(
             dbKSClass.allDbClassDaoGetters().forEach { daoGetterOrProp ->
                 val daoKSClass = daoGetterOrProp.propertyOrReturnType()?.resolve()?.declaration as? KSClassDeclaration
                     ?: return@forEach
-                val daoImplClassName = daoKSClass.toClassNameWithSuffix(SUFFIX_JDBC_KT2)
+                val daoImplClassName = daoKSClass.toClassNameWithSuffix(SUFFIX_JDBC_IMPL)
                 addProperty(PropertySpec.builder("_${daoKSClass.simpleName.asString()}",
                     daoImplClassName).delegate("lazy·{·%T(this)·}", daoImplClassName).build())
                 addDaoPropOrGetterOverride(daoGetterOrProp, CodeBlock.of("return _${daoKSClass.simpleName.asString()}"))
             }
         }
+        .addFunction(FunSpec.builder("close")
+            .addModifiers(KModifier.OVERRIDE)
+            .addCode("jdbcImplHelper.close()\n")
+            .build())
         .build())
     return this
 }
@@ -696,7 +702,7 @@ fun FileSpec.Builder.addDaoJdbcImplType(
     Napier.d("DbProcessorJdbcKotlin: addDaoJdbcImplType: start ${daoKSClass.simpleName.asString()}")
     val allFunctions = daoKSClass.getAllFunctions()
     addImport("com.ustadmobile.door", "DoorDbType")
-    addType(TypeSpec.classBuilder(daoKSClass.toClassNameWithSuffix(SUFFIX_JDBC_KT2))
+    addType(TypeSpec.classBuilder(daoKSClass.toClassNameWithSuffix(SUFFIX_JDBC_IMPL))
         .addOriginatingKSClass(daoKSClass)
         .addOriginatingKSClasses(daoKSClass.allDaoEntities(resolver))
         .primaryConstructor(FunSpec.constructorBuilder().addParameter("_db",
@@ -1235,7 +1241,7 @@ class DoorJdbcProcessor(
                 .writeTo(environment.codeGenerator, false)
 
             if(target in JDBC_TARGETS) {
-                FileSpec.builder(dbKSClass.packageName.asString(), dbKSClass.simpleName.asString() + SUFFIX_JDBC_KT2)
+                FileSpec.builder(dbKSClass.packageName.asString(), dbKSClass.simpleName.asString() + SUFFIX_JDBC_IMPL)
                     .addJdbcDbImplType(dbKSClass, target, resolver)
                     .build()
                     .writeTo(environment.codeGenerator, false)
@@ -1251,7 +1257,7 @@ class DoorJdbcProcessor(
 
         if(target in JDBC_TARGETS) {daoSymbols.forEach { daoKSClass ->
             FileSpec.builder(daoKSClass.packageName.asString(),
-                    daoKSClass.simpleName.asString() + SUFFIX_JDBC_KT2)
+                    daoKSClass.simpleName.asString() + SUFFIX_JDBC_IMPL)
                     .addDaoJdbcImplType(daoKSClass, resolver, environment, target)
                     .build()
                     .writeTo(environment.codeGenerator, false)
@@ -1265,7 +1271,7 @@ class DoorJdbcProcessor(
 
         val JDBC_TARGETS = listOf(DoorTarget.JVM, DoorTarget.JS)
 
-        const val SUFFIX_JDBC_KT2 = "_JdbcImpl"
+        const val SUFFIX_JDBC_IMPL = "_JdbcImpl"
 
         const val SUFFIX_JS_IMPLEMENTATION_CLASSES = "JsImplementations"
     }

@@ -53,6 +53,7 @@ class NodeEventTest {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+        db.close()
 
     }
 
@@ -100,6 +101,8 @@ class NodeEventTest {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+        db1.close()
+        db2.close()
     }
 
 

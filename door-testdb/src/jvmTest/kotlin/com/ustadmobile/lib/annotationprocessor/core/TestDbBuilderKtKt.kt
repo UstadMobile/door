@@ -1,8 +1,10 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import com.ustadmobile.door.*
+import com.ustadmobile.door.DatabaseBuilder
+import com.ustadmobile.door.SimpleDoorQuery
 import db2.ExampleDatabase2
 import db2.ExampleEntity2
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -23,6 +25,11 @@ class TestDbBuilderKtKt {
         exampleDb2 = DatabaseBuilder.databaseBuilder( ExampleDatabase2::class,
             "jdbc:sqlite::memory:", 1L).build()
         exampleDb2.clearAllTables()
+    }
+
+    @After
+    fun tearDown() {
+        exampleDb2.close()
     }
 
     @Test
