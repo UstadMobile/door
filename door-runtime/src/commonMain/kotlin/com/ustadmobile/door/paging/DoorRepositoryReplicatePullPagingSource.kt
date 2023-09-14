@@ -8,6 +8,7 @@ import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.ext.DoorTag
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.update
 
 /**
  * This is the primary offline-first PagingSource implementation - it is used for DAO functions that are annotated as
@@ -32,7 +33,7 @@ class DoorRepositoryReplicatePullPagingSource<Value: Any>(
     private val repoPath: String,
     private val dbPagingSource: PagingSource<Int, Value>,
     private val onLoadHttp: suspend (params: PagingSourceLoadParams<Int>) -> Unit,
-) : PagingSource<Int, Value>(){
+) : DoorRepositoryPagingSource<Int, Value>(){
 
     private val scope = CoroutineScope(Dispatchers.Default + Job())
 
@@ -57,10 +58,20 @@ class DoorRepositoryReplicatePullPagingSource<Value: Any>(
 
     override suspend fun load(params: PagingSourceLoadParams<Int>): PagingSourceLoadResult<Int, Value> {
         scope.launch {
+            val loadRequest = PagingSourceLoadState.PagingRequest(params.key)
+            _loadState.update { prev ->
+                prev.copyWithNewRequest(loadRequest)
+            }
             try {
                 onLoadHttp(params)
+                _loadState.update { prev ->
+                    prev.copyWhenRequestCompleted(loadRequest)
+                }
             }catch(e: Exception) {
                 Napier.v(tag = DoorTag.LOG_TAG) { "" }
+                _loadState.update { prev ->
+                    prev.copyWhenRequestFailed(loadRequest)
+                }
             }
         }
 

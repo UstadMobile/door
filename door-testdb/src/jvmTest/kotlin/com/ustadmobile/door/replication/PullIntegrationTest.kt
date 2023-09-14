@@ -9,8 +9,8 @@ import com.ustadmobile.door.RepositoryConfig
 import com.ustadmobile.door.ext.asRepository
 import com.ustadmobile.door.ext.doorWrapperNodeId
 import com.ustadmobile.door.http.DoorHttpServerConfig
-import com.ustadmobile.door.http.LoadingState
-import com.ustadmobile.door.http.repoFlowWithLoadingState
+import com.ustadmobile.door.flow.FlowLoadingState
+import com.ustadmobile.door.flow.repoFlowWithLoadingState
 import db3.*
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
@@ -274,13 +274,13 @@ class PullIntegrationTest {
             clientRepo.discussionPostDao.repoFlowWithLoadingState {
                 it.findByUidWithPosterMemberAsFlow(post.postUid)
             }.test(timeout = 500.seconds) {
-                val initialState = awaitItemWhere { it.loadingState?.status == LoadingState.Status.LOADING }
+                val initialState = awaitItemWhere { it.loadingState?.status == FlowLoadingState.Status.LOADING }
 
-                val loadedState = awaitItemWhere { it.loadingState?.status == LoadingState.Status.DONE }
+                val loadedState = awaitItemWhere { it.loadingState?.status == FlowLoadingState.Status.DONE }
 
                 val postInClientDb = clientDb.discussionPostDao.findByUidWithPosterMember(post.postUid)
 
-                assertEquals(LoadingState.Status.LOADING, initialState.loadingState?.status)
+                assertEquals(FlowLoadingState.Status.LOADING, initialState.loadingState?.status)
                 assertEquals(post, postInClientDb?.discussionPost)
                 assertEquals(memberInServerDb, postInClientDb?.posterMember)
                 cancelAndIgnoreRemainingEvents()

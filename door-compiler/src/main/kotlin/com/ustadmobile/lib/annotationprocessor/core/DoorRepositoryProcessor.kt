@@ -19,7 +19,7 @@ import com.ustadmobile.door.annotation.RepoHttpBodyParam
 import com.ustadmobile.door.annotation.Repository
 import com.ustadmobile.door.http.RepoDaoFlowHelper
 import com.ustadmobile.door.http.RepositoryDaoWithFlowHelper
-import com.ustadmobile.door.paging.DoorRepositoryHttpPagingSource
+import com.ustadmobile.door.paging.DoorRepositoryHttpRequestPagingSource
 import com.ustadmobile.door.paging.DoorRepositoryReplicatePullPagingSource
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_ILLEGALSTATEEXCEPTION
@@ -340,7 +340,7 @@ fun TypeSpec.Builder.addDaoRepoFun(
 
 
     fun CodeBlock.Builder.addHttpPagingSource(withFallback: Boolean) {
-        add("%T(\n", DoorRepositoryHttpPagingSource::class)
+        add("%T(\n", DoorRepositoryHttpRequestPagingSource::class)
         val componentType = funResolved.returnType?.unwrapResultType(resolver)
             ?: throw IllegalArgumentException("addDaoRepoFun ${daoKSFun.simpleName.asString()} " +
                     " cannot resolve result type")

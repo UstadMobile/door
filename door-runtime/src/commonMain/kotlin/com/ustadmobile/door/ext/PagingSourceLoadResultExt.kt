@@ -6,7 +6,7 @@ import app.cash.paging.PagingSourceLoadResultInvalid
 import app.cash.paging.PagingSourceLoadResultPage
 import com.ustadmobile.door.DoorConstants
 import com.ustadmobile.door.http.DoorJsonResponse
-import com.ustadmobile.door.paging.DoorRepositoryHttpPagingSource
+import com.ustadmobile.door.paging.DoorRepositoryHttpRequestPagingSource
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
@@ -42,13 +42,13 @@ fun <Key: Any, Value: Any> PagingSourceLoadResult<Key, Value>.toJsonResponse(
                 bodyText = json.encodeToString(valueSerializer, this.data),
                 headers = listOf(
                     DoorConstants.HEADER_NODE_ID to localNodeId.toString(),
-                    DoorRepositoryHttpPagingSource.HEADER_NEXT_KEY to
+                    DoorRepositoryHttpRequestPagingSource.HEADER_NEXT_KEY to
                         json.encodeToString(keySerializer, this.nextKey),
-                    DoorRepositoryHttpPagingSource.HEADER_PREV_KEY to
+                    DoorRepositoryHttpRequestPagingSource.HEADER_PREV_KEY to
                         json.encodeToString(keySerializer, this.prevKey),
-                    DoorRepositoryHttpPagingSource.HEADER_ITEMS_BEFORE to
+                    DoorRepositoryHttpRequestPagingSource.HEADER_ITEMS_BEFORE to
                         json.encodeToString(Int.serializer(), this.itemsBefore),
-                    DoorRepositoryHttpPagingSource.HEADER_ITEMS_AFTER to
+                    DoorRepositoryHttpRequestPagingSource.HEADER_ITEMS_AFTER to
                         json.encodeToString(Int.serializer(), this.itemsAfter)
                 )
             )

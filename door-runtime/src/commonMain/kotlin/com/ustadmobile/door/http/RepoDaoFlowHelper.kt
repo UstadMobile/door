@@ -2,8 +2,15 @@ package com.ustadmobile.door.http
 
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.ext.weakMapOf
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import com.ustadmobile.door.flow.FlowLoadingState
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 /**
  * Helper class that is used by DAO repositories to manage returned flows.
@@ -16,7 +23,7 @@ class RepoDaoFlowHelper(
     /**
      * Note: the weakmap is required to
      */
-    private val flowToStatusMap: MutableMap<Flow<*>, Flow<LoadingState>> = weakMapOf()
+    private val flowToStatusMap: MutableMap<Flow<*>, Flow<FlowLoadingState>> = weakMapOf()
 
     /**
      * This is used by generated code to create an offline-first flow where the flow will immediately load from the
@@ -24,25 +31,25 @@ class RepoDaoFlowHelper(
      * server (if any). This will run an insert, which would trigger the flow to update with the new data automatically.
      *
      * @param dbFlow the flow from the database DAO
-     * @param onMakeHttpRequest a function that will make the http request to fetch replicate entities and insert them
-     *        into the database
+     * @param onMakeHttpRequest a (generated) function that will make the http request to fetch replicate entities and
+     *        insert them into the database
      */
     fun <T> asRepoFlow(
         dbFlow: Flow<T>,
         onMakeHttpRequest: suspend () -> Unit,
     ): Flow<T> {
-        val statusFlow = MutableStateFlow(LoadingState())
+        val statusFlow = MutableStateFlow(FlowLoadingState())
 
         val wrappedFlow = dbFlow.onStart {
             val requestScope = CoroutineScope(currentCoroutineContext() + Job())
 
             requestScope.launch {
                 try {
-                    statusFlow.update { prev -> prev.copy(LoadingState.Status.LOADING) }
+                    statusFlow.update { prev -> prev.copy(FlowLoadingState.Status.LOADING) }
                     onMakeHttpRequest()
-                    statusFlow.update { prev -> prev.copy(LoadingState.Status.DONE) }
+                    statusFlow.update { prev -> prev.copy(FlowLoadingState.Status.DONE) }
                 }catch(e: Exception) {
-                    statusFlow.update { prev -> prev.copy(LoadingState.Status.FAILED) }
+                    statusFlow.update { prev -> prev.copy(FlowLoadingState.Status.FAILED) }
                 }
             }
         }
@@ -54,7 +61,7 @@ class RepoDaoFlowHelper(
     /**
      *
      */
-    fun httpStatusOf(flow: Flow<*>): Flow<LoadingState>? {
+    fun httpStatusOf(flow: Flow<*>): Flow<FlowLoadingState>? {
         return flowToStatusMap[flow]
     }
 

@@ -6,14 +6,12 @@ package com.ustadmobile.door.paging
 import app.cash.paging.*
 import com.ustadmobile.door.ext.DoorTag
 import io.github.aakira.napier.Napier
-import io.ktor.client.*
-import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.coroutines.flow.update
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
 /**
@@ -26,12 +24,12 @@ import kotlinx.serialization.json.Json
  * PagingSourceLoadResult as an HttpResponse
  */
 @Suppress("unused") // Used by generated code.
-class DoorRepositoryHttpPagingSource<Value: Any>(
+class DoorRepositoryHttpRequestPagingSource<Value: Any>(
     private val valueDeserializationStrategy: DeserializationStrategy<List<Value>>,
     private val json: Json,
     private val onLoadHttp: suspend (PagingSourceLoadParams<Int>) -> HttpResponse,
     private val fallbackPagingSource: PagingSource<Int, Value>? = null,
-) : PagingSource<Int, Value>(){
+) : DoorRepositoryPagingSource<Int, Value>(){
 
     class HttpPagingSourceRemoteException(
         @Suppress("unused") // part of the API - can be used by consumers
@@ -45,10 +43,22 @@ class DoorRepositoryHttpPagingSource<Value: Any>(
     }
 
     override suspend fun load(params: PagingSourceLoadParams<Int>): PagingSourceLoadResult<Int, Value> {
+        val loadRequest = PagingSourceLoadState.PagingRequest(params.key)
+
         try {
+            _loadState.update { prev ->
+                prev.copy(
+                    activeRequests = prev.activeRequests + listOf(loadRequest)
+                )
+            }
+
             val httpResponse = onLoadHttp(params)
             return when(httpResponse.status) {
                 HttpStatusCode.OK -> {
+                    _loadState.update { prev ->
+                        prev.copyWhenRequestCompleted(loadRequest)
+                    }
+
                     PagingSourceLoadResultPage(
                         data = json.decodeFromString(
                             deserializer = valueDeserializationStrategy,
@@ -71,6 +81,7 @@ class DoorRepositoryHttpPagingSource<Value: Any>(
                     )
                 }
                 HttpStatusCode.InternalServerError -> {
+                    _loadState.update { prev -> prev.copyWhenRequestFailed(loadRequest) }
                     PagingSourceLoadResultError(
                         throwable = HttpPagingSourceRemoteException(
                             httpStatusCode = httpResponse.status,
@@ -79,10 +90,12 @@ class DoorRepositoryHttpPagingSource<Value: Any>(
                     )
                 }
                 else -> {
+                    _loadState.update { prev -> prev.copyWhenRequestFailed(loadRequest) }
                     PagingSourceLoadResultInvalid()
                 }
             }
         }catch(e: Exception) {
+            _loadState.update { prev -> prev.copyWhenRequestFailed(loadRequest) }
             Napier.w(tag = DoorTag.LOG_TAG, throwable = e) {
                 "DoorRepositoryHttpPagingSource: could not load"
             }

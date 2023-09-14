@@ -1,6 +1,8 @@
-package com.ustadmobile.door.http
+package com.ustadmobile.door.flow
 
 import com.ustadmobile.door.RepositoryFlowLoadingStatusProvider
+import com.ustadmobile.door.http.RepositoryDaoWithFlowHelper
+import com.ustadmobile.door.http.ValueAndLoadingState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
@@ -12,8 +14,8 @@ import kotlinx.coroutines.flow.flowOf
 fun <T> Flow<T>.combineWithLoadingState(
     repositoryDao: RepositoryFlowLoadingStatusProvider
 ): Flow<ValueAndLoadingState<T>> {
-    val loadingStateFlow: Flow<LoadingState?> = (repositoryDao as? RepositoryDaoWithFlowHelper)?.repoDaoFlowHelper?.httpStatusOf(this)
-        ?: flowOf<LoadingState?>(null)
+    val loadingStateFlow: Flow<FlowLoadingState?> = (repositoryDao as? RepositoryDaoWithFlowHelper)?.repoDaoFlowHelper?.httpStatusOf(this)
+        ?: flowOf<FlowLoadingState?>(null)
     return this.combine(loadingStateFlow) { value, loadingState ->
         ValueAndLoadingState(value, loadingState)
     }
