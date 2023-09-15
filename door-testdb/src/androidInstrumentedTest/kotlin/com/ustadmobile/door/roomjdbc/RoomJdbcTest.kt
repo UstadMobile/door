@@ -1,19 +1,19 @@
-package com.ustadmobile.door.testandroid
+package com.ustadmobile.door.roomjdbc
 
 import android.content.Context
 import androidx.room.InvalidationTracker
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import com.ustadmobile.door.ext.*
+import com.ustadmobile.door.ext.prepareAndUseStatement
+import com.ustadmobile.door.ext.prepareAndUseStatementAsync
+import com.ustadmobile.door.ext.withDoorTransaction
+import com.ustadmobile.door.ext.withDoorTransactionAsync
 import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
-import com.ustadmobile.door.roomjdbc.ConnectionRoomJdbc
 import dbonly.VanillaDatabase
 import dbonly.VanillaEntity
 import kotlinx.coroutines.runBlocking
-
+import org.junit.Assert
 import org.junit.Test
-
-import org.junit.Assert.*
 
 class RoomJdbcTest {
 
@@ -33,8 +33,9 @@ class RoomJdbcTest {
         val resultSet = preparedStmt.executeQuery()
         resultSet.next()
         val count = resultSet.getInt(1)
-        assertEquals("Got count", 1, count)
+        Assert.assertEquals("Got count", 1, count)
     }
+
 
     @Test
     fun prepareAndUseStatement() {
@@ -62,7 +63,7 @@ class RoomJdbcTest {
         }
 
         val entityFound = db.vanillaDao.findEntityByPk(42L)
-        assertNotNull("Found entity inserted by prepareAndUseStatement:", entityFound)
+        Assert.assertNotNull("Found entity inserted by prepareAndUseStatement:", entityFound)
     }
 
     @Test
@@ -136,7 +137,7 @@ class RoomJdbcTest {
         }
 
         val entityFound = db.vanillaDao.findEntityByPk(42L)
-        assertNotNull("Found entity inserted by prepareAndUseStatement:", entityFound)
+        Assert.assertNotNull("Found entity inserted by prepareAndUseStatement:", entityFound)
     }
 
     @Test
@@ -178,7 +179,7 @@ class RoomJdbcTest {
 
 
         Thread.sleep(2000)
-        assertTrue(invalidatedTables.isNotEmpty())
+        Assert.assertTrue(invalidatedTables.isNotEmpty())
     }
 
 }

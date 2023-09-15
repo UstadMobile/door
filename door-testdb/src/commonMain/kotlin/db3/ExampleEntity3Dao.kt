@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
 
 @DoorDao
 @Repository
-abstract class ExampleEntity3Dao {
+expect abstract class ExampleEntity3Dao {
 
     @Insert
     abstract suspend fun insertAsync(exampleEntity3: ExampleEntity3): Long

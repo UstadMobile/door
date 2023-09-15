@@ -9,6 +9,8 @@ import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
 import com.ustadmobile.door.jdbc.ext.executeUpdateAsync
 import com.ustadmobile.door.jdbc.ext.mapRows
+import com.ustadmobile.door.triggers.TriggerConstants.SQLITE_SELECT_TRIGGER_NAMES
+import com.ustadmobile.door.triggers.TriggerConstants.SQLITE_SELECT_VIEW_NAMES
 
 fun DoorDatabaseMetadata<*>.createTriggerSetupStatementList(dbType: Int) :List<String> {
     return if(dbType ==DoorDbType.SQLITE)
@@ -18,12 +20,7 @@ fun DoorDatabaseMetadata<*>.createTriggerSetupStatementList(dbType: Int) :List<S
 }
 
 internal suspend fun Connection.getSqliteDoorTriggerNames(): List<String> {
-    return prepareStatement("""
-                SELECT name
-                  FROM sqlite_master
-                 WHERE type = 'trigger'
-                   AND name LIKE ?
-            """).use { preparedStmt ->
+    return prepareStatement(SQLITE_SELECT_TRIGGER_NAMES).use { preparedStmt ->
         preparedStmt.setString(1, "${Trigger.NAME_PREFIX}%")
         preparedStmt.executeQueryAsyncKmp().use { results ->
             results.mapRows { resultSet ->
@@ -34,12 +31,7 @@ internal suspend fun Connection.getSqliteDoorTriggerNames(): List<String> {
 }
 
 internal suspend fun Connection.getSqliteDoorReceiveViewNames(): List<String> {
-    return prepareStatement("""
-                SELECT name
-                  FROM sqlite_schema
-                 WHERE type = 'view'
-                   AND name LIKE ? 
-            """).use { preparedStatement ->
+    return prepareStatement(SQLITE_SELECT_VIEW_NAMES).use { preparedStatement ->
         preparedStatement.setString(1, "%${DoorConstants.RECEIVE_VIEW_SUFFIX}")
         preparedStatement.executeQueryAsyncKmp().use { results ->
             results.mapRows { resultSet ->

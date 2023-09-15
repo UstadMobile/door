@@ -1,18 +1,16 @@
 package com.ustadmobile.door.ext
 
-import androidx.room.RoomDatabase
 import androidx.room.*
 import com.ustadmobile.door.*
 import com.ustadmobile.door.jdbc.PreparedStatement
-import com.ustadmobile.door.PreparedStatementConfig
 import com.ustadmobile.door.roomjdbc.ConnectionRoomJdbc
 import com.ustadmobile.door.util.DoorAndroidRoomHelper
 import com.ustadmobile.door.util.NodeIdAuthCache
+import com.ustadmobile.door.util.TransactionMode
 import io.github.aakira.napier.Napier
 import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KClass
-import com.ustadmobile.door.util.TransactionMode
 
 actual fun RoomDatabase.dbType(): Int = DoorDbType.SQLITE
 
@@ -41,7 +39,7 @@ actual fun <T: RoomDatabase, R> T.withDoorTransaction(
 
 private val metadataCache = mutableMapOf<KClass<*>, DoorDatabaseMetadata<*>>()
 
-@Suppress("UNCHECKED_CAST", "RECEIVER_NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
+@Suppress("UNCHECKED_CAST")
 actual fun <T: RoomDatabase> KClass<T>.doorDatabaseMetadata(): DoorDatabaseMetadata<T> {
     return metadataCache.getOrPut(this) {
         Class.forName(this.java.canonicalName.substringBefore('_') + DoorDatabaseMetadata.SUFFIX_DOOR_METADATA).newInstance()
@@ -159,7 +157,7 @@ fun <T: RoomDatabase> RoomDatabase.isWrappable(dbClass: KClass<T>): Boolean {
  * Wrap a database with replication support. The wrapper manages setting primary keys, (if an entity has a field
  * annotated with @LastChangedTime) setting the last changed time as the version id, and storing attachment data.
  */
-@Suppress("UNCHECKED_CAST")
+@Deprecated("This is now done by the DatabaseBuilder")
 actual fun <T: RoomDatabase> T.wrap(
     dbClass: KClass<T>,
     nodeId: Long,
@@ -167,7 +165,9 @@ actual fun <T: RoomDatabase> T.wrap(
     val wrapperClass = Class.forName(
         "${dbClass.qualifiedName}${DoorDatabaseWrapper.SUFFIX}"
     ) as Class<T>
-    return wrapperClass.getConstructor(dbClass.java).newInstance(this)
+    return wrapperClass.getConstructor(
+        dbClass.java, Long::class.javaPrimitiveType
+    ).newInstance(this, nodeId)
 }
 
 @Suppress("UNCHECKED_CAST")

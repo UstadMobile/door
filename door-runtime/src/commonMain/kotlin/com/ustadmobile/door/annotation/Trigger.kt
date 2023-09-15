@@ -3,8 +3,9 @@ package com.ustadmobile.door.annotation
 //Array literal is not supported on Javascript compilation
 @Suppress("ReplaceArrayOfWithLiteral")
 @Target(AnnotationTarget.CLASS)
+
 /**
- * Attempt to implement a common trigger wrapper that works on both SQL and Postgres.
+ * Trigger annotation that supports creating triggers on both SQLite and Postgres.
  *
  * ON SQLite this will simply create a trigger using the normal create trigger syntax.
  *
@@ -12,10 +13,15 @@ package com.ustadmobile.door.annotation
  * clause to contain queries like SQLite does. Here a function will be generated that
  * will run the function.
  *
+ * Triggers are used by the ReplicateEntity ReceiveView (see @ReplicateEntity) as part of handling replication.
+ *
+ * Migration: All triggers created by Door according to Trigger annotation will be dropped and new triggers will be
+ * created.
+ *
  */
 annotation class Trigger(
 
-    /** Base name for the trigger */
+    /** Base name for the trigger. All triggers will be prefixed with NAME_PREFIX in the database itself  */
     val name: String,
 
     /** When the trigger runs e.g. BEFORE, AFTER, INSTEAD_OF */

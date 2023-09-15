@@ -17,9 +17,8 @@ class NodeEventManagerJvm<T: RoomDatabase>(
     db: T,
     messageCallback: DoorMessageCallback<T>,
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
-    //scope: CoroutineScope,
 ) : NodeEventManagerCommon<T>(
-    db, messageCallback, dispatcher, //scope
+    db, messageCallback, dispatcher,
 ) {
 
     /**

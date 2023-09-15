@@ -125,9 +125,6 @@ kotlin {
             }
         }
 
-        androidTest {
-
-        }
 
         commonJvmJs {
             dependsOn commonMain

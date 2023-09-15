@@ -12,11 +12,18 @@ version rootProject.version
 
 
 android {
-    compileSdkVersion rootProject.ext.version_android_compile_sdk
+    compileSdk rootProject.ext.version_android_compile_sdk
     sourceSets.main.manifest.srcFile('src/androidMain/AndroidManifest.xml')
     defaultConfig {
         minSdkVersion 21
         targetSdkVersion rootProject.ext.version_android_target_sdk
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunnerArguments clearPackageData: 'true'
+    }
+
+    testOptions {
+        execution 'ANDROIDX_TEST_ORCHESTRATOR'
     }
 
     compileOptions {
@@ -76,12 +83,16 @@ kotlin {
                 implementation "io.ktor:ktor-client-json:$version_ktor"
                 implementation "io.github.aakira:napier:$version_napier"
                 implementation "org.kodein.di:kodein-di:$version_kodein_di"
+                implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$version_kotlinx_coroutines"
+
             }
         }
         commonTest {
             dependencies {
                 implementation kotlin('test-common')
                 implementation kotlin('test-annotations-common')
+                implementation "app.cash.turbine:turbine:$version_turbine"
+                implementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:$version_kotlinx_coroutines"
             }
         }
 
@@ -110,7 +121,7 @@ kotlin {
                 implementation "org.apache.commons:commons-dbcp2:$version_apache_commons_dbcp2"
                 implementation "org.xerial:sqlite-jdbc:$version_sqlite_jdbc"
                 implementation "org.postgresql:postgresql:$version_postgres_jdbc"
-                implementation "app.cash.turbine:turbine:$version_turbine"
+
                 implementation "io.ktor:ktor-server-test-host:$version_ktor"
             }
         }
@@ -141,6 +152,13 @@ kotlin {
                 implementation "org.nanohttpd:nanohttpd-nanolets:$version_nanohttpd"
             }
         }
+
+        androidInstrumentedTest {
+            dependsOn commonTest
+            dependencies {
+                implementation kotlin('test-junit')
+            }
+        }
     }
 }
 
@@ -159,4 +177,12 @@ dependencies {
     kspAndroid project(":door-compiler")
     kspAndroid "androidx.room:room-compiler:$version_android_room"
     kspAndroid project(":door-shallowcopy")
+
+    androidTestUtil "androidx.test:orchestrator:$version_androidx_test_orchestrator"
+    androidTestImplementation "androidx.test.ext:junit:$version_androidx_test_junit_ext"
+    androidTestImplementation "androidx.test:runner:$version_androidx_test_runner"
+    androidTestImplementation "androidx.test:rules:$version_androidx_test_rules"
+
+
+
 }

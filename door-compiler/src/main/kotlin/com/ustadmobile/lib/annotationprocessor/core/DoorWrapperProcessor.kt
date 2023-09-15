@@ -247,6 +247,10 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
                 .applyIf(target == DoorTarget.JVM) {
                     initializer("%T(_db, messageCallback)\n", NodeEventManagerJvm::class)
                 }
+                .applyIf(target == DoorTarget.ANDROID) {
+                    initializer("%T(_db, messageCallback)\n",
+                        ClassName("com.ustadmobile.door.nodeevent", "NodeEventManagerAndroid"))
+                }
                 .build()
             )
             .applyIf(target == DoorTarget.JS) {

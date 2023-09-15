@@ -13,7 +13,7 @@ import com.ustadmobile.door.room.RoomDatabase
         OutgoingReplication::class
     )
 )
-abstract class ExampleDb3: RoomDatabase() {
+expect abstract class ExampleDb3: RoomDatabase {
 
     abstract val exampleEntity3Dao: ExampleEntity3Dao
 
