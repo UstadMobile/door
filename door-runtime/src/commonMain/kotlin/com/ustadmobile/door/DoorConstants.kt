@@ -26,4 +26,6 @@ object DoorConstants {
 
     const val NOTPGSECTION_END_COMMENT_PREFIX = "--endnotpsql"
 
+    const val RECEIVE_VIEW_SUFFIX = "_ReceiveView"
+
 }

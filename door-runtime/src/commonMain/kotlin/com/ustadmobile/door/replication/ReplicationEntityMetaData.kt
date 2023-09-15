@@ -48,5 +48,15 @@ class ReplicationEntityMetaData(
         """
     }
 
+    /**
+     * The SQL that will be used to create the Receive View (used by triggers as per ReplicateEntity strategy.
+     */
+    internal val createReceiveViewSql: String
+        get() = """
+                CREATE VIEW $receiveViewName AS 
+                       SELECT $entityTableName.*, 0 AS fromNodeId
+                         FROM $entityTableName
+            """
+
 
 }

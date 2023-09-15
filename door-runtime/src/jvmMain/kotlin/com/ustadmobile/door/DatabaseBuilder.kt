@@ -1,31 +1,31 @@
 package com.ustadmobile.door
 
-import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.DoorConstants.DBINFO_TABLENAME
 import com.ustadmobile.door.ext.dbType
 import com.ustadmobile.door.ext.doorDatabaseMetadata
+import com.ustadmobile.door.jdbc.ext.mapRows
+import com.ustadmobile.door.jdbc.ext.useResults
+import com.ustadmobile.door.message.DefaultDoorMessageCallback
+import com.ustadmobile.door.message.DoorMessageCallback
 import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.migration.DoorMigrationAsync
 import com.ustadmobile.door.migration.DoorMigrationStatementList
 import com.ustadmobile.door.migration.DoorMigrationSync
+import com.ustadmobile.door.room.RoomDatabase
+import com.ustadmobile.door.triggers.createTriggerSetupStatementList
+import com.ustadmobile.door.triggers.dropDoorTriggers
 import com.ustadmobile.door.util.PostgresChangeTracker
+import com.zaxxer.hikari.HikariConfig
+import com.zaxxer.hikari.HikariDataSource
 import kotlinx.coroutines.runBlocking
-import java.lang.IllegalStateException
+import org.sqlite.SQLiteConfig
+import org.sqlite.SQLiteDataSource
 import java.sql.ResultSet
 import java.sql.SQLException
 import java.sql.Statement
 import javax.naming.InitialContext
 import javax.sql.DataSource
 import kotlin.reflect.KClass
-import com.ustadmobile.door.jdbc.ext.useResults
-import com.ustadmobile.door.jdbc.ext.mapRows
-import com.ustadmobile.door.message.DefaultDoorMessageCallback
-import com.ustadmobile.door.message.DoorMessageCallback
-import com.ustadmobile.door.triggers.setupTriggers
-import com.zaxxer.hikari.HikariConfig
-import com.zaxxer.hikari.HikariDataSource
-import org.sqlite.SQLiteConfig
-import org.sqlite.SQLiteDataSource
 
 
 @Suppress("unused") //This is used as an API
@@ -131,7 +131,15 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                     }
                 }
 
-                sqlDatabase.setupTriggers(dbClass.doorDatabaseMetadata())
+                /**
+                 * Setup initial trigger and receive views as per ReplicateEntity annotation
+                 */
+                connection.createStatement().use { stmt ->
+                    dbClass.doorDatabaseMetadata().createTriggerSetupStatementList(dbType).forEach { triggerSetupSql ->
+                        stmt.addBatch(triggerSetupSql)
+                    }
+                    stmt.executeBatch()
+                }
 
                 callbacks.forEach {
                     when(it) {
@@ -158,6 +166,15 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                     stmt?.close()
                 }
 
+                val dbWillBeMigrated = currentDbVersion <= doorDb.dbVersion
+                /*
+                 * If the database will be migrated, then all door-created triggers/views should be dropped. Will be
+                 * recreated after migration
+                 */
+                if(dbWillBeMigrated) {
+                    runBlocking { sqlDatabase.connection.dropDoorTriggers() }
+                }
+
                 while(currentDbVersion < doorDb.dbVersion) {
                     val nextMigration = migrationList.filter { it.startVersion == currentDbVersion}
                         .maxByOrNull { it.endVersion }
@@ -175,6 +192,13 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                         throw IllegalStateException("Need to migrate to version " +
                                 "${doorDb.dbVersion} from $currentDbVersion - could not find next migration")
                     }
+                }
+
+                if(dbWillBeMigrated) {
+                    dbClass.doorDatabaseMetadata().createTriggerSetupStatementList(dbType).forEach {sql ->
+                        stmt?.addBatch(sql)
+                    }
+                    stmt?.executeBatch()
                 }
             }
 
