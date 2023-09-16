@@ -1,12 +1,15 @@
 package db2
 
-import com.ustadmobile.door.annotation.DoorDao
 import androidx.room.Insert
+import com.ustadmobile.door.annotation.DoorDao
 
 @DoorDao
-abstract class ExampleLinkEntityDao {
+expect abstract class ExampleLinkEntityDao {
 
     @Insert
     abstract fun insert(linkEntity: ExampleLinkEntity)
+
+    @Insert
+    abstract suspend fun insertAsync(linkEntity: ExampleLinkEntity)
 
 }

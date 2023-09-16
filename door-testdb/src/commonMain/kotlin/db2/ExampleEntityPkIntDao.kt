@@ -5,7 +5,7 @@ import androidx.room.Insert
 import androidx.room.Query
 
 @DoorDao
-abstract class ExampleEntityPkIntDao {
+expect abstract class ExampleEntityPkIntDao {
 
     @Insert
     abstract fun insertAndReturnId(entity: ExampleEntityPkInt): Long

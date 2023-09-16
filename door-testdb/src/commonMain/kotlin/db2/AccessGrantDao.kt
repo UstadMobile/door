@@ -6,7 +6,7 @@ import com.ustadmobile.door.annotation.Repository
 
 @DoorDao
 @Repository
-abstract class AccessGrantDao {
+expect abstract class AccessGrantDao {
 
     @Insert
     abstract fun insert(entity: AccessGrant)

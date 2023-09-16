@@ -12,8 +12,12 @@ import kotlinx.serialization.json.Json
 
 /**
  * Used by generated functions on the server side to deserialize the PagingSourceLoadParams that were sent for a
- * PagingSource that is HttpAccessible See HttpRequestBuilderExt#pagingSourceLoadParameters
+ * PagingSource that is HttpAccessible See HttpRequestBuilderExt#pagingSourceLoadParameters.
+ *
+ * Note: explicit casting is required because the expect classes for PagingSourceLoadParams do not declare
+ * parent class.
  */
+@Suppress("IMPLICIT_CAST_TO_ANY", "UNCHECKED_CAST", "NO_CAST_NEEDED")
 fun <K: Any> DoorJsonRequest.requirePagingSourceLoadParams(
     json: Json,
     keyDeserializationStrategy: DeserializationStrategy<K?>,
@@ -42,5 +46,5 @@ fun <K: Any> DoorJsonRequest.requirePagingSourceLoadParams(
                 placeholdersEnabled = false
             )
         }
-    }
+    } as PagingSourceLoadParams<K>
 }

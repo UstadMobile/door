@@ -3,11 +3,7 @@ package com.ustadmobile.door.sse
 import com.ustadmobile.door.RepositoryConfig
 import com.ustadmobile.door.ext.DoorTag
 import io.github.aakira.napier.Napier
-import kotlinx.atomicfu.atomic
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -28,11 +24,12 @@ actual class DoorEventSource actual constructor(
     private val logPrefix: String
         get() = "[DoorEventSource@$this - $url]"
 
+    @Volatile
     private lateinit var eventSource: EventSource
 
     private val okHttpClient: OkHttpClient
 
-    private val retryJob = atomic(null as Job?)
+    private val scope = CoroutineScope(Dispatchers.Default + Job())
 
     @Volatile
     private var isClosed: Boolean = false
@@ -46,10 +43,9 @@ actual class DoorEventSource actual constructor(
             if(!isClosed) {
                 val err = (t as? Exception) ?: IOException("other event source error")
                 listener.onError(err)
-                retryJob.value = GlobalScope.launch {
+                scope.launch {
                     Napier.e("$logPrefix error: $err . Attempting to reconnect after ${retry}ms")
                     delay(retry.toLong())
-                    retryJob.value = null
                     connectToEventSource()
                 }
             }
@@ -77,7 +73,7 @@ actual class DoorEventSource actual constructor(
 
     actual fun close() {
         isClosed = true
-        retryJob.value?.cancel()
+        scope.cancel()
         eventSource.cancel()
         Napier.d("$logPrefix close", tag = DoorTag.LOG_TAG)
     }

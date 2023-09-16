@@ -34,7 +34,7 @@ class NodeEventManagerAndroid<T: RoomDatabase>(
     }
 
     init {
-        db.invalidationTracker.addObserver(invalidationObserver)
+        db.invalidationTracker.takeIf { hasOutgoingReplicationTable }?.addObserver(invalidationObserver)
         scope.launch {
             runCheckForNewEventsLoop()
         }
@@ -83,7 +83,7 @@ class NodeEventManagerAndroid<T: RoomDatabase>(
     }
 
     override fun close() {
-        db.invalidationTracker.removeObserver(invalidationObserver)
+        db.invalidationTracker.takeIf { hasOutgoingReplicationTable }?.removeObserver(invalidationObserver)
         scope.cancel()
         super.close()
     }

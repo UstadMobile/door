@@ -26,7 +26,7 @@ plugins {
 
 
 group 'com.github.UstadMobile.door'
-version '0.0.63o14'
+version '0.1a'
 
 ext.localProperties = new Properties()
 
@@ -85,7 +85,7 @@ ext {
     version_androidx_test_junit_ext = "1.1.5"
     version_espresso = "3.5.1"
     version_paging_multiplatform = "3.2.0-alpha05-0.2.3"
-
+    version_android_roboelectric = "4.10.3"
 
     version_kotlinx_metadata = "0.4.2"
     version_hikaricp = "5.0.1"

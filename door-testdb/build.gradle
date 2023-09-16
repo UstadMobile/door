@@ -24,6 +24,11 @@ android {
 
     testOptions {
         execution 'ANDROIDX_TEST_ORCHESTRATOR'
+
+        unitTests {
+            includeAndroidResources = true
+            returnDefaultValues = true
+        }
     }
 
     compileOptions {
@@ -157,6 +162,18 @@ kotlin {
             dependsOn commonTest
             dependencies {
                 implementation kotlin('test-junit')
+            }
+        }
+
+        androidUnitTest {
+            dependsOn commonTest
+
+            dependencies {
+                implementation kotlin('test-junit')
+                implementation "org.robolectric:robolectric:$version_android_roboelectric"
+                implementation "androidx.test.ext:junit:$version_androidx_test_junit_ext"
+                implementation "androidx.test:runner:$version_androidx_test_runner"
+                implementation "androidx.test:rules:$version_androidx_test_rules"
             }
         }
     }

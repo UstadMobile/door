@@ -6,9 +6,8 @@ import com.ustadmobile.door.*
 import com.ustadmobile.door.annotation.DoorNodeIdAuthRequired
 import com.ustadmobile.door.annotation.MinReplicationVersion
 import com.ustadmobile.door.entities.*
-import db2.ExampleDatabase2.Companion.DB_VERSION
 
-@DoorDatabase(version = DB_VERSION, entities = [ExampleEntity2::class, ExampleLinkEntity::class,
+@DoorDatabase(version = 2, entities = [ExampleEntity2::class, ExampleLinkEntity::class,
     ExampleEntityPkInt::class,
     SyncNode::class,
     ExampleSyncableEntity::class,
@@ -19,7 +18,7 @@ import db2.ExampleDatabase2.Companion.DB_VERSION
 ])
 @MinReplicationVersion(1)
 @DoorNodeIdAuthRequired
-abstract class ExampleDatabase2 : RoomDatabase() {
+expect abstract class ExampleDatabase2 : RoomDatabase {
 
     abstract fun exampleSyncableDao(): ExampleSyncableDao
 
@@ -33,7 +32,4 @@ abstract class ExampleDatabase2 : RoomDatabase() {
 
     abstract fun accessGrantDao(): AccessGrantDao
 
-    companion object {
-        const val DB_VERSION = 2
-    }
 }

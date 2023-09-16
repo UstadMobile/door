@@ -1,5 +1,6 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
+import com.ustadmobile.door.ext.sqlToPostgresSql
 import org.junit.Assert
 import org.junit.Test
 

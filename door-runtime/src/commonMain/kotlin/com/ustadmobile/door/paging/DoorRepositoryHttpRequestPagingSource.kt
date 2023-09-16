@@ -23,7 +23,7 @@ import kotlinx.serialization.json.Json
  * See PagingSourceLoadResultExt#toJsonResponse which contains the server side logic to serialize a
  * PagingSourceLoadResult as an HttpResponse
  */
-@Suppress("unused") // Used by generated code.
+@Suppress("unused", "CAST_NEVER_SUCCEEDS") // Used by generated code.
 class DoorRepositoryHttpRequestPagingSource<Value: Any>(
     private val valueDeserializationStrategy: DeserializationStrategy<List<Value>>,
     private val json: Json,
@@ -38,10 +38,24 @@ class DoorRepositoryHttpRequestPagingSource<Value: Any>(
     ): Exception(message)
 
 
+    @Suppress("CAST_NEVER_SUCCEEDS", "NO_CAST_NEEDED")
+    private fun newInvalidLoadResult(): PagingSourceLoadResult<Int, Value> {
+        return PagingSourceLoadResultInvalid<Int, Value>() as PagingSourceLoadResult<Int, Value>
+    }
+
+    private fun newErrorLoadResult(throwable: Throwable): PagingSourceLoadResult<Int, Value> {
+        return PagingSourceLoadResultError<Int, Value>(throwable) as PagingSourceLoadResult<Int, Value>
+    }
+
     override fun getRefreshKey(state: PagingState<Int, Value>): Int? {
         return state.anchorPosition
     }
 
+    /**
+     * Note: the expect class for paging-multiplatform PagingSourceLoadResult does not declare LoadResultPage etc as
+     * children of PagingSourceLoadResult. This requires the result to be casted in order for commonMain compilation
+     * to succeed.
+     */
     override suspend fun load(params: PagingSourceLoadParams<Int>): PagingSourceLoadResult<Int, Value> {
         val loadRequest = PagingSourceLoadState.PagingRequest(params.key)
 
@@ -66,11 +80,11 @@ class DoorRepositoryHttpRequestPagingSource<Value: Any>(
                         ),
                         prevKey = json.decodeFromString(
                             deserializer = Int.serializer().nullable,
-                            httpResponse.headers[HEADER_PREV_KEY] ?: return PagingSourceLoadResultInvalid()
+                            httpResponse.headers[HEADER_PREV_KEY] ?: return newInvalidLoadResult()
                         ),
                         nextKey = json.decodeFromString(
                             deserializer = Int.serializer().nullable,
-                            httpResponse.headers[HEADER_NEXT_KEY] ?: return PagingSourceLoadResultInvalid()
+                            httpResponse.headers[HEADER_NEXT_KEY] ?: return newInvalidLoadResult()
                         ),
                         itemsBefore = httpResponse.headers[HEADER_ITEMS_BEFORE]?.let {
                             json.decodeFromString(Int.serializer(), it)
@@ -78,20 +92,20 @@ class DoorRepositoryHttpRequestPagingSource<Value: Any>(
                         itemsAfter = httpResponse.headers[HEADER_ITEMS_AFTER]?.let {
                             json.decodeFromString(Int.serializer(), it)
                         } ?: COUNT_UNDEFINED
-                    )
+                    ) as PagingSourceLoadResult<Int, Value>
                 }
                 HttpStatusCode.InternalServerError -> {
                     _loadState.update { prev -> prev.copyWhenRequestFailed(loadRequest) }
-                    PagingSourceLoadResultError(
+                    PagingSourceLoadResultError<Int, Value>(
                         throwable = HttpPagingSourceRemoteException(
                             httpStatusCode = httpResponse.status,
                             message = httpResponse.bodyAsText()
                         )
-                    )
+                    ) as PagingSourceLoadResult<Int, Value>
                 }
                 else -> {
                     _loadState.update { prev -> prev.copyWhenRequestFailed(loadRequest) }
-                    PagingSourceLoadResultInvalid()
+                    newInvalidLoadResult()
                 }
             }
         }catch(e: Exception) {
@@ -99,7 +113,7 @@ class DoorRepositoryHttpRequestPagingSource<Value: Any>(
             Napier.w(tag = DoorTag.LOG_TAG, throwable = e) {
                 "DoorRepositoryHttpPagingSource: could not load"
             }
-            return fallbackPagingSource?.load(params) ?: PagingSourceLoadResultError(e)
+            return fallbackPagingSource?.load(params) ?: newErrorLoadResult(e)
         }
     }
 

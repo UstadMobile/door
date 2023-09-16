@@ -11,7 +11,7 @@ import com.ustadmobile.door.annotation.Repository
 
 @DoorDao
 @Repository
-abstract class ExampleSyncableDao {
+expect abstract class ExampleSyncableDao {
 
     @Insert
     abstract fun insert(syncableEntity: ExampleSyncableEntity): Long
@@ -51,18 +51,7 @@ abstract class ExampleSyncableDao {
     abstract suspend fun updateAsync(exampleSyncableEntity: ExampleSyncableEntity)
 
 
-    open suspend fun findByUidAndAddOneThousand(@ParamName("uid") uid: Long): ExampleSyncableEntity? {
-        val entity = findByUid(uid)
-        if(entity != null)
-            entity.esNumber += 1000
-
-        return entity
-    }
-
-
-    //@Repository(methodType = Repository.METHOD_DELEGATE_TO_WEB)
     @Query("SELECT * FROM ExampleSyncableEntity LIMIT 1")
-    //@RepoHttpAccessible
     abstract suspend fun findOneFromWeb(): ExampleSyncableEntity?
 
     @Query("SELECT esNumber FROM ExampleSyncableEntity LIMIT 1")

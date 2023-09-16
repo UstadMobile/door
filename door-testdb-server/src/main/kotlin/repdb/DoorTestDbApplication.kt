@@ -6,27 +6,26 @@ import com.ustadmobile.door.entities.NodeIdAndAuth
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.nodeIdAuthCache
 import com.ustadmobile.door.ext.sanitizeDbName
+import com.ustadmobile.door.http.DoorHttpServerConfig
 import com.ustadmobile.door.util.NodeIdAuthCache
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
-import io.ktor.server.application.*
 import io.ktor.http.*
+import io.ktor.server.application.*
 import io.ktor.server.plugins.callloging.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.json.Json
 import org.kodein.di.*
 import org.kodein.di.ktor.closestDI
 import org.kodein.di.ktor.di
-import java.nio.file.Files
 
 @Suppress("unused") //This is specified by the application.conf file as the module to run
 fun Application.doorTestDbApplication() {
 
     Napier.base(DebugAntilog())
     install(CallLogging)
-
-    val attachmentDir = Files.createTempDirectory("door-testdb-server-attachments").toFile()
 
     install(CORS) {
         allowMethod(HttpMethod.Get)
@@ -39,12 +38,16 @@ fun Application.doorTestDbApplication() {
         anyHost()
     }
 
+    val json = Json {
+        encodeDefaults = true
+    }
+
 
     di {
         bind<RepDb>(tag = DoorTag.TAG_DB) with scoped(VirtualHostScope.Default).singleton {
             val dbHostName = context.sanitizeDbName()
             DatabaseBuilder.databaseBuilder(RepDb::class, "jdbc:sqlite:build/tmp/${dbHostName}.sqlite",
-                    attachmentDir = attachmentDir)
+                    1L)
                 .build().also {
                     it.clearAllTables()
                     it.repDao.insert(RepEntity().apply {
@@ -71,7 +74,10 @@ fun Application.doorTestDbApplication() {
 
     routing {
         route("RepDb") {
-            RepDb_KtorRoute()
+            RepDb_KtorRoute(DoorHttpServerConfig(json = json)) {
+                val di : DI by  it.closestDI()
+                di.on(it).direct.instance<RepDb>(tag = DoorTag.TAG_DB)
+            }
         }
 
         get("/") {

@@ -93,13 +93,12 @@ class ReplicationRouteTest {
                 }
             }
 
-            block(
-                try {
-                    ReplicationRouteTestContext(db, json, httpClient)
-                }finally {
-                    db.close()
-                }
-            )
+            val testRouteContext = ReplicationRouteTestContext(db, json, httpClient)
+            try {
+                block(testRouteContext)
+            }finally {
+                db.close()
+            }
         }
 
     }

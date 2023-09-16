@@ -22,7 +22,6 @@ import com.ustadmobile.door.http.RepositoryDaoWithFlowHelper
 import com.ustadmobile.door.paging.DoorRepositoryHttpRequestPagingSource
 import com.ustadmobile.door.paging.DoorRepositoryReplicatePullPagingSource
 import com.ustadmobile.door.room.RoomDatabase
-import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.CLASSNAME_ILLEGALSTATEEXCEPTION
 import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.SUFFIX_REPOSITORY2
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
 import io.ktor.client.*
@@ -165,14 +164,12 @@ private fun TypeSpec.Builder.addRepoDbDaoAccessor(
  *
  * @param daoKSClass The KSClassDeclaration containing the FunSpecs for this DAO
  * @param daoClassName Classname for the abstract DAO class
- * @param target The target platform
  * @param
  *
  */
 fun FileSpec.Builder.addDaoRepoType(
     daoKSClass: KSClassDeclaration,
     daoClassName: ClassName,
-    target: DoorTarget,
     extraConstructorParams: List<ParameterSpec> = listOf(),
     resolver: Resolver,
     environment: SymbolProcessorEnvironment,
@@ -223,7 +220,7 @@ fun FileSpec.Builder.addDaoRepoType(
 
             daoKSClass.getAllDaoFunctionsIncSuperTypesToGenerate().forEach { daoFun ->
                 //If this is OK, then remove the name param - no need for that...
-                addDaoRepoFun(daoFun, daoKSClass, daoKSClass.simpleName.asString(), target, environment, resolver)
+                addDaoRepoFun(daoFun, daoKSClass, environment, resolver)
             }
         }
         .build())
@@ -321,14 +318,10 @@ fun CodeBlock.Builder.addMakeHttpRequestAndInsertReplicationsCode(
 /**
  * Add a repo implementation of the given DAO FunSpec
  * @param daoKSFun the function spec for which an implementation is being generated
- * @param daoName the name of the DAO class (simple name e.g. SomeDao)
- * @param doorTarget
  */
 fun TypeSpec.Builder.addDaoRepoFun(
     daoKSFun: KSFunctionDeclaration,
     daoKSClass: KSClassDeclaration,
-    daoName: String,
-    doorTarget: DoorTarget,
     environment: SymbolProcessorEnvironment,
     resolver: Resolver,
 ) : TypeSpec.Builder {
@@ -496,35 +489,6 @@ fun CodeBlock.Builder.addRepoDelegateToDaoCode(
     return this
 }
 
-fun CodeBlock.Builder.addDelegateToWebCode(
-    daoFunSpec: FunSpec,
-    daoName: String,
-    target: DoorTarget
-) : CodeBlock.Builder {
-    if(target == DoorTarget.JS) {
-        add("throw %T(%S)\n", CLASSNAME_ILLEGALSTATEEXCEPTION,
-            "${daoName}.${daoFunSpec.name} : non-suspended delegate to web not supported on JS")
-        return this
-    }
-
-    if(daoFunSpec.hasReturnType) {
-        add("return ")
-    }
-
-    if(!daoFunSpec.isSuspended) {
-        beginRunBlockingControlFlow()
-    }
-
-    addKtorRequestForFunction(daoFunSpec, daoName = daoName,
-        addClientIdHeaderVar = "_clientId")
-
-    if(!daoFunSpec.isSuspended) {
-        endControlFlow()
-    }
-
-    return this
-}
-
 class DoorRepositoryProcessor(
     private val environment: SymbolProcessorEnvironment,
 ) : SymbolProcessor {
@@ -551,7 +515,7 @@ class DoorRepositoryProcessor(
             FileSpec.builder(daoKSClass.packageName.asString(),
                 "${daoKSClass.simpleName.asString()}$SUFFIX_REPOSITORY2")
                 .addDaoRepoType(daoKSClass,
-                    daoKSClass.toClassName(), target, resolver = resolver, environment = environment)
+                    daoKSClass.toClassName(), resolver = resolver, environment = environment)
                 .build()
                 .writeTo(environment.codeGenerator, false)
         }

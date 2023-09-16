@@ -2,13 +2,13 @@ package db2
 
 import androidx.room.*
 import app.cash.paging.PagingSource
-import com.ustadmobile.door.*
+import com.ustadmobile.door.DoorQuery
 import com.ustadmobile.door.annotation.DoorDao
 import kotlinx.coroutines.flow.Flow
 
 @Suppress("unused") //Even if functions here are unused, they are still testing that the generated code compiles
 @DoorDao
-abstract class ExampleDao2 {
+expect abstract class ExampleDao2 {
 
     @Insert
     abstract fun insertAndReturnId(entity: ExampleEntity2): Long
@@ -61,7 +61,7 @@ abstract class ExampleDao2 {
     @Query("SELECT ExampleEntity2.*, ExampleLinkEntity.* FROM " +
             " ExampleEntity2 LEFT JOIN ExampleLinkEntity ON ExampleEntity2.uid = ExampleLinkEntity.fkValue " +
             "WHERE ExampleEntity2.uid = :uid")
-    abstract fun findByUidWithLinkEntity(uid: Long): ExampleEntity2WithExampleLinkEntity?
+    abstract suspend fun findByUidWithLinkEntityAsync(uid: Long): ExampleEntity2WithExampleLinkEntity?
 
     @Query("SELECT * FROM ExampleEntity2 ORDER BY uid")
     abstract fun findAll(): List<ExampleEntity2>
@@ -76,13 +76,13 @@ abstract class ExampleDao2 {
     abstract fun findAllStringsSync(): List<String?>
 
     @Update
-    abstract fun updateSingleItem(entity: ExampleEntity2)
+    abstract suspend fun updateSingleItemAsync(entity: ExampleEntity2)
 
     @Update
-    abstract fun updateSingleItemAndReturnCount(entity: ExampleEntity2): Int
+    abstract suspend fun updateSingleItemAndReturnCountAsync(entity: ExampleEntity2): Int
 
     @Update
-    abstract fun updateList(updateEntityList: List<ExampleEntity2>)
+    abstract suspend fun updateListAsync(updateEntityList: List<ExampleEntity2>)
 
     @Query("UPDATE ExampleEntity2 SET name = :newName WHERE someNumber >= :num")
     abstract fun updateByParam(newName: String, num: Long) : Int
@@ -162,7 +162,7 @@ abstract class ExampleDao2 {
                 ELSE (ExampleEntity2.rewardsCardNumber = :rewardsNum) 
                 END)
     """)
-    abstract fun findWithNullableInt(rewardsNum: Int?): ExampleEntity2?
+    abstract suspend fun findWithNullableIntAsync(rewardsNum: Int?): ExampleEntity2?
 
     @Query("""
         SELECT * 
@@ -180,6 +180,6 @@ abstract class ExampleDao2 {
            AND rewardsCardNumber >= :minNumber 
       ORDER BY rewardsCardNumber    
     """)
-    abstract fun findAllWithRewardNumberAsList(minNumber: Int): List<ExampleEntity2>
+    abstract suspend fun findAllWithRewardNumberAsListAsync(minNumber: Int): List<ExampleEntity2>
 
 }

@@ -23,12 +23,17 @@ import kotlinx.serialization.json.Json
  *
  * - LoadResultInvalid: Http response code = 400, body is empty
  *
+ * Re. unchecked casting - unfortunately the expect/actual declarations of paging multiplatform for
+ * PagingSourceLoadResult do not declare them as children of PagingSourceLoadResult, so they need
+ * to be casted
+ *
  * @param json: Kotlinx Serialization Json
  * @param localNodeId the id of this node (e.g. the server)
  * @param keySerializer the serializer for the Load Key (must be nullable)
  * @param valueSerializer the serializer for the Paging Source Value type
  * @param includeErrorMessageInResponse if true, include throwable exception in error response
  */
+@Suppress("UNCHECKED_CAST", "USELESS_IS_CHECK")
 fun <Key: Any, Value: Any> PagingSourceLoadResult<Key, Value>.toJsonResponse(
     json: Json,
     localNodeId: Long,
@@ -37,15 +42,15 @@ fun <Key: Any, Value: Any> PagingSourceLoadResult<Key, Value>.toJsonResponse(
     includeErrorMessageInResponse: Boolean = false,
 ): DoorJsonResponse {
     return when(this){
-        is PagingSourceLoadResultPage<Key, Value> -> {
+        is PagingSourceLoadResultPage<*, *> -> {
             DoorJsonResponse(
-                bodyText = json.encodeToString(valueSerializer, this.data),
+                bodyText = json.encodeToString(valueSerializer, this.data as List<Value>),
                 headers = listOf(
                     DoorConstants.HEADER_NODE_ID to localNodeId.toString(),
                     DoorRepositoryHttpRequestPagingSource.HEADER_NEXT_KEY to
-                        json.encodeToString(keySerializer, this.nextKey),
+                        json.encodeToString(keySerializer, this.nextKey as? Key),
                     DoorRepositoryHttpRequestPagingSource.HEADER_PREV_KEY to
-                        json.encodeToString(keySerializer, this.prevKey),
+                        json.encodeToString(keySerializer, this.prevKey as? Key),
                     DoorRepositoryHttpRequestPagingSource.HEADER_ITEMS_BEFORE to
                         json.encodeToString(Int.serializer(), this.itemsBefore),
                     DoorRepositoryHttpRequestPagingSource.HEADER_ITEMS_AFTER to
@@ -53,7 +58,7 @@ fun <Key: Any, Value: Any> PagingSourceLoadResult<Key, Value>.toJsonResponse(
                 )
             )
         }
-        is PagingSourceLoadResultError<Key, Value> -> {
+        is PagingSourceLoadResultError<*, *> -> {
             DoorJsonResponse(
                 bodyText = if(includeErrorMessageInResponse) (this.throwable.message ?: "") else "Internal Error: see logs",
                 contentType = "text/plain",
@@ -61,7 +66,7 @@ fun <Key: Any, Value: Any> PagingSourceLoadResult<Key, Value>.toJsonResponse(
                 headers = listOf(DoorConstants.HEADER_NODE_ID to localNodeId.toString()),
             )
         }
-        is PagingSourceLoadResultInvalid<Key, Value> -> {
+        is PagingSourceLoadResultInvalid<*, *> -> {
             DoorJsonResponse(
                 bodyText = "",
                 contentType = "text/plain",
@@ -69,5 +74,6 @@ fun <Key: Any, Value: Any> PagingSourceLoadResult<Key, Value>.toJsonResponse(
                 headers = listOf(DoorConstants.HEADER_NODE_ID to localNodeId.toString()),
             )
         }
+        else -> throw IllegalArgumentException("PagingLoadResult is not page, error or invalid?")
     }
 }

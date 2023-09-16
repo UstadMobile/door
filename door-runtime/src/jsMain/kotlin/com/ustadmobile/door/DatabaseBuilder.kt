@@ -1,8 +1,8 @@
 package com.ustadmobile.door
 
-import com.ustadmobile.door.room.InvalidationTracker
-import com.ustadmobile.door.room.RoomDatabase
-import com.ustadmobile.door.ext.*
+import com.ustadmobile.door.ext.DoorTag
+import com.ustadmobile.door.ext.createInstance
+import com.ustadmobile.door.ext.wrap
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.SQLException
 import com.ustadmobile.door.jdbc.ext.useStatementAsync
@@ -10,7 +10,10 @@ import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.migration.DoorMigrationAsync
 import com.ustadmobile.door.migration.DoorMigrationStatementList
 import com.ustadmobile.door.migration.DoorMigrationSync
+import com.ustadmobile.door.room.InvalidationTracker
+import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.sqljsjdbc.*
+import com.ustadmobile.door.sqljsjdbc.SQLiteDatasourceJs.Companion.LOCATION_MEMORY
 import com.ustadmobile.door.sqljsjdbc.SQLiteDatasourceJs.Companion.PROTOCOL_SQLITE_PREFIX
 import com.ustadmobile.door.util.DoorJsImplClasses
 import io.github.aakira.napier.Napier
@@ -27,15 +30,17 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
 
     suspend fun build(): T {
         if(!builderOptions.dbUrl.startsWith(PROTOCOL_SQLITE_PREFIX))
-            throw IllegalArgumentException("Door/JS: Only SQLite is supported on JS! dbUrl must be in the form of sqlite:indexeddb_name")
+            throw IllegalArgumentException("Door/JS: Only SQLite is supported on JS! dbUrl must be in the form of " +
+                    "sqlite::memory: OR sqlite:indexeddb_name")
 
-        val indexeddbStoreName = builderOptions.dbUrl.substringAfter(PROTOCOL_SQLITE_PREFIX)
-        val dataSource = SQLiteDatasourceJs(indexeddbStoreName, Worker(builderOptions.webWorkerPath))
+        val storageLocation = builderOptions.dbUrl.substringAfter(PROTOCOL_SQLITE_PREFIX)
+        val dataSource = SQLiteDatasourceJs(storageLocation, Worker(builderOptions.webWorkerPath))
         register(builderOptions.dbImplClasses)
 
         val dbImpl = builderOptions.dbImplClasses.dbImplKClass.js.createInstance(null, dataSource,
             builderOptions.dbUrl, builderOptions.jdbcQueryTimeout, DoorDbType.SQLITE) as T
-        val exists = IndexedDb.checkIfExists(indexeddbStoreName)
+        val loadFromIndexedDb = storageLocation != LOCATION_MEMORY &&
+                IndexedDb.checkIfExists(storageLocation)
         val connection = dataSource.getConnection()
         val sqlDatabase = DoorSqlDatabaseConnectionImpl(connection, DoorDbType.SQLITE)
 
@@ -46,7 +51,7 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
         }
 
 
-        if(exists){
+        if(loadFromIndexedDb){
             Napier.i("DatabaseBuilderJs: database ${builderOptions.dbUrl} exists... loading\n", tag = DoorTag.LOG_TAG)
             dataSource.loadDbFromIndexedDb()
             var sqlCon = null as SQLiteConnectionJs?
@@ -126,8 +131,10 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
 
         Napier.d("DatabaseBuilderJs: Setting up change listener\n", tag = DoorTag.LOG_TAG)
 
-        SaveToIndexedDbChangeListener(dbImpl, dataSource, dbMetaData.replicateTableNames,
-            builderOptions.saveToIndexedDbDelayTime)
+        if(storageLocation != LOCATION_MEMORY)  {
+            SaveToIndexedDbChangeListener(dbImpl, dataSource, dbMetaData.replicateTableNames,
+                builderOptions.saveToIndexedDbDelayTime)
+        }
 
         connection.close()
 

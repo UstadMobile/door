@@ -1,5 +1,8 @@
 package com.ustadmobile.door.sqljsjdbc
-import com.ustadmobile.door.ext.*
+import com.ustadmobile.door.ext.DoorTag
+import com.ustadmobile.door.ext.ReentrantMutexContextElement
+import com.ustadmobile.door.ext.ReentrantMutexContextKey
+import com.ustadmobile.door.ext.withReentrantLock
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.jdbc.ResultSet
@@ -256,6 +259,9 @@ class SQLiteDatasourceJs(
         var idCounter = 0
 
         val PROTOCOL_SQLITE_PREFIX = "sqlite:"
+
+        const val LOCATION_MEMORY = ":memory:"
+
 
     }
 }

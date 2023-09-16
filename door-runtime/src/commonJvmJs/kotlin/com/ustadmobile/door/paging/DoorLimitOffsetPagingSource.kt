@@ -8,6 +8,7 @@ import kotlin.math.max
 /**
  * Implementation of an offset-limit PagingSource for JVM and JS.
  */
+@Suppress("CAST_NEVER_SUCCEEDS")
 abstract class DoorLimitOffsetPagingSource<Value: Any>(
     private val db: RoomDatabase,
 ): PagingSource<Int, Value>() {
@@ -16,6 +17,11 @@ abstract class DoorLimitOffsetPagingSource<Value: Any>(
 
     abstract suspend fun countRows(): Int
 
+    /**
+     * Note: the expect class for paging-multiplatform PagingSourceLoadResult does not declare LoadResultPage etc as a
+     * child class of PagingSourceLoadResult. This requires the result to be casted in order for commonMain compilation
+     * to succeed.
+     */
     override suspend fun load(
         params: PagingSourceLoadParams<Int>
     ): PagingSourceLoadResult<Int, Value> {

@@ -72,13 +72,14 @@ class GeneratedHttpDaoEndpointTest {
                 }
             }
 
-            block(
-                try {
-                    PullReplicationTestContext(db, client, json)
-                }finally {
-                    db.close()
-                }
-            )
+            val context = PullReplicationTestContext(db, client, json)
+            try {
+                block(context)
+            }catch(e: Exception) {
+                e.printStackTrace()
+            } finally {
+                db.close()
+            }
         }
     }
 

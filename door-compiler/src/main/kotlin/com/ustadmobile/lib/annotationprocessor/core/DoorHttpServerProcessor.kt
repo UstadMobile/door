@@ -72,18 +72,6 @@ fun FunSpec.Builder.addParametersForHttpDb(isPrimaryDefaultVal: Boolean): FunSpe
 }
 
 
-fun CodeBlock.Builder.addRequestDi(diVarName: String = "_di", dbVarName: String = "_db",
-    typeTokenVarName: String = "_typeToken", serverType: Int = SERVER_TYPE_KTOR) : CodeBlock.Builder {
-    if(serverType == SERVER_TYPE_KTOR) {
-        add("val ${diVarName} = %M()\n", MemberName("org.kodein.di.ktor", "closestDI"))
-                .add("val $dbVarName : %T = %M($typeTokenVarName)\n",
-                    TypeVariableName.invoke("T"),
-                    MemberName("com.ustadmobile.door.ext", "unwrappedDbOnCall"))
-    }
-
-    return this
-}
-
 /**
  * Adds a KTOR Route function for the given DAO to the FileSpec
  *
@@ -102,8 +90,6 @@ fun CodeBlock.Builder.addRequestDi(diVarName: String = "_di", dbVarName: String 
 fun FileSpec.Builder.addDaoKtorRouteFun(
     daoClassDecl: KSClassDeclaration,
     daoClassName: ClassName,
-    resolver: Resolver,
-    logger: KSPLogger,
 ) : FileSpec.Builder {
 
     addFunction(FunSpec.builder("${daoClassDecl.simpleName.asString()}$SUFFIX_KTOR_ROUTE")
@@ -276,33 +262,6 @@ fun TypeSpec.Builder.addNanoHttpdResponderFun(
 
 
 /**
- * Get a list of parameters of the FunSpec that must be transmitted in the http body (eg. entities)
- */
-private fun FunSpec.httpBodyParams(): List<ParameterSpec> {
-    return parameters.filter { !it.type.isHttpQueryQueryParam() }
-}
-
-fun CodeBlock.Builder.addKtorDaoMethodCode(daoFunSpec: FunSpec) : CodeBlock.Builder {
-    val memberFn = if(daoFunSpec.httpBodyParams().isNotEmpty()) {
-        POST_MEMBER
-    }else {
-        GET_MEMBER
-    }
-
-    beginControlFlow("%M(%S)", memberFn, daoFunSpec.name)
-            .addRequestDi()
-            .add("val _dao = _daoFn(_db)\n")
-            .add("val _gson: %T by _di.%M()\n", Gson::class, DI_INSTANCE_MEMBER)
-
-    addHttpServerPassToDaoCodeBlock(daoFunSpec, serverType = SERVER_TYPE_KTOR)
-
-
-    endControlFlow()
-
-    return this
-}
-
-/**
  * Generates a Codeblock that will call the DAO method, and then call.respond with the result
  *
  * e.g.
@@ -344,7 +303,7 @@ fun CodeBlock.Builder.addHttpServerPassToDaoCodeBlock(
 
     callCodeBlock.add("$daoVarName.${daoMethod.name}(")
     var paramOutCount = 0
-    daoMethod.parameters.forEachIndexed {index, param ->
+    daoMethod.parameters.forEachIndexed { _, param ->
         val paramTypeName = param.type.javaToKotlinType()
 
 
@@ -561,7 +520,6 @@ fun FileSpec.Builder.addDbKtorRouteFunction(
  */
 fun FileSpec.Builder.addDbNanoHttpdMapperFunction(
     dbClassDeclaration: KSClassDeclaration,
-    resolver: Resolver,
 ) : FileSpec.Builder {
     val dbTypeClassName = dbClassDeclaration.toClassName()
     addFunction(FunSpec.builder("${dbTypeClassName.simpleName}$SUFFIX_NANOHTTPD_ADDURIMAPPING")
@@ -805,7 +763,7 @@ fun CodeBlock.Builder.addHttpReplicationEntityServerExtension(
     add("%T(\n", DoorMessage::class)
     indent()
     add("what = %T.WHAT_REPLICATION,\n", DoorMessage::class)
-    add("fromNode = _thisNodeId,\n",)
+    add("fromNode = _thisNodeId,\n")
     add("toNode = request.requireNodeId(),\n")
     add("replications = replicationEntities,\n")
     unindent()
@@ -868,7 +826,7 @@ class DoorHttpServerProcessor(
 
                 daoSymbols.forEach { daoClassDecl ->
                     FileSpec.builder(daoClassDecl.packageName.asString(), "${daoClassDecl.simpleName.asString()}$SUFFIX_KTOR_ROUTE")
-                        .addDaoKtorRouteFun(daoClassDecl, daoClassDecl.toClassName(), resolver, environment.logger)
+                        .addDaoKtorRouteFun(daoClassDecl, daoClassDecl.toClassName())
                         .build()
                         .writeTo(environment.codeGenerator, false)
                 }
@@ -879,7 +837,7 @@ class DoorHttpServerProcessor(
                     if (dbClassDecl.dbEnclosedDaos().any { it.hasAnnotation(Repository::class) }) {
                         FileSpec.builder(dbClassDecl.packageName.asString(),
                             "${dbClassDecl.simpleName.asString()}$SUFFIX_NANOHTTPD_ADDURIMAPPING")
-                            .addDbNanoHttpdMapperFunction(dbClassDecl, resolver)
+                            .addDbNanoHttpdMapperFunction(dbClassDecl)
                             .build()
                             .writeTo(environment.codeGenerator, false)
                     }
@@ -933,8 +891,6 @@ class DoorHttpServerProcessor(
         val CALL_MEMBER = MemberName("io.ktor.server.application", "call")
 
         val RESPOND_MEMBER = MemberName("io.ktor.server.response", "respond")
-
-        val RESPONSE_HEADER = MemberName("io.ktor.server.response", "header")
 
         val DI_ON_MEMBER = MemberName("org.kodein.di", "on")
 

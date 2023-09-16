@@ -50,7 +50,7 @@ private suspend fun openRepoDb() {
     }
     Napier.d("Created db")
     Napier.d("Db name = ${(repDb.rootDatabase as DoorDatabaseJdbc).dbName}\n")
-    Napier.d("Replicate wrapper name = ${(repDb as DoorDatabaseWrapper).dbName}\n")
+    Napier.d("Replicate wrapper name = ${(repDb as DoorDatabaseWrapper<RepDb>).dbName}\n")
     Napier.d("repDb toString = $repDb\n")
     val nodeId = Random.nextLong(0, Long.MAX_VALUE)
     repRepo = repDb.asRepository(

@@ -76,9 +76,8 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(
 
     //If running on JS, non-suspended (sync) version is NOT allowed
     val isSyncFunctionOnJs = doorTarget == DoorTarget.JS && !overridingFunction.isSuspended
-            && (overridingFunction.returnType?.isAsynchronousReturnType() == false)
+            && (overridingFunction.returnType.isAsynchronousReturnType() == false)
 
-    val entityParam = overridingFunction.parameters.firstOrNull()
     val entityComponentClassDecl: KSClassDeclaration? =
         if(daoFunDeclaration.isDaoReplicateEntityWriteFunction(resolver, daoClassDeclaration)) {
             functionResolved.firstParamEntityType(resolver).declaration as KSClassDeclaration
@@ -161,7 +160,7 @@ fun TypeSpec.Builder.addDaoFunctionDelegate(
             .applyIf(!isSyncFunctionOnJs) {
                 addDelegateFunctionCall("_dao", overridingFunction)
                     .add("\n")
-                    .applyIf(setPk && overridingFunction.returnType != null && overridingFunction.returnType != UNIT) {
+                    .applyIf(setPk && overridingFunction.returnType != UNIT) {
                         //We need to override this to return the PKs that were really generated
                         val entityParamType = overridingFunction.parameters.first().type
                         if(entityParamType.isListOrArray()) {
@@ -269,9 +268,9 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
                 .build())
             .addFunction(FunSpec.builder("runInTransaction")
                 .addModifiers(KModifier.OVERRIDE)
-                .addParameter("body", ClassName("kotlinx.coroutines",
+                .addParameter("runnable", ClassName("kotlinx.coroutines",
                     "Runnable"))
-                .addCode("_db.runInTransaction(body)\n")
+                .addCode("_db.runInTransaction(runnable)\n")
                 .build())
             .applyIf(target == DoorTarget.ANDROID) {
                 addRoomDatabaseCreateOpenHelperFunction()
@@ -283,6 +282,7 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
             }
             .addFunction(FunSpec.builder("close")
                 .addModifiers(KModifier.OVERRIDE)
+                .addCode("_db.close()\n")
                 .build())
 
             .build()
