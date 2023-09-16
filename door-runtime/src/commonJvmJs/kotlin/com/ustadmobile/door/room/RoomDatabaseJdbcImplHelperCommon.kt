@@ -138,8 +138,10 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
             Napier.e("useConnectionAsync: transaction ERROR: useConnectionAsync (transaction #${transactionId}: " +
                     "Transactions [${openTransactions.keys.joinToString()}] are still open" +
                     "Exception", t)
-            if(!connection.isClosed() && !connection.getAutoCommit())
+            if(!connection.isClosed() && !connection.getAutoCommit()) {
+                Napier.e(tag = DoorTag.LOG_TAG, message = "  Attempting to rollback transaction #${transactionId}")
                 connection.rollback()
+            }
 
             throw t
         }finally {
@@ -151,7 +153,6 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
         }
     }
 
-    @Suppress("UNUSED_PARAMETER") //Reserved for future usage
     suspend fun <R> useConnectionAsync(
         transactionMode: TransactionMode,
         block: suspend (Connection) -> R
@@ -194,7 +195,7 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
 
     fun close() {
         //close connections for any open transactions
-        if(closed.getAndSet(true)) {
+        if(!closed.getAndSet(true)) {
             openTransactions.forEach {
                 try {
                     it.value.connection.close()

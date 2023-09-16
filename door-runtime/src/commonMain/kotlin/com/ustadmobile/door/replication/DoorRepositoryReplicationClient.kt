@@ -6,12 +6,12 @@ import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.nodeevent.NodeEventManager
 import com.ustadmobile.door.room.RoomDatabase
-import com.ustadmobile.door.util.systemTimeInMillis
 import io.github.aakira.napier.Napier
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
+import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -77,7 +77,9 @@ class DoorRepositoryReplicationClient(
         retryInterval = retryInterval,
     )
 
-    private val logPrefix = "[DoorRepositoryReplicationClient localNodeId=$localNodeId endpoint=$repoEndpointUrl]"
+    private val instanceId = INSTANCE_ID_COUNTER.incrementAndGet()
+
+    private val logPrefix = "[DoorRepositoryReplicationClient #$instanceId localNodeId=$localNodeId endpoint=$repoEndpointUrl]"
 
     private val _state = MutableStateFlow(ClientState())
 
@@ -150,7 +152,7 @@ class DoorRepositoryReplicationClient(
     init {
         //Get the door node id of the remote endpoint.
         scope.launch {
-            while(isActive && !remoteNodeId.isCompleted && !remoteNodeId.isCancelled) {
+            while(isActive && !remoteNodeId.isCompleted) {
                 try {
                     Napier.v(tag = DoorTag.LOG_TAG) {
                         "$logPrefix getRemoteNodeId : requesting node id of server"
@@ -349,6 +351,8 @@ class DoorRepositoryReplicationClient(
          * The path from the database endpoint e.g. https://server.com/DbName/ to the replication endpoint
          */
         const val REPLICATION_PATH = "replication"
+
+        private val INSTANCE_ID_COUNTER = atomic(0)
     }
 
 }

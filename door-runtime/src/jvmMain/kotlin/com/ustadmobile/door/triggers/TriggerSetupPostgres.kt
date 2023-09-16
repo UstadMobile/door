@@ -21,7 +21,7 @@ fun DoorDatabaseMetadata<*>.createPostgresTriggerSetupStatementList() : List<Str
                 }
 
                 val createFunctionSql = buildString {
-                    append("CREATE OR REPLACE FUNCTION ${trigger.name}_fn() RETURNS TRIGGER AS $$ ")
+                    append("CREATE OR REPLACE FUNCTION ${Trigger.NAME_PREFIX}${trigger.name}_fn() RETURNS TRIGGER AS $$ ")
                     if(trigger.conditionSql != "") {
                         append("""
                        DECLARE
@@ -57,7 +57,7 @@ fun DoorDatabaseMetadata<*>.createPostgresTriggerSetupStatementList() : List<Str
                 add(createFunctionSql)
 
                 add("""
-                CREATE TRIGGER ${trigger.name}_trig ${trigger.order.sqlStr} ${trigger.events.joinToString(separator = " OR ") { it.sqlKeyWord }}
+                CREATE TRIGGER ${Trigger.NAME_PREFIX}${trigger.name}_trig ${trigger.order.sqlStr} ${trigger.events.joinToString(separator = " OR ") { it.sqlKeyWord }}
                                        ON $tableOrViewName
                                        FOR EACH ROW EXECUTE PROCEDURE ${trigger.name}_fn()
             """.trimIndent())

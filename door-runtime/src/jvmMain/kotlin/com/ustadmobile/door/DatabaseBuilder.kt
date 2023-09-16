@@ -1,7 +1,6 @@
 package com.ustadmobile.door
 
 import com.ustadmobile.door.DoorConstants.DBINFO_TABLENAME
-import com.ustadmobile.door.ext.dbType
 import com.ustadmobile.door.ext.doorDatabaseMetadata
 import com.ustadmobile.door.jdbc.ext.mapRows
 import com.ustadmobile.door.jdbc.ext.useResults
@@ -14,7 +13,6 @@ import com.ustadmobile.door.migration.DoorMigrationSync
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.triggers.createTriggerSetupStatementList
 import com.ustadmobile.door.triggers.dropDoorTriggers
-import com.ustadmobile.door.util.PostgresChangeTracker
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import kotlinx.coroutines.runBlocking
@@ -166,7 +164,7 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                     stmt?.close()
                 }
 
-                val dbWillBeMigrated = currentDbVersion <= doorDb.dbVersion
+                val dbWillBeMigrated = currentDbVersion < doorDb.dbVersion
                 /*
                  * If the database will be migrated, then all door-created triggers/views should be dropped. Will be
                  * recreated after migration
@@ -194,11 +192,11 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                     }
                 }
 
-                if(dbWillBeMigrated) {
-                    dbClass.doorDatabaseMetadata().createTriggerSetupStatementList(dbType).forEach {sql ->
-                        stmt?.addBatch(sql)
+                connection.takeIf { dbWillBeMigrated }?.createStatement()?.use { statement ->
+                    dbClass.doorDatabaseMetadata().createTriggerSetupStatementList(dbType).forEach { sql ->
+                        statement.addBatch(sql)
                     }
-                    stmt?.executeBatch()
+                    statement.executeBatch()
                 }
             }
 
@@ -209,11 +207,6 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                         sqlDatabase.execSQLBatch(it.onOpen(sqlDatabase).toTypedArray())
                     }
                 }
-            }
-
-            if(doorDb.dbType() == DoorDbType.POSTGRES) {
-                val postgresChangeTracker = PostgresChangeTracker(doorDb as DoorDatabaseJdbc)
-                postgresChangeTracker.setupTriggers()
             }
 
             val wrapperClass = Class.forName("${dbClass.java.canonicalName}${DoorDatabaseWrapper.SUFFIX}") as Class<T>

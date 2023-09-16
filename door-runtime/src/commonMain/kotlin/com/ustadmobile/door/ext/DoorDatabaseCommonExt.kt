@@ -1,12 +1,15 @@
 package com.ustadmobile.door.ext
 
-import com.ustadmobile.door.room.RoomDatabase
-import com.ustadmobile.door.*
+import com.ustadmobile.door.DoorDatabaseRepository
+import com.ustadmobile.door.DoorDbType
+import com.ustadmobile.door.PreparedStatementConfig
+import com.ustadmobile.door.SyncNodeIdCallback
 import com.ustadmobile.door.jdbc.PreparedStatement
 import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
 import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
 import com.ustadmobile.door.jdbc.ext.mapRows
 import com.ustadmobile.door.jdbc.ext.useResults
+import com.ustadmobile.door.room.RoomDatabase
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 
@@ -152,3 +155,13 @@ val RoomDatabase.rootDatabase: RoomDatabase
 
 val RoomDatabase.arraySupported: Boolean
     get() = dbType() == DoorDbType.POSTGRES
+
+inline fun <T: RoomDatabase> T.use(
+    block: (T) -> Unit
+) {
+    try {
+        block(this)
+    }finally {
+        close()
+    }
+}

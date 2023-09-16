@@ -8,6 +8,7 @@ import com.ustadmobile.door.ext.asRepository
 import com.ustadmobile.door.ext.withDoorTransactionAsync
 import com.ustadmobile.door.http.DoorHttpServerConfig
 import com.ustadmobile.door.ktor.routes.ReplicationRoute
+import com.ustadmobile.door.test.initNapierLog
 import com.ustadmobile.door.util.systemTimeInMillis
 import db3.ExampleDb3
 import db3.ExampleEntity3
@@ -50,6 +51,7 @@ class PushIntegrationTest {
 
     @BeforeTest
     fun setup() {
+        initNapierLog()
         serverDb = DatabaseBuilder.databaseBuilder(ExampleDb3::class, "jdbc:sqlite::memory:", serverNodeId)
             .build()
         serverDb.clearAllTables()

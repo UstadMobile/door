@@ -8,8 +8,10 @@ import com.ustadmobile.door.ext.rootDatabase
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.jdbc.ext.mutableLinkedListOf
+import com.ustadmobile.door.util.PostgresChangeTracker
 import com.ustadmobile.door.util.TransactionMode
 import com.ustadmobile.door.util.systemTimeInMillis
+import com.zaxxer.hikari.HikariDataSource
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.withLock
@@ -18,12 +20,19 @@ import kotlinx.coroutines.withTimeout
 actual class RoomDatabaseJdbcImplHelper actual constructor(
     dataSource: DataSource,
     db: RoomDatabase,
+    private val dbUrl: String,
     tableNames: List<String>,
     invalidationTracker: InvalidationTracker,
     dbType: Int,
 ) : RoomDatabaseJdbcImplHelperCommon(dataSource, db, tableNames, invalidationTracker, dbType) {
 
     inner class PendingTransaction(val connection: Connection)
+
+    private val postgresChangeTracker = if(dbType == DoorDbType.POSTGRES) {
+        PostgresChangeTracker(dataSource, invalidationTracker, tableNames)
+    }else {
+        null
+    }
 
     override suspend fun Connection.setupSqliteTriggersAsync() {
         invalidationTracker.setupSqliteTriggersAsync(this)
@@ -65,8 +74,8 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
 
             throw e
         }finally {
-            pendingTransactionThreadMap.remove(threadId)
             transaction.connection.close()
+            pendingTransactionThreadMap.remove(threadId)
             if(pendingTransactionThreadMap.isNotEmpty()) {
                 Napier.d("useConnection: close connection for thread #$threadId (took ${systemTimeInMillis() - startTime}ms)" +
                         " There are ${pendingTransactionThreadMap.size} pending non-async transactions still open.")
@@ -115,5 +124,15 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
             }
         }
         pendingTransactionThreadMap.clear()
+
+        postgresChangeTracker?.close()
+
+        // If the DBURL is jdbc: then the datasource was created by the DatabaseBuilder, otherwise it was looked up
+        // via JNDI. If the DataSource was created by the builder and is a datapool, then it must be closed so
+        // connections are released
+        if(dbUrl.startsWith("jdbc:") && dataSource is HikariDataSource) {
+            dataSource.close()
+            Napier.d(tag = DoorTag.LOG_TAG, message = "Closed HikariDataSource connection pool")
+        }
     }
 }

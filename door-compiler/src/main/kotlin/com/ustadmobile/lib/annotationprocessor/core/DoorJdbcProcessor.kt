@@ -31,7 +31,6 @@ import com.ustadmobile.lib.annotationprocessor.core.DoorJdbcProcessor.Companion.
 import com.ustadmobile.lib.annotationprocessor.core.DoorRepositoryProcessor.Companion.SUFFIX_REPOSITORY2
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlin.math.abs
 import kotlin.reflect.KClass
 import kotlin.reflect.jvm.internal.impl.builtins.jvm.JavaToKotlinClassMap
@@ -326,7 +325,6 @@ fun sqlArrayComponentTypeOf(typeName: TypeName): String {
 
 val PRIMITIVE = listOf(INT, LONG, BOOLEAN, SHORT, BYTE, FLOAT, DOUBLE)
 
-@OptIn(DelicateCoroutinesApi::class)
 fun FileSpec.Builder.addJdbcDbImplType(
     dbKSClass: KSClassDeclaration,
     target: DoorTarget,
@@ -350,7 +348,7 @@ fun FileSpec.Builder.addJdbcDbImplType(
             .initializer("dataSource")
             .build())
         .addProperty(PropertySpec.builder("jdbcImplHelper", RoomDatabaseJdbcImplHelper::class, KModifier.OVERRIDE)
-            .initializer("%T(dataSource, this, this::class.%M().allTables, %T(*this::class.%M().allTables.toTypedArray()), jdbcDbType)\n",
+            .initializer("%T(dataSource, this, dbName, this::class.%M().allTables, %T(*this::class.%M().allTables.toTypedArray()), jdbcDbType)\n",
                 RoomDatabaseJdbcImplHelper::class,
                 MemberName("com.ustadmobile.door.ext", "doorDatabaseMetadata"),
                 InvalidationTracker::class,
@@ -938,12 +936,12 @@ fun TypeSpec.Builder.addDaoQueryFunction(
                                 .applyIf(rawQueryParamName != null) {
                                     add("val $rawQueryParamName = $rawQueryParamName.%M(\n",
                                         MemberName("com.ustadmobile.door.ext", "copyWithExtraParams"))
-                                    add("sql = \"SELECT * FROM (\${$rawQueryParamName.sql}) LIMIT ? OFFSET ?\",\n")
+                                    add("sql = \"SELECT * FROM (\${$rawQueryParamName.sql}) AS _PagingData LIMIT ? OFFSET ?\",\n")
                                     add("extraParams = arrayOf(_limit, _offset))\n")
                                 }
                                 .add("return ")
                                 .addJdbcQueryCode(daoFunDecl, daoDecl, pagingSourceQueryVarsMap, resolver,
-                                    querySql = querySql?.let { "SELECT * FROM ($it) LIMIT :_limit OFFSET :_offset" })
+                                    querySql = querySql?.let { "SELECT * FROM ($it) AS _PagingData LIMIT :_limit OFFSET :_offset" })
                                 .build()
                             )
                             .build()
@@ -960,7 +958,7 @@ fun TypeSpec.Builder.addDaoQueryFunction(
                                 .add("return ")
                                 .addJdbcQueryCode(daoFunDecl, daoDecl, queryVarsMap, resolver,
                                     resultType = resolver.builtIns.intType,
-                                    querySql = querySql?.let { "SELECT COUNT(*) FROM ($querySql) " })
+                                    querySql = querySql?.let { "SELECT COUNT(*) FROM ($querySql) AS _PagingCount" })
                                 .build()
                             )
                             .build()

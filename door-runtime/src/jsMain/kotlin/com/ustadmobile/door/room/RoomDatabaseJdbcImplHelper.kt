@@ -12,6 +12,7 @@ import com.ustadmobile.door.util.TransactionMode
 actual class RoomDatabaseJdbcImplHelper actual constructor(
     dataSource: DataSource,
     db: RoomDatabase,
+    dbUrl: String,
     tableNames: List<String>,
     invalidationTracker: InvalidationTracker,
     dbType: Int,

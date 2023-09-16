@@ -8,12 +8,12 @@ import com.ustadmobile.door.DatabaseBuilder
 import com.ustadmobile.door.RepositoryConfig
 import com.ustadmobile.door.ext.asRepository
 import com.ustadmobile.door.ext.doorWrapperNodeId
+import com.ustadmobile.door.ext.use
 import com.ustadmobile.door.http.DoorHttpServerConfig
 import com.ustadmobile.door.flow.FlowLoadingState
 import com.ustadmobile.door.flow.repoFlowWithLoadingState
+import com.ustadmobile.door.test.initNapierLog
 import db3.*
-import io.github.aakira.napier.DebugAntilog
-import io.github.aakira.napier.Napier
 import io.ktor.client.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.engine.*
@@ -112,7 +112,7 @@ class PullIntegrationTest {
 
     @Test
     fun givenEntityOnServer_whenClientMakesPullRequest_repoFunctionReturnsValuesAndEntitiesAreStoredInClientLocalDb() {
-        Napier.base(DebugAntilog())
+        initNapierLog()
         clientServerIntegrationTest {
             val memberInServerDb = Member().apply {
                 firstName = "Roger"
@@ -205,11 +205,11 @@ class PullIntegrationTest {
                 postUid = serverDb.discussionPostDao.insertAsync(this)
             }
 
-            val clientRepo = makeClientRepo()
+            makeClientRepo().use { clientRepo ->
+                server.stop()
+                clientRepo.discussionPostDao.getNumPostsSinceTimeHttpOnly(0)
+            }
 
-            server.stop()
-            clientRepo.discussionPostDao.getNumPostsSinceTimeHttpOnly(0)
-            clientRepo.close()
         }
     }
 
@@ -282,6 +282,7 @@ class PullIntegrationTest {
             }.test(timeout = 500.seconds) {
                 val initialState = awaitItemWhere { it.loadingState?.status == FlowLoadingState.Status.LOADING }
 
+                @Suppress("UNUSED_VARIABLE")
                 val loadedState = awaitItemWhere { it.loadingState?.status == FlowLoadingState.Status.DONE }
 
                 val postInClientDb = clientDb.discussionPostDao.findByUidWithPosterMember(post.postUid)

@@ -2,8 +2,6 @@ package com.ustadmobile.door.room
 
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
-import com.ustadmobile.door.room.InvalidationTracker
-import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.util.TransactionMode
 
 
@@ -15,6 +13,7 @@ import com.ustadmobile.door.util.TransactionMode
 expect class RoomDatabaseJdbcImplHelper(
     dataSource: DataSource,
     db: RoomDatabase,
+    dbUrl: String,
     tableNames: List<String>,
     invalidationTracker: InvalidationTracker,
     dbType: Int,

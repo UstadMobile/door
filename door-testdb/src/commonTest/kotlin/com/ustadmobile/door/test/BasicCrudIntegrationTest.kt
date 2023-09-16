@@ -22,7 +22,10 @@ class BasicCrudIntegrationTest : AbstractCommonTest() {
         val exampleDb2: ExampleDatabase2,
     )
 
-
+    @BeforeTest
+    fun setup() {
+        initNapierLog()
+    }
 
     @Test
     fun givenEntryInserted_whenQueried_shouldBeEqual() = runExampleDbTest {
@@ -171,9 +174,9 @@ class BasicCrudIntegrationTest : AbstractCommonTest() {
             flow.first()
         }
 
-        assertEquals(firstEmission.size, 1,
+        assertEquals( 1, firstEmission.size,
             "Initial result had one entity in list")
-        assertEquals(secondEmission.size, 2,
+        assertEquals( 2, secondEmission.size,
                 message = "Second result had two entities in list")
         flowJob.cancelAndJoin()
 
@@ -262,7 +265,6 @@ class BasicCrudIntegrationTest : AbstractCommonTest() {
                 }finally {
                     db.close()
                 }
-
             }
         }
     }
