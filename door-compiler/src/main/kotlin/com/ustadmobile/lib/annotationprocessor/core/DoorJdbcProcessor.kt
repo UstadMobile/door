@@ -282,8 +282,8 @@ private fun CodeBlock.Builder.addReplicateEntityMetaDataCode(
         return this
     }
 
-    val repEntityAnnotation = entity.getAnnotation(ReplicateEntity::class)
-    val triggersAnnotation = entity.getAnnotation(Triggers::class)
+    val repEntityAnnotation = entity.getKSAnnotationByType(ReplicateEntity::class)?.toReplicateEntity()
+    val triggersAnnotation = entity.getKSAnnotationByType(Triggers::class)?.toTriggers()
     add("%T(", ReplicationEntityMetaData::class)
     add("tableId = %L, \n", repEntityAnnotation?.tableId)
     add("entityTableName = %S, \n", entity.entityTableName)

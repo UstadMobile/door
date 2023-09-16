@@ -1,5 +1,33 @@
 package com.ustadmobile.door
 
+import db3.ExampleDb3
+import db3.ExampleDb3JsImplementations
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlin.test.Test
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class TestDbBuilder {
+
+    @Test
+    fun testDbOpen() = runTest {
+        withContext(Dispatchers.Default.limitedParallelism(1)) {
+            val builderOptions = DatabaseBuilderOptions(ExampleDb3::class,
+                ExampleDb3JsImplementations,
+                webWorkerPath = "worker.sql-wasm.js",
+                dbUrl = "sqlite:exampledb3"
+            )
+            val db = DatabaseBuilder.databaseBuilder(builderOptions).build()
+            println("Opened db: $db")
+
+        }
+    }
+
+}
+
+
 //import com.ustadmobile.door.room.InvalidationTracker
 //import com.ustadmobile.door.ext.withDoorTransactionAsync
 //import com.ustadmobile.door.room.InvalidationTrackerObserver

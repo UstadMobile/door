@@ -14,7 +14,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
-
+/**
+ * Common code for implementation of NodeEventManager.
+ *
+ */
 @Suppress("PropertyName")
 abstract class NodeEventManagerCommon<T : RoomDatabase>(
     protected val db: T,

@@ -169,6 +169,30 @@ ksp {
     arg("doordb_postgres_password", rootProject.ext.localProperties["door.postgresPass"])
 }
 
+/**
+ * Door uses SQLite.JS WASM Worker to run on Kotlin/JS. This is kept as a resource in door-runtime/jsMain.
+ *
+ * The default Kotlin/JS test runner does not load resources as per this bug:
+ * https://youtrack.jetbrains.com/issue/KT-42923
+ *
+ * This would prevent Door on Kotlin/JS loading the required WebWorker and WASM file. This workaround
+ * adds a resource loader to the Karma config as per:
+ *
+ * https://github.com/DaanVandenBosch/kotlin-js-karma-resources-test/tree/fix
+ */
+def generateKarmaConfigExtra = tasks.register("generateKarmaConfigExtra") {
+    def outputFile = project.file("karma.config.d/karma.config.generated.js")
+    outputs.file(outputFile)
+
+    doLast {
+        outputFile.text = "var PROJECT_PATH = '${rootProject.rootDir}';\n"
+    }
+}
+
+tasks.getByName("jsTest") {
+    dependsOn(generateKarmaConfigExtra)
+}
+
 dependencies {
     kspJvm project(":door-compiler")
     kspJvm project(":door-shallowcopy")
@@ -182,7 +206,4 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$version_androidx_test_junit_ext"
     androidTestImplementation "androidx.test:runner:$version_androidx_test_runner"
     androidTestImplementation "androidx.test:rules:$version_androidx_test_rules"
-
-
-
 }

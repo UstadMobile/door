@@ -225,3 +225,5 @@ app-ktor-server/devmode.conf
 #data directory for running the server
 app-ktor-server/data
 
+#Ignore generated karma config created as per door-testdb/build.gradle
+door-testdb/karma.config.d/karma.config.generated.js

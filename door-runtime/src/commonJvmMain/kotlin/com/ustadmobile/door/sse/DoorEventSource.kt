@@ -1,10 +1,14 @@
 package com.ustadmobile.door.sse
 
-import com.ustadmobile.door.ext.doorIdentityHashCode
-import io.github.aakira.napier.Napier
 import com.ustadmobile.door.RepositoryConfig
 import com.ustadmobile.door.ext.DoorTag
+import io.github.aakira.napier.Napier
 import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.sse.EventSource
@@ -12,11 +16,6 @@ import okhttp3.sse.EventSourceListener
 import okhttp3.sse.EventSources
 import java.io.IOException
 import java.util.concurrent.TimeUnit
-import okhttp3.OkHttpClient
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.Job
 import kotlin.concurrent.Volatile
 
 actual class DoorEventSource actual constructor(
@@ -27,7 +26,7 @@ actual class DoorEventSource actual constructor(
 ) {
 
     private val logPrefix: String
-        get() = "[DoorEventSource@${this.doorIdentityHashCode} - $url]"
+        get() = "[DoorEventSource@$this - $url]"
 
     private lateinit var eventSource: EventSource
 

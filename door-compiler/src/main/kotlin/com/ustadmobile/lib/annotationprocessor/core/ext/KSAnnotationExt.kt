@@ -6,6 +6,7 @@ import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSValueArgument
+import com.ustadmobile.door.annotation.ReplicateEntity
 import com.ustadmobile.door.annotation.Trigger
 import com.ustadmobile.door.annotation.Triggers
 import kotlin.reflect.KClass
@@ -113,6 +114,17 @@ private fun KSAnnotation.assertQualifiedNameIs(qualifiedName: String) {
     if(qualifiedNameStr != qualifiedName) {
         throw IllegalArgumentException("Called toTrigger on KSAnnotation that is not a Trigger: it is $qualifiedNameStr")
     }
+}
+
+fun KSAnnotation.toReplicateEntity(): ReplicateEntity {
+    assertQualifiedNameIs("com.ustadmobile.door.annotation.ReplicateEntity")
+    return ReplicateEntity(
+        tableId = arguments.firstOrNull { it.name?.asString() == "tableId" }?.value?.toString()?.toInt()
+            ?: throw IllegalArgumentException("tableId is mandatory"),
+        remoteInsertStrategy = getArgumentValueByNameAsKSType("remoteInsertStrategy")?.let {
+            ReplicateEntity.RemoteInsertStrategy.valueOf(it.declaration.simpleName.asString())
+        } ?: ReplicateEntity.RemoteInsertStrategy.CALLBACK,
+    )
 }
 
 fun KSAnnotation.toTrigger() : Trigger{
