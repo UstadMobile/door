@@ -44,6 +44,8 @@ class SQLiteDatasourceJs(
 
     private var transactionIdCounter = 0
 
+    private var closed = false
+
     init {
         worker.onmessage = { dbEvent: dynamic ->
             val actionId = dbEvent.data["id"].toString().toInt()
@@ -74,11 +76,18 @@ class SQLiteDatasourceJs(
         }
     }
 
+    private fun assertNotClosed() {
+        if(closed)
+            throw IllegalStateException("SQLiteDataSourceJs is closed!")
+    }
+
+
     // This is here because we need the mutex lock on datasource (there could be any number of connections). We need to
     internal suspend fun <R> withTransactionLock(
         transactionMode: TransactionMode = TransactionMode.READ_WRITE,
         block: suspend () -> R
     ) : R {
+        assertNotClosed()
         with(transactionMutex) {
             val key = ReentrantMutexContextKey(this)
             // call block directly when this mutex is already locked in the context
@@ -95,7 +104,7 @@ class SQLiteDatasourceJs(
             return withContext(ReentrantMutexContextElement(key)) {
                 withLock {
                     val transactionId = ++transactionIdCounter
-                    Napier.d("Transaction: Start Transaction $transactionId\n", tag = DoorTag.LOG_TAG)
+                    Napier.v("Transaction: Start Transaction $transactionId\n", tag = DoorTag.LOG_TAG)
                     var transactionSuccessful = false
                     try {
                         if(transactionMode == TransactionMode.READ_WRITE)
@@ -112,7 +121,7 @@ class SQLiteDatasourceJs(
                         Napier.e("withTransactionLock: Exception! ", e, tag = DoorTag.LOG_TAG)
                         throw e
                     }finally {
-                        Napier.d("Transaction: End transaction $transactionId", tag = DoorTag.LOG_TAG)
+                        Napier.v("Transaction: End transaction $transactionId", tag = DoorTag.LOG_TAG)
                         if(!transactionSuccessful && transactionMode == TransactionMode.READ_WRITE)
                             sendUpdate("ROLLBACK", emptyArray())
                     }
@@ -126,16 +135,17 @@ class SQLiteDatasourceJs(
      * @param message message to be sent for SQLJs to execute
      */
     private suspend fun sendMessage(message: Json): WorkerResult {
+        assertNotClosed()
         return transactionMutex.withReentrantLock {
             val completable = CompletableDeferred<WorkerResult>()
             val actionId = ++idCounter
-            Napier.d("$logPrefix sendMessage #$actionId - sending action=${message["action"]} \n", tag = DoorTag.LOG_TAG)
+            Napier.v("$logPrefix sendMessage #$actionId - sending action=${message["action"]} \n", tag = DoorTag.LOG_TAG)
             pendingMessages[actionId] = completable
             executedSqlQueries[actionId] = message["sql"].toString()
             message["id"] = actionId
             worker.postMessage(message)
             val result = completable.await()
-            Napier.d("$logPrefix sendMessage #$actionId - got result \n", tag = DoorTag.LOG_TAG)
+            Napier.v("$logPrefix sendMessage #$actionId - got result \n", tag = DoorTag.LOG_TAG)
             result
         }
     }
@@ -153,10 +163,10 @@ class SQLiteDatasourceJs(
         sql: String,
         params: Array<Any?>? = null
     ): ResultSet = withTransactionLock(transactionMode = TransactionMode.READ_ONLY) {
-        Napier.d("$logPrefix sending query: $sql params=${params?.joinToString()}", tag = DoorTag.LOG_TAG)
+        Napier.v("$logPrefix sending query: $sql params=${params?.joinToString()}", tag = DoorTag.LOG_TAG)
         val results = sendMessage(makeMessage(sql, params)).results
         val sqliteResultSet = results?.let { SQLiteResultSet(it) } ?: SQLiteResultSet(arrayOf())
-        Napier.d("$logPrefix Got result: Ran: '$sql' params=${params?.joinToString()} result = $sqliteResultSet\n", tag = DoorTag.LOG_TAG)
+        Napier.v("$logPrefix Got result: Ran: '$sql' params=${params?.joinToString()} result = $sqliteResultSet\n", tag = DoorTag.LOG_TAG)
         sqliteResultSet
     }
 
@@ -165,7 +175,7 @@ class SQLiteDatasourceJs(
         params: Array<Any?>?,
         returnGeneratedKey: Boolean = false
     ): UpdateResult = withTransactionLock{
-        Napier.d("$logPrefix sending update: '$sql', params=${params?.joinToString()}\n",
+        Napier.v("$logPrefix sending update: '$sql', params=${params?.joinToString()}\n",
             tag = DoorTag.LOG_TAG)
         sendMessage(makeMessage(sql, params))
         val generatedKey = if(returnGeneratedKey) {
@@ -173,7 +183,7 @@ class SQLiteDatasourceJs(
         }else {
             null
         }
-        Napier.d("$logPrefix update done: '$sql'", tag = DoorTag.LOG_TAG)
+        Napier.v("$logPrefix update done: '$sql'", tag = DoorTag.LOG_TAG)
         UpdateResult(1, generatedKey)
     }
 
@@ -251,7 +261,15 @@ class SQLiteDatasourceJs(
 
 
     override fun getConnection(): Connection {
+        assertNotClosed()
         return SQLiteConnectionJs(this)
+    }
+
+    fun close() {
+        Napier.d(tag = DoorTag.LOG_TAG) { "SQLiteDataSourceJS: close - terminating worker\n" }
+        worker.terminate()
+        closed = true
+        Napier.i(tag = DoorTag.LOG_TAG) { "SQLiteDataSourceJS: close - worker terminated, closed\n" }
     }
 
 

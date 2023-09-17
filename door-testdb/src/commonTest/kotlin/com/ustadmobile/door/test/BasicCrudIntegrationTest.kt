@@ -5,6 +5,7 @@ import com.ustadmobile.door.util.systemTimeInMillis
 import db2.ExampleDatabase2
 import db2.ExampleEntity2
 import db2.ExampleLinkEntity
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestResult
@@ -22,9 +23,12 @@ class BasicCrudIntegrationTest : AbstractCommonTest() {
         val exampleDb2: ExampleDatabase2,
     )
 
+    val startTime = systemTimeInMillis()
+
     @BeforeTest
     fun setup() {
         initNapierLog()
+        Napier.d("Start time = $startTime\n")
     }
 
     @Test

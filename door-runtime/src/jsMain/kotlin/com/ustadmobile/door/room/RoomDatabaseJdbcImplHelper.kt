@@ -1,8 +1,11 @@
 package com.ustadmobile.door.room
 
+import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
+import com.ustadmobile.door.sqljsjdbc.SQLiteDatasourceJs
 import com.ustadmobile.door.util.TransactionMode
+import io.github.aakira.napier.Napier
 
 /**
  * Contains logic that is used by generated JDBC implementations on JVM and JS. The reason this is not in the parent
@@ -36,4 +39,13 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
         throw IllegalStateException("useConnection synchronous not supported on JS")
     }
 
+    override fun onClose() {
+        super.onClose()
+
+        if(dataSource is SQLiteDatasourceJs) {
+            Napier.i(tag = DoorTag.LOG_TAG) { "SQLite/JS Datasource: closing\n" }
+            dataSource.close()
+            Napier.i(tag = DoorTag.LOG_TAG) { "SQLite/JS Datasource: closed\n" }
+        }
+    }
 }

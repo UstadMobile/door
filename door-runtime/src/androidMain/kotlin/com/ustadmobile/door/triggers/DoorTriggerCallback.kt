@@ -32,7 +32,7 @@ class DoorTriggerCallback(
 
     override fun onCreate(db: SupportSQLiteDatabase) {
         val metadata = dbClass.doorDatabaseMetadata()
-        metadata.createSqliteTriggerSetupStatementList().forEach { sql ->
+        metadata.createSqliteTriggerAndReceiveViewSetupStatementList().forEach { sql ->
             db.execSQL(sql)
         }
 
@@ -71,7 +71,7 @@ class DoorTriggerCallback(
                 db.execSQL("DROP VIEW $receiveViewName")
             }
 
-            dbClass.doorDatabaseMetadata().createSqliteTriggerSetupStatementList().forEach { sql ->
+            dbClass.doorDatabaseMetadata().createSqliteTriggerAndReceiveViewSetupStatementList().forEach { sql ->
                 db.execSQL(sql)
             }
 

@@ -15,6 +15,8 @@ import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.sqljsjdbc.*
 import com.ustadmobile.door.sqljsjdbc.SQLiteDatasourceJs.Companion.LOCATION_MEMORY
 import com.ustadmobile.door.sqljsjdbc.SQLiteDatasourceJs.Companion.PROTOCOL_SQLITE_PREFIX
+import com.ustadmobile.door.triggers.createSqliteTriggerAndReceiveViewSetupStatementList
+import com.ustadmobile.door.triggers.dropDoorTriggersAndReceiveViewsSqlite
 import com.ustadmobile.door.util.DoorJsImplClasses
 import io.github.aakira.napier.Napier
 import org.w3c.dom.Worker
@@ -32,8 +34,11 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
         if(!builderOptions.dbUrl.startsWith(PROTOCOL_SQLITE_PREFIX))
             throw IllegalArgumentException("Door/JS: Only SQLite is supported on JS! dbUrl must be in the form of " +
                     "sqlite::memory: OR sqlite:indexeddb_name")
+        register(builderOptions.dbImplClasses)
 
         val storageLocation = builderOptions.dbUrl.substringAfter(PROTOCOL_SQLITE_PREFIX)
+        val dbMetaData = lookupImplementations(builderOptions.dbClass).metadata
+
         val dataSource = SQLiteDatasourceJs(storageLocation, Worker(builderOptions.webWorkerPath))
         register(builderOptions.dbImplClasses)
 
@@ -74,6 +79,11 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
             }
 
             Napier.d("DatabaseBuilderJs: Found current db version = $currentDbVersion\n", tag = DoorTag.LOG_TAG)
+
+            //If there is going to be a migration, then drop all door-generated triggers and ReceiveView(s)
+            val dbWillBeMigrated = currentDbVersion < dbImpl.dbVersion
+            sqlCon?.takeIf { dbWillBeMigrated }?.dropDoorTriggersAndReceiveViewsSqlite()
+
             while(currentDbVersion < dbImpl.dbVersion) {
                 val nextMigration = migrationList.filter {
                     it.startVersion == currentDbVersion && it !is DoorMigrationSync
@@ -97,9 +107,17 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
                             "${dbImpl.dbVersion} from $currentDbVersion - could not find next migration")
                 }
             }
+
+            connection.takeIf { dbWillBeMigrated }?.execSqlAsync(
+                sqlStmts = dbMetaData.createSqliteTriggerAndReceiveViewSetupStatementList().toTypedArray()
+            )
         }else{
             Napier.i("DatabaseBuilderJs: Creating database ${builderOptions.dbUrl}\n", tag = DoorTag.LOG_TAG)
             connection.execSqlAsync(*dbImpl.createAllTables().toTypedArray())
+            Napier.i("DatabaseBuilderJs: creating door triggers and receive views ${builderOptions.dbUrl}\n", tag = DoorTag.LOG_TAG)
+            connection.execSqlAsync(
+                sqlStmts = dbMetaData.createSqliteTriggerAndReceiveViewSetupStatementList().toTypedArray()
+            )
             Napier.d("DatabaseBuilderJs: Running onCreate callbacks...\n", tag = DoorTag.LOG_TAG)
             callbacks.forEach {
                 when(it) {
@@ -111,6 +129,7 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
                     }
                 }
             }
+            Napier.d("DatabaseBuilderJs: table creation finished\n", tag = DoorTag.LOG_TAG)
         }
 
         Napier.d("DatabaseBuilderJs: Running onOpen callbacks...\n", tag = DoorTag.LOG_TAG)
@@ -125,9 +144,9 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
         }
 
         Napier.d("DatabaseBuilderJs: Setting up trigger SQL\n", tag = DoorTag.LOG_TAG)
-        val dbMetaData = lookupImplementations(builderOptions.dbClass).metadata
         connection.execSqlAsync(
-            *InvalidationTracker.generateCreateTriggersSql(dbMetaData.allTables, temporary = false).toTypedArray())
+            sqlStmts = InvalidationTracker.generateCreateTriggersSql(dbMetaData.allTables, temporary = false).toTypedArray()
+        )
 
         Napier.d("DatabaseBuilderJs: Setting up change listener\n", tag = DoorTag.LOG_TAG)
 
@@ -139,7 +158,7 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
         connection.close()
 
         val dbWrappedIfNeeded = if(dbMetaData.hasReadOnlyWrapper) {
-            dbImpl.wrap(builderOptions.dbClass, 0)
+            dbImpl.wrap(builderOptions.dbClass, builderOptions.nodeId)
         }else {
             dbImpl
         }

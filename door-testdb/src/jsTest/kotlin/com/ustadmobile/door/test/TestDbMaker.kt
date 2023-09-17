@@ -13,6 +13,7 @@ actual suspend fun makeExample2Database(nodeId: Long): ExampleDatabase2 {
     return DatabaseBuilder.databaseBuilder(
         DatabaseBuilderOptions(ExampleDatabase2::class, ExampleDatabase2JsImplementations,
             webWorkerPath = "worker.sql-wasm.js",
-            dbUrl = "sqlite:exampledb3")
+            dbUrl = "sqlite::memory:",
+            nodeId = nodeId)
     ).build()
 }

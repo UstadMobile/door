@@ -7,7 +7,7 @@ import com.ustadmobile.door.ext.DoorDatabaseMetadata
 /**
  * Generate of all the SQL statements required to add the triggers and receive view as per the DoorDatabaseMetadata
  */
-fun DoorDatabaseMetadata<*>.createSqliteTriggerSetupStatementList(): List<String> {
+fun DoorDatabaseMetadata<*>.createSqliteTriggerAndReceiveViewSetupStatementList(): List<String> {
     return buildList {
         replicateEntities.values.forEach { entity ->
             if(entity.remoteInsertStrategy == ReplicateEntity.RemoteInsertStrategy.INSERT_INTO_RECEIVE_VIEW) {

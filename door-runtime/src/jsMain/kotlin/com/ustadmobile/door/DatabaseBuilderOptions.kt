@@ -7,6 +7,7 @@ import kotlin.reflect.KClass
 data class DatabaseBuilderOptions<T : RoomDatabase>(
     var dbClass: KClass<T>,
     var dbImplClasses: DoorJsImplClasses<T>,
+    val nodeId: Long,
     var dbUrl: String = "indexeddb:${dbClass.simpleName!!}",
 
     /**
