@@ -608,7 +608,8 @@ fun FileSpec.Builder.addHttpServerExtensionFun(
                     }
 
                     if(effectiveStrategy == HttpAccessible.ClientStrategy.PULL_REPLICATE_ENTITIES) {
-                        addHttpReplicationEntityServerExtension(resolver, daoFunDecl)
+                        addHttpReplicationEntityServerExtension(resolver, daoFunDecl, daoKSClassDeclaration,
+                                requestValName = "request", pagingLoadParamValName = "_pagingLoadParams")
                     }else {
                         //Run the query and return JSON
                         add("val _thisNodeId = request.db.%M\n",
@@ -665,7 +666,10 @@ fun FileSpec.Builder.addHttpServerExtensionFun(
 
 fun CodeBlock.Builder.addHttpReplicationEntityServerExtension(
     resolver: Resolver,
-    daoFunDecl: KSFunctionDeclaration
+    daoFunDecl: KSFunctionDeclaration,
+    daoKSClassDeclaration: KSClassDeclaration,
+    requestValName: String,
+    pagingLoadParamValName: String,
 ) : CodeBlock.Builder {
     beginControlFlow("val replicationEntities = %M<%T>",
         MemberName("kotlin.collections", "buildList"),
@@ -674,17 +678,52 @@ fun CodeBlock.Builder.addHttpReplicationEntityServerExtension(
 
     //Next: we can add list of functions e.g. replicateData = ["selectAllSalesPeople", "selectAllSalesByType"]
     // that are going to generate data to replicate
-    listOf(daoFunDecl).forEach { funDeclaration ->
+    val httpAccessibleAnnotation = daoFunDecl.getAnnotation(HttpAccessible::class)
+        ?: throw IllegalArgumentException("addHttpReplicationEntityServerExtension: can only be used for function with @HttpAccessible annotation")
+
+    val functionsToReplicate = if(httpAccessibleAnnotation.pullQueriesToReplicate.isEmpty()) {
+        listOf(daoFunDecl)
+    }else {
+        httpAccessibleAnnotation.pullQueriesToReplicate.map { daoFunCall ->
+            daoKSClassDeclaration.getAllFunctions().first { it.simpleName.asString() == daoFunCall.functionName }
+        }
+    }
+
+    functionsToReplicate.forEach { funDeclaration ->
         val returnType = funDeclaration.returnType?.resolve()
-        val resultType = funDeclaration.returnType?.resolve()?.unwrapResultType(resolver)
+        val resultType = returnType?.unwrapResultType(resolver)
         val resultComponentType = resultType?.unwrapComponentTypeIfListOrArray(resolver)
         val resultValName = "_result_${funDeclaration.simpleName.asString()}"
+        val functionCallAnnotation = httpAccessibleAnnotation.pullQueriesToReplicate.firstOrNull {
+            it.functionName == funDeclaration.simpleName.asString()
+        }
 
         add("val $resultValName = ${funDeclaration.simpleName.asString()}(\n")
         indent()
         funDeclaration.parameters.forEach { param ->
             val paramNameStr = param.name?.asString()
-            add("$paramNameStr = _arg_$paramNameStr,\n")
+            val argParamAnnotation = functionCallAnnotation?.functionArgs?.firstOrNull { it.name == paramNameStr }
+            if(argParamAnnotation != null) {
+                when(argParamAnnotation.argType) {
+                    HttpServerFunctionParam.ArgType.LITERAL -> {
+                        if(param.type.resolve().makeNotNullable() == resolver.builtIns.stringType)
+                            add("$paramNameStr = %S,\n", argParamAnnotation.literalValue)
+                        else
+                            add("$paramNameStr = %L,\n", argParamAnnotation.literalValue)
+                    }
+                    HttpServerFunctionParam.ArgType.REQUESTER_NODE_ID -> {
+                        add("$paramNameStr = $requestValName.requireNodeId(),\n")
+                    }
+                    HttpServerFunctionParam.ArgType.PAGING_KEY -> {
+                        add("$paramNameStr = $pagingLoadParamValName.key ?: 0,\n")
+                    }
+                    HttpServerFunctionParam.ArgType.PAGING_LOAD_SIZE -> {
+                        add("$paramNameStr = $pagingLoadParamValName.loadSize,\n")
+                    }
+                }
+            }else {
+                add("$paramNameStr = _arg_$paramNameStr,\n")
+            }
         }
         unindent()
         add(")")

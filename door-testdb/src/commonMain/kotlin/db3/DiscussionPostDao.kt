@@ -4,10 +4,7 @@ import androidx.room.Insert
 import androidx.room.Query
 import app.cash.paging.PagingSource
 import com.ustadmobile.door.RepositoryFlowLoadingStatusProvider
-import com.ustadmobile.door.annotation.DoorDao
-import com.ustadmobile.door.annotation.HttpAccessible
-import com.ustadmobile.door.annotation.RepoHttpBodyParam
-import com.ustadmobile.door.annotation.Repository
+import com.ustadmobile.door.annotation.*
 import kotlinx.coroutines.flow.Flow
 
 @DoorDao
@@ -119,5 +116,104 @@ expect abstract class DiscussionPostDao : RepositoryFlowLoadingStatusProvider {
     """)
     abstract fun findAllPostAsNetworkWithFallbackPagingSource(since: Long): PagingSource<Int, DiscussionPost>
 
+    @Query("""
+        SELECT DiscussionPost.*
+          FROM DiscussionPost
+         WHERE DiscussionPost.postReplyToPostUid = :postUid 
+           AND :nodeId != 0
+    """)
+    abstract suspend fun findAllRepliesForPost(postUid: Long, nodeId: Long): List<DiscussionPost>
+
+    @HttpAccessible(
+        pullQueriesToReplicate = arrayOf(
+            HttpServerFunctionCall("findAllRepliesForPost",
+                functionArgs = arrayOf(
+                    HttpServerFunctionParam(
+                        name = "nodeId",
+                        argType = HttpServerFunctionParam.ArgType.REQUESTER_NODE_ID,
+                    )
+                )
+            ),
+            HttpServerFunctionCall("findPostAndNumReplies"),
+        )
+    )
+    @Query("""
+        SELECT DiscussionPost.*,
+               (SELECT COUNT(*) 
+                  FROM DiscussionPost DiscussionPostInternal
+                 WHERE DiscussionPostInternal.postReplyToPostUid = :postUid) AS numReplies
+         FROM DiscussionPost
+        WHERE DiscussionPost.postUid = :postUid
+          AND DiscussionPost.postLastModified >= :sinceTime
+    """)
+    abstract suspend fun findPostAndNumReplies(postUid: Long, sinceTime: Long): DiscussionPostAndNumReplies?
+
+
+    @Query("""
+        SELECT DiscussionPost.*
+          FROM DiscussionPost
+         WHERE DiscussionPost.postReplyToPostUid != 0 
+    """)
+    abstract fun findRootRepliesAsPagingSource(): PagingSource<Int, DiscussionPost>
+
+    @HttpAccessible(
+        pullQueriesToReplicate = arrayOf(
+            HttpServerFunctionCall("findRootPostsAndNumRepliesAsPagingSource"),
+            HttpServerFunctionCall("findRootRepliesAsPagingSource"),
+        )
+    )
+    @Query("""
+        SELECT DiscussionPost.*,
+               (SELECT COUNT(*) 
+                  FROM DiscussionPost DiscussionPostInternal
+                 WHERE DiscussionPostInternal.postReplyToPostUid = DiscussionPost.postUid) AS numReplies
+         FROM DiscussionPost
+        WHERE DiscussionPost.postReplyToPostUid = 0
+    """)
+    abstract fun findRootPostsAndNumRepliesAsPagingSource(): PagingSource<Int, DiscussionPostAndNumReplies>
+
+
+    @Query("""
+        SELECT DiscussionPost.*
+          FROM DiscussionPost
+         WHERE DiscussionPost.postReplyToPostUid != 0 
+         LIMIT :limit
+        OFFSET :offset   
+    """)
+    abstract suspend fun findReplyPostsWithOffsetAndLimit(offset: Int, limit: Int): List<DiscussionPost>
+
+    @HttpAccessible(
+        pullQueriesToReplicate = arrayOf(
+            HttpServerFunctionCall("findRootPostAndNumRepliesAsPagingSourceWithPagedParams"),
+            HttpServerFunctionCall(
+                functionName = "findReplyPostsWithOffsetAndLimit",
+                functionArgs = arrayOf(
+                    HttpServerFunctionParam(name = "offset", argType = HttpServerFunctionParam.ArgType.PAGING_KEY),
+                    HttpServerFunctionParam(name = "limit", argType = HttpServerFunctionParam.ArgType.PAGING_LOAD_SIZE)
+                )
+            )
+        )
+    )
+    @Query("""
+        SELECT DiscussionPost.*,
+               (SELECT COUNT(*) 
+                  FROM DiscussionPost DiscussionPostInternal
+                 WHERE DiscussionPostInternal.postReplyToPostUid = DiscussionPost.postUid) AS numReplies
+         FROM DiscussionPost
+        WHERE DiscussionPost.postReplyToPostUid = 0
+    """)
+    @Suppress("unused")
+    abstract fun findRootPostAndNumRepliesAsPagingSourceWithPagedParams(): PagingSource<Int, DiscussionPostAndNumReplies>
+
+    @Query("""
+        SELECT DiscussionPost.*,
+               (SELECT COUNT(*) 
+                  FROM DiscussionPost DiscussionPostInternal
+                 WHERE DiscussionPostInternal.postReplyToPostUid = DiscussionPost.postUid) AS numReplies
+         FROM DiscussionPost
+        WHERE DiscussionPost.postReplyToPostUid = 0
+    """)
+    @Suppress("unused")
+    abstract fun findRootPostAndNumRepliesAsPagingSourceWithAsFlow(): Flow<List<DiscussionPostAndNumReplies>>
 
 }

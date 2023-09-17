@@ -9,6 +9,15 @@ package com.ustadmobile.door.annotation
  *        generated endpoints will use.
  * @param httpMethod - the HTTP method (GET or POST) that will be used by the generated repository client (created by
  *        .asRepository(..)) and generated http endpoints will use.
+ * @param pullQueriesToReplicate sometimes when using the replicate strategy it might be needed to pull down and replicate
+ *        entities into the client local database that are not part of the query return value itself e.g. if the query is
+ *        using aggregate functions like SUM, COUNT, etc. The specified queries must return a class that is a replicate
+ *        entity, is a child of a replicate entity, or contains one or more replicate entities via embedded properties.
+ *        The name must be unique (overloads and selection according to parameter types is not supported).
+ *
+ *        If no pullQueriesToReplicate are specified then this will automatically default to the function itself. If any
+ *        pullQueriesToReplicate are specified, then only those specified queries will be used. This does not have to
+ *        include the function annotated @HttpAccessible itself, but it can be named the same as any other function.
  *
  */
 @Target(AnnotationTarget.FUNCTION)

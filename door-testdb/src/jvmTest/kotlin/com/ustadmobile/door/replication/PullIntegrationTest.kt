@@ -30,6 +30,7 @@ import org.junit.Assert
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
 class PullIntegrationTest {
@@ -357,6 +358,89 @@ class PullIntegrationTest {
             assertEquals(post, firstLoad.data.first())
             assertNull(clientDb.discussionPostDao.findByUid(post.postUid))
             clientRepo.close()
+        }
+    }
+
+    @Test
+    fun givenEntitiesCreatedOnServer_whenExtraPullQueriesToReplicateAreSpecified_thenWillLoadExtraData() {
+        clientServerIntegrationTest {
+            val memberInServerDb = Member().apply {
+                firstName = "Roger"
+                lastName = "Rabbit"
+                memberUid = serverDb.memberDao.insertAsync(this)
+            }
+
+            val originalPost = DiscussionPost().apply {
+                postTitle = "I like hay"
+                postText = "Mmm... Hay..."
+                posterMemberUid = memberInServerDb.memberUid
+                postUid = serverDb.discussionPostDao.insertAsync(this)
+            }
+
+            val replyPost = DiscussionPost().apply {
+                postTitle = "I also like hay"
+                postText = "Mmm... Hay..."
+                posterMemberUid = memberInServerDb.memberUid
+                postReplyToPostUid = originalPost.postUid
+                postUid = serverDb.discussionPostDao.insertAsync(this)
+            }
+
+            makeClientRepo().use { clientRepo ->
+                val result = clientRepo.discussionPostDao.findPostAndNumReplies(originalPost.postUid, 0L)
+
+                //Return result from the function itself should match what we expect: e.g. contains the original post,
+                // and there is one reply
+                assertEquals(originalPost, result?.discussionPost)
+                assertEquals(1, result?.numReplies ?: -1)
+
+                //Both replies should now be in the database
+                val originalPostInLocalDb = clientDb.discussionPostDao.findByUid(originalPost.postUid)
+                assertEquals(originalPost, originalPostInLocalDb)
+
+                val replyPostInLocalDb = clientDb.discussionPostDao.findByUid(replyPost.postUid)
+                assertEquals(replyPost, replyPostInLocalDb)
+            }
+        }
+    }
+
+    @Test
+    fun givenEntitiesCreatedOnServer_whenExtraPullQueriesToReplicateAreSpecifiedForPagingSource_thenWillLoadExtraData() {
+        clientServerIntegrationTest {
+            val memberInServerDb = Member().apply {
+                firstName = "Roger"
+                lastName = "Rabbit"
+                memberUid = serverDb.memberDao.insertAsync(this)
+            }
+
+            val originalPost = DiscussionPost().apply {
+                postTitle = "I like hay"
+                postText = "Mmm... Hay..."
+                posterMemberUid = memberInServerDb.memberUid
+                postUid = serverDb.discussionPostDao.insertAsync(this)
+            }
+
+            val replyPost = DiscussionPost().apply {
+                postTitle = "I also like hay"
+                postText = "Mmm... Hay..."
+                posterMemberUid = memberInServerDb.memberUid
+                postReplyToPostUid = originalPost.postUid
+                postUid = serverDb.discussionPostDao.insertAsync(this)
+            }
+
+            makeClientRepo().use { clientRepo ->
+                clientRepo.discussionPostDao.findRootPostAndNumRepliesAsPagingSourceWithPagedParams().load(
+                    PagingSourceLoadParamsRefresh(
+                        key = 0, loadSize = 50, placeholdersEnabled = false
+                    )
+                )
+
+                clientDb.discussionPostDao.findRootPostAndNumRepliesAsPagingSourceWithAsFlow().filter { postAndReplyList: List<DiscussionPostAndNumReplies> ->
+                    postAndReplyList.any { it.discussionPost?.postUid ==  originalPost.postUid && it.numReplies == 1 }
+                }.test(timeout = 10.seconds) {
+                    assertTrue(awaitItem().isNotEmpty())
+                    cancelAndIgnoreRemainingEvents()
+                }
+            }
         }
     }
 
