@@ -1,8 +1,8 @@
 package com.ustadmobile.door.ext
 
-import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.*
 import com.ustadmobile.door.jdbc.SQLException
+import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.room.RoomJdbcImpl
 import com.ustadmobile.door.util.TransactionMode
 import io.github.aakira.napier.Napier
@@ -60,18 +60,6 @@ actual suspend fun RoomDatabase.execSqlBatchAsync(vararg sqlStatements: String) 
 
 actual fun <T : RoomDatabase> KClass<T>.doorDatabaseMetadata(): DoorDatabaseMetadata<T> {
     return DatabaseBuilder.lookupImplementations(this).metadata
-}
-
-actual fun <T : RoomDatabase> T.wrap(
-    dbClass: KClass<T>,
-    nodeId: Long,
-): T {
-    val jsImplClasses = DatabaseBuilder.lookupImplementations(dbClass)
-    val rootDb = rootDatabase
-    val wrapperKClass = jsImplClasses.replicateWrapperImplClass
-        ?: throw IllegalArgumentException("$this has no replicate wrapper")
-    val wrapperImpl = wrapperKClass.js.createInstance(rootDb)
-    return wrapperImpl as T
 }
 
 @Suppress("UNCHECKED_CAST")

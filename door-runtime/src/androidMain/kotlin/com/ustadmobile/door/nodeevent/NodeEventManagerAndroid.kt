@@ -13,6 +13,11 @@ import com.ustadmobile.door.util.TransactionMode
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 
+/**
+ * Note: On Android the NodeEvent trigger is not used because it is not so straightforward to hook into the end of
+ * each transaction. NodeEventManager on Android currently simply listens for Invalidation of OutgoingReplication. It
+ * tracks the most recent uid to avoid emitting duplicate events.
+ */
 class NodeEventManagerAndroid<T: RoomDatabase>(
     db: T,
     messageCallback: DoorMessageCallback<T>,

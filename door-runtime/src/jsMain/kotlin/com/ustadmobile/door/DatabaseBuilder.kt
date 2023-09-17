@@ -2,7 +2,6 @@ package com.ustadmobile.door
 
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.createInstance
-import com.ustadmobile.door.ext.wrap
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.SQLException
 import com.ustadmobile.door.jdbc.ext.useStatementAsync
@@ -10,6 +9,8 @@ import com.ustadmobile.door.migration.DoorMigration
 import com.ustadmobile.door.migration.DoorMigrationAsync
 import com.ustadmobile.door.migration.DoorMigrationStatementList
 import com.ustadmobile.door.migration.DoorMigrationSync
+import com.ustadmobile.door.nodeevent.NodeEventConstants
+import com.ustadmobile.door.nodeevent.createNodeEventTmpTableAndTrigger
 import com.ustadmobile.door.room.InvalidationTracker
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.sqljsjdbc.*
@@ -143,9 +144,14 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
             }
         }
 
-        Napier.d("DatabaseBuilderJs: Setting up trigger SQL\n", tag = DoorTag.LOG_TAG)
+        Napier.d("DatabaseBuilderJs: Setting up InvalidationTracker trigger SQL\n", tag = DoorTag.LOG_TAG)
         connection.execSqlAsync(
             sqlStmts = InvalidationTracker.generateCreateTriggersSql(dbMetaData.allTables, temporary = false).toTypedArray()
+        )
+
+        Napier.d("DatabaseBuilderJs: Setting up NodeEvent temp table and trigger SQL\n", tag = DoorTag.LOG_TAG)
+        connection.createNodeEventTmpTableAndTrigger(
+            hasOutgoingReplicationTable = NodeEventConstants.OUTGOING_REPLICATION_TABLE_NAME in dbMetaData.allTables
         )
 
         Napier.d("DatabaseBuilderJs: Setting up change listener\n", tag = DoorTag.LOG_TAG)
@@ -157,28 +163,28 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
 
         connection.close()
 
-        val dbWrappedIfNeeded = if(dbMetaData.hasReadOnlyWrapper) {
-            dbImpl.wrap(builderOptions.dbClass, builderOptions.nodeId)
-        }else {
-            dbImpl
-        }
+        val wrapperClass = builderOptions.dbImplClasses.replicateWrapperImplClass?.js?.createInstance(dbImpl,
+            builderOptions.nodeId, builderOptions.messageCallback) as T?
 
         Napier.i("Built database for: ${builderOptions.dbUrl}\n", tag = DoorTag.LOG_TAG)
 
-        return dbWrappedIfNeeded
+        return wrapperClass ?: dbImpl
     }
 
+    @Suppress("unused")
     fun addMigrations(vararg migrations: DoorMigration): DatabaseBuilder<T> {
         migrationList.addAll(migrations)
         return this
     }
 
+    @Suppress("unused")
     fun addCallback(callback: DoorDatabaseCallback): DatabaseBuilder<T> {
         Napier.d("DatabaseBuilderJs: Add Callback: ${callback::class.simpleName}", tag = DoorTag.LOG_TAG)
         callbacks.add(callback)
         return this
     }
 
+    @Suppress("unused")
     fun queryTimeout(seconds: Int) {
         builderOptions.jdbcQueryTimeout = seconds
     }

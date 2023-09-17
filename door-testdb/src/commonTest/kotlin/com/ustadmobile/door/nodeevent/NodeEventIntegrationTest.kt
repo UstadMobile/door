@@ -5,7 +5,9 @@ import com.ustadmobile.door.DoorDatabaseWrapper
 import com.ustadmobile.door.ext.withDoorTransactionAsync
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.replication.selectDoorReplicationEntitiesForEvents
-import db3.ExampleDb3
+import com.ustadmobile.door.test.AbstractCommonTest
+import com.ustadmobile.door.test.initNapierLog
+import com.ustadmobile.door.test.makeExample3Database
 import db3.ExampleEntity3
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -19,18 +21,23 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.seconds
 
+/**
+ * Integration test to check that:
+ *
+ * 1) Inserting into OutgoingReplication will generate a DoorNodeEvent
+ * 2) The ReplicateEntity for the DoorNodeEvent can be selected as expected
+ * 3) Calling onIncomingMessageReceived on another database with the given ReplicateEntity will insert into the other
+ *    database
+ */
 @OptIn(ExperimentalCoroutinesApi::class) //Requires using the real clock, not virtual clock for coroutines.
-abstract class AbstractNodeEventTest {
-
-
-    abstract fun makeExampleDb(nodeId: Long): ExampleDb3
+class NodeEventIntegrationTest : AbstractCommonTest() {
 
     @Test
     fun givenEmptyDatabases_whenNewOutgoingReplicationInsertedIsEmittedAndMessageIsSentToSecondDatabase_thenEntityIsPresentOnSecondDatabase() = runTest {
         withContext(Dispatchers.Default.limitedParallelism(1)) {
-            val db1 = makeExampleDb(1L)
+            val db1 = makeExample3Database(1L)
 
-            val db2 = makeExampleDb(2L)
+            val db2 = makeExample3Database(2L)
 
             val outgoingNodeEvents = (db1 as DoorDatabaseWrapper<*>).nodeEventManager.outgoingEvents
             outgoingNodeEvents.filter {
@@ -71,8 +78,9 @@ abstract class AbstractNodeEventTest {
      */
     @Test
     fun givenEmptyDatabase_whenNewOutgoingReplicationInserted_thenShouldEmitNodeEventWhichCanBeSelectedAsReplicationEntity()  = runTest {
+        initNapierLog()
         withContext(Dispatchers.Default.limitedParallelism(1)) {
-            val db = makeExampleDb(1L)
+            val db = makeExample3Database(1L)
 
             val outgoingNodeEvents = (db as DoorDatabaseWrapper<*>).nodeEventManager.outgoingEvents
             outgoingNodeEvents.filter {
@@ -93,7 +101,7 @@ abstract class AbstractNodeEventTest {
                 val eventReplication = db.selectDoorReplicationEntitiesForEvents(nodeEvents).first()
                 assertEquals(ExampleEntity3.TABLE_ID, eventReplication.tableId)
                 assertEquals(insertedUid, eventReplication.entity.get("eeUid")?.jsonPrimitive?.long)
-
+                println("Received nodeEvent for $insertedUid")
                 cancelAndIgnoreRemainingEvents()
             }
 

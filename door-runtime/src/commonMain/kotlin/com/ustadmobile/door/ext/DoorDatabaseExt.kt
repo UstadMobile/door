@@ -1,11 +1,13 @@
 package com.ustadmobile.door.ext
 
+import com.ustadmobile.door.DoorPrimaryKeyManager
+import com.ustadmobile.door.PreparedStatementConfig
+import com.ustadmobile.door.RepositoryConfig
+import com.ustadmobile.door.jdbc.PreparedStatement
 import com.ustadmobile.door.room.RoomDatabase
-import com.ustadmobile.door.*
-import kotlin.reflect.KClass
-import com.ustadmobile.door.jdbc.*
 import com.ustadmobile.door.util.NodeIdAuthCache
 import com.ustadmobile.door.util.TransactionMode
+import kotlin.reflect.KClass
 
 
 /**
@@ -102,11 +104,6 @@ expect val RoomDatabase.doorPrimaryKeyManager: DoorPrimaryKeyManager
  * @param repositoryConfig config for the repository to be created
  */
 expect inline fun <reified  T: RoomDatabase> T.asRepository(repositoryConfig: RepositoryConfig): T
-
-expect fun <T: RoomDatabase> T.wrap(
-    dbClass: KClass<T>,
-    nodeId: Long,
-): T
 
 expect fun <T: RoomDatabase> T.unwrap(dbClass: KClass<T>): T
 

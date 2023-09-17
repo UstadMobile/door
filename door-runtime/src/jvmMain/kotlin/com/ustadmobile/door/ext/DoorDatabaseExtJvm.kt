@@ -1,13 +1,13 @@
 package com.ustadmobile.door.ext
 
-import com.ustadmobile.door.room.RoomDatabase
-import com.ustadmobile.door.*
+import com.ustadmobile.door.DoorDatabaseWrapper
+import com.ustadmobile.door.RepositoryConfig
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
+import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.room.RoomJdbcImpl
 import com.ustadmobile.door.util.TransactionMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-
 import kotlin.reflect.KClass
 
 actual fun RoomDatabase.dbType(): Int = (this.rootDatabase as RoomJdbcImpl).jdbcImplHelper.dbType
@@ -76,24 +76,6 @@ actual inline fun <reified  T: RoomDatabase> T.asRepository(repositoryConfig: Re
  */
 private val KClass<*>.qualifiedNameBeforeLastUnderscore: String?
     get() = this.qualifiedName?.substringBeforeLast("_")
-
-/**
- * Wrap a syncable database to prevent accidental use of the database instead of the repo on queries
- * that modify syncable entities. All modification queries (e.g. update, insert etc) must be done on
- * the repo.
- */
-@Suppress("UNCHECKED_CAST")
-actual fun <T: RoomDatabase> T.wrap(
-    dbClass: KClass<T>,
-    nodeId: Long,
-) : T {
-    val wrapperClass = Class.forName(
-        "${dbClass.qualifiedNameBeforeLastUnderscore}${DoorDatabaseWrapper.SUFFIX}"
-    ) as Class<T>
-    return wrapperClass.getConstructor(
-        dbClass.java, Long::class.javaPrimitiveType
-    ).newInstance(this, nodeId)
-}
 
 @Suppress("UNCHECKED_CAST")
 actual fun <T: RoomDatabase> T.unwrap(dbClass: KClass<T>): T {

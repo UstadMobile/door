@@ -153,23 +153,6 @@ fun <T: RoomDatabase> RoomDatabase.isWrappable(dbClass: KClass<T>): Boolean {
     }
 }
 
-/**
- * Wrap a database with replication support. The wrapper manages setting primary keys, (if an entity has a field
- * annotated with @LastChangedTime) setting the last changed time as the version id, and storing attachment data.
- */
-@Deprecated("This is now done by the DatabaseBuilder")
-actual fun <T: RoomDatabase> T.wrap(
-    dbClass: KClass<T>,
-    nodeId: Long,
-) : T {
-    val wrapperClass = Class.forName(
-        "${dbClass.qualifiedName}${DoorDatabaseWrapper.SUFFIX}"
-    ) as Class<T>
-    return wrapperClass.getConstructor(
-        dbClass.java, Long::class.javaPrimitiveType
-    ).newInstance(this, nodeId)
-}
-
 @Suppress("UNCHECKED_CAST")
 actual fun <T: RoomDatabase> T.unwrap(dbClass: KClass<T>): T {
     if(this is DoorDatabaseWrapper<*>) {

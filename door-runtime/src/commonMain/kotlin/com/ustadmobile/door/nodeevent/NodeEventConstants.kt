@@ -4,7 +4,9 @@ import com.ustadmobile.door.message.DoorMessage
 
 object NodeEventConstants {
 
-    const val CREATE_EVENT_TMP_TABLE_SQL = """
+    const val OUTGOING_REPLICATION_TABLE_NAME = "OutgoingReplication"
+
+    const val CREATE_NODE_EVENT_TMP_TABLE_SQL = """
             CREATE TEMP TABLE IF NOT EXISTS NodeEvent (
                    eventId INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
                    what INTEGER NOT NULL, 
@@ -15,10 +17,10 @@ object NodeEventConstants {
             )
         """
 
-    const val CREATE_OUTGOING_REPLICATION_EVENT_TRIGGER = """
+    const val CREATE_OUTGOING_REPLICATION_NODE_EVENT_TRIGGER = """
             CREATE TEMP TRIGGER IF NOT EXISTS _door_event_trig
              AFTER INSERT
-                ON OutgoingReplication
+                ON $OUTGOING_REPLICATION_TABLE_NAME
              BEGIN INSERT INTO NodeEvent(what, toNode, tableId, key1, key2)
                    VALUES (${DoorMessage.WHAT_REPLICATION}, 
                            NEW.destNodeId, 
