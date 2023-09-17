@@ -57,10 +57,10 @@ fun DoorDatabaseMetadata<*>.createPostgresTriggerSetupStatementList() : List<Str
                 add(createFunctionSql)
 
                 add("""
-                CREATE TRIGGER ${Trigger.NAME_PREFIX}${trigger.name}_trig ${trigger.order.sqlStr} ${trigger.events.joinToString(separator = " OR ") { it.sqlKeyWord }}
-                                       ON $tableOrViewName
-                                       FOR EACH ROW EXECUTE PROCEDURE ${trigger.name}_fn()
-            """.trimIndent())
+                    CREATE TRIGGER ${Trigger.NAME_PREFIX}${trigger.name}_trig ${trigger.order.sqlStr} ${trigger.events.joinToString(separator = " OR ") { it.sqlKeyWord }}
+                    ON $tableOrViewName
+                    FOR EACH ROW EXECUTE PROCEDURE ${Trigger.NAME_PREFIX}${trigger.name}_fn()
+                """)
             }
         }
     }

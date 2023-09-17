@@ -34,6 +34,10 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
         null
     }
 
+    override fun onStartChangeTracking() {
+        postgresChangeTracker?.setupTriggers()
+    }
+
     override suspend fun Connection.setupSqliteTriggersAsync() {
         invalidationTracker.setupSqliteTriggersAsync(this)
     }

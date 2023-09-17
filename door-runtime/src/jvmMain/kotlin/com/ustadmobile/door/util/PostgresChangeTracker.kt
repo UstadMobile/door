@@ -1,5 +1,6 @@
 package com.ustadmobile.door.util
 
+import com.ustadmobile.door.annotation.Trigger
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.room.InvalidationTracker
@@ -24,7 +25,6 @@ class PostgresChangeTracker(
     private val scope = CoroutineScope(Dispatchers.Default + Job())
 
     init {
-        setupTriggers()
         Napier.d(tag = DoorTag.LOG_TAG){
             "PostgresChangeTracker: initialized "
         }
@@ -65,14 +65,19 @@ class PostgresChangeTracker(
     }
 
     /**
-     * Create a trigger and function for each table on the database.
+     * Create a trigger and function for each table on the database for any change.
+     * This will be called by the JdbcImplHelper, which will be called by the DatabaseBuilder
+     * when all tables have been created.
      */
-    private fun setupTriggers() {
+    internal fun setupTriggers() {
         tableNames.forEach { tableName ->
             dataSource.connection.use { connection ->
+                val functionName = "${Trigger.NAME_PREFIX}mod_fn_$tableName"
+                val triggerName = "${Trigger.NAME_PREFIX}mod_tr_$tableName"
+
                 connection.createStatement().use { stmt ->
                     stmt.execute("""
-                    CREATE OR REPLACE FUNCTION door_mod_fn_$tableName() RETURNS TRIGGER AS ${'$'}${'$'}
+                    CREATE OR REPLACE FUNCTION $functionName() RETURNS TRIGGER AS ${'$'}${'$'}
                         BEGIN 
                         NOTIFY $LISTEN_CHANNEL_NAME, '$tableName';
                         IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN
@@ -84,12 +89,12 @@ class PostgresChangeTracker(
                         LANGUAGE plpgsql;
                     """)
                     stmt.execute("""
-                       DROP TRIGGER IF EXISTS door_mod_trig_$tableName ON $tableName  
+                       DROP TRIGGER IF EXISTS $triggerName ON $tableName  
                     """)
                     stmt.execute("""
-                    CREATE TRIGGER door_mod_trig_$tableName AFTER UPDATE OR INSERT OR DELETE 
+                    CREATE TRIGGER $triggerName AFTER UPDATE OR INSERT OR DELETE 
                         ON $tableName FOR EACH STATEMENT 
-                        EXECUTE PROCEDURE door_mod_fn_$tableName();
+                        EXECUTE PROCEDURE $functionName();
                 """)
                 }
             }

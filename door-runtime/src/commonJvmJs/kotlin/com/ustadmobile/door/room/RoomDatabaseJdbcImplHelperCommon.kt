@@ -76,6 +76,7 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
     class TransactionElement(
         override val key: Key,
         val connection: Connection,
+        @Suppress("unused") //Reserved for future use and debugging purposes
         val transactionId: Int = 0,
     ) : CoroutineContext.Element
 
@@ -191,6 +192,14 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
 
     internal fun removeListener(listener: Listener) {
         listeners -= listener
+    }
+
+    /**
+     * This function is called by the DatabaseBuilder after table creation, migration, and callbacks have been run. It
+     * is currently used to initialize postgres change tracking triggers.
+     */
+    internal open fun onStartChangeTracking() {
+
     }
 
     fun close() {

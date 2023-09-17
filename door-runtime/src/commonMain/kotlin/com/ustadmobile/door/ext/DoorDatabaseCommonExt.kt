@@ -5,10 +5,6 @@ import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.PreparedStatementConfig
 import com.ustadmobile.door.SyncNodeIdCallback
 import com.ustadmobile.door.jdbc.PreparedStatement
-import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
-import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
-import com.ustadmobile.door.jdbc.ext.mapRows
-import com.ustadmobile.door.jdbc.ext.useResults
 import com.ustadmobile.door.room.RoomDatabase
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
@@ -31,18 +27,18 @@ import kotlinx.coroutines.withTimeout
  * @param block a function block that represents the function to run. The supplied parameter must be
  * used as the database for the fallback to running from the
  */
-@Suppress("UNCHECKED_CAST")
+@Suppress("UNCHECKED_CAST", "unused")
 suspend fun <T : RoomDatabase, R> T.onRepoWithFallbackToDb(timeMillis: Long, block: suspend (T) -> R) : R {
-    if(this is DoorDatabaseRepository) {
+    return if(this is DoorDatabaseRepository) {
         try {
-            return withTimeout(timeMillis) {
+            withTimeout(timeMillis) {
                 block(this@onRepoWithFallbackToDb)
             }
         }catch(e: TimeoutCancellationException) {
-            return block(this.db as T)
+            block(this.db as T)
         }
     }else {
-        return block(this)
+        block(this)
     }
 }
 
@@ -58,17 +54,17 @@ suspend fun <T : RoomDatabase, R> T.onRepoWithFallbackToDb(timeMillis: Long, blo
  */
 @Suppress("UNCHECKED_CAST")
 suspend fun <T: RoomDatabase, R> T.onDbThenRepoWithTimeout(timeMillis: Long, block: suspend (doorDb: T, lastResult: R?) -> R) : R{
-    if(this is DoorDatabaseRepository) {
+    return if(this is DoorDatabaseRepository) {
         val dbResult = block(this.db as T, null)
         try {
-            return withTimeout(timeMillis) {
+            withTimeout(timeMillis) {
                 block(this@onDbThenRepoWithTimeout, dbResult)
             }
         }catch(e: TimeoutCancellationException) {
-            return dbResult
+            dbResult
         }
     }else {
-        return block(this, null)
+        block(this, null)
     }
 }
 
@@ -81,7 +77,7 @@ suspend fun <T: RoomDatabase, R> T.onDbThenRepoWithTimeout(timeMillis: Long, blo
  * @return Pair of the database and repository
  * @throws IllegalArgumentException if the receiver is not actually the repository
  */
-@Suppress("UNCHECKED_CAST")
+@Suppress("UNCHECKED_CAST", "unused")
 fun <T: RoomDatabase> T.requireDbAndRepo(): Pair<T, T> {
     val repo = this as? DoorDatabaseRepository
         ?: throw IllegalStateException("Must use repo for addFileToContainer")
@@ -96,6 +92,7 @@ fun <T: RoomDatabase> T.requireDbAndRepo(): Pair<T, T> {
  * After clearing all the table data, the sync tables (e.g. TableSyncStatus,
  * The nodeId on SyncNode, etc) need to be setup again.
  */
+@Suppress("unused")
 fun <T:RoomDatabase> T.clearAllTablesAndResetNodeId(nodeId: Long) : T {
     clearAllTables()
     execSqlBatch(*SyncNodeIdCallback(nodeId)
@@ -118,27 +115,6 @@ fun <R> RoomDatabase.prepareAndUseStatement(
     sql: String,
     block: (PreparedStatement) -> R
 ) = prepareAndUseStatement(PreparedStatementConfig(sql), block)
-
-/**
- * This is used from generated code to delete ChangeLogs for the givne table id
- */
-suspend fun RoomDatabase.deleteFromChangeLog(tableId: Int) {
-    prepareAndUseStatementAsync("DELETE FROM ChangeLog WHERE chTableId = ?") { stmt ->
-        stmt.setInt(1, tableId)
-        stmt.executeUpdateAsyncKmp()
-    }
-}
-
-/**
- * Find tables which have pending changelogs that have not yet been processed.
- */
-suspend fun RoomDatabase.findDistinctPendingChangeLogs(): List<Int> {
-    return prepareAndUseStatementAsync("SELECT DISTINCT chTableId FROM ChangeLog") { stmt ->
-        stmt.executeQueryAsyncKmp().useResults { it.mapRows {
-            it.getInt(1)
-        } }
-    }
-}
 
 /**
  * Get the real, one and only, root database. This will get out of any wrappers, transactions, etc.

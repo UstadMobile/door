@@ -1,5 +1,6 @@
 package com.ustadmobile.door.nodeevent
 
+import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.ext.dbType
 import com.ustadmobile.door.message.DoorMessageCallback
@@ -9,7 +10,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 
 /**
- * @param db this MUST be the unwrapped DB
+ * @param db this MUST be the unwrapped DB e.g. the JdbcImpl or Room implementation
  */
 class NodeEventManagerJvm<T: RoomDatabase>(
     db: T,
@@ -22,21 +23,35 @@ class NodeEventManagerJvm<T: RoomDatabase>(
     /**
      * Used on SQLite - where we pick up events using the jdbcimplhelper.
      */
-    private val jdbcImplListener = NodeEventJdbcImplListenerSqlite(hasOutgoingReplicationTable, _outgoingEvents)
+    private val sqliteJdbcListener = if(db.dbType() == DoorDbType.SQLITE) {
+        NodeEventJdbcImplListenerSqlite(hasOutgoingReplicationTable, _outgoingEvents)
+    }else {
+        null
+    }
+
+    private val postgresEventListener = if(db.dbType() == DoorDbType.POSTGRES) {
+        PostgresNodeEventListener(
+            dataSource = (db as DoorDatabaseJdbc).dataSource,
+            outgoingEvents = _outgoingEvents,
+            hasOutgoingReplicationTable = hasOutgoingReplicationTable,
+        )
+    }else {
+        null
+    }
 
     init {
         //If using SQLite on JDBC, we need to add a listener to setup
-        if(db.dbType() == DoorDbType.SQLITE) {
-            (db as RoomJdbcImpl).jdbcImplHelper.addListener(jdbcImplListener)
-        }else {
-            //Setup listening for postgres channel
+        sqliteJdbcListener?.also {
+            (db as RoomJdbcImpl).jdbcImplHelper.addListener(it)
         }
     }
     
     override fun close() {
-        if(db.dbType() == DoorDbType.SQLITE) {
-            (db as RoomJdbcImpl).jdbcImplHelper.removeListener(jdbcImplListener)
+        sqliteJdbcListener?.also {
+            (db as RoomJdbcImpl).jdbcImplHelper.removeListener(it)
         }
+
+        postgresEventListener?.close()
     }
 
 

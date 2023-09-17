@@ -1,6 +1,7 @@
 package com.ustadmobile.door
 
 import com.ustadmobile.door.DoorConstants.DBINFO_TABLENAME
+import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.doorDatabaseMetadata
 import com.ustadmobile.door.jdbc.ext.mapRows
 import com.ustadmobile.door.jdbc.ext.useResults
@@ -11,10 +12,12 @@ import com.ustadmobile.door.migration.DoorMigrationAsync
 import com.ustadmobile.door.migration.DoorMigrationStatementList
 import com.ustadmobile.door.migration.DoorMigrationSync
 import com.ustadmobile.door.room.RoomDatabase
+import com.ustadmobile.door.room.RoomJdbcImpl
 import com.ustadmobile.door.triggers.createTriggerSetupStatementList
-import com.ustadmobile.door.triggers.dropDoorTriggers
+import com.ustadmobile.door.triggers.dropDoorTriggersAndReceiveViews
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.runBlocking
 import org.sqlite.SQLiteConfig
 import org.sqlite.SQLiteDataSource
@@ -137,6 +140,9 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                         stmt.addBatch(triggerSetupSql)
                     }
                     stmt.executeBatch()
+                    Napier.v(tag = DoorTag.LOG_TAG) {
+                        "[DatabaseBuilder $dbUrl]: created tables"
+                    }
                 }
 
                 callbacks.forEach {
@@ -170,7 +176,7 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                  * recreated after migration
                  */
                 if(dbWillBeMigrated) {
-                    runBlocking { sqlDatabase.connection.dropDoorTriggers() }
+                    runBlocking { sqlDatabase.connection.dropDoorTriggersAndReceiveViews() }
                 }
 
                 while(currentDbVersion < doorDb.dbVersion) {
@@ -208,6 +214,9 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                     }
                 }
             }
+
+            //Start change tracking
+            (doorDb as RoomJdbcImpl).jdbcImplHelper.onStartChangeTracking()
 
             val wrapperClass = Class.forName("${dbClass.java.canonicalName}${DoorDatabaseWrapper.SUFFIX}") as Class<T>
             return wrapperClass.getConstructor(dbClass.java, Long::class.javaPrimitiveType, DoorMessageCallback::class.java)

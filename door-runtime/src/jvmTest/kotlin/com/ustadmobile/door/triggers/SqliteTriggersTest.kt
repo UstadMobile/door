@@ -47,7 +47,7 @@ class SqliteTriggersTest {
             val initialTriggerNames = sqliteConnection.getSqliteDoorTriggerNames()
             val initialViewNames = sqliteConnection.getSqliteDoorReceiveViewNames()
 
-            sqliteConnection.dropDoorTriggers()
+            sqliteConnection.dropDoorTriggersAndReceiveViews()
 
             assertEquals(1, initialTriggerNames.size)
             assertEquals(1, initialViewNames.size)
