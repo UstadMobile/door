@@ -10,8 +10,8 @@ import com.squareup.kotlinpoet.ksp.TypeParameterResolver
 import com.squareup.kotlinpoet.ksp.toKModifier
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.toTypeParameterResolver
-import com.ustadmobile.door.annotation.QueryLiveTables
 import com.ustadmobile.door.annotation.HttpAccessible
+import com.ustadmobile.door.annotation.QueryLiveTables
 import com.ustadmobile.door.annotation.RepoHttpBodyParam
 import com.ustadmobile.lib.annotationprocessor.core.applyIf
 import net.sf.jsqlparser.parser.CCJSqlParserUtil
@@ -161,3 +161,13 @@ fun KSFunctionDeclaration.getDaoFunHttpMethodToUse(): String {
     }
 }
 
+fun KSFunctionDeclaration.isOverridden(
+    containiningClassDeclaration: KSClassDeclaration,
+    resolver: Resolver,
+): Boolean {
+    val allFunctions = containiningClassDeclaration.getAllFunctions()
+    return allFunctions.any { otherFun ->
+        otherFun !== this && otherFun.simpleName.asString() == this.simpleName.asString()
+                && resolver.overrides(otherFun, this, containiningClassDeclaration)
+    }
+}
