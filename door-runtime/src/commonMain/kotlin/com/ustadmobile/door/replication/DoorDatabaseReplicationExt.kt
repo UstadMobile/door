@@ -1,7 +1,6 @@
 package com.ustadmobile.door.replication
 
 import com.ustadmobile.door.annotation.ReplicateEntity
-import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.entities.DoorNode
 import com.ustadmobile.door.entities.OutgoingReplication
 import com.ustadmobile.door.ext.*
@@ -9,6 +8,7 @@ import com.ustadmobile.door.jdbc.ext.*
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.nodeevent.NodeEvent
 import com.ustadmobile.door.nodeevent.NodeEventManager
+import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.util.TransactionMode
 import io.github.aakira.napier.Napier
 import io.ktor.client.call.*
@@ -179,9 +179,23 @@ suspend fun RoomDatabase.acknowledgeReceivedReplicationsAndSelectNextPendingBatc
 suspend fun RoomDatabase.insertEntitiesFromMessage(
     message: DoorMessage,
 ) {
+    val dbMetadata = this::class.doorDatabaseMetadata()
+    val hasReplicationOpTable = "ReplicationOperation" in dbMetadata.allTables
     message.replications.runningSplitBy { it.tableId }.forEach { tableEntities ->
         val tableId = tableEntities.first().tableId
-        val entityMetaData = this::class.doorDatabaseMetadata().requireReplicateEntityMetaData(tableId)
+        val entityMetaData = dbMetadata.requireReplicateEntityMetaData(tableId)
+        if(hasReplicationOpTable) {
+            prepareAndUseStatementAsync("""
+                INSERT INTO ReplicationOperation(repOpRemoteNodeId, repOpTableId, repOpStatus)
+                       VALUES(?, ?, ?)
+            """) { stmt ->
+                stmt.setLong(1, message.fromNode)
+                stmt.setInt(2, tableId)
+                stmt.setInt(3, 0)
+                stmt.executeUpdateAsyncKmp()
+            }
+        }
+
         if(entityMetaData.remoteInsertStrategy == ReplicateEntity.RemoteInsertStrategy.INSERT_INTO_RECEIVE_VIEW) {
             prepareAndUseStatementAsync(entityMetaData.insertIntoReceiveViewSql) { stmt ->
                 tableEntities.forEach { entity ->
@@ -191,6 +205,18 @@ suspend fun RoomDatabase.insertEntitiesFromMessage(
                     stmt.setLong(entityMetaData.entityFields.size + 1, message.fromNode)
                     stmt.executeUpdateAsyncKmp()
                 }
+            }
+        }
+
+        if(hasReplicationOpTable) {
+            prepareAndUseStatementAsync("""
+                DELETE FROM ReplicationOperation
+                      WHERE repOpRemoteNodeId = ?
+                        AND repOpTableId = ?
+            """) { stmt ->
+                stmt.setLong(1, message.fromNode)
+                stmt.setInt(2, tableId)
+                stmt.executeUpdateAsyncKmp()
             }
         }
     }

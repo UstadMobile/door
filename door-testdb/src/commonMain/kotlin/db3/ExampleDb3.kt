@@ -2,6 +2,7 @@ package db3
 
 import com.ustadmobile.door.annotation.DoorDatabase
 import com.ustadmobile.door.entities.OutgoingReplication
+import com.ustadmobile.door.entities.ReplicationOperation
 import com.ustadmobile.door.room.RoomDatabase
 
 @DoorDatabase(
@@ -10,7 +11,8 @@ import com.ustadmobile.door.room.RoomDatabase
         ExampleEntity3::class,
         DiscussionPost::class,
         Member::class,
-        OutgoingReplication::class
+        OutgoingReplication::class,
+        ReplicationOperation::class,
     )
 )
 expect abstract class ExampleDb3: RoomDatabase {
