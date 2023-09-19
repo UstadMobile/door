@@ -9,6 +9,7 @@ import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.DoorDbType.Companion.productNameForDbType
 import com.ustadmobile.door.PreparedStatementConfig
@@ -214,6 +215,85 @@ class DoorValidatorProcessor(
             }
     }
 
+    private fun validateHttpServerFunctionCall(
+        funTypeName: String,//pulQueriesToReplicate or authQuery
+        daoFun: KSFunctionDeclaration,
+        dao: KSClassDeclaration,
+        httpServerFunCall: HttpServerFunctionCall,
+        resolver: Resolver,
+    ) {
+        val allDaoFunctions = dao.getAllFunctions()
+        val matchingFunctions = allDaoFunctions.filter {
+            it.simpleName.asString() == httpServerFunCall.functionName && !it.isOverridden(dao, resolver)
+        }.toList()
+
+        httpServerFunCall.functionArgs.toList().findDuplicates { httpServerFunctionParam, httpServerFunctionParam2 ->
+            httpServerFunctionParam.name == httpServerFunctionParam2.name
+        }.takeIf { it.isNotEmpty() }?.also { duplicateParams ->
+            logger.error("@HttpAccessible $funTypeName -" +
+                    " \"${httpServerFunCall.functionName}\" - has duplicate parameters: " +
+                    duplicateParams.map { it.name }.toSet().joinToString(), daoFun)
+        }
+
+        if(matchingFunctions.size != 1) {
+            logger.error("@HttpAccessible $funTypeName: referenced function " +
+                    "\"${httpServerFunCall.functionName}\" must match one and only one function in DAO. " +
+                    "This matches ${matchingFunctions.size}. Name must be unique. Overloading by parameter types" +
+                    " is not supported.", daoFun)
+        }else {
+            val matchingFunction = matchingFunctions.first()
+
+            matchingFunction.parameters.forEach { matchingFunParam ->
+                val daoFunMatchingParam = daoFun.parameters.firstOrNull {
+                        daoFunParam -> daoFunParam.name?.asString() == matchingFunParam.name?.asString()
+                }
+                val annotatedParamValue = httpServerFunCall.functionArgs.firstOrNull {
+                    it.name == matchingFunParam.name?.asString()
+                }
+
+                if(annotatedParamValue == null && daoFunMatchingParam != null
+                    && daoFunMatchingParam.type.resolve() != matchingFunParam.type.resolve()) {
+                    logger.error("@HttpAccessible - $funTypeName " +
+                            "\"${httpServerFunCall.functionName}\" parameter type for: " +
+                            "${matchingFunParam.name?.asString()} does not match", daoFun)
+                }
+
+                if(daoFunMatchingParam == null && annotatedParamValue == null){
+                    logger.error("@HttpAccessible - $funTypeName " +
+                            "\"${httpServerFunCall.functionName}\" cannot find parameter: " +
+                            "${matchingFunParam.name?.asString()} - must match a parameter of the same naame in " +
+                            " @HttpAccessible function or specify using @HttpServerFunctionParam", daoFun)
+                }
+
+                if(annotatedParamValue != null) {
+                    val loggerPrefix = "@HttpAccessible - $funTypeName - " +
+                            "\"${httpServerFunCall.functionName}\" - param ${annotatedParamValue.name}"
+                    when(annotatedParamValue.argType) {
+                        HttpServerFunctionParam.ArgType.LITERAL -> {
+                            if(annotatedParamValue.literalValue.isEmpty()) {
+                                logger.error("$loggerPrefix - type is literal,but literalValue is empty",
+                                    daoFun)
+                            }
+                        }
+                        HttpServerFunctionParam.ArgType.REQUESTER_NODE_ID -> {
+                            if(matchingFunParam.type.resolve() != resolver.builtIns.longType)
+                                logger.error("$loggerPrefix - type is requester node id, but param " +
+                                        "type is not long.", daoFun)
+                        }
+                        HttpServerFunctionParam.ArgType.PAGING_KEY,
+                        HttpServerFunctionParam.ArgType.PAGING_LOAD_SIZE-> {
+                            if(matchingFunParam.type.resolve() != resolver.builtIns.intType ||
+                                daoFun.returnType?.resolve()?.isPagingSource() != true) {
+                                logger.error("$loggerPrefix - type is paging key/loadsize - but param " +
+                                        "type is not int or function itself does not return pagingsource", daoFun)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private fun validateDaoHttpAccessibleFunctions(
         dao: KSClassDeclaration,
         resolver: Resolver,
@@ -263,77 +343,12 @@ class DoorValidatorProcessor(
                         daoFun)
             }
 
-            val allDaoFunctions = dao.getAllFunctions()
             httpAccessibleAnnotation?.pullQueriesToReplicate?.forEach { pullQueryToReplicateFn ->
-                val matchingFunctions = allDaoFunctions.filter {
-                    it.simpleName.asString() == pullQueryToReplicateFn.functionName && !it.isOverridden(dao, resolver)
-                }.toList()
-
-                pullQueryToReplicateFn.functionArgs.toList().findDuplicates { httpServerFunctionParam, httpServerFunctionParam2 ->
-                    httpServerFunctionParam.name == httpServerFunctionParam2.name
-                }.takeIf { it.isNotEmpty() }?.also { duplicateParams ->
-                    logger.error("@HttpAccessible pullQueriesToReplicate -" +
-                            " \"${pullQueryToReplicateFn.functionName}\" - has duplicate parameters: " +
-                            duplicateParams.map { it.name }.toSet().joinToString(), daoFun)
-                }
-
-                if(matchingFunctions.size != 1) {
-                    logger.error("@HttpAccessible pullQueriesToReplicate: referenced function " +
-                            "\"${pullQueryToReplicateFn.functionName}\" must match one and only one function in DAO. " +
-                            "This matches ${matchingFunctions.size}. Name must be unique. Overloading by parameter types" +
-                            " is not supported.", daoFun)
-                }else {
-                    val matchingFunction = matchingFunctions.first()
-
-                    matchingFunction.parameters.forEach { matchingFunParam ->
-                        val daoFunMatchingParam = daoFun.parameters.firstOrNull {
-                            daoFunParam -> daoFunParam.name?.asString() == matchingFunParam.name?.asString()
-                        }
-                        val annotatedParamValue = pullQueryToReplicateFn.functionArgs.firstOrNull {
-                            it.name == matchingFunParam.name?.asString()
-                        }
-
-                        if(annotatedParamValue == null && daoFunMatchingParam != null
-                                && daoFunMatchingParam.type.resolve() != matchingFunParam.type.resolve()) {
-                            logger.error("@HttpAccessible - pullQueryToReplicate " +
-                                    "\"${pullQueryToReplicateFn.functionName}\" parameter type for: " +
-                                    "${matchingFunParam.name?.asString()} does not match", daoFun)
-                        }
-
-                        if(daoFunMatchingParam == null && annotatedParamValue == null){
-                            logger.error("@HttpAccessible - pullQueryToReplicate " +
-                                    "\"${pullQueryToReplicateFn.functionName}\" cannot find parameter: " +
-                                    "${matchingFunParam.name?.asString()} - must match a parameter of the same naame in " +
-                                    " @HttpAccessible function or specify using @HttpServerFunctionParam", daoFun)
-                        }
-
-                        if(annotatedParamValue != null) {
-                            val loggerPrefix = "@HttpAccessible - pullQueryToReplicate - " +
-                                    "\"${pullQueryToReplicateFn.functionName}\" - param ${annotatedParamValue.name}"
-                            when(annotatedParamValue.argType) {
-                                HttpServerFunctionParam.ArgType.LITERAL -> {
-                                    if(annotatedParamValue.literalValue.isEmpty()) {
-                                        logger.error("$loggerPrefix - type is literal,but literalValue is empty",
-                                            daoFun)
-                                    }
-                                }
-                                HttpServerFunctionParam.ArgType.REQUESTER_NODE_ID -> {
-                                    if(matchingFunParam.type.resolve() != resolver.builtIns.longType)
-                                        logger.error("$loggerPrefix - type is requester node id, but param " +
-                                                "type is not long.", daoFun)
-                                }
-                                HttpServerFunctionParam.ArgType.PAGING_KEY,
-                                HttpServerFunctionParam.ArgType.PAGING_LOAD_SIZE-> {
-                                    if(matchingFunParam.type.resolve() != resolver.builtIns.intType ||
-                                            daoFun.returnType?.resolve()?.isPagingSource() != true) {
-                                        logger.error("$loggerPrefix - type is paging key/loadsize - but param " +
-                                                "type is not int or function itself does not return pagingsource", daoFun)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                validateHttpServerFunctionCall("pullQueriesToReplicate", daoFun, dao,
+                    pullQueryToReplicateFn, resolver)
+            }
+            httpAccessibleAnnotation?.authQueries?.forEach { authFun ->
+                validateHttpServerFunctionCall("authQueries", daoFun, dao, authFun, resolver)
             }
         }
     }

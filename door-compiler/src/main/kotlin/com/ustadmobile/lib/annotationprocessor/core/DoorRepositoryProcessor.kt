@@ -301,6 +301,10 @@ fun CodeBlock.Builder.addMakeHttpRequestAndInsertReplicationsCode(
     dbValName: String = "_db",
     pagingParamsValName: String? = null,
 ) {
+    beginControlFlow("_repo.%M(repoPath = %S)",
+        MemberName("com.ustadmobile.door.http", "repoReplicateHttpRequest"),
+        "${daoKSClass.simpleName.asString()}/${daoKSFun.simpleName.asString()}"
+    )
     add("val _response = _httpClient.")
     addRepoHttpClientRequestForFunction(
         daoKSFun = daoKSFun,
@@ -313,6 +317,7 @@ fun CodeBlock.Builder.addMakeHttpRequestAndInsertReplicationsCode(
 
     add("$dbValName.%M(_response)\n",
         MemberName("com.ustadmobile.door.replication","onClientRepoDoorMessageHttpResponse"))
+    endControlFlow()
 }
 
 /**

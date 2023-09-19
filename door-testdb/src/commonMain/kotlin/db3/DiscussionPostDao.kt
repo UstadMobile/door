@@ -216,4 +216,35 @@ expect abstract class DiscussionPostDao : RepositoryFlowLoadingStatusProvider {
     @Suppress("unused")
     abstract fun findRootPostAndNumRepliesAsPagingSourceWithAsFlow(): Flow<List<DiscussionPostAndNumReplies>>
 
+
+    @Query("""
+        SELECT EXISTS(
+               SELECT Member.memberUid
+                 FROM Member
+                WHERE :postUid != 0
+                  AND Member.memberUid = :postUid
+        )
+    """)
+    abstract suspend fun checkNodeHasPermission(postUid: Long, nodeId: Long): Boolean
+
+    @HttpAccessible(
+        authQueries = arrayOf(
+            HttpServerFunctionCall(
+                functionName = "checkNodeHasPermission",
+                functionArgs = arrayOf(
+                    HttpServerFunctionParam(
+                        name = "nodeId",
+                        argType = HttpServerFunctionParam.ArgType.REQUESTER_NODE_ID
+                    )
+                )
+            )
+        )
+    )
+    @Query("""
+        SELECT DiscussionPost.*
+          FROM DiscussionPost
+         WHERE DiscussionPost.postReplyToPostUid = :postUid 
+    """)
+    abstract suspend fun findRepliesWithAuthCheck(postUid: Long): List<DiscussionPost>
+
 }

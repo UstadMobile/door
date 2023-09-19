@@ -212,7 +212,7 @@ class BasicCrudIntegrationTest : AbstractCommonTest() {
     }
 
     @Test
-    fun givenPagingSourceParameter_whenQueried_pagingSourceShouldReturnPagedRows() = runExampleDbTest{
+    fun givenPagingSourceParameter_whenQueried_pagingSourceShouldReturnPagedRows() = runExampleDbTest {
         exampleDb2.exampleDao2().insertListAsync(
             (0 until 500).map {number ->
                 ExampleEntity2().apply {

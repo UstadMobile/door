@@ -33,3 +33,16 @@ inline fun <R> DoorDatabaseRepository.repoHttpRequestWithFallback(
         fallback()
     }
 }
+
+inline fun DoorDatabaseRepository.repoReplicateHttpRequest(
+    repoPath: String,
+    block: () -> Unit
+) {
+    try {
+        block()
+    }catch(e: Exception) {
+        Napier.v(tag = DoorTag.LOG_TAG, throwable = e) {
+            "$this: repoHttpRequestWithFallback: exception for $repoPath"
+        }
+    }
+}

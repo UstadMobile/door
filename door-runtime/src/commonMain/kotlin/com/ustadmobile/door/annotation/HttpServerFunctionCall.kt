@@ -5,7 +5,7 @@ package com.ustadmobile.door.annotation
 /**
  * Used as part of the @HttpAccessible annotation - this can be used to specify function calls that should be made
  * by generated code on the HTTP server. Sometimes the server should return additional replication data that is not
- * part of the annotated query itself. Sometimes an http server must make an additional check that would not be required
+ * part of the annotated query itself. Sometimes a http server must make an additional check that would not be required
  * for a local database call.
  *
  * @param functionName   This function MUST return be part of the same DAO as the function with @HttpAccessible

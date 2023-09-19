@@ -29,6 +29,7 @@ import okhttp3.OkHttpClient
 import org.junit.Assert
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
@@ -444,4 +445,69 @@ class PullIntegrationTest {
         }
     }
 
+    @Test
+    fun givenEntitiesCreatedOnServer_whenAuthCheckIsFailed_thenWillNotPullAndInsert() {
+        clientServerIntegrationTest {
+            val originalPost = DiscussionPost().apply {
+                postTitle = "I like hay"
+                postText = "Mmm... Hay..."
+                posterMemberUid = 1
+                postUid = serverDb.discussionPostDao.insertAsync(this)
+            }
+
+            val replyPost = DiscussionPost().apply {
+                postTitle = "I also like hay"
+                postText = "Mmm... Hay..."
+                posterMemberUid = 1
+                postReplyToPostUid = originalPost.postUid
+                postUid = serverDb.discussionPostDao.insertAsync(this)
+            }
+
+            val hasPermissionOnServer = serverDb.discussionPostDao.checkNodeHasPermission(
+                originalPost.postUid, clientDb.doorWrapperNodeId)
+            println(hasPermissionOnServer)
+
+            makeClientRepo().use { clientRepo ->
+                clientRepo.discussionPostDao.findRepliesWithAuthCheck(originalPost.postUid)
+                assertNull(clientDb.discussionPostDao.findByUid(replyPost.postUid))
+            }
+
+        }
+    }
+
+    @Test
+    fun givenEntitiesCreatedOnServer_whenAuthCheckIsPassed_thenWillPullAndInsert() {
+        //The auth check simply checks if the client node id matches the postUid
+        val memberAndClientUid = 5L
+        clientServerIntegrationTest(clientNodeId = memberAndClientUid) {
+            val memberInServerDb = Member().apply {
+                firstName = "Roger"
+                lastName = "Rabbit"
+                memberUid = memberAndClientUid
+                serverDb.memberDao.insertAsync(this)
+            }
+
+            val originalPost = DiscussionPost().apply {
+                postTitle = "I like hay"
+                postText = "Mmm... Hay..."
+                posterMemberUid = memberInServerDb.memberUid
+                postUid = memberAndClientUid
+                serverDb.discussionPostDao.insertAsync(this)
+            }
+
+            val replyPost = DiscussionPost().apply {
+                postTitle = "I also like hay"
+                postText = "Mmm... Hay..."
+                posterMemberUid = memberInServerDb.memberUid
+                postReplyToPostUid = originalPost.postUid
+                postUid = serverDb.discussionPostDao.insertAsync(this)
+            }
+
+            makeClientRepo().use { clientRepo ->
+                val clientRepliesWithCheck = clientRepo.discussionPostDao.findRepliesWithAuthCheck(originalPost.postUid)
+                assertEquals(replyPost, clientRepliesWithCheck.first())
+                assertEquals(replyPost, clientDb.discussionPostDao.findByUid(replyPost.postUid))
+            }
+        }
+    }
 }

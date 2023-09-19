@@ -607,6 +607,24 @@ fun FileSpec.Builder.addHttpServerExtensionFun(
                             .add("\n")
                     }
 
+                    val httpAccessibleAnnotation = daoFunDecl.getAnnotation(HttpAccessible::class)
+                    httpAccessibleAnnotation?.authQueries?.forEach { authQuery ->
+                        val authFun = daoKSClassDeclaration.getAllFunctions().first {
+                            it.simpleName.asString() == authQuery.functionName
+                        }
+                        add("if(!")
+                        addHttpServerFunctionCallCode(
+                            funDeclaration = authFun,
+                            httpAccessibleFunctionCalls = httpAccessibleAnnotation.authQueries.toList(),
+                            pagingLoadParamValName = "_pagingLoadParams",
+                            requestValName = "request",
+                            resolver = resolver
+                        )
+                        beginControlFlow(")")
+                        add("return %T.newErrorResponse(403)\n", DoorJsonResponse::class)
+                        endControlFlow()
+                    }
+
                     if(effectiveStrategy == HttpAccessible.ClientStrategy.PULL_REPLICATE_ENTITIES) {
                         addHttpReplicationEntityServerExtension(resolver, daoFunDecl, daoKSClassDeclaration,
                                 requestValName = "request", pagingLoadParamValName = "_pagingLoadParams")
@@ -664,6 +682,61 @@ fun FileSpec.Builder.addHttpServerExtensionFun(
 }
 
 
+/**
+ * Add a code block for the given function declaration which is to be executed as per an HttpServerCall
+ */
+fun CodeBlock.Builder.addHttpServerFunctionCallCode(
+    funDeclaration: KSFunctionDeclaration,
+    httpAccessibleFunctionCalls: List<HttpServerFunctionCall>,
+    requestValName: String,
+    pagingLoadParamValName: String,
+    resolver: Resolver,
+
+) : CodeBlock.Builder {
+    val functionCallAnnotation = httpAccessibleFunctionCalls.firstOrNull {
+        it.functionName == funDeclaration.simpleName.asString()
+    }
+    val returnType = funDeclaration.returnType?.resolve()
+
+    add("${funDeclaration.simpleName.asString()}(\n")
+    withIndent {
+        funDeclaration.parameters.forEach { param ->
+            val paramNameStr = param.name?.asString()
+            val argParamAnnotation = functionCallAnnotation?.functionArgs?.firstOrNull { it.name == paramNameStr }
+            if(argParamAnnotation != null) {
+                when(argParamAnnotation.argType) {
+                    HttpServerFunctionParam.ArgType.LITERAL -> {
+                        if(param.type.resolve().makeNotNullable() == resolver.builtIns.stringType)
+                            add("$paramNameStr = %S,\n", argParamAnnotation.literalValue)
+                        else
+                            add("$paramNameStr = %L,\n", argParamAnnotation.literalValue)
+                    }
+                    HttpServerFunctionParam.ArgType.REQUESTER_NODE_ID -> {
+                        add("$paramNameStr = $requestValName.requireNodeId(),\n")
+                    }
+                    HttpServerFunctionParam.ArgType.PAGING_KEY -> {
+                        add("$paramNameStr = $pagingLoadParamValName.key ?: 0,\n")
+                    }
+                    HttpServerFunctionParam.ArgType.PAGING_LOAD_SIZE -> {
+                        add("$paramNameStr = $pagingLoadParamValName.loadSize,\n")
+                    }
+                }
+            }else {
+                add("$paramNameStr = _arg_$paramNameStr,\n")
+            }
+        }
+    }
+    add(")")
+    if(returnType?.isFlow() == true) {
+        add(".%M()", MemberName("kotlinx.coroutines.flow", "first"))
+    }else if(returnType?.isPagingSource() == true) {
+        add(".%M(_pagingLoadParams)",
+            MemberName("com.ustadmobile.door.paging", "loadPageDataOrEmptyList"))
+    }
+
+    return this
+}
+
 fun CodeBlock.Builder.addHttpReplicationEntityServerExtension(
     resolver: Resolver,
     daoFunDecl: KSFunctionDeclaration,
@@ -694,46 +767,15 @@ fun CodeBlock.Builder.addHttpReplicationEntityServerExtension(
         val resultType = returnType?.unwrapResultType(resolver)
         val resultComponentType = resultType?.unwrapComponentTypeIfListOrArray(resolver)
         val resultValName = "_result_${funDeclaration.simpleName.asString()}"
-        val functionCallAnnotation = httpAccessibleAnnotation.pullQueriesToReplicate.firstOrNull {
-            it.functionName == funDeclaration.simpleName.asString()
-        }
 
-        add("val $resultValName = ${funDeclaration.simpleName.asString()}(\n")
-        indent()
-        funDeclaration.parameters.forEach { param ->
-            val paramNameStr = param.name?.asString()
-            val argParamAnnotation = functionCallAnnotation?.functionArgs?.firstOrNull { it.name == paramNameStr }
-            if(argParamAnnotation != null) {
-                when(argParamAnnotation.argType) {
-                    HttpServerFunctionParam.ArgType.LITERAL -> {
-                        if(param.type.resolve().makeNotNullable() == resolver.builtIns.stringType)
-                            add("$paramNameStr = %S,\n", argParamAnnotation.literalValue)
-                        else
-                            add("$paramNameStr = %L,\n", argParamAnnotation.literalValue)
-                    }
-                    HttpServerFunctionParam.ArgType.REQUESTER_NODE_ID -> {
-                        add("$paramNameStr = $requestValName.requireNodeId(),\n")
-                    }
-                    HttpServerFunctionParam.ArgType.PAGING_KEY -> {
-                        add("$paramNameStr = $pagingLoadParamValName.key ?: 0,\n")
-                    }
-                    HttpServerFunctionParam.ArgType.PAGING_LOAD_SIZE -> {
-                        add("$paramNameStr = $pagingLoadParamValName.loadSize,\n")
-                    }
-                }
-            }else {
-                add("$paramNameStr = _arg_$paramNameStr,\n")
-            }
-        }
-        unindent()
-        add(")")
-        if(returnType?.isFlow() == true) {
-            add(".%M()", MemberName("kotlinx.coroutines.flow", "first"))
-        }else if(returnType?.isPagingSource() == true) {
-            add(".%M(_pagingLoadParams)",
-                MemberName("com.ustadmobile.door.paging", "loadPageDataOrEmptyList"))
-        }
-        add("\n")
+        add("val $resultValName = ")
+        addHttpServerFunctionCallCode(
+            funDeclaration = funDeclaration,
+            httpAccessibleFunctionCalls = httpAccessibleAnnotation.pullQueriesToReplicate.toList(),
+            requestValName = requestValName,
+            pagingLoadParamValName = pagingLoadParamValName,
+            resolver = resolver,
+        ).add("\n")
 
         val replicationEntitiesOnResult = (resultComponentType?.declaration as? KSClassDeclaration)
             ?.getDoorReplicateEntityComponents()
@@ -895,7 +937,7 @@ class DoorHttpServerProcessor(
             }
         }
 
-        daoSymbols.forEach { daoDecl ->
+        daoSymbols.takeIf { target != DoorTarget.JS }?.forEach { daoDecl ->
             val httpAccessibleFunctions = daoDecl.getAllFunctions().filter { it.hasAnnotation(HttpAccessible::class) }.toList()
             if(httpAccessibleFunctions.isNotEmpty()) {
                 FileSpec.builder(daoDecl.packageName.asString(), "${daoDecl.simpleName.asString()}$SUFFIX_HTTP_SERVER_EXTENSION_FUNS")

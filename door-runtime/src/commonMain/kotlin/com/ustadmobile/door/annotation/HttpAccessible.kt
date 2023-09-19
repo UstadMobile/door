@@ -18,7 +18,9 @@ package com.ustadmobile.door.annotation
  *        If no pullQueriesToReplicate are specified then this will automatically default to the function itself. If any
  *        pullQueriesToReplicate are specified, then only those specified queries will be used. This does not have to
  *        include the function annotated @HttpAccessible itself, but it can be named the same as any other function.
- *
+ * @param authQueries sometimes additional access checks should be performed on a query when it comes from an http
+ *        request that would not otherwise be needed if it is being run locally. The specified queries must return a
+ *        Boolean. If any of the listed queries returns false, then the server will reply with http 403 forbidden
  */
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.BINARY)
@@ -26,6 +28,7 @@ annotation class HttpAccessible(
     val clientStrategy: ClientStrategy = ClientStrategy.AUTO,
     val httpMethod: HttpMethod = HttpMethod.AUTO,
     val pullQueriesToReplicate: Array<HttpServerFunctionCall> = arrayOf(),
+    val authQueries: Array<HttpServerFunctionCall> = arrayOf(),
 ) {
 
     enum class ClientStrategy {

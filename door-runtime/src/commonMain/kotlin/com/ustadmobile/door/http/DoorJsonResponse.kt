@@ -7,6 +7,15 @@ data class DoorJsonResponse(
     val headers: List<Pair<String, String>> = emptyList(),
 ) {
 
+    companion object {
 
+        @Suppress("unused")//used by generated code
+        fun newErrorResponse(errorCode: Int) = DoorJsonResponse(
+            bodyText = "",
+            responseCode = errorCode,
+            contentType = "text/plain"
+        )
+
+    }
 
 }
