@@ -153,7 +153,9 @@ fun KSAnnotation.toTriggers(): Triggers {
 }
 
 /**
- * The HttpServerFunctionCall annotation can reference a different DAO.
+ * The HttpServerFunctionCall annotation can reference a different DAO if explicitly specified via the "functionDao"
+ * parameter, otherwise, by default, the HttpServerFunctionCall refers to the DAO that has the HttpAccessible annotation
+ * itself.
  *
  * @receiver a KSAnnotation that represents an HttpServerFunctionCall
  * @param daoKSClassDeclaration the KSClassDeclaration of the DAO which has the HttpAccessible function, of which the
@@ -176,7 +178,11 @@ fun KSAnnotation.getHttpServerFunctionCallDaoKSClass(
 }
 
 /**
- * Where the given KSAnnotation represents a HttpServerFunctionCall annotation, lookup the function declaration
+ * Where the given receiver KSAnnotation represents a HttpServerFunctionCall annotation, lookup the function declaration
+ * that it is referring to. This will check the functionDao (if specified) and return the matching function declaration.
+ *
+ * If there is no matching function NoSuchElement exception will be thrown.
+ *
  */
 fun KSAnnotation.httpServerFunctionFunctionDecl(
     daoKSClassDeclaration: KSClassDeclaration,

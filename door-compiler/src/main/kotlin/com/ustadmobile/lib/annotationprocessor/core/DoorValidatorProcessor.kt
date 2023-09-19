@@ -247,6 +247,16 @@ class DoorValidatorProcessor(
         }else {
             val matchingFunction = matchingFunctions.first() //Eg the function that is being referred to by HttpServerFunctionCall
 
+            httpServerFunCall.getArgumentValueByNameAsAnnotationList("functionArgs")?.mapNotNull { serverFunctionParam ->
+                serverFunctionParam.getArgumentValueByNameAsString("name")
+            }?.filter { serverFunctionParamName ->
+                !matchingFunction.parameters.any { it.name?.asString() == serverFunctionParamName }
+            }?.forEach { serverFunctionParamName ->
+                logger.error("HttpServerFunction \"${matchingFunction.simpleName.asString()}\" has no parameter $serverFunctionParamName",
+                    daoFun)
+            }
+
+
             matchingFunction.parameters.forEach { matchingFunParam ->
                 val daoFunMatchingParam = daoFun.parameters.firstOrNull { daoFunParam ->
                     daoFunParam.name?.asString() == matchingFunParam.name?.asString()
