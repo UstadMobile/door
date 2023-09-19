@@ -20,6 +20,7 @@ import com.ustadmobile.door.nodeevent.NodeEventManagerCommon
 import com.ustadmobile.door.nodeevent.NodeEventManagerJvm
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
+import kotlin.reflect.KClass
 
 /**
  * Add a DAO accessor for a database replication wrapper (e.g. property or function). If the given DAO
@@ -280,6 +281,7 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
             .applyIf(target != DoorTarget.ANDROID) {
                 addOverrideInvalidationTracker("_db")
             }
+            .addGetDaoByClassfunction(dbClassDecl)
             .addFunction(FunSpec.builder("close")
                 .addModifiers(KModifier.OVERRIDE)
                 .addCode("_db.close()\n")
@@ -290,6 +292,38 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
 
     return this
 }
+
+private fun TypeSpec.Builder.addGetDaoByClassfunction(
+    dbKSClassDeclaration: KSClassDeclaration,
+) : TypeSpec.Builder{
+    val typeVarName = TypeVariableName.Companion.invoke("T", Any::class)
+    addFunction(FunSpec.builder("getDaoByClass")
+        .addModifiers(KModifier.OVERRIDE)
+        .addAnnotation(AnnotationSpec.builder(Suppress::class).addMember("%S", "UNCHECKED_CAST").build())
+        .addTypeVariable(typeVarName)
+        .addParameter("daoClass", KClass::class.asClassName().parameterizedBy(typeVarName))
+        .returns(typeVarName)
+        .addCode(CodeBlock.builder()
+            .apply {
+                beginControlFlow("return when(daoClass)")
+                dbKSClassDeclaration.allDbDaos().forEach { daoDecl ->
+                    add("%T::class -> ", daoDecl.toClassName())
+                    add(dbKSClassDeclaration.findDbGetterForDao(daoDecl)?.toPropertyOrEmptyFunctionCaller() ?: "")
+                    add(" as T\n")
+                }
+                add("else -> throw %T(%S)\n", ClassName("kotlin", "IllegalArgumentException"),
+                        "No such DAO on this DB")
+                endControlFlow()
+            }
+            .build())
+        .apply {
+
+        }
+        .build())
+
+    return this
+}
+
 
 fun FileSpec.Builder.addDaoWrapperTypeSpec(
     daoClassDeclaration: KSClassDeclaration,

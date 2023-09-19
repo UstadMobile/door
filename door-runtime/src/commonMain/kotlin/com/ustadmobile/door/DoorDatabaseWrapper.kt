@@ -2,6 +2,7 @@ package com.ustadmobile.door
 
 import com.ustadmobile.door.nodeevent.NodeEventManagerCommon
 import com.ustadmobile.door.room.RoomDatabase
+import kotlin.reflect.KClass
 
 /**
  * The DoorDatabaseWrapper takes care of door-specific behaviors when data is modified:
@@ -23,6 +24,13 @@ interface DoorDatabaseWrapper<T: RoomDatabase> {
     val nodeEventManager: NodeEventManagerCommon<T>
 
     val nodeId: Long
+
+    /**
+     * This allows the lookup of a DAO according to the class. This is used by generated code, in particular generated
+     * http endpoints where auth / additional replication data functions may be located on another DAO. This avoids the
+     * need to copy/paste functions onto each DAO.
+     */
+    fun <T: Any> getDaoByClass(daoClass: KClass<T>): T
 
     companion object {
 

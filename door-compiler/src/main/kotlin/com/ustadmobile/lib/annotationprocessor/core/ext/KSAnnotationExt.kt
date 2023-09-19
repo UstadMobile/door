@@ -2,10 +2,8 @@ package com.ustadmobile.lib.annotationprocessor.core.ext
 
 import androidx.room.Entity
 import androidx.room.Index
-import com.google.devtools.ksp.symbol.KSAnnotation
-import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.google.devtools.ksp.symbol.KSType
-import com.google.devtools.ksp.symbol.KSValueArgument
+import com.google.devtools.ksp.processing.Resolver
+import com.google.devtools.ksp.symbol.*
 import com.ustadmobile.door.annotation.ReplicateEntity
 import com.ustadmobile.door.annotation.Trigger
 import com.ustadmobile.door.annotation.Triggers
@@ -152,4 +150,43 @@ fun KSAnnotation.toTriggers(): Triggers {
     return Triggers(getArgumentValueByNameAsAnnotationList("value")?.map {
         it.toTrigger()
     }?.toTypedArray() ?: emptyArray())
+}
+
+/**
+ * The HttpServerFunctionCall annotation can reference a different DAO.
+ *
+ * @receiver a KSAnnotation that represents an HttpServerFunctionCall
+ * @param daoKSClassDeclaration the KSClassDeclaration of the DAO which has the HttpAccessible function, of which the
+ *        receiver is a part.
+ * @return the KSClassDeclaration for the specified DAO e.g. if specified by functionDao=OtherDao::class, or the
+ *         daoKSClassDeclaration if unspecified.
+ */
+fun KSAnnotation.getHttpServerFunctionCallDaoKSClass(
+    daoKSClassDeclaration: KSClassDeclaration,
+    resolver: Resolver
+): KSClassDeclaration {
+    assertQualifiedNameIs("com.ustadmobile.door.annotation.HttpServerFunctionCall")
+    val daoClassArg = getArgumentValueByNameAsKSType("functionDao")
+
+    return if(daoClassArg != null && daoClassArg != resolver.builtIns.anyType) {
+        daoClassArg.declaration as KSClassDeclaration
+    }else {
+        daoKSClassDeclaration
+    }
+}
+
+/**
+ * Where the given KSAnnotation represents a HttpServerFunctionCall annotation, lookup the function declaration
+ */
+fun KSAnnotation.httpServerFunctionFunctionDecl(
+    daoKSClassDeclaration: KSClassDeclaration,
+    resolver: Resolver
+): KSFunctionDeclaration {
+    assertQualifiedNameIs("com.ustadmobile.door.annotation.HttpServerFunctionCall")
+    val functionName = getArgumentValueByNameAsString("functionName")
+    val functionCallDaoKSClass = getHttpServerFunctionCallDaoKSClass(daoKSClassDeclaration, resolver)
+
+    return functionCallDaoKSClass.getAllFunctions().first {
+        it.simpleName.asString() == functionName
+    }
 }

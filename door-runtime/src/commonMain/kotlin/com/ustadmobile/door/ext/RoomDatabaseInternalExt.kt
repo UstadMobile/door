@@ -5,7 +5,7 @@ import com.ustadmobile.door.DoorDatabaseWrapper
 import com.ustadmobile.door.room.RoomDatabase
 
 @Suppress("UNCHECKED_CAST")
-internal val <T: RoomDatabase> T.doorWrapper: DoorDatabaseWrapper<T>
+val <T: RoomDatabase> T.doorWrapper: DoorDatabaseWrapper<T>
     get() {
         return when (this) {
             is DoorDatabaseWrapper<*> -> {

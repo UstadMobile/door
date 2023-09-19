@@ -510,4 +510,36 @@ class PullIntegrationTest {
             }
         }
     }
+
+    /**
+     * Test use of an HttpServerFunction that includes getting data from a function on another DAO
+     */
+    @Test
+    fun givenEntitiesCreatedOnServer_whenQueryFromOtherDaoIsUsed_thenWillPullAndInsert() {
+        clientServerIntegrationTest {
+            val memberInServerDb = Member().apply {
+                firstName = "Roger"
+                lastName = "Rabbit"
+                memberUid = serverDb.memberDao.insertAsync(this)
+
+            }
+
+            val originalPost = DiscussionPost().apply {
+                postTitle = "I like hay"
+                postText = "Mmm... Hay..."
+                posterMemberUid = memberInServerDb.memberUid
+                postUid = serverDb.discussionPostDao.insertAsync(this)
+            }
+
+            makeClientRepo().use { clientRepo ->
+                val postAndName = clientRepo.discussionPostDao.getDiscussionPostAndAuthorName(originalPost.postUid)
+                assertEquals(originalPost, postAndName?.discussionPost)
+                assertEquals(memberInServerDb.firstName, postAndName?.firstName)
+                assertEquals(memberInServerDb.lastName, postAndName?.lastName)
+                assertEquals(originalPost, clientDb.discussionPostDao.findByUid(originalPost.postUid))
+                assertEquals(memberInServerDb, clientRepo.memberDao.findByUid(memberInServerDb.memberUid))
+            }
+        }
+    }
+
 }

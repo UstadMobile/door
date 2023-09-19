@@ -5,6 +5,7 @@ import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.gson.Gson
@@ -607,15 +608,13 @@ fun FileSpec.Builder.addHttpServerExtensionFun(
                             .add("\n")
                     }
 
-                    val httpAccessibleAnnotation = daoFunDecl.getAnnotation(HttpAccessible::class)
-                    httpAccessibleAnnotation?.authQueries?.forEach { authQuery ->
-                        val authFun = daoKSClassDeclaration.getAllFunctions().first {
-                            it.simpleName.asString() == authQuery.functionName
-                        }
+                    val httpAccessibleAnnotation = daoFunDecl.getKSAnnotationByType(HttpAccessible::class)
+                    httpAccessibleAnnotation?.getArgumentValueByNameAsAnnotationList("authQueries")?.forEach { authQuery ->
+                        val authFun = authQuery.httpServerFunctionFunctionDecl(daoKSClassDeclaration, resolver)
                         add("if(!")
                         addHttpServerFunctionCallCode(
                             funDeclaration = authFun,
-                            httpAccessibleFunctionCalls = httpAccessibleAnnotation.authQueries.toList(),
+                            httpAccessibleFunctionCall = authQuery,
                             pagingLoadParamValName = "_pagingLoadParams",
                             requestValName = "request",
                             resolver = resolver
@@ -687,29 +686,42 @@ fun FileSpec.Builder.addHttpServerExtensionFun(
  */
 fun CodeBlock.Builder.addHttpServerFunctionCallCode(
     funDeclaration: KSFunctionDeclaration,
-    httpAccessibleFunctionCalls: List<HttpServerFunctionCall>,
+    httpAccessibleFunctionCall: KSAnnotation?,
     requestValName: String,
     pagingLoadParamValName: String,
     resolver: Resolver,
-
 ) : CodeBlock.Builder {
-    val functionCallAnnotation = httpAccessibleFunctionCalls.firstOrNull {
-        it.functionName == funDeclaration.simpleName.asString()
-    }
     val returnType = funDeclaration.returnType?.resolve()
+
+    httpAccessibleFunctionCall?.getArgumentValueByNameAsKSType("functionDao")
+            ?.takeIf { it != resolver.builtIns.anyType }
+            ?.also {daoClass ->
+        add("$requestValName.db.%M.getDaoByClass(%T::class).",
+            MemberName("com.ustadmobile.door.ext", "doorWrapper"),
+            daoClass.toClassName()
+        )
+    }
+
 
     add("${funDeclaration.simpleName.asString()}(\n")
     withIndent {
         funDeclaration.parameters.forEach { param ->
             val paramNameStr = param.name?.asString()
-            val argParamAnnotation = functionCallAnnotation?.functionArgs?.firstOrNull { it.name == paramNameStr }
-            if(argParamAnnotation != null) {
-                when(argParamAnnotation.argType) {
+            val argParamAnnotation = httpAccessibleFunctionCall?.getArgumentValueByNameAsAnnotationList("functionArgs")?.firstOrNull {
+                it.getArgumentValueByNameAsString("name") == paramNameStr
+            }
+            val argType = argParamAnnotation?.getArgumentValueByNameAsKSType("argType")?.let {
+                HttpServerFunctionParam.ArgType.valueOf(it.declaration.simpleName.asString())
+            }
+
+            if(argType != null) {
+                when(argType) {
                     HttpServerFunctionParam.ArgType.LITERAL -> {
+                        val literalValue = argParamAnnotation.getArgumentValueByNameAsString("literalValue")
                         if(param.type.resolve().makeNotNullable() == resolver.builtIns.stringType)
-                            add("$paramNameStr = %S,\n", argParamAnnotation.literalValue)
+                            add("$paramNameStr = %S,\n", literalValue)
                         else
-                            add("$paramNameStr = %L,\n", argParamAnnotation.literalValue)
+                            add("$paramNameStr = %L,\n", literalValue)
                     }
                     HttpServerFunctionParam.ArgType.REQUESTER_NODE_ID -> {
                         add("$paramNameStr = $requestValName.requireNodeId(),\n")
@@ -751,14 +763,16 @@ fun CodeBlock.Builder.addHttpReplicationEntityServerExtension(
 
     //Next: we can add list of functions e.g. replicateData = ["selectAllSalesPeople", "selectAllSalesByType"]
     // that are going to generate data to replicate
-    val httpAccessibleAnnotation = daoFunDecl.getAnnotation(HttpAccessible::class)
+    val httpAccessibleKSAnnotation = daoFunDecl.getKSAnnotationByType(HttpAccessible::class)
         ?: throw IllegalArgumentException("addHttpReplicationEntityServerExtension: can only be used for function with @HttpAccessible annotation")
+    val queriesToReplicate = httpAccessibleKSAnnotation.getArgumentValueByNameAsAnnotationList("pullQueriesToReplicate")
+        ?: emptyList()
 
-    val functionsToReplicate = if(httpAccessibleAnnotation.pullQueriesToReplicate.isEmpty()) {
+    val functionsToReplicate = if(queriesToReplicate.isEmpty()) {
         listOf(daoFunDecl)
     }else {
-        httpAccessibleAnnotation.pullQueriesToReplicate.map { daoFunCall ->
-            daoKSClassDeclaration.getAllFunctions().first { it.simpleName.asString() == daoFunCall.functionName }
+        queriesToReplicate.map { queryToReplicate ->
+            queryToReplicate.httpServerFunctionFunctionDecl(daoKSClassDeclaration, resolver)
         }
     }
 
@@ -771,7 +785,9 @@ fun CodeBlock.Builder.addHttpReplicationEntityServerExtension(
         add("val $resultValName = ")
         addHttpServerFunctionCallCode(
             funDeclaration = funDeclaration,
-            httpAccessibleFunctionCalls = httpAccessibleAnnotation.pullQueriesToReplicate.toList(),
+            httpAccessibleFunctionCall = queriesToReplicate.firstOrNull {
+                it.getArgumentValueByNameAsString("functionName") == funDeclaration.simpleName.asString()
+            },
             requestValName = requestValName,
             pagingLoadParamValName = pagingLoadParamValName,
             resolver = resolver,

@@ -8,6 +8,7 @@ import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.ustadmobile.door.DoorDbType
@@ -216,61 +217,70 @@ class DoorValidatorProcessor(
     }
 
     private fun validateHttpServerFunctionCall(
-        funTypeName: String,//pulQueriesToReplicate or authQuery
+        funTypeName: String,//e.g. "pulQueriesToReplicate" or "authQuery"
         daoFun: KSFunctionDeclaration,
         dao: KSClassDeclaration,
-        httpServerFunCall: HttpServerFunctionCall,
+        httpServerFunCall: KSAnnotation,
         resolver: Resolver,
     ) {
-        val allDaoFunctions = dao.getAllFunctions()
-        val matchingFunctions = allDaoFunctions.filter {
-            it.simpleName.asString() == httpServerFunCall.functionName && !it.isOverridden(dao, resolver)
+        val functionName = httpServerFunCall.getArgumentValueByNameAsString("functionName")
+
+        val matchingFunctions = httpServerFunCall.getHttpServerFunctionCallDaoKSClass(
+            dao, resolver
+        ).getAllFunctions().filter {
+            it.simpleName.asString() == functionName && !it.isOverridden(dao, resolver)
         }.toList()
 
-        httpServerFunCall.functionArgs.toList().findDuplicates { httpServerFunctionParam, httpServerFunctionParam2 ->
-            httpServerFunctionParam.name == httpServerFunctionParam2.name
-        }.takeIf { it.isNotEmpty() }?.also { duplicateParams ->
+        httpServerFunCall.getArgumentValueByNameAsAnnotationList("functionArgs")?.findDuplicates { httpServerFunctionParam, httpServerFunctionParam2 ->
+            httpServerFunctionParam.getArgumentValueByNameAsString("name") == httpServerFunctionParam2.getArgumentValueByNameAsString("name")
+        }.takeIf { it?.isNotEmpty() == true }?.also { duplicateParams ->
             logger.error("@HttpAccessible $funTypeName -" +
-                    " \"${httpServerFunCall.functionName}\" - has duplicate parameters: " +
-                    duplicateParams.map { it.name }.toSet().joinToString(), daoFun)
+                    " \"$functionName\" - has duplicate parameters: " +
+                    duplicateParams.map { it.getArgumentValueByNameAsString("name") }.toSet().joinToString(), daoFun)
         }
 
         if(matchingFunctions.size != 1) {
             logger.error("@HttpAccessible $funTypeName: referenced function " +
-                    "\"${httpServerFunCall.functionName}\" must match one and only one function in DAO. " +
+                    "\"$functionName\" must match one and only one function in DAO. " +
                     "This matches ${matchingFunctions.size}. Name must be unique. Overloading by parameter types" +
                     " is not supported.", daoFun)
         }else {
-            val matchingFunction = matchingFunctions.first()
+            val matchingFunction = matchingFunctions.first() //Eg the function that is being referred to by HttpServerFunctionCall
 
             matchingFunction.parameters.forEach { matchingFunParam ->
-                val daoFunMatchingParam = daoFun.parameters.firstOrNull {
-                        daoFunParam -> daoFunParam.name?.asString() == matchingFunParam.name?.asString()
+                val daoFunMatchingParam = daoFun.parameters.firstOrNull { daoFunParam ->
+                    daoFunParam.name?.asString() == matchingFunParam.name?.asString()
                 }
-                val annotatedParamValue = httpServerFunCall.functionArgs.firstOrNull {
-                    it.name == matchingFunParam.name?.asString()
+
+                val annotatedParamValue = httpServerFunCall.getArgumentValueByNameAsAnnotationList("functionArgs")?.firstOrNull {
+                    it.getArgumentValueByNameAsString("name") == matchingFunParam.name?.asString()
                 }
 
                 if(annotatedParamValue == null && daoFunMatchingParam != null
                     && daoFunMatchingParam.type.resolve() != matchingFunParam.type.resolve()) {
                     logger.error("@HttpAccessible - $funTypeName " +
-                            "\"${httpServerFunCall.functionName}\" parameter type for: " +
+                            "\"$functionName\" parameter type for: " +
                             "${matchingFunParam.name?.asString()} does not match", daoFun)
                 }
 
                 if(daoFunMatchingParam == null && annotatedParamValue == null){
                     logger.error("@HttpAccessible - $funTypeName " +
-                            "\"${httpServerFunCall.functionName}\" cannot find parameter: " +
+                            "\"$functionName\" cannot find parameter: " +
                             "${matchingFunParam.name?.asString()} - must match a parameter of the same naame in " +
                             " @HttpAccessible function or specify using @HttpServerFunctionParam", daoFun)
                 }
 
                 if(annotatedParamValue != null) {
-                    val loggerPrefix = "@HttpAccessible - $funTypeName - " +
-                            "\"${httpServerFunCall.functionName}\" - param ${annotatedParamValue.name}"
-                    when(annotatedParamValue.argType) {
+                    val paramValName = annotatedParamValue.getArgumentValueByNameAsString("name")
+                    val loggerPrefix = "@HttpAccessible - $funTypeName - \"$functionName\" - param $paramValName"
+                    val argType = annotatedParamValue.getArgumentValueByNameAsKSType("argType")?.let {
+                        HttpServerFunctionParam.ArgType.valueOf(it.declaration.simpleName.asString())
+                    } ?: HttpServerFunctionParam.ArgType.LITERAL
+
+                    when(argType) {
                         HttpServerFunctionParam.ArgType.LITERAL -> {
-                            if(annotatedParamValue.literalValue.isEmpty()) {
+                            val literalValue = annotatedParamValue.getArgumentValueByNameAsString("literalValue")
+                            if(literalValue.isNullOrEmpty()) {
                                 logger.error("$loggerPrefix - type is literal,but literalValue is empty",
                                     daoFun)
                             }
@@ -343,11 +353,14 @@ class DoorValidatorProcessor(
                         daoFun)
             }
 
-            httpAccessibleAnnotation?.pullQueriesToReplicate?.forEach { pullQueryToReplicateFn ->
+
+            val httpAccessibleKSAnnotation = daoFun.getKSAnnotationByType(HttpAccessible::class)
+
+            httpAccessibleKSAnnotation?.getArgumentValueByNameAsAnnotationList("pullQueriesToReplicate")?.forEach { pullQueryToReplicateFn ->
                 validateHttpServerFunctionCall("pullQueriesToReplicate", daoFun, dao,
                     pullQueryToReplicateFn, resolver)
             }
-            httpAccessibleAnnotation?.authQueries?.forEach { authFun ->
+            httpAccessibleKSAnnotation?.getArgumentValueByNameAsAnnotationList("authQueries")?.forEach { authFun ->
                 validateHttpServerFunctionCall("authQueries", daoFun, dao, authFun, resolver)
             }
         }

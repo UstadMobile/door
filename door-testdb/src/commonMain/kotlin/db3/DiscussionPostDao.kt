@@ -223,6 +223,7 @@ expect abstract class DiscussionPostDao : RepositoryFlowLoadingStatusProvider {
                  FROM Member
                 WHERE :postUid != 0
                   AND Member.memberUid = :postUid
+                  AND :nodeId != 0
         )
     """)
     abstract suspend fun checkNodeHasPermission(postUid: Long, nodeId: Long): Boolean
@@ -230,13 +231,14 @@ expect abstract class DiscussionPostDao : RepositoryFlowLoadingStatusProvider {
     @HttpAccessible(
         authQueries = arrayOf(
             HttpServerFunctionCall(
-                functionName = "checkNodeHasPermission",
+                functionName = "checkMemberNodeHasPermission",
                 functionArgs = arrayOf(
                     HttpServerFunctionParam(
                         name = "nodeId",
                         argType = HttpServerFunctionParam.ArgType.REQUESTER_NODE_ID
                     )
-                )
+                ),
+                functionDao = MemberDao::class,
             )
         )
     )
@@ -246,5 +248,26 @@ expect abstract class DiscussionPostDao : RepositoryFlowLoadingStatusProvider {
          WHERE DiscussionPost.postReplyToPostUid = :postUid 
     """)
     abstract suspend fun findRepliesWithAuthCheck(postUid: Long): List<DiscussionPost>
+
+
+    @HttpAccessible(
+        pullQueriesToReplicate = arrayOf(
+            HttpServerFunctionCall("getDiscussionPostAndAuthorName"),
+            HttpServerFunctionCall(
+                functionName = "findAuthorByPostUid",
+                functionDao = MemberDao::class,
+            )
+        )
+    )
+    @Query("""
+        SELECT DiscussionPost.*,
+               Member.firstName AS firstName,
+               Member.lastName AS lastName
+          FROM DiscussionPost
+               LEFT JOIN Member
+                         ON Member.memberUid = DiscussionPost.posterMemberUid 
+         WHERE DiscussionPost.postUid = :postUid       
+    """)
+    abstract suspend fun getDiscussionPostAndAuthorName(postUid: Long): DiscussionPostAndAuthorName?
 
 }

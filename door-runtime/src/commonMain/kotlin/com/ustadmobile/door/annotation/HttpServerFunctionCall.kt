@@ -1,5 +1,7 @@
 package com.ustadmobile.door.annotation
 
+import kotlin.reflect.KClass
+
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.BINARY)
 /**
@@ -12,9 +14,10 @@ package com.ustadmobile.door.annotation
  *                       annotation. Any parameters must also be found on the function with the @RepoHttpAccessible
  *                       annotation or be listed as part of this function (the types must match), or the parameters
  *                       must be specified within functionArgs
- *
+ * @param functionArgs A list of
  */
 annotation class HttpServerFunctionCall(
     val functionName: String,
     val functionArgs: Array<HttpServerFunctionParam> = arrayOf(),
+    val functionDao: KClass<*> = Any::class,
 )
