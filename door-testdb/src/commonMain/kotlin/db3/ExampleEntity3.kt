@@ -20,12 +20,9 @@ import kotlinx.serialization.Serializable
             on = Trigger.On.RECEIVEVIEW,
             sqlStatements = arrayOf(
                 """
-                REPLACE INTO ExampleEntity3(eeUid, cardNumber, name, lastUpdatedTime)
-                      SELECT NEW.eeUid, NEW.cardNumber, NEW.name, NEW.lastUpdatedTime
-                       WHERE NEW.lastUpdatedTime !=
-                             COALESCE((SELECT ExampleEntity3Internal.lastUpdatedTime
-                                         FROM ExampleEntity3 ExampleEntity3Internal
-                                        WHERE ExampleEntity3Internal.eeUid = NEW.eeUid), 0)
+                REPLACE INTO %TABLE_AND_FIELD_NAMES%
+                      SELECT %NEW_VALUES%
+                       WHERE %NEW_ETAG_NOT_EQUAL_TO_EXISTING%
                 """
             )
         )

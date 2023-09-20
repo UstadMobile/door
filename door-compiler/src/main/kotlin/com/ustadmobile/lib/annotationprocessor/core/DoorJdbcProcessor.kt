@@ -215,15 +215,15 @@ private fun FileSpec.Builder.addJsImplementationsClassesObject(
 }
 
 private fun CodeBlock.Builder.addTriggerMetadataCode(
-    trigger: Trigger
+    trigger: Trigger,
+    entityKSClass: KSClassDeclaration,
 ) : CodeBlock.Builder {
-
     fun addStringArrayVal(array: Array<String>) {
         if(array.isNotEmpty()) {
             add("arrayOf(\n")
             indent()
             array.forEach {
-                add("%S,\n", it)
+                add("%S,\n", it.expandSqlTemplates(entityKSClass))
             }
             unindent()
             add(")")
@@ -257,9 +257,9 @@ private fun CodeBlock.Builder.addTriggerMetadataCode(
     addStringArrayVal(trigger.postgreSqlStatements)
     add(",\n")
 
-    add("conditionSql = %S,\n", trigger.conditionSql)
+    add("conditionSql = %S,\n", trigger.conditionSql.expandSqlTemplates(entityKSClass))
 
-    add("conditionSqlPostgres = %S,\n", trigger.conditionSqlPostgres)
+    add("conditionSqlPostgres = %S,\n", trigger.conditionSqlPostgres.expandSqlTemplates(entityKSClass))
 
     unindent()//unindent for end of trigger init
     add(")")
@@ -296,7 +296,7 @@ private fun CodeBlock.Builder.addReplicateEntityMetaDataCode(
     add("triggers = listOf(\n")
     indent()
     triggersAnnotation?.value?.forEach {
-        addTriggerMetadataCode(it)
+        addTriggerMetadataCode(it, entity)
         add(",")
     }
     unindent()
@@ -1272,6 +1272,15 @@ class DoorJdbcProcessor(
         const val SUFFIX_JDBC_IMPL = "_JdbcImpl"
 
         const val SUFFIX_JS_IMPLEMENTATION_CLASSES = "JsImplementations"
+
+        const val TRIGGER_TEMPLATE_TABLE_AND_FIELD_NAMES = "%TABLE_AND_FIELD_NAMES%"
+
+        const val TRIGGER_TEMPLATE_NEW_VALUES = "%NEW_VALUES%"
+
+        const val TRIGGER_TEMPLATE_NEW_LAST_MODIFIED_GREATER_THAN_EXISTING = "%NEW_LAST_MODIFIED_GREATER_THAN_EXISTING%"
+
+        const val TRIGGER_TEMPLATE_NEW_ETAG_NOT_EQUAL_TO_EXISTING = "%NEW_ETAG_NOT_EQUAL_TO_EXISTING%"
+
     }
 
 }

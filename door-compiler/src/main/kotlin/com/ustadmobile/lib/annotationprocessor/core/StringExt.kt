@@ -1,6 +1,12 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import com.squareup.kotlinpoet.TypeName
+import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.ustadmobile.door.annotation.ReplicateEtag
+import com.ustadmobile.door.annotation.ReplicateLastModified
+import com.ustadmobile.lib.annotationprocessor.core.ext.entityPrimaryKeyProps
+import com.ustadmobile.lib.annotationprocessor.core.ext.entityProps
+import com.ustadmobile.lib.annotationprocessor.core.ext.entityTableName
+import com.ustadmobile.lib.annotationprocessor.core.ext.hasAnnotation
 
 /**
  * Determine if the given SQL runs a query that could modify a table. This will return true
@@ -72,3 +78,58 @@ fun String.replaceColNameWithDefaultValueInSql(fieldName: String, substitution: 
         it.groupValues[1] + substitution + it.groupValues[2]
     }
 }
+
+/**
+ *
+ */
+fun String.expandSqlTemplates(
+    entityKSClass: KSClassDeclaration,
+) : String{
+    val entityProps = entityKSClass.entityProps(getAutoIncLast = false)
+
+    //Where clause checks that all primary keys match
+    val selectExistingWhereClause = entityKSClass.entityPrimaryKeyProps.joinToString(separator = " AND ") {
+        "${entityKSClass.entityTableName}_Existing.${it.simpleName.asString()} = NEW.${it.simpleName.asString()}"
+    }
+
+    val triggerTemplateReplacements = mapOf(
+        DoorJdbcProcessor.TRIGGER_TEMPLATE_TABLE_AND_FIELD_NAMES to buildString {
+            append("${entityKSClass.entityTableName} (")
+            append(entityProps.joinToString(separator = ", "))
+            append(")")
+        },
+        DoorJdbcProcessor.TRIGGER_TEMPLATE_NEW_VALUES to
+            entityProps.joinToString(separator = ", ") { "NEW.${it.simpleName.asString()}" },
+        DoorJdbcProcessor.TRIGGER_TEMPLATE_NEW_LAST_MODIFIED_GREATER_THAN_EXISTING to buildString {
+            val replicateLastModifiedPropName = entityKSClass.entityProps(false).firstOrNull {
+                it.hasAnnotation(ReplicateLastModified::class)
+            }?.simpleName?.asString() ?: "INVALID_TEMPLATE_NO_LAST_MODIFIED_FIELD_ON_ENTITY"
+
+            append("""
+                   NEW.$replicateLastModifiedPropName >
+                       COALESCE((SELECT ${entityKSClass.entityTableName}_Existing.$replicateLastModifiedPropName
+                                   FROM ${entityKSClass.entityTableName} ${entityKSClass.entityTableName}_Existing
+                                  WHERE $selectExistingWhereClause), 0)
+                   """)
+        },
+        DoorJdbcProcessor.TRIGGER_TEMPLATE_NEW_ETAG_NOT_EQUAL_TO_EXISTING to buildString {
+            val etagFieldPropName = entityKSClass.entityProps(false).firstOrNull {
+                it.hasAnnotation(ReplicateEtag::class)
+            }?.simpleName?.asString() ?: "INVALID_NO_ETAG"
+
+            append("""
+               NEW.$etagFieldPropName != 
+                   COALESCE((SELECT ${entityKSClass.entityTableName}_Existing.$etagFieldPropName
+                                   FROM ${entityKSClass.entityTableName} ${entityKSClass.entityTableName}_Existing
+                                  WHERE $selectExistingWhereClause), 0)
+            """)
+        }
+    )
+
+    var expanded = this
+    triggerTemplateReplacements.forEach {
+        expanded = expanded.replace(it.key, it.value)
+    }
+    return expanded
+}
+

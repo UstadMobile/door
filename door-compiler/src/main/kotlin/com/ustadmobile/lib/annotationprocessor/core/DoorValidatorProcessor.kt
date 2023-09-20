@@ -74,15 +74,14 @@ class DoorValidatorProcessor(
             }
 
             val allEntityProps = entity.getAllProperties().toList()
-            /*
-            val missingPkFields = entity.getAnnotation(Entity::class)?.primaryKeys?.filter { pkFieldName ->
+            val missingPkFields = entity.getKSAnnotationByType(Entity::class)?.toEntity()?.primaryKeys?.filter { pkFieldName ->
                 !allEntityProps.any { it.simpleName.asString() == pkFieldName }
             } ?: emptyList()
 
             if(missingPkFields.isNotEmpty()) {
                 logger.error("Entity annotation primary key " +
                         "fields not found: ${missingPkFields.joinToString()}", entity)
-            }*/
+            }
 
             if(entity.entityPrimaryKeyProps.isEmpty()) {
                 logger.error(
@@ -178,7 +177,7 @@ class DoorValidatorProcessor(
 
 
                     stmtsMap.forEach {entry ->
-                        var sqlToRun = trigger.conditionSql.substituteTriggerPrefixes(entry.key)
+                        var sqlToRun = trigger.conditionSql.expandSqlTemplates(entity).substituteTriggerPrefixes(entry.key)
                         try {
                             if(entry.key == DoorDbType.POSTGRES)
                                 sqlToRun = sqlToRun.sqlToPostgresSql()
@@ -201,7 +200,7 @@ class DoorValidatorProcessor(
                         try {
                             stmtsMap.forEach { stmtEntry ->
                                 dbType = stmtEntry.key
-                                sqlToRun = sql.substituteTriggerPrefixes(stmtEntry.key)
+                                sqlToRun = sql.expandSqlTemplates(entity).substituteTriggerPrefixes(stmtEntry.key)
                                 if(dbType == DoorDbType.POSTGRES)
                                     sqlToRun = sqlToRun.sqlToPostgresSql()
 

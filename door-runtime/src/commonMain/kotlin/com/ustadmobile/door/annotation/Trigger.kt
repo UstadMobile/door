@@ -16,7 +16,20 @@ package com.ustadmobile.door.annotation
  * Triggers are used by the ReplicateEntity ReceiveView (see @ReplicateEntity) as part of handling replication.
  *
  * Migration: All triggers created by Door according to Trigger annotation will be dropped and new triggers will be
- * created.
+ * created after migration runs. Therefor migrations do not need to handle triggers and receive views, this will be
+ * handled automatically.
+ *
+ * The following templates are available for convenience that can be used in SQL statements. NEW will refer to the
+ * incoming replication data.
+ *
+ * %TABLE_AND_FIELD_NAMES% will be expanded to EntityName(field1, field2, field3...). Fields will be in the same order in
+ * which they are declared on the entity.
+ * %NEW_VALUES% - will be expanded to NEW.field1, NEW.field2, NEW.field3 . Fields will be in the same order in
+ * which they are declared on the entity.
+ * %NEW_LAST_MODIFIED_GREATER_THAN_EXISTING% - will be expanded to a where clause that will check if the new last
+ * modified is greater than the existing entity in the local database, if present.
+ * %NEW_ETAG_NOT_EQUAL_TO_EXISTING% - will be expanded to a where clause that will check that the new etag field is not
+ * equal to the existing entity in the local database, if present
  *
  */
 annotation class Trigger(
