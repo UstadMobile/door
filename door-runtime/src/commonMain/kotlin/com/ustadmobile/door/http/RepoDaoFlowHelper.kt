@@ -3,6 +3,7 @@ package com.ustadmobile.door.http
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.ext.weakMapOf
 import com.ustadmobile.door.flow.FlowLoadingState
+import com.ustadmobile.door.util.IWeakMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -21,9 +22,10 @@ class RepoDaoFlowHelper(
 ) {
 
     /**
-     * Note: the weakmap is required to
+     * Note: The WeakMap is required because we want to ensure that we keep one status flow per database flow as long as
+     * the database flow is in memory
      */
-    private val flowToStatusMap: MutableMap<Flow<*>, Flow<FlowLoadingState>> = weakMapOf()
+    private val flowToStatusMap: IWeakMap<Flow<*>, Flow<FlowLoadingState>> = weakMapOf()
 
     /**
      * This is used by generated code to create an offline-first flow where the flow will immediately load from the
