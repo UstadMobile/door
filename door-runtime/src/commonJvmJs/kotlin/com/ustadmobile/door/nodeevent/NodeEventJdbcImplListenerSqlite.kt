@@ -28,7 +28,7 @@ internal class NodeEventJdbcImplListenerSqlite(
         connection: Connection,
         transactionId: Int,
     ) {
-        connection.takeIf { createTmpEvtTableAndTriggerOnBeforeTransaction }?.createNodeEventTmpTableAndTrigger(
+        connection.takeIf { createTmpEvtTableAndTriggerOnBeforeTransaction }?.createNodeEventTableAndTrigger(
             hasOutgoingReplicationTable)
     }
 

@@ -10,7 +10,7 @@ import com.ustadmobile.door.migration.DoorMigrationAsync
 import com.ustadmobile.door.migration.DoorMigrationStatementList
 import com.ustadmobile.door.migration.DoorMigrationSync
 import com.ustadmobile.door.nodeevent.NodeEventConstants
-import com.ustadmobile.door.nodeevent.createNodeEventTmpTableAndTrigger
+import com.ustadmobile.door.nodeevent.createNodeEventTableAndTrigger
 import com.ustadmobile.door.room.InvalidationTracker
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.sqljsjdbc.*
@@ -149,9 +149,10 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
             sqlStmts = InvalidationTracker.generateCreateTriggersSql(dbMetaData.allTables, temporary = false).toTypedArray()
         )
 
-        Napier.d("DatabaseBuilderJs: Setting up NodeEvent temp table and trigger SQL\n", tag = DoorTag.LOG_TAG)
-        connection.createNodeEventTmpTableAndTrigger(
-            hasOutgoingReplicationTable = NodeEventConstants.OUTGOING_REPLICATION_TABLE_NAME in dbMetaData.allTables
+        Napier.d("DatabaseBuilderJs: Setting up NodeEvent table and trigger SQL\n", tag = DoorTag.LOG_TAG)
+        connection.createNodeEventTableAndTrigger(
+            hasOutgoingReplicationTable = NodeEventConstants.OUTGOING_REPLICATION_TABLE_NAME in dbMetaData.allTables,
+            temporary = false,
         )
 
         Napier.d("DatabaseBuilderJs: Setting up change listener\n", tag = DoorTag.LOG_TAG)
