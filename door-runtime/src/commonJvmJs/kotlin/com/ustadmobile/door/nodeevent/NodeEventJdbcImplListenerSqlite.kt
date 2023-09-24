@@ -53,9 +53,9 @@ internal class NodeEventJdbcImplListenerSqlite(
             }
         }
 
-        connection.prepareStatement(
+        connection.takeIf { createTmpEvtTableAndTriggerOnBeforeTransaction }?.prepareStatement(
             NodeEventConstants.CLEAR_EVENTS_TMP_TABLE
-        ).useStatementAsync { stmt ->
+        )?.useStatementAsync { stmt ->
             stmt.executeUpdateAsyncKmp()
         }
 

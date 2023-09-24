@@ -129,7 +129,7 @@ class DoorValidatorProcessor(
                 val entityVersionIdField = entity.getAllProperties().filter { it.hasAnnotation(ReplicateEtag::class) }.toList()
                 if(entityVersionIdField.size != 1) {
                     logger.error(
-                        "@ReplicateEntity ${entity.qualifiedName?.asString()} must have exactly one field annotated @ReplicationVersionId",
+                        "@ReplicateEntity ${entity.qualifiedName?.asString()} must have exactly one field annotated @ReplicateEtag",
                         entity
                     )
                 }
