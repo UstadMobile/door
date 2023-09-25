@@ -542,4 +542,20 @@ class PullIntegrationTest {
         }
     }
 
+    @Test
+    fun givenEntityCreatedOnServer_whenEntityIsChildOfReplicateClass_thenWillPullAndInsert() {
+        clientServerIntegrationTest {
+            val badgeInServerDb = Badge().apply {
+                badgeName = "star"
+                badgeUid = serverDb.badgeDao.insertAsync(this)
+            }
+
+            makeClientRepo().use { clientRepo ->
+                val badgeFromClient = clientRepo.badgeDao.findBadgeByUid(badgeInServerDb.badgeUid)
+                assertEquals(badgeInServerDb.badgeUid, badgeFromClient?.badgeUid)
+            }
+        }
+    }
+
+
 }

@@ -1,10 +1,14 @@
 package com.ustadmobile.lib.annotationprocessor.core.ext
 
 import androidx.room.*
-import com.google.devtools.ksp.*
+import com.google.devtools.ksp.KspExperimental
+import com.google.devtools.ksp.getAllSuperTypes
+import com.google.devtools.ksp.getDeclaredProperties
+import com.google.devtools.ksp.isAnnotationPresent
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
-import com.squareup.kotlinpoet.*
+import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.CodeBlock
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.annotation.*
 import com.ustadmobile.lib.annotationprocessor.core.AbstractDbProcessor.Companion.SUFFIX_DEFAULT_RECEIVEVIEW
@@ -431,7 +435,7 @@ fun KSClassDeclaration.inheritedOrDeclaredDoorReplicateEntity(): EmbeddedEntityA
     return if(hasAnnotation(ReplicateEntity::class)) {
         EmbeddedEntityAndPath(this, emptyList())
     } else {
-        superTypes.firstOrNull { it.hasAnnotation(ReplicateEntity::class) }?.resolve()?.declaration?.let {
+        superTypes.map { it.resolve().declaration }.firstOrNull { it.hasAnnotation(ReplicateEntity::class) }?.let {
             EmbeddedEntityAndPath(it as KSClassDeclaration, emptyList())
         }
     }
