@@ -1,6 +1,5 @@
 package com.ustadmobile.door
 
-import kotlinx.coroutines.*
 import com.ustadmobile.door.ext.concurrentSafeListOf
 import com.ustadmobile.door.ext.doorWrapper
 import com.ustadmobile.door.nodeevent.NodeEventManager
@@ -8,6 +7,10 @@ import com.ustadmobile.door.nodeevent.NodeEventSseClient
 import com.ustadmobile.door.replication.DoorRepositoryReplicationClient
 import com.ustadmobile.door.room.RoomDatabase
 import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -61,6 +64,14 @@ class RepositoryHelper(
                 }
             }
         }
+
+    fun remoteNodeIdOrNull() : Long? {
+        return client.remoteNodeIdOrNull()
+    }
+
+    fun remoteNodeIdOrFake(): Long {
+        return client.remoteNodeIdOrFake()
+    }
 
 
     fun close() {

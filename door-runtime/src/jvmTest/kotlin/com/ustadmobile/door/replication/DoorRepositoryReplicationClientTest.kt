@@ -7,17 +7,17 @@ import com.ustadmobile.door.nodeevent.NodeEvent
 import com.ustadmobile.door.nodeevent.NodeEventManager
 import com.ustadmobile.door.room.RoomDatabase
 import io.ktor.client.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import okhttp3.mockwebserver.MockResponse
-import okhttp3.mockwebserver.MockWebServer
-import org.junit.Test
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import okhttp3.mockwebserver.Dispatcher
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
+import org.junit.Test
 import org.mockito.kotlin.*
 import kotlin.test.BeforeTest
 import kotlin.test.assertNotNull
@@ -133,6 +133,8 @@ class DoorRepositoryReplicationClientTest {
             scope = scope,
             nodeEventManager = mockEventManager,
             onMarkAcknowledgedAndGetNextOutgoingReplications = mock { },
+            onStartPendingSession = mock { },
+            onPendingSessionResolved = mock { },
         )
 
         verifyBlocking(mockEventManager, timeout(5000)) {
@@ -196,6 +198,8 @@ class DoorRepositoryReplicationClientTest {
             scope = scope,
             nodeEventManager = mockEventManager,
             onMarkAcknowledgedAndGetNextOutgoingReplications = mock { },
+            onStartPendingSession = mock { },
+            onPendingSessionResolved = mock { },
         )
 
         //wait for the first request
@@ -289,6 +293,8 @@ class DoorRepositoryReplicationClientTest {
             scope = scope,
             nodeEventManager = mockEventManager,
             onMarkAcknowledgedAndGetNextOutgoingReplications = onMarkAcknowledgedAndGetNextOutgoingReplications,
+            onStartPendingSession = mock { },
+            onPendingSessionResolved = mock { },
         )
 
         runBlocking {
@@ -340,6 +346,8 @@ class DoorRepositoryReplicationClientTest {
             scope = scope,
             nodeEventManager = mockEventManager,
             onMarkAcknowledgedAndGetNextOutgoingReplications = onMarkAcknowledgedAndGetNextOutgoingReplications,
+            onStartPendingSession = mock { },
+            onPendingSessionResolved = mock { },
         )
 
         //Wait for the first check for pending outgoing replications

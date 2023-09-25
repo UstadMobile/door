@@ -394,7 +394,7 @@ fun TypeSpec.Builder.addDaoRepoFun(
                             add("\n)")
                         } else {
                             addMakeHttpRequestAndInsertReplicationsCode(daoKSFun, daoKSClass, resolver)
-                            addRepoDelegateToDaoCode(daoKSFun, resolver)
+                            addRepoDelegateToDaoCode(daoKSFun, daoKSClass, resolver)
                         }
 
 
@@ -443,7 +443,7 @@ fun TypeSpec.Builder.addDaoRepoFun(
                     }
 
                     else -> {
-                        addRepoDelegateToDaoCode(daoKSFun, resolver)
+                        addRepoDelegateToDaoCode(daoKSFun, daoKSClass, resolver)
                     }
                 }
             }
@@ -473,19 +473,31 @@ fun CodeBlock.Builder.addDelegateFunctionCall(
  * 2) Update the change sequence numbers when running an update
  * 3) Pass the work to the DAO and return the result
  *
- * TODO: Update last changed by field, return primary key values from pk manager if applicable
  */
 fun CodeBlock.Builder.addRepoDelegateToDaoCode(
     daoFun: KSFunctionDeclaration,
+    daoKSClass: KSClassDeclaration,
     resolver: Resolver,
 ) : CodeBlock.Builder{
+    val modifiedTableName = daoFun.getDaoFunctionModifiedTableName(daoKSClass, resolver)
 
     if(daoFun.hasReturnType(resolver))
         add("val _result = ")
 
+    if(modifiedTableName != null) {
+        beginControlFlow("_repo.%M(%S)",
+            MemberName(
+                packageName = "com.ustadmobile.door.replication",
+                simpleName = if(daoFun.isSuspended) "withRepoChangeMonitorAsync" else "withRepoChangeMonitor"
+            ),
+            modifiedTableName)
+    }
     add("_dao.")
     addDelegateFunctionCall(daoFun)
     add("\n")
+    if(modifiedTableName != null) {
+        endControlFlow()
+    }
 
     if(daoFun.hasReturnType(resolver)) {
         add("return _result\n")

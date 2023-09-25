@@ -1,5 +1,6 @@
 package com.ustadmobile.door.replication
 
+import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.annotation.ReplicateEntity
 import com.ustadmobile.door.entities.DoorNode
 import com.ustadmobile.door.entities.OutgoingReplication
@@ -14,6 +15,7 @@ import io.github.aakira.napier.Napier
 import io.ktor.client.call.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlin.math.absoluteValue
 
 private data class ReplicateEntityPrimaryKeys(
     val pk1: Long,
@@ -244,6 +246,7 @@ internal suspend fun RoomDatabase.insertNewDoorNode(node: DoorNode) {
     }
 }
 
+@Suppress("unused") //This can be used by generated code
 internal suspend fun RoomDatabase.selectDoorNodeExists(nodeId: Long): Boolean {
     return prepareAndUseStatementAsync("""
         SELECT EXISTS(
@@ -285,6 +288,102 @@ suspend fun RoomDatabase.onClientRepoDoorMessageHttpResponse(
         else -> {
             throw IllegalStateException("$this - unexpected response status - ${httpResponse.status}")
         }
+    }
+}
+
+
+private fun createChangeMonitorTriggerSql(
+    entityMetaData: ReplicationEntityMetaData,
+    remoteNodeId: Long,
+    operation: String
+): String {
+    val triggerName =  "_d_ch_monitor_${entityMetaData.tableId}_${remoteNodeId.absoluteValue}" +
+            "_${operation.substring(0, 2).lowercase()}"
+    return """
+            CREATE TEMP TRIGGER IF NOT EXISTS $triggerName 
+            AFTER $operation ON ${entityMetaData.entityTableName}
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO OutgoingReplication(destNodeId, orTableId, orPk1, orPk2)
+                VALUES ($remoteNodeId, ${entityMetaData.tableId}, NEW.${entityMetaData.entityPrimaryKeyFieldName}, 0);
+            END
+            """
+}
+
+private fun dropChangeMonitorTriggerSql(
+    entityMetaData: ReplicationEntityMetaData,
+    remoteNodeId: Long,
+    operation: String
+): String {val triggerName =  "_d_ch_monitor_${entityMetaData.tableId}_${remoteNodeId.absoluteValue}" +
+        "_${operation.substring(0, 2).lowercase()}"
+    return "DROP TRIGGER IF EXISTS $triggerName"
+}
+
+/**
+ * Put any changes to the given table name into the OutgoingReplications outbox.
+ *
+ *
+ */
+@Suppress("unused") //This function is called by generated code
+suspend fun <R> DoorDatabaseRepository.withRepoChangeMonitorAsync(
+    tableName: String,
+    block: suspend () -> R,
+): R {
+    val entityMetaData = db::class.doorDatabaseMetadata().replicateEntities.values.first {
+        it.entityTableName == tableName
+    }
+
+    val remoteNodeId = remoteNodeIdOrFake()
+    return db.withDoorTransactionAsync {
+        db.prepareAndUseStatementAsync(createChangeMonitorTriggerSql(entityMetaData, remoteNodeId, "INSERT")) { stmt ->
+            stmt.executeUpdateAsyncKmp()
+        }
+
+        db.prepareAndUseStatementAsync(createChangeMonitorTriggerSql(entityMetaData, remoteNodeId, "UPDATE")) {stmt ->
+            stmt.executeUpdateAsyncKmp()
+        }
+
+        val result = block()
+
+        db.prepareAndUseStatementAsync(dropChangeMonitorTriggerSql(entityMetaData, remoteNodeId, "INSERT")) { stmt ->
+            stmt.executeUpdateAsyncKmp()
+        }
+        db.prepareAndUseStatementAsync(dropChangeMonitorTriggerSql(entityMetaData, remoteNodeId, "UPDATE")) { stmt ->
+            stmt.executeUpdateAsyncKmp()
+        }
+
+        result
+    }
+}
+
+fun <R> DoorDatabaseRepository.withRepoChangeMonitor(
+    tableName: String,
+    block: () -> R
+) :R {
+    val entityMetaData = db::class.doorDatabaseMetadata().replicateEntities.values.first {
+        it.entityTableName == tableName
+    }
+    val remoteNodeId = remoteNodeIdOrFake()
+
+    return db.withDoorTransaction {
+        db.prepareAndUseStatement(createChangeMonitorTriggerSql(entityMetaData, remoteNodeId, "INSERT")) { stmt ->
+            stmt.executeUpdate()
+        }
+
+        db.prepareAndUseStatement(createChangeMonitorTriggerSql(entityMetaData, remoteNodeId, "UPDATE")) {stmt ->
+            stmt.executeUpdate()
+        }
+
+        val result = block()
+
+        db.prepareAndUseStatement(dropChangeMonitorTriggerSql(entityMetaData, remoteNodeId, "INSERT")) { stmt ->
+            stmt.executeUpdate()
+        }
+        db.prepareAndUseStatement(dropChangeMonitorTriggerSql(entityMetaData, remoteNodeId, "UPDATE")) { stmt ->
+            stmt.executeUpdate()
+        }
+
+        result
     }
 }
 

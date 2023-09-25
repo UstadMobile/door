@@ -1,6 +1,8 @@
 package com.ustadmobile.lib.annotationprocessor.core.ext
 
+import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Update
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
@@ -14,9 +16,12 @@ import com.ustadmobile.door.annotation.HttpAccessible
 import com.ustadmobile.door.annotation.QueryLiveTables
 import com.ustadmobile.door.annotation.RepoHttpBodyParam
 import com.ustadmobile.lib.annotationprocessor.core.applyIf
+import com.ustadmobile.lib.annotationprocessor.core.isSQLAModifyingQuery
 import net.sf.jsqlparser.parser.CCJSqlParserUtil
 import net.sf.jsqlparser.statement.select.Select
 import net.sf.jsqlparser.util.TablesNamesFinder
+import net.sf.jsqlparser.statement.insert.Insert as InsertStatement
+import net.sf.jsqlparser.statement.update.Update as UpdateStatement
 
 fun KSFunctionDeclaration.toFunSpecBuilder(
     resolver: Resolver,
@@ -169,5 +174,28 @@ fun KSFunctionDeclaration.isOverridden(
     return allFunctions.any { otherFun ->
         otherFun !== this && otherFun.simpleName.asString() == this.simpleName.asString()
                 && resolver.overrides(otherFun, this, containiningClassDeclaration)
+    }
+}
+
+/**
+ * Get the table name of the
+ */
+fun KSFunctionDeclaration.getDaoFunctionModifiedTableName(
+    daoDeclaration: KSClassDeclaration,
+    resolver: Resolver,
+): String? {
+    val thisResolved = this.asMemberOf(daoDeclaration.asType(emptyList()))
+    val queryAnnotation = getAnnotation(Query::class)
+    return if(hasAnyAnnotation(Update::class, Insert::class)) {
+        return (thisResolved.firstParamEntityType(resolver).declaration as KSClassDeclaration).entityTableName
+    }else if(queryAnnotation != null && queryAnnotation.value.isSQLAModifyingQuery()){
+        val parsed = CCJSqlParserUtil.parse(queryAnnotation.value)
+        when(parsed) {
+            is UpdateStatement ->  parsed.table.name
+            is InsertStatement -> parsed.table.name
+            else -> null
+        }
+    }else {
+        null
     }
 }

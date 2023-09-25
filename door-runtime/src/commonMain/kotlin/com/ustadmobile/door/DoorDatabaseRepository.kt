@@ -24,36 +24,10 @@ interface DoorDatabaseRepository {
 
     val clientState: Flow<DoorRepositoryReplicationClient.ClientState>
 
+    fun remoteNodeIdOrNull(): Long?
+
+    fun remoteNodeIdOrFake(): Long
+
     fun close()
 
-    companion object {
-
-        const val STATUS_CONNECTED = 1
-
-        const val STATUS_DISCONNECTED = 2
-
-        const val DOOR_ATTACHMENT_URI_SCHEME = "door-attachment"
-
-        val DOOR_ATTACHMENT_URI_PREFIX = "$DOOR_ATTACHMENT_URI_SCHEME://"
-
-        val PATH_REPLICATION = "replication"
-
-        val ENDPOINT_SUBSCRIBE_SSE = "subscribe"
-
-        val ENDPOINT_CHECK_PENDING_REPLICATION_TRACKERS = "checkPendingReplicationTrackers"
-
-        val ENDPOINT_RECEIVE_ENTITIES = "receive"
-
-        val ENDPOINT_CHECK_FOR_ENTITIES_ALREADY_RECEIVED = "checkForEntitiesAlreadyReceived"
-
-        val ENDPOINT_FIND_PENDING_REPLICATION_TRACKERS = "findPendingReplicationTrackers"
-
-        val ENDPOINT_FIND_PENDING_REPLICATIONS = "findPendingReplication"
-
-        val ENDPOINT_MARK_REPLICATE_TRACKERS_AS_PROCESSED = "markReplicateTrackersAsProcessed"
-
-
-
-
-    }
 }

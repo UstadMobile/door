@@ -12,7 +12,6 @@ import com.ustadmobile.door.entities.*
     SyncNode::class,
     ExampleSyncableEntity::class,
     OtherSyncableEntity::class,
-    ChangeLog::class,
     AccessGrant::class,
     DoorNode::class,
 ])

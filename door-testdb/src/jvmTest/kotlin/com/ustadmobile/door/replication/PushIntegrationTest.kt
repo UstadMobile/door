@@ -76,7 +76,6 @@ class PushIntegrationTest {
                 }
             }
         }
-        server.start()
     }
 
     @AfterTest
@@ -101,6 +100,7 @@ class PushIntegrationTest {
 
     @Test
     fun givenEntityWithOutgoingReplicationCreatedOnServerBeforeClientConnects_whenClientConnects_thenShouldReplicateToClient() {
+        server.start()
         val insertedEntity = ExampleEntity3(lastUpdatedTime = systemTimeInMillis(), cardNumber = 123)
         runBlocking {
             serverDb.withDoorTransactionAsync {
@@ -124,6 +124,7 @@ class PushIntegrationTest {
 
     @Test
     fun givenEntityWithOutgoingReplicationCreatedOnClientBeforeClientConnects_whenClientCnonects_thenShouldReplicateToServer() {
+        server.start()
         val insertedEntity = ExampleEntity3(lastUpdatedTime = systemTimeInMillis(), cardNumber = 123)
         runBlocking {
             clientDb.withDoorTransactionAsync {
@@ -148,6 +149,7 @@ class PushIntegrationTest {
 
     @Test(timeout = 10000)
     fun givenBlankClientDatabase_whenEntityCreatedOnClientAfterConnection_thenShouldReplicateToServer() {
+        server.start()
         val clientRepo = clientDb.asClientNodeRepository()
         val clientRepoClientState = (clientRepo as DoorDatabaseRepository).clientState
         runBlocking {
@@ -160,8 +162,7 @@ class PushIntegrationTest {
             val insertedEntity = ExampleEntity3(lastUpdatedTime = systemTimeInMillis(), cardNumber = 123)
 
             clientRepo.withDoorTransactionAsync {
-                insertedEntity.eeUid = clientDb.exampleEntity3Dao.insertAsync(insertedEntity)
-                clientDb.exampleEntity3Dao.insertOutgoingReplication(insertedEntity.eeUid, serverNodeId)
+                insertedEntity.eeUid = clientRepo.exampleEntity3Dao.insertAsync(insertedEntity)
             }
 
             serverDb.exampleEntity3Dao.findByUidAsFlow(insertedEntity.eeUid).filter {
@@ -176,6 +177,7 @@ class PushIntegrationTest {
 
     @Test
     fun givenBlankServerDatabase_whenEntityCreatedOnServerAfterConnection_thenShouldReplicateToClient() {
+        server.start()
         val clientRepo = clientDb.asClientNodeRepository()
         val clientRepoClientState = (clientRepo as DoorDatabaseRepository).clientState
 
@@ -204,6 +206,25 @@ class PushIntegrationTest {
         clientRepo.close()
     }
 
+    @Test(timeout = 10000)
+    fun givenBlankClientDatabase_whenEntityCreatedOnClientBeforeServerStarts_thenShouldReplicateToClientWhenConnected() {
+        val clientRepo = clientDb.asClientNodeRepository()
+        runBlocking {
+            val insertedEntity = ExampleEntity3(lastUpdatedTime = systemTimeInMillis(), cardNumber = 123)
 
+            clientRepo.withDoorTransactionAsync {
+                insertedEntity.eeUid = clientRepo.exampleEntity3Dao.insertAsync(insertedEntity)
+            }
 
+            server.start()
+
+            serverDb.exampleEntity3Dao.findByUidAsFlow(insertedEntity.eeUid).filter {
+                it != null
+            }.test(timeout = 5.seconds, name = "Entity created after connection is replicated from client to server as expected") {
+                assertNotNull(awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+        clientRepo.close()
+    }
 }

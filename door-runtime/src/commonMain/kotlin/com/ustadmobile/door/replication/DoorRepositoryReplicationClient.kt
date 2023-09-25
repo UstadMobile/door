@@ -3,6 +3,7 @@ package com.ustadmobile.door.replication
 import com.ustadmobile.door.DoorConstants
 import com.ustadmobile.door.RepositoryConfig
 import com.ustadmobile.door.ext.*
+import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.nodeevent.NodeEventManager
 import com.ustadmobile.door.room.RoomDatabase
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlin.concurrent.Volatile
+import kotlin.random.Random
 
 
 /**
@@ -53,6 +55,8 @@ class DoorRepositoryReplicationClient(
     scope: CoroutineScope,
     private val nodeEventManager: NodeEventManager<*>,
     private val onMarkAcknowledgedAndGetNextOutgoingReplications: OnMarkAcknowledgedAndGetNextOutgoingReplications,
+    private val onStartPendingSession: OnStartPendingSession,
+    private val onPendingSessionResolved: OnPendingSessionResolved,
     private val retryInterval: Int = 10_000,
 ) {
 
@@ -74,6 +78,8 @@ class DoorRepositoryReplicationClient(
         scope = scope,
         nodeEventManager = nodeEventManager,
         onMarkAcknowledgedAndGetNextOutgoingReplications = DefaultOnMarkAcknowledgedAndGetNextOutgoingReplications(db),
+        onStartPendingSession = DefaultOnStartPendingSession(db),
+        onPendingSessionResolved = DefaultOnPendingSessionResolved(db),
         retryInterval = retryInterval,
     )
 
@@ -84,6 +90,17 @@ class DoorRepositoryReplicationClient(
     private val _state = MutableStateFlow(ClientState())
 
     val state: Flow<ClientState> = _state.asStateFlow()
+
+    /**
+     * When the repository is used to make an update and the SendChangesStrategy is OUTBOX then the repository client
+     * creates a trigger when running INSERT and UPDATE DAO functions to catch changes and put them into the replication
+     * outbox.
+     *
+     * We don't know the nodeId of the remote server until this client connects to get the remote node id. If changes are
+     * made before that, the fakeRemoteNodeId will be used as the destination node id for the replication outbox entities
+     * until we receive the real remote node id.
+     */
+    private val fakeRemoteNodeId = Random.nextLong(-10000, -1)
 
     init {
         Napier.d(
@@ -129,6 +146,78 @@ class DoorRepositoryReplicationClient(
     }
 
     /**
+     * Functional interface that will run one time only on initialization. It will insert into the RepositorySession
+     * to include the fakeRemoteNodeId (see fakeRemoteNodeId). This is provided as an interface so it can be mocked on
+     * unit tests
+     */
+    interface OnStartPendingSession {
+        suspend operator fun invoke(
+            fakeRemoteNodeId: Long,
+            endpointUrl: String,
+        )
+    }
+
+    class DefaultOnStartPendingSession(
+        private val db: RoomDatabase
+    ) : OnStartPendingSession {
+        override suspend fun invoke(fakeRemoteNodeId: Long, endpointUrl: String) {
+            db.prepareAndUseStatementAsync(
+                """
+                INSERT INTO PendingRepositorySession(remoteNodeId, endpointUrl)
+                            VALUES(?, ?)
+                """
+            ) {
+                it.setLong(1, fakeRemoteNodeId)
+                it.setString(2, endpointUrl)
+                it.executeUpdateAsyncKmp()
+            }
+        }
+    }
+
+    /**
+     * Function interface that will run one time once the real remote node id is known. It should update any pending
+     * replication in the outbox that was sent to the fake node id.
+     */
+    interface OnPendingSessionResolved {
+        suspend operator fun invoke(
+            remoteNodeId: Long,
+            endpointUrl: String,
+        )
+    }
+
+    class DefaultOnPendingSessionResolved(private val db: RoomDatabase) : OnPendingSessionResolved{
+        override suspend fun invoke(remoteNodeId: Long, endpointUrl: String) {
+            db.withDoorTransactionAsync {
+                db.prepareAndUseStatementAsync(
+                    """
+                    UPDATE OutgoingReplication
+                       SET destNodeId = ?
+                     WHERE destNodeId IN
+                           (SELECT PendingRepositorySession.remoteNodeId
+                              FROM PendingRepositorySession
+                             WHERE endpointUrl = ?)  
+                    """
+                ) {
+                    it.setLong(1, remoteNodeId)
+                    it.setString(2, endpointUrl)
+                    it.executeUpdateAsyncKmp()
+                }
+
+                db.prepareAndUseStatementAsync(
+                    """
+                        DELETE 
+                          FROM PendingRepositorySession
+                         WHERE PendingRepositorySession.endpointUrl = ?
+                    """
+                ) {
+                    it.setString(1, endpointUrl)
+                    it.executeUpdateAsyncKmp()
+                }
+            }
+        }
+    }
+
+    /**
      * The time (as per the other node) that we have most recently received all pending outgoing replications
      */
     @Volatile
@@ -149,11 +238,15 @@ class DoorRepositoryReplicationClient(
 
     private val remoteNodeId = CompletableDeferred<Long>()
 
+
+
     init {
         //Get the door node id of the remote endpoint.
         scope.launch {
             while(isActive && !remoteNodeId.isCompleted) {
                 try {
+                    onStartPendingSession(fakeRemoteNodeId, repoEndpointUrl)
+
                     Napier.v(tag = DoorTag.LOG_TAG) {
                         "$logPrefix getRemoteNodeId : requesting node id of server"
                     }
@@ -167,11 +260,12 @@ class DoorRepositoryReplicationClient(
                         "$logPrefix getRemoteNodeId : got server node id: status=${remoteNodeIdResponse.status} $nodeIdHeaderVal"
                     }
                     if(nodeIdHeaderVal != null) {
+                        remoteNodeId.complete(nodeIdHeaderVal)
+                        onPendingSessionResolved(nodeIdHeaderVal, repoEndpointUrl)
+
                         _state.update { prev ->
                             prev.copy(initialized = true)
                         }
-
-                        remoteNodeId.complete(nodeIdHeaderVal)
                     }else {
                         throw IllegalStateException("$logPrefix getRemoteNodeId : server did not provide node id")
                     }
@@ -332,6 +426,33 @@ class DoorRepositoryReplicationClient(
                     delay(retryInterval.toLong())
                 }
             }
+        }
+    }
+
+    /**
+     * Get the remote node id if known, otherwise, null
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    internal fun remoteNodeIdOrNull() : Long? {
+        return if(remoteNodeId.isCompleted)
+            remoteNodeId.getCompleted()
+        else
+            null
+    }
+
+    /**
+     * When the repository is used to make an update and the SendChangesStrategy is OUTBOX then a trigger is created to
+     * automatically put any changes into the outbox so they are sent to the server.
+     *
+     * We don't know the nodeId of the remote server until this client connects to get the remote node id. If changes are
+     * made before that, the fakeRemoteNodeId will be used.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    internal fun remoteNodeIdOrFake(): Long {
+        return if(remoteNodeId.isCompleted) {
+            remoteNodeId.getCompleted()
+        }else {
+            fakeRemoteNodeId
         }
     }
 

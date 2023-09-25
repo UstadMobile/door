@@ -13,7 +13,6 @@ import com.ustadmobile.lib.annotationprocessor.core.ext.getAnnotation
 import com.ustadmobile.lib.annotationprocessor.core.ext.propertyOrReturnType
 import com.ustadmobile.lib.annotationprocessor.core.ext.toPropertyOrEmptyFunctionCaller
 import kotlinx.coroutines.flow.Flow
-import kotlin.IllegalArgumentException
 
 fun TypeSpec.Builder.addDaoPropOrGetterOverride(
     daoPropOrGetterDeclaration: KSDeclaration,
@@ -86,6 +85,21 @@ internal fun TypeSpec.Builder.addRepositoryHelperDelegateCalls(delegatePropName:
         .addModifiers(KModifier.OVERRIDE)
         .addCode("$delegatePropName.close()\n")
         .build())
+
+    addFunction(
+        FunSpec.builder("remoteNodeIdOrNull")
+            .addModifiers(KModifier.OVERRIDE)
+            .returns(LONG.copy(nullable = true))
+            .addCode("return ${delegatePropName}.remoteNodeIdOrNull()\n")
+            .build()
+    )
+    addFunction(
+        FunSpec.builder("remoteNodeIdOrFake")
+            .addModifiers(KModifier.OVERRIDE)
+            .returns(LONG)
+            .addCode("return ${delegatePropName}.remoteNodeIdOrFake()\n")
+            .build()
+    )
 
     return this
 }

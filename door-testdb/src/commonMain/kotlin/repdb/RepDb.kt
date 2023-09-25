@@ -7,9 +7,7 @@ import com.ustadmobile.door.entities.*
 
 @DoorDatabase(version  = 1, entities = [
     RepEntity::class,
-    ChangeLog::class,
     DoorNode::class,
-    ReplicationStatus::class,
     RepEntityWithAttachment::class,
     SyncNode::class,
     CompositePkEntity::class,
