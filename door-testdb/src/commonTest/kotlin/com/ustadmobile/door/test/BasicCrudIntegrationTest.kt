@@ -258,6 +258,43 @@ class BasicCrudIntegrationTest : AbstractCommonTest() {
             "When combining all pages, this should be the same as getting it all in one list")
     }
 
+    @Test
+    fun givenPagingSource_whenQueriedAndDataChanged_thenShouldInvalidated() = runExampleDbTest {
+        exampleDb2.exampleDao2().insertListAsync(
+            (0 until 20).map {number ->
+                ExampleEntity2().apply {
+                    name = "Customer_$number"
+                    rewardsCardNumber = number
+                }
+            }
+        )
+
+        val pagingSource = exampleDb2.exampleDao2().findAllWithRewardNumberAsPagingSource(0)
+        pagingSource.load(
+            PagingSourceLoadParamsRefresh(
+                key = null ,
+                loadSize = 50,
+                placeholdersEnabled = false,
+            ) as PagingSourceLoadParams<Int>
+        )
+
+        val invalidationCompletable = CompletableDeferred<Boolean>()
+        pagingSource.registerInvalidatedCallback {
+            invalidationCompletable.complete(true)
+        }
+
+        exampleDb2.exampleDao2().insertAsync(
+            ExampleEntity2(
+                name = "New customer",
+                rewardsCardNumber = 1042,
+            )
+        )
+
+        withTimeout(1000) {
+            assertTrue(invalidationCompletable.await())
+        }
+    }
+
     companion object {
         fun runExampleDbTest(
             block: suspend ExampleDbContext.() -> Unit

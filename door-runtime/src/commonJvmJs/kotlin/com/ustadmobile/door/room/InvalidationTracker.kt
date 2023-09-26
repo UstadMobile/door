@@ -3,6 +3,8 @@ package com.ustadmobile.door.room
 import com.ustadmobile.door.ext.concurrentSafeListOf
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.ext.*
+import com.ustadmobile.door.util.IWeakRef
+import com.ustadmobile.door.util.weakRefOf
 
 actual open class InvalidationTracker(
     vararg tables: String,
@@ -12,7 +14,7 @@ actual open class InvalidationTracker(
 
     private val observers = concurrentSafeListOf<InvalidationTrackerObserver>()
 
-
+    private val weakObservers = concurrentSafeListOf<IWeakRef<InvalidationTrackerObserver>>()
 
     actual open fun addObserver(observer: InvalidationTrackerObserver) {
         observers += observer
@@ -20,6 +22,10 @@ actual open class InvalidationTracker(
 
     actual open fun removeObserver(observer: InvalidationTrackerObserver) {
         observers -= observer
+    }
+
+    fun addWeakObserver(observer: InvalidationTrackerObserver) {
+        weakObservers += weakRefOf(observer)
     }
 
     fun onTablesInvalidated(tableNames: Set<String>) {
@@ -34,6 +40,18 @@ actual open class InvalidationTracker(
         affectedObservers.forEach {
             it.onInvalidated(listToFire)
         }
+
+        val affectedWeakObservers = weakObservers.mapNotNull { observerRef ->
+            val observer = observerRef.get()
+            if(observer != null && observer.tables.any { listToFire.contains(it) }) {
+                observer
+            }else {
+                null
+            }
+        }
+
+        affectedWeakObservers.forEach { it.onInvalidated(listToFire) }
+        weakObservers.removeAll { it.get() == null }
     }
 
     fun setupSqliteTriggers(connection: Connection) {

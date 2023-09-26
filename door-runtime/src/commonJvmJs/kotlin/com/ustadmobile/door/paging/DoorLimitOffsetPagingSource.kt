@@ -2,8 +2,11 @@ package com.ustadmobile.door.paging
 
 import app.cash.paging.*
 import com.ustadmobile.door.ext.withDoorTransactionAsync
+import com.ustadmobile.door.room.InvalidationTrackerObserver
 import com.ustadmobile.door.room.RoomDatabase
+import kotlinx.atomicfu.atomic
 import kotlin.math.max
+
 
 /**
  * Implementation of an offset-limit PagingSource for JVM and JS.
@@ -11,7 +14,24 @@ import kotlin.math.max
 @Suppress("CAST_NEVER_SUCCEEDS")
 abstract class DoorLimitOffsetPagingSource<Value: Any>(
     private val db: RoomDatabase,
+    private val tableNames: Array<String>,
 ): PagingSource<Int, Value>() {
+
+    private inner class InvalidationTracker(): InvalidationTrackerObserver(tableNames) {
+
+        private val registered = atomic(false)
+
+        fun registerIfNeeded() {
+            if(!registered.getAndSet(true))
+                db.invalidationTracker.addWeakObserver(this)
+        }
+
+        override fun onInvalidated(tables: Set<String>) {
+            invalidate()
+        }
+    }
+
+    private val invalidationTracker = InvalidationTracker()
 
     abstract suspend fun loadRows(_limit: Int, _offset: Int): List<Value>
 
@@ -25,6 +45,8 @@ abstract class DoorLimitOffsetPagingSource<Value: Any>(
     override suspend fun load(
         params: PagingSourceLoadParams<Int>
     ): PagingSourceLoadResult<Int, Value> {
+        invalidationTracker.registerIfNeeded()
+
         val offset = params.key ?: 0
 
         val (items, count) = db.withDoorTransactionAsync {
@@ -33,7 +55,7 @@ abstract class DoorLimitOffsetPagingSource<Value: Any>(
         return PagingSourceLoadResultPage(
             data = items,
             prevKey = if(offset > 0) max(0, offset - params.loadSize) else null,
-            nextKey = if(offset + params.loadSize < count) offset + params.loadSize else null
+            nextKey = if(offset + params.loadSize < count) offset + params.loadSize else null,
         ) as PagingSourceLoadResult<Int, Value>
     }
 

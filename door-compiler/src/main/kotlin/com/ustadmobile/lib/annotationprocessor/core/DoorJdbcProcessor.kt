@@ -921,10 +921,13 @@ fun TypeSpec.Builder.addDaoQueryFunction(
             val resultComponentType = resultType.unwrapComponentTypeIfListOrArray(resolver)
             val pagingSourceQueryVarsMap = queryVarsMap + mapOf("_offset" to resolver.builtIns.intType,
                 "_limit" to resolver.builtIns.intType)
+            val tablesToObserve = daoFunDecl.getQueryTables(environment.logger).joinToString { "\"$it\"" }
+
             addCode(CodeBlock.builder()
                 .add("return %L\n",
                     TypeSpec.anonymousClassBuilder()
-                        .addSuperclassConstructorParameter("_db")
+                        .addSuperclassConstructorParameter("db = _db\n")
+                        .addSuperclassConstructorParameter("tableNames = arrayOf($tablesToObserve)\n")
                         .superclass(DoorLimitOffsetPagingSource::class.asClassName()
                             .parameterizedBy(resultComponentType.toTypeName()))
                         .addFunction(FunSpec.builder("loadRows")
