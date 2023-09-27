@@ -220,7 +220,7 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
             withContext(transactionContext) {
                 block(transactionContext.connection)
             }
-        }else if(dbType == DoorDbType.SQLITE && !readOnly){
+        }else if(dbType == DoorDbType.SQLITE){
             withTimeout(dbQueryTimeoutMs) {
                 sqliteMutex.withLock {
                     useNewConnectionAsyncInternal(readOnly, block)
