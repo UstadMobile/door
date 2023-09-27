@@ -255,13 +255,13 @@ fun CodeBlock.Builder.addGetResultOrSetQueryParamCall(
             MemberName(extPkgName, "${operation}LongNullable"))
         type == builtIns.floatType -> add("${operation}Float")
         type == builtIns.floatType.makeNullable() -> add("%M",
-            MemberName(extPkgName,"${operation}Float"))
+            MemberName(extPkgName,"${operation}FloatNullable"))
         type == builtIns.doubleType -> add("${operation}Double")
         type == builtIns.doubleType.makeNullable() -> add("%M",
-            MemberName(extPkgName, "${operation}Double"))
+            MemberName(extPkgName, "${operation}DoubleNullable"))
         type == builtIns.booleanType -> add("${operation}Boolean")
         type == builtIns.booleanType.makeNullable() -> add("%M",
-            MemberName(extPkgName, "${operation}Boolean"))
+            MemberName(extPkgName, "${operation}BooleanNullable"))
         type.equalsIgnoreNullable(builtIns.stringType) -> add("${operation}String")
         type == builtIns.arrayType -> add("${operation}Array")
         (type.declaration as? KSClassDeclaration)?.isListDeclaration() == true -> add("${operation}Array")
