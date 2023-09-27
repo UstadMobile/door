@@ -37,6 +37,8 @@ class DoorRepositoryReplicatePullPagingSource<Value: Any>(
 
     private val scope = CoroutineScope(Dispatchers.Default + Job())
 
+    private val httpLoadCompletable = CompletableDeferred<Unit>()
+
     private val onDbInvalidatedCallback: () -> Unit = {
         onDbInvalidated()
     }
@@ -48,15 +50,24 @@ class DoorRepositoryReplicatePullPagingSource<Value: Any>(
 
     private fun onDbInvalidated() {
         dbPagingSource.unregisterInvalidatedCallback(onDbInvalidatedCallback)
-        scope.cancel()
-        invalidate()
+        scope.launch {
+            try {
+                withTimeout(10000) {  httpLoadCompletable.await() }
+            }finally {
+                scope.cancel()
+                invalidate()
+            }
+
+        }
     }
 
     override fun getRefreshKey(state: PagingState<Int, Value>): Int? {
         return dbPagingSource.getRefreshKey(state)
     }
 
-    override suspend fun load(params: PagingSourceLoadParams<Int>): PagingSourceLoadResult<Int, Value> {
+    override suspend fun load(
+        params: PagingSourceLoadParams<Int>
+    ): PagingSourceLoadResult<Int, Value> {
         scope.launch {
             val loadRequest = PagingSourceLoadState.PagingRequest(params.key)
             _loadState.update { prev ->
@@ -64,10 +75,12 @@ class DoorRepositoryReplicatePullPagingSource<Value: Any>(
             }
             try {
                 onLoadHttp(params)
+                httpLoadCompletable.complete(Unit)
                 _loadState.update { prev ->
                     prev.copyWhenRequestCompleted(loadRequest)
                 }
             }catch(e: Exception) {
+                httpLoadCompletable.completeExceptionally(e)
                 Napier.v(tag = DoorTag.LOG_TAG) { "" }
                 _loadState.update { prev ->
                     prev.copyWhenRequestFailed(loadRequest)

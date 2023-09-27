@@ -89,7 +89,7 @@ class PostgresNodeEventListener(
                 stmt.execute("""
                         CREATE OR REPLACE FUNCTION door_outgoingrep_nodeevent_fn() RETURNS TRIGGER AS ${'$'}${'$'}
                         BEGIN
-                        PERFORM pg_notify('$LISTEN_CHANNEL_NAME', (SELECT '${DoorMessage.WHAT_REPLICATION},' || CAST(NEW.destNodeId AS VARCHAR) ||','|| CAST(NEW.orTableId AS VARCHAR) || ',' || CAST(NEW.orPk1 AS VARCHAR) || ',' || CAST(NEW.orPk2 AS VARCHAR)));
+                        PERFORM pg_notify('$LISTEN_CHANNEL_NAME', (SELECT '${DoorMessage.WHAT_REPLICATION_PUSH},' || CAST(NEW.destNodeId AS VARCHAR) ||','|| CAST(NEW.orTableId AS VARCHAR) || ',' || CAST(NEW.orPk1 AS VARCHAR) || ',' || CAST(NEW.orPk2 AS VARCHAR)));
                         RETURN NEW;
                         END ${'$'}${'$'}
                         LANGUAGE plpgsql;

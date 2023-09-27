@@ -859,7 +859,7 @@ fun CodeBlock.Builder.addHttpReplicationEntityServerExtension(
     add("%T.serializer(),\n", DoorMessage::class)
     add("%T(\n", DoorMessage::class)
     indent()
-    add("what = %T.WHAT_REPLICATION,\n", DoorMessage::class)
+    add("what = %T.WHAT_REPLICATION_PULL,\n", DoorMessage::class)
     add("fromNode = _thisNodeId,\n")
     add("toNode = request.requireNodeId(),\n")
     add("replications = replicationEntities,\n")

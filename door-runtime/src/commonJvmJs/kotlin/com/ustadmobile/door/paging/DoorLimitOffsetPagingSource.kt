@@ -1,7 +1,6 @@
 package com.ustadmobile.door.paging
 
 import app.cash.paging.*
-import com.ustadmobile.door.ext.withDoorTransactionAsync
 import com.ustadmobile.door.room.InvalidationTrackerObserver
 import com.ustadmobile.door.room.RoomDatabase
 import kotlinx.atomicfu.atomic
@@ -21,13 +20,16 @@ abstract class DoorLimitOffsetPagingSource<Value: Any>(
 
         private val registered = atomic(false)
 
+        private val invalidated = atomic(false)
+
         fun registerIfNeeded() {
             if(!registered.getAndSet(true))
                 db.invalidationTracker.addWeakObserver(this)
         }
 
         override fun onInvalidated(tables: Set<String>) {
-            invalidate()
+            if(!invalidated.getAndSet(true))
+                invalidate()
         }
     }
 
@@ -49,9 +51,9 @@ abstract class DoorLimitOffsetPagingSource<Value: Any>(
 
         val offset = params.key ?: 0
 
-        val (items, count) = db.withDoorTransactionAsync {
-            loadRows(params.loadSize, offset) to countRows()
-        }
+        val items = loadRows(params.loadSize, offset)
+        val count = countRows()
+
         return PagingSourceLoadResultPage(
             data = items,
             prevKey = if(offset > 0) max(0, offset - params.loadSize) else null,

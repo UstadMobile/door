@@ -33,7 +33,10 @@ private suspend fun RoomDatabase.selectDoorReplicateEntitiesByTableIdAndPrimaryK
     val entityMetaData = this::class.doorDatabaseMetadata().requireReplicateEntityMetaData(tableId)
     val entityFieldsTypeMap = entityMetaData.entityFieldsTypeMap
 
-    return prepareAndUseStatementAsync(entityMetaData.selectEntityByPrimaryKeysSql) { stmt ->
+    return prepareAndUseStatementAsync(
+        sql = entityMetaData.selectEntityByPrimaryKeysSql,
+        readOnly = true,
+    ) { stmt ->
         primaryKeysList.mapNotNull { primaryKeys ->
             stmt.setLong(1, primaryKeys.pk1)
             stmt.executeQueryAsyncKmp().useResults { result ->
@@ -75,13 +78,16 @@ suspend fun RoomDatabase.selectPendingOutgoingReplicationsByDestNodeId(
     nodeId: Long,
     limit: Int = 1000
 ): List<DoorReplicationEntity> {
-    val pendingReplications = prepareAndUseStatementAsync("""
-        SELECT OutgoingReplication.*
-          FROM OutgoingReplication
-         WHERE OutgoingReplication.destNodeId = ?
-      ORDER BY OutgoingReplication.orUid ASC
-         LIMIT ?
-    """) { stmt ->
+    val pendingReplications = prepareAndUseStatementAsync(
+        sql = """
+            SELECT OutgoingReplication.*
+              FROM OutgoingReplication
+             WHERE OutgoingReplication.destNodeId = ?
+          ORDER BY OutgoingReplication.orUid ASC
+             LIMIT ?
+        """,
+        readOnly = true
+    ) { stmt ->
         stmt.setLong(1, nodeId)
         stmt.setInt(2, limit)
 
@@ -120,11 +126,14 @@ suspend fun RoomDatabase.acknowledgeReceivedReplications(
     nodeId: Long,
     receivedUids: List<Long>,
 ) {
-    prepareAndUseStatementAsync("""
+    prepareAndUseStatementAsync(
+        sql = """
         DELETE FROM ${OutgoingReplication::class.simpleName}
               WHERE orUid = ?
                 AND destNodeId = ?
-    """) { stmt ->
+        """,
+        readOnly = false
+    ) { stmt ->
         receivedUids.forEach { uid ->
             stmt.setLong(1, uid)
             stmt.setLong(2, nodeId)
@@ -168,7 +177,7 @@ suspend fun RoomDatabase.acknowledgeReceivedReplicationsAndSelectNextPendingBatc
     }
 
     return DoorMessage(
-        what = DoorMessage.WHAT_REPLICATION,
+        what = DoorMessage.WHAT_REPLICATION_PUSH,
         fromNode = doorWrapperNodeId,
         toNode = nodeId,
         replications = pendingReplications,
@@ -187,10 +196,13 @@ suspend fun RoomDatabase.insertEntitiesFromMessage(
         val tableId = tableEntities.first().tableId
         val entityMetaData = dbMetadata.requireReplicateEntityMetaData(tableId)
         if(hasReplicationOpTable) {
-            prepareAndUseStatementAsync("""
-                INSERT INTO ReplicationOperation(repOpRemoteNodeId, repOpTableId, repOpStatus)
-                       VALUES(?, ?, ?)
-            """) { stmt ->
+            prepareAndUseStatementAsync(
+                sql = """
+                    INSERT INTO ReplicationOperation(repOpRemoteNodeId, repOpTableId, repOpStatus)
+                           VALUES(?, ?, ?)
+                    """,
+                readOnly = false,
+            ) { stmt ->
                 stmt.setLong(1, message.fromNode)
                 stmt.setInt(2, tableId)
                 stmt.setInt(3, 0)
@@ -199,7 +211,10 @@ suspend fun RoomDatabase.insertEntitiesFromMessage(
         }
 
         if(entityMetaData.remoteInsertStrategy == ReplicateEntity.RemoteInsertStrategy.INSERT_INTO_RECEIVE_VIEW) {
-            prepareAndUseStatementAsync(entityMetaData.insertIntoReceiveViewSql) { stmt ->
+            prepareAndUseStatementAsync(
+                sql = entityMetaData.insertIntoReceiveViewSql,
+                readOnly = false,
+            ) { stmt ->
                 tableEntities.forEach { entity ->
                     stmt.setAllFromJsonObject(entity.entity, entityMetaData.entityFields)
 
@@ -211,11 +226,14 @@ suspend fun RoomDatabase.insertEntitiesFromMessage(
         }
 
         if(hasReplicationOpTable) {
-            prepareAndUseStatementAsync("""
-                DELETE FROM ReplicationOperation
-                      WHERE repOpRemoteNodeId = ?
-                        AND repOpTableId = ?
-            """) { stmt ->
+            prepareAndUseStatementAsync(
+                sql = """
+                    DELETE FROM ReplicationOperation
+                          WHERE repOpRemoteNodeId = ?
+                            AND repOpTableId = ?
+                    """,
+                readOnly = false,
+            ) { stmt ->
                 stmt.setLong(1, message.fromNode)
                 stmt.setInt(2, tableId)
                 stmt.executeUpdateAsyncKmp()
@@ -225,9 +243,13 @@ suspend fun RoomDatabase.insertEntitiesFromMessage(
 }
 
 internal suspend fun RoomDatabase.getDoorNodeAuth(nodeId : Long): String? {
-    return prepareAndUseStatementAsync("""SELECT auth
-          FROM DoorNode
-         WHERE nodeId = ?""") { stmt ->
+    return prepareAndUseStatementAsync(
+        sql = """SELECT auth
+            FROM DoorNode
+            WHERE nodeId = ?
+            """,
+        readOnly = true,
+    ) { stmt ->
 
         stmt.setLong(1, nodeId)
 
@@ -248,12 +270,15 @@ internal suspend fun RoomDatabase.insertNewDoorNode(node: DoorNode) {
 
 @Suppress("unused") //This can be used by generated code
 internal suspend fun RoomDatabase.selectDoorNodeExists(nodeId: Long): Boolean {
-    return prepareAndUseStatementAsync("""
-        SELECT EXISTS(
-               SELECT nodeId 
-                 FROM DoorNode
-                WHERE nodeId = ?) 
-    """) { stmt ->
+    return prepareAndUseStatementAsync(
+        sql = """
+            SELECT EXISTS(
+                   SELECT nodeId 
+                     FROM DoorNode
+                    WHERE nodeId = ?) 
+            """,
+        readOnly = true,
+    ) { stmt ->
         stmt.setLong(1, nodeId)
         stmt.executeQueryAsyncKmp().useResults { results -> results.mapRows {
             it.getBoolean(1)
@@ -334,7 +359,7 @@ suspend fun <R> DoorDatabaseRepository.withRepoChangeMonitorAsync(
     }
 
     val remoteNodeId = remoteNodeIdOrFake()
-    return db.withDoorTransactionAsync {
+    return db.withDoorTransactionAsync(transactionMode = TransactionMode.READ_WRITE) {
         db.prepareAndUseStatementAsync(createChangeMonitorTriggerSql(entityMetaData, remoteNodeId, "INSERT")) { stmt ->
             stmt.executeUpdateAsyncKmp()
         }
@@ -365,7 +390,7 @@ fun <R> DoorDatabaseRepository.withRepoChangeMonitor(
     }
     val remoteNodeId = remoteNodeIdOrFake()
 
-    return db.withDoorTransaction {
+    return db.withDoorTransaction(transactionMode = TransactionMode.READ_WRITE) {
         db.prepareAndUseStatement(createChangeMonitorTriggerSql(entityMetaData, remoteNodeId, "INSERT")) { stmt ->
             stmt.executeUpdate()
         }

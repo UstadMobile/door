@@ -12,6 +12,7 @@ import com.ustadmobile.door.ext.use
 import com.ustadmobile.door.http.DoorHttpServerConfig
 import com.ustadmobile.door.flow.FlowLoadingState
 import com.ustadmobile.door.flow.repoFlowWithLoadingState
+import com.ustadmobile.door.room.InvalidationTrackerObserver
 import com.ustadmobile.door.test.initNapierLog
 import db3.*
 import io.ktor.client.*
@@ -19,17 +20,16 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.routing.*
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import org.junit.Assert
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
@@ -556,6 +556,105 @@ class PullIntegrationTest {
             }
         }
     }
+
+    /**
+     * When an entity is pulled from the server again, the default template should avoid any updates or invalidations
+     * when the replicateetag did not change.
+     */
+    @Test
+    fun givenEntityCreatedOnServer_whenEntityIsPulledTwice_thenWillOnlyBeInvalidatedOnce() {
+        clientServerIntegrationTest {
+            val memberInServerDb = Member().apply {
+                firstName = "Roger"
+                lastName = "Rabbit"
+                memberUid = serverDb.memberDao.insertAsync(this)
+
+            }
+
+            val originalPost = DiscussionPost().apply {
+                postTitle = "I like hay"
+                postText = "Mmm... Hay..."
+                posterMemberUid = memberInServerDb.memberUid
+                postUid = serverDb.discussionPostDao.insertAsync(this)
+            }
+
+            val invalidationCount = AtomicInteger()
+            val invalidationTrackerObserver = object: InvalidationTrackerObserver(arrayOf("DiscussionPost")) {
+                override fun onInvalidated(tables: Set<String>) {
+                    invalidationCount.incrementAndGet()
+                }
+            }
+            clientDb.invalidationTracker.addObserver(invalidationTrackerObserver)
+
+            makeClientRepo().use { clientRepo ->
+                clientRepo.discussionPostDao.getDiscussionPostAndAuthorName(originalPost.postUid)
+                val invalidationCountAfterPull1 = invalidationCount.get()
+                clientRepo.discussionPostDao.getDiscussionPostAndAuthorName(originalPost.postUid)
+                assertTrue(invalidationCountAfterPull1 >= 1,
+                    message = "Invalidation count after pulling from server is at least one")
+                assertEquals(invalidationCountAfterPull1, invalidationCount.get(),
+                        message = "Making a second pull when the entities on the server have not changed does not cause any invalidation")
+            }
+        }
+    }
+
+    @Test
+    fun givenEntityCreatedOnServer_whenEntityPulledViaPagingSource_thenWillOnlyBeInvalidatedOnce() {
+        initNapierLog()
+        clientServerIntegrationTest {
+            val memberInServerDb = Member().apply {
+                firstName = "Roger"
+                lastName = "Rabbit"
+                memberUid = serverDb.memberDao.insertAsync(this)
+
+            }
+
+            val originalPost = DiscussionPost().apply {
+                postTitle = "I like hay"
+                postText = "Mmm... Hay..."
+                posterMemberUid = memberInServerDb.memberUid
+                postUid = serverDb.discussionPostDao.insertAsync(this)
+            }
+
+            val invalidationCountFlow = MutableStateFlow(0)
+            val invalidationTrackerObserver = object: InvalidationTrackerObserver(arrayOf("DiscussionPost")) {
+                override fun onInvalidated(tables: Set<String>) {
+                    invalidationCountFlow.update { prev ->
+                        prev + 1
+                    }
+                }
+            }
+
+            clientDb.invalidationTracker.addObserver(invalidationTrackerObserver)
+
+            val scope = CoroutineScope(currentCoroutineContext() + Job())
+            makeClientRepo().use { clientRepo ->
+                //Simulate a pager in the UI that would request a new paging source every time it gets invalidated
+                scope.launch {
+                    while(isActive) {
+                        val pagingSource = clientRepo.discussionPostDao.findAllPostAsPagingSource(0)
+                        pagingSource.load(PagingSourceLoadParamsRefresh(key = null, loadSize = 20, placeholdersEnabled = false))
+                        val invalidatedCompletable = CompletableDeferred<Unit>()
+                        pagingSource.registerInvalidatedCallback {
+                            invalidatedCompletable.complete(Unit)
+                        }
+                        invalidatedCompletable.await()
+                    }
+                }
+
+                invalidationCountFlow.filter { it >= 1  }.test(timeout = 5.seconds) {
+                    val count = awaitItem()
+                    delay(2000)
+                    expectNoEvents()
+                    cancelAndIgnoreRemainingEvents()
+                }
+
+
+            }
+        }
+    }
+
+
 
 
 }

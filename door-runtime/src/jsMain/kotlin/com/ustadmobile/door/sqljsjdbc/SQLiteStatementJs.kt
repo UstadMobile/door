@@ -25,7 +25,7 @@ open class SQLiteStatementJs(
 
     override suspend fun executeUpdateAsyncJs(sql: String): Int {
         Napier.v("SqliteJs: updateAsyncJs: $sql\n", tag = DoorTag.LOG_TAG)
-        return connection.datasource.sendUpdate(sql, emptyArray()).numRowsChanged
+        return connection.datasource.sendUpdate(connection, sql, emptyArray()).numRowsChanged
     }
 
     override fun close() {

@@ -50,12 +50,15 @@ class NodeEventManagerAndroid<T: RoomDatabase>(
         while(isActive) {
             notifyChannel.receive()
             val newOutgoingReplication = db.withDoorTransactionAsync(TransactionMode.READ_ONLY) {
-                db.prepareAndUseStatementAsync("""
-                    SELECT OutgoingReplication.*
-                      FROM OutgoingReplication
-                     WHERE OutgoingReplication.orUid >= ?
-                  ORDER BY OutgoingReplication.orUid ASC           
-                """) { stmt ->
+                db.prepareAndUseStatementAsync(
+                    sql = """
+                            SELECT OutgoingReplication.*
+                              FROM OutgoingReplication
+                             WHERE OutgoingReplication.orUid >= ?
+                          ORDER BY OutgoingReplication.orUid ASC           
+                        """,
+                    readOnly = true
+                ) { stmt ->
                     stmt.setLong(1, lastOutgoingReplicationUid)
                     stmt.executeQueryAsyncKmp().use { results ->
                         results.mapRows { resultSet ->
@@ -77,7 +80,7 @@ class NodeEventManagerAndroid<T: RoomDatabase>(
 
             _outgoingEvents.emit(newOutgoingReplication.map {
                 NodeEvent(
-                    what = DoorMessage.WHAT_REPLICATION,
+                    what = DoorMessage.WHAT_REPLICATION_PUSH,
                     toNode = it.destNodeId,
                     tableId = it.orTableId,
                     key1 = it.orPk1,

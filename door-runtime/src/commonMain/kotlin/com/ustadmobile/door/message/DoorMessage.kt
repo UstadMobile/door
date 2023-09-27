@@ -36,9 +36,19 @@ data class DoorMessage(
     companion object {
 
         /**
-         *
+         * Indicates that the Door message contains replication that is being pushed from the fromNode to the toNode
          */
-        const val WHAT_REPLICATION = 1
+        const val WHAT_REPLICATION_PUSH = 1
+
+
+        /**
+         * Indicates that the door message contains replication that is being pulled at the request of the toNode from
+         * the fromNode.
+         *
+         * The differentiation between PULL and PUSH avoids triggering DoorRepositoryReplicationClient to look for
+         * changes to send to the server whenever data from a replication pull is received.
+         */
+        const val WHAT_REPLICATION_PULL = 2
 
 
     }

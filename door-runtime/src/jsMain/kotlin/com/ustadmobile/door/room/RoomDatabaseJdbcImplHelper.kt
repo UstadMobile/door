@@ -4,7 +4,6 @@ import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.sqljsjdbc.SQLiteDatasourceJs
-import com.ustadmobile.door.util.TransactionMode
 import io.github.aakira.napier.Napier
 
 /**
@@ -26,7 +25,7 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
     }
 
     actual fun <R> useConnection(
-        transactionMode: TransactionMode,
+        readOnly: Boolean,
         block: (Connection) -> R
     ): R {
         throw IllegalStateException("useConnection synchronous not supported on JS")

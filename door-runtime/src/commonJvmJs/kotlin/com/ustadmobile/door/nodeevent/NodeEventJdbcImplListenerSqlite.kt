@@ -1,10 +1,11 @@
 package com.ustadmobile.door.nodeevent
 
+import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.concurrentSafeMapOf
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.ext.*
 import com.ustadmobile.door.room.RoomDatabaseJdbcImplHelperCommon
-import com.ustadmobile.door.util.TransactionMode
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableSharedFlow
 
 /**
@@ -24,19 +25,31 @@ internal class NodeEventJdbcImplListenerSqlite(
     private val pendingEvents = concurrentSafeMapOf<Int, List<NodeEvent>>()
 
     override suspend fun onBeforeTransactionAsync(
-        transactionMode: TransactionMode,
+        readOnly: Boolean,
         connection: Connection,
         transactionId: Int,
     ) {
-        connection.takeIf { createTmpEvtTableAndTriggerOnBeforeTransaction }?.createNodeEventTableAndTrigger(
-            hasOutgoingReplicationTable)
+        if(readOnly)
+            return
+
+        if(createTmpEvtTableAndTriggerOnBeforeTransaction) {
+            Napier.d(tag = DoorTag.LOG_TAG) {
+                "NodeEventJdbcImplListenerSqlite: creating SQLite triggers "
+            }
+            connection.createNodeEventTableAndTrigger(
+                hasOutgoingReplicationTable = hasOutgoingReplicationTable
+            )
+        }
     }
 
     override suspend fun onAfterTransactionAsync(
-        transactionMode: TransactionMode,
+        readOnly: Boolean,
         connection: Connection,
         transactionId: Int,
     ) {
+        if(readOnly)
+            return
+
         val events = connection.prepareStatement(
             NodeEventConstants.SELECT_EVENT_FROM_TMP_TABLE
         ).useStatementAsync { stmt ->
@@ -53,27 +66,40 @@ internal class NodeEventJdbcImplListenerSqlite(
             }
         }
 
-        connection.takeIf { createTmpEvtTableAndTriggerOnBeforeTransaction }?.prepareStatement(
+        Napier.v(tag = DoorTag.LOG_TAG) {
+            "NodeEventJdbcImplListenerSqlite: found ${events.size} new events = ${events.joinToString()} "
+        }
+
+
+        connection.prepareStatement(
             NodeEventConstants.CLEAR_EVENTS_TMP_TABLE
-        )?.useStatementAsync { stmt ->
+        ).useStatementAsync { stmt ->
             stmt.executeUpdateAsyncKmp()
         }
 
-        pendingEvents[transactionId] = events
+        if(events.isNotEmpty()) {
+            Napier.v(tag = DoorTag.LOG_TAG) {
+                "NodeEventJdbcImplListenerSqlite: emitting ${events.size} events ${events.joinToString()} "
+            }
+            pendingEvents[transactionId] = events
+        }
     }
 
     override suspend fun onTransactionCommittedAsync(
-        transactionMode: TransactionMode,
+        readOnly: Boolean,
         connection: Connection,
         transactionId: Int,
     ) {
+        if(readOnly)
+            return
+
         pendingEvents.remove(transactionId)?.also {
             outgoingEvents.emit(it)
         }
     }
 
     override fun onBeforeTransaction(
-        transactionMode: TransactionMode,
+        readOnly: Boolean,
         connection: Connection,
         transactionId: Int,
     ) {
@@ -81,7 +107,7 @@ internal class NodeEventJdbcImplListenerSqlite(
     }
 
     override fun onAfterTransaction(
-        transactionMode: TransactionMode,
+        readOnly: Boolean,
         connection: Connection,
         transactionId: Int,
     ) {

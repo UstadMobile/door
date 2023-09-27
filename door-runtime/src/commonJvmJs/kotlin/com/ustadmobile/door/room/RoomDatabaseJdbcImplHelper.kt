@@ -2,7 +2,6 @@ package com.ustadmobile.door.room
 
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
-import com.ustadmobile.door.util.TransactionMode
 
 
 /**
@@ -19,8 +18,16 @@ expect class RoomDatabaseJdbcImplHelper(
     dbType: Int,
 ) : RoomDatabaseJdbcImplHelperCommon {
 
+    /**
+     * Use a (blocking) connection. If there is already a connection associated with this thread (e.g. via
+     * withDoorTransaction), it will be used, otherwise a new connection will be used.
+     *
+     * @param readOnly true if only non-modifying (e.g. select queries) will be run using this connection. This helps
+     *        improve performance : setting up change catch triggers can be skipped, look for changed tables can be
+     *        skipped, and on servers, this could allow the use of read-only replicas.
+     */
     fun <R> useConnection(
-        transactionMode: TransactionMode,
+        readOnly: Boolean,
         block: (Connection) -> R
     ) : R
 

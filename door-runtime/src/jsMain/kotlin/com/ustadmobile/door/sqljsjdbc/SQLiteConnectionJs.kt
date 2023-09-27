@@ -1,20 +1,70 @@
 package com.ustadmobile.door.sqljsjdbc
 
+import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.jdbc.*
+import io.github.aakira.napier.Napier
 import kotlin.Array
 
-class SQLiteConnectionJs(val datasource: SQLiteDatasourceJs):Connection {
+class SQLiteConnectionJs(
+    val datasource: SQLiteDatasourceJs
+):Connection, ConnectionAsync {
 
     private var closed = false
 
     private var mAutoCommit = true
 
+    val connectionId = connectionIdCounter++
+
+    private val logPrefix: String = "[SQLiteConnectionJS #$connectionId]"
+
+    init {
+        Napier.v(tag = DoorTag.LOG_TAG) {
+            "$logPrefix : open"
+        }
+    }
+
     override fun setAutoCommit(commit: Boolean) {
-        mAutoCommit = commit
+        //mAutoCommit = commit
     }
 
     override fun getAutoCommit(): Boolean {
         return mAutoCommit
+    }
+
+    override suspend fun setAutoCommitAsync(autoCommit: Boolean) {
+        if(!autoCommit && mAutoCommit) {
+            //switching to a transaction
+            datasource.acquireTransactionLock(this)
+            mAutoCommit = false
+            datasource.sendUpdate(
+                connection = this,
+                sql = "BEGIN TRANSACTION",
+                params = emptyArray()
+            )
+        }else if(autoCommit && !autoCommit) {
+            //leaving transaction mode
+            datasource.releaseTransactionLock(this)
+            mAutoCommit = false
+        }
+    }
+
+    override suspend fun commitAsync() {
+        if(mAutoCommit)
+            throw IllegalStateException("commitAsync: not in transaction (autoCommit=true) - cannot commit")
+
+        datasource.sendUpdate(
+            connection = this,
+            sql = "COMMIT",
+            params = emptyArray()
+        )
+    }
+
+    override suspend fun rollbackAsync() {
+        datasource.sendUpdate(
+            connection = this,
+            sql = "ROLLBACK",
+            params = emptyArray()
+        )
     }
 
     override fun prepareStatement(sql: String): PreparedStatement {
@@ -36,6 +86,12 @@ class SQLiteConnectionJs(val datasource: SQLiteDatasourceJs):Connection {
     }
 
     override fun close() {
+        Napier.v(tag = DoorTag.LOG_TAG) {
+            "$logPrefix : close"
+        }
+        if(!mAutoCommit)
+            datasource.releaseTransactionLock(this)
+
         closed = true
     }
 
@@ -47,6 +103,12 @@ class SQLiteConnectionJs(val datasource: SQLiteDatasourceJs):Connection {
 
     override fun getMetaData(): DatabaseMetadata {
         return SQLiteDatabaseMetadataJs(datasource)
+    }
+
+    companion object {
+
+        private var connectionIdCounter = 1
+
     }
 
 

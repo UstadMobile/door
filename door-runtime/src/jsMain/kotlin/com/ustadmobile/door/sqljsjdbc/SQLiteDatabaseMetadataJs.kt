@@ -2,6 +2,7 @@ package com.ustadmobile.door.sqljsjdbc
 
 import com.ustadmobile.door.jdbc.DatabaseMetadata
 import com.ustadmobile.door.jdbc.ResultSet
+import com.ustadmobile.door.jdbc.ext.useConnection
 import kotlin.text.Regex.Companion.escape
 
 class SQLiteDatabaseMetadataJs(val datasource: SQLiteDatasourceJs): DatabaseMetadata {
@@ -19,7 +20,7 @@ class SQLiteDatabaseMetadataJs(val datasource: SQLiteDatasourceJs): DatabaseMeta
 
     /**
      * List all tables from the database, this implementation was adapter from SQLiteJDBC
-     * @see https://github.com/xerial/sqlite-jdbc/blob/master/src/main/java/org/sqlite/jdbc3/JDBC3DatabaseMetaData.java
+     * see https://github.com/xerial/sqlite-jdbc/blob/master/src/main/java/org/sqlite/jdbc3/JDBC3DatabaseMetaData.java
      */
     override suspend fun getTablesAsync(
         catalog: String?,
@@ -68,6 +69,8 @@ class SQLiteDatabaseMetadataJs(val datasource: SQLiteDatasourceJs): DatabaseMeta
         }
 
         sql += ") ORDER BY TABLE_TYPE, TABLE_NAME"
-        return datasource.sendQuery(sql)
+        return datasource.getConnection().useConnection {
+            datasource.sendQuery(it, sql)
+        }
     }
 }

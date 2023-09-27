@@ -105,16 +105,18 @@ fun <T:RoomDatabase> T.clearAllTablesAndResetNodeId(nodeId: Long) : T {
  */
 suspend fun <R> RoomDatabase.prepareAndUseStatementAsync(
     sql: String,
+    readOnly: Boolean = false,
     block: suspend (PreparedStatement) -> R,
-) = prepareAndUseStatementAsync(PreparedStatementConfig(sql), block)
+) = prepareAndUseStatementAsync(PreparedStatementConfig(sql, readOnly = readOnly), block)
 
 /**
  * Suspended wrapper that will prepare a Statement, execute a code block, and return the code block result
  */
 fun <R> RoomDatabase.prepareAndUseStatement(
     sql: String,
+    readOnly: Boolean = false,
     block: (PreparedStatement) -> R
-) = prepareAndUseStatement(PreparedStatementConfig(sql), block)
+) = prepareAndUseStatement(PreparedStatementConfig(sql, readOnly = readOnly), block)
 
 /**
  * Get the real, one and only, root database. This will get out of any wrappers, transactions, etc.

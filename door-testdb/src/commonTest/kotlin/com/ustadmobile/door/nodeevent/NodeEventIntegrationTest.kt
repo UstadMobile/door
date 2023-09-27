@@ -41,7 +41,7 @@ class NodeEventIntegrationTest : AbstractCommonTest() {
 
             val outgoingNodeEvents = (db1 as DoorDatabaseWrapper<*>).nodeEventManager.outgoingEvents
             outgoingNodeEvents.filter {
-                it.isNotEmpty() && it.first().what == DoorMessage.WHAT_REPLICATION
+                it.isNotEmpty() && it.first().what == DoorMessage.WHAT_REPLICATION_PUSH
             }.test(timeout = 10.seconds) {
                 val insertedUid = db1.withDoorTransactionAsync {
                     val uid = db1.exampleEntity3Dao.insertAsync(ExampleEntity3())
@@ -57,7 +57,7 @@ class NodeEventIntegrationTest : AbstractCommonTest() {
 
                 (db2 as DoorDatabaseWrapper<*>).nodeEventManager.onIncomingMessageReceived(
                     DoorMessage(
-                        what = DoorMessage.WHAT_REPLICATION,
+                        what = DoorMessage.WHAT_REPLICATION_PUSH,
                         fromNode = 1L,
                         toNode = 2L,
                         replications = listOf(eventReplication)
@@ -84,7 +84,7 @@ class NodeEventIntegrationTest : AbstractCommonTest() {
 
             val outgoingNodeEvents = (db as DoorDatabaseWrapper<*>).nodeEventManager.outgoingEvents
             outgoingNodeEvents.filter {
-                it.isNotEmpty() && it.first().what == DoorMessage.WHAT_REPLICATION
+                it.isNotEmpty() && it.first().what == DoorMessage.WHAT_REPLICATION_PUSH
             }.test(timeout = 10.seconds) {
                 val insertedUid = db.withDoorTransactionAsync {
                     val uid = db.exampleEntity3Dao.insertAsync(ExampleEntity3())

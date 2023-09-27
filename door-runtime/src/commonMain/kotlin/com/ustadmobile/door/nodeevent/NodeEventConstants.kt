@@ -31,7 +31,7 @@ object NodeEventConstants {
              AFTER INSERT
                 ON $OUTGOING_REPLICATION_TABLE_NAME
              BEGIN INSERT INTO NodeEvent(what, toNode, tableId, key1, key2)
-                   VALUES (${DoorMessage.WHAT_REPLICATION}, 
+                   VALUES (${DoorMessage.WHAT_REPLICATION_PUSH}, 
                            NEW.destNodeId, 
                            NEW.orTableId,
                            NEW.orPk1,

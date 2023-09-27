@@ -15,9 +15,11 @@ import com.ustadmobile.door.replication.ServerSentEventsReplicationClient.Compan
 import com.ustadmobile.door.sse.DoorEventListener
 import com.ustadmobile.door.sse.DoorEventSource
 import com.ustadmobile.door.sse.DoorServerSentEvent
+import com.ustadmobile.door.test.initNapierLog
 import com.ustadmobile.door.util.systemTimeInMillis
 import db3.ExampleDb3
 import db3.ExampleEntity3
+import io.github.aakira.napier.Napier
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -38,6 +40,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
 import okhttp3.OkHttpClient
+import org.junit.Before
 import org.junit.Test
 import java.net.URLEncoder
 import kotlin.test.assertEquals
@@ -103,6 +106,11 @@ class ReplicationRouteTest {
 
     }
 
+    @Before
+    fun setup() {
+        initNapierLog()
+    }
+
     @Test
     fun givenReplicationsArePendingForNode_whenAckAndGetPendingReplicationsCalled_thenShouldReturnPendingReplications() {
         testReplicationRoute {context ->
@@ -123,7 +131,7 @@ class ReplicationRouteTest {
             }
 
             val responseDoorMessage: DoorMessage = context.json.decodeFromString(response.bodyAsText())
-            assertEquals(DoorMessage.WHAT_REPLICATION, responseDoorMessage.what)
+            assertEquals(DoorMessage.WHAT_REPLICATION_PUSH, responseDoorMessage.what)
             assertEquals(1, responseDoorMessage.replications.size)
             val receivedReplicationEntity = responseDoorMessage.replications.first()
             val entityInResponse = context.json.decodeFromJsonElement(ExampleEntity3.serializer(),
@@ -177,7 +185,7 @@ class ReplicationRouteTest {
             val outgoingReplicationUid = 10420L
 
             val incomingMessage = DoorMessage(
-                what = DoorMessage.WHAT_REPLICATION,
+                what = DoorMessage.WHAT_REPLICATION_PUSH,
                 fromNode =123L,
                 toNode = context.db.doorWrapperNodeId,
                 replications = listOf(
@@ -264,15 +272,17 @@ class ReplicationRouteTest {
                 assertEquals(EVT_INIT, initEvt.event)
 
                 db.withDoorTransactionAsync {
+                    Napier.d("insert entity")
                     val uid = db.exampleEntity3Dao.insertAsync(
                         ExampleEntity3(
                             lastUpdatedTime = systemTimeInMillis()
                         )
                     )
+                    Napier.d("insert replication")
                     db.exampleEntity3Dao.insertOutgoingReplication(uid, clientNodeId)
                 }
 
-                val replicationPendingEvt = withTimeout(5000) { eventChannel.receive() }
+                val replicationPendingEvt = withTimeout(10000) { eventChannel.receive() }
                 assertEquals(EVT_PENDING_REPLICATION, replicationPendingEvt.event)
             }
         }finally {

@@ -1,10 +1,12 @@
 package com.ustadmobile.door.room
 
+import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.concurrentSafeListOf
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.ext.*
 import com.ustadmobile.door.util.IWeakRef
 import com.ustadmobile.door.util.weakRefOf
+import io.github.aakira.napier.Napier
 
 actual open class InvalidationTracker(
     vararg tables: String,
@@ -33,6 +35,9 @@ actual open class InvalidationTracker(
     }
 
     private fun fireChanges(listToFire: Set<String>) {
+        Napier.v(tag = DoorTag.LOG_TAG) { "" +
+            "InvalidationTracker: tables invalidated: ${listToFire.joinToString()}"
+        }
         val affectedObservers = observers.filter { observer ->
             observer.tables.any { listToFire.contains(it) }
         }
@@ -106,6 +111,7 @@ actual open class InvalidationTracker(
     companion object {
 
         fun generateCreateTriggersSql(tableNames: List<String>, temporary: Boolean = true) : List<String>{
+            //TODO: this could be a problem when number of tables is reduced...
             val tempStr = if(temporary) "TEMP" else ""
             val createTableSql = if(temporary) CREATE_TEMP_TABLE_SQL else CREATE_TABLE_SQL
             return listOf(createTableSql) + tableNames.mapIndexed { tableId, tableName ->

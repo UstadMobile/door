@@ -9,7 +9,6 @@ import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.jdbc.ext.mutableLinkedListOf
 import com.ustadmobile.door.util.PostgresChangeTracker
-import com.ustadmobile.door.util.TransactionMode
 import com.ustadmobile.door.util.systemTimeInMillis
 import com.zaxxer.hikari.HikariDataSource
 import io.github.aakira.napier.Napier
@@ -26,7 +25,7 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
     dbType: Int,
 ) : RoomDatabaseJdbcImplHelperCommon(dataSource, db, tableNames, invalidationTracker, dbType) {
 
-    inner class PendingTransaction(val connection: Connection)
+    inner class PendingTransaction(val connection: Connection, val readOnly: Boolean)
 
     private val postgresChangeTracker = if(dbType == DoorDbType.POSTGRES) {
         PostgresChangeTracker(dataSource, invalidationTracker, tableNames)
@@ -46,33 +45,33 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
 
     @Suppress("UNUSED_PARAMETER") //Reserved for future usage
     private fun <R> useNewConnectionInternal(
-        transactionMode: TransactionMode,
+        readOnly: Boolean,
         block: (Connection) -> R,
         threadId: Long,
     ): R {
         assertNotClosed()
         val startTime = systemTimeInMillis()
-        val transaction = PendingTransaction(dataSource.connection)
-        transaction.connection.autoCommit = false
+        val transaction = PendingTransaction(dataSource.connection, readOnly)
+        transaction.connection.takeIf { !readOnly }?.autoCommit = false
         pendingTransactionThreadMap[threadId] = transaction
         return try {
-            if(dbType == DoorDbType.SQLITE) {
+            if(!readOnly && dbType == DoorDbType.SQLITE) {
                 invalidationTracker.setupSqliteTriggers(transaction.connection)
             }
 
             val changedTables = mutableLinkedListOf<String>()
             block(transaction.connection).also {
-                if(dbType == DoorDbType.SQLITE) {
+                if(!readOnly && dbType == DoorDbType.SQLITE) {
                     changedTables.addAll(invalidationTracker.findChangedTablesOnConnection(transaction.connection))
                 }
 
-                transaction.connection.commit()
+                transaction.connection.takeIf { !readOnly }?.commit()
 
                 invalidationTracker.takeIf { changedTables.isNotEmpty() }?.onTablesInvalidated(changedTables.toSet())
             }
         }catch(e: Exception) {
             Napier.e("useConnection: ERROR", e)
-            if(!transaction.connection.autoCommit) {
+            if(!readOnly) {
                 transaction.connection.rollback()
             }
 
@@ -88,7 +87,7 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
     }
 
     actual fun <R> useConnection(
-        transactionMode: TransactionMode,
+        readOnly: Boolean,
         block: (Connection) -> R,
     ): R {
         val threadId = Thread.currentThread().id
@@ -96,6 +95,11 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
         val dbQueryTimeoutMs = ((db.rootDatabase as DoorDatabaseJdbc).jdbcQueryTimeout * 1000).toLong()
 
         return if(threadPendingTransaction != null) {
+            if(threadPendingTransaction.readOnly && !readOnly) {
+                throw IllegalStateException("useConnection: current connection is readOnly, cannot request a " +
+                        "read/write connection in the same transaction")
+            }
+
             try {
                 block(threadPendingTransaction.connection)
             }catch(e: Exception){
@@ -106,16 +110,16 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
             runBlocking {
                 withTimeout(dbQueryTimeoutMs) {
                     sqliteMutex.withLock {
-                        useNewConnectionInternal(transactionMode, block, threadId)
+                        useNewConnectionInternal(readOnly, block, threadId)
                     }
                 }
             }
         }else {
-            useNewConnectionInternal(transactionMode, block, threadId)
+            useNewConnectionInternal(readOnly, block, threadId)
         }
     }
 
-    actual fun <R> useConnection(block: (Connection) -> R) = useConnection(TransactionMode.READ_WRITE, block)
+    actual fun <R> useConnection(block: (Connection) -> R) = useConnection(false, block)
 
     override fun onClose() {
         pendingTransactionThreadMap.forEach {

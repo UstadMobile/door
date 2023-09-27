@@ -24,7 +24,11 @@ class NodeEventManagerJvm<T: RoomDatabase>(
      * Used on SQLite - where we pick up events using the jdbcimplhelper.
      */
     private val sqliteJdbcListener = if(db.dbType() == DoorDbType.SQLITE) {
-        NodeEventJdbcImplListenerSqlite(hasOutgoingReplicationTable, _outgoingEvents)
+        NodeEventJdbcImplListenerSqlite(
+            hasOutgoingReplicationTable = hasOutgoingReplicationTable,
+            outgoingEvents = _outgoingEvents,
+            createTmpEvtTableAndTriggerOnBeforeTransaction = true
+        )
     }else {
         null
     }

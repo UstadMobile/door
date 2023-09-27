@@ -1,11 +1,14 @@
 package com.ustadmobile.door
 
-import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.ext.dbType
-import com.ustadmobile.door.jdbc.*
-import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
 import com.ustadmobile.door.ext.prepareAndUseStatement
 import com.ustadmobile.door.ext.prepareAndUseStatementAsync
+import com.ustadmobile.door.jdbc.PreparedStatement
+import com.ustadmobile.door.jdbc.ResultSet
+import com.ustadmobile.door.jdbc.Statement
+import com.ustadmobile.door.jdbc.StatementConstantsKmp
+import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
+import com.ustadmobile.door.room.RoomDatabase
 
 /**
  * This is similar to the EntityInsertionAdapter on Room. It is used by generated code.
@@ -35,7 +38,7 @@ abstract class EntityInsertionAdapter<T>(protected val db: RoomDatabase) {
     abstract fun makeSql(returnsId: Boolean): String
 
     fun insert(entity: T) {
-        db.prepareAndUseStatement(makeSql(false)) { stmt ->
+        db.prepareAndUseStatement(makeSql(false), readOnly = false) { stmt ->
             bindPreparedStmtToEntity(stmt, entity)
             stmt.executeUpdate()
         }
@@ -122,7 +125,7 @@ abstract class EntityInsertionAdapter<T>(protected val db: RoomDatabase) {
 
 
     fun insertList(entities: List<T>) {
-        db.prepareAndUseStatement(makeSql(false)) { stmt ->
+        db.prepareAndUseStatement(makeSql(false), readOnly = false) { stmt ->
             stmt.getConnection().setAutoCommit(false)
             entities.forEach {
                 bindPreparedStmtToEntity(stmt, it)

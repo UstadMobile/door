@@ -1,11 +1,11 @@
 package com.ustadmobile.door.ext
 
-import com.ustadmobile.door.room.RoomDatabase
-import com.ustadmobile.door.room.RoomJdbcImpl
 import com.ustadmobile.door.*
-import com.ustadmobile.door.jdbc.*
+import com.ustadmobile.door.jdbc.PreparedStatement
 import com.ustadmobile.door.jdbc.ext.useStatement
 import com.ustadmobile.door.jdbc.ext.useStatementAsync
+import com.ustadmobile.door.room.RoomDatabase
+import com.ustadmobile.door.room.RoomJdbcImpl
 import com.ustadmobile.door.util.NodeIdAuthCache
 import com.ustadmobile.door.util.systemTimeInMillis
 import io.github.aakira.napier.Napier
@@ -16,7 +16,9 @@ actual suspend fun <R> RoomDatabase.prepareAndUseStatementAsync(
     block: suspend (PreparedStatement) -> R
 ) : R {
     try {
-        return (this.rootDatabase as RoomJdbcImpl).jdbcImplHelper.useConnectionAsync { connection ->
+        return (this.rootDatabase as RoomJdbcImpl).jdbcImplHelper.useConnectionAsync(
+            readOnly = stmtConfig.readOnly
+        ) { connection ->
             connection.prepareStatement(this, stmtConfig).useStatementAsync { stmt: PreparedStatement ->
                 stmt.setQueryTimeout((rootDatabase as DoorDatabaseJdbc).jdbcQueryTimeout)
                 val blockStartTime = systemTimeInMillis()
@@ -39,7 +41,9 @@ actual fun <R> RoomDatabase.prepareAndUseStatement(
     block: (PreparedStatement) -> R
 ) : R {
     try {
-        return (this.rootDatabase as RoomJdbcImpl).jdbcImplHelper.useConnection { connection ->
+        return (this.rootDatabase as RoomJdbcImpl).jdbcImplHelper.useConnection(
+            readOnly = stmtConfig.readOnly
+        ) { connection ->
             connection.prepareStatement(this, stmtConfig).useStatement { stmt: PreparedStatement ->
                 stmt.setQueryTimeout((rootDatabase as DoorDatabaseJdbc).jdbcQueryTimeout)
                 val blockStartTime = systemTimeInMillis()

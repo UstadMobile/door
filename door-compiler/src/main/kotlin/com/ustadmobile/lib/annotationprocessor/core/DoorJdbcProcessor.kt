@@ -1105,7 +1105,7 @@ fun CodeBlock.Builder.addPreparedStatementConfig(
     daoFunDecl: KSFunctionDeclaration,
     daoClassDecl: KSClassDeclaration,
     resolver: Resolver,
-    querySql: String? = daoFunDecl.getAnnotation(Query::class)?.value
+    querySql: String? = daoFunDecl.getAnnotation(Query::class)?.value,
 ): CodeBlock.Builder {
     val daoFun = daoFunDecl.asMemberOf(daoClassDecl.asType(emptyList()))
     val querySqlPostgres = daoFunDecl.getAnnotation(PostgresQuery::class)?.value
@@ -1120,16 +1120,19 @@ fun CodeBlock.Builder.addPreparedStatementConfig(
         ?: querySql?.replaceQueryNamedParamsWithQuestionMarks()?.sqlToPostgresSql()
 
     if(rawQueryVarName == null) {
-        add("%T(%S ", PreparedStatementConfig::class, preparedStatementSql)
-        if(queryVars.any { it.value.isListOrArrayType(resolver) })
-            add(",hasListParams = true")
-
-        if(preparedStatementSql?.trim() != preparedStatementSqlPostgres?.trim())
-            add(", postgreSql = %S", preparedStatementSqlPostgres)
-
-        add(")")
+        add("%T(\n", PreparedStatementConfig::class)
+        withIndent {
+            add("sql = %S,\n", preparedStatementSql)
+            if(queryVars.any { it.value.isListOrArrayType(resolver) })
+                add("hasListParams = true,\n")
+            if(preparedStatementSql?.trim() != preparedStatementSqlPostgres?.trim())
+                add("postgreSql = %S,\n", preparedStatementSqlPostgres)
+            add("readOnly = ${querySql?.isSQLAModifyingQuery() == false},")
+        }
+        add(")\n")
     }else {
-        add("%T($rawQueryVarName.sql, hasListParams = $rawQueryVarName.%M())\n",
+        //Note RawQuery only supports select, therefor it must be readOnly
+        add("%T($rawQueryVarName.sql, hasListParams = $rawQueryVarName.%M(), readOnly = true)\n",
             PreparedStatementConfig::class, MemberName("com.ustadmobile.door.ext", "hasListOrArrayParams"))
     }
     return this

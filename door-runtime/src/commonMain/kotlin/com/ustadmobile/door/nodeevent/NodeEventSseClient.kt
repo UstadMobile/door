@@ -60,7 +60,7 @@ class NodeEventSseClient(
 
                 scope.launch {
                     nodeEventManager.onIncomingMessageReceived(DoorMessage(
-                        what = DoorMessage.WHAT_REPLICATION,
+                        what = DoorMessage.WHAT_REPLICATION_PUSH,
                         fromNode = remoteNodeId,
                         toNode = repoConfig.nodeId,
                         replications = emptyList()

@@ -42,7 +42,7 @@ class DoorRepositoryReplicationClientTest {
     private val serverNodeId = 2L
 
     private val pendingReplicationMessage = DoorMessage(
-        what = DoorMessage.WHAT_REPLICATION,
+        what = DoorMessage.WHAT_REPLICATION_PUSH,
         fromNode = clientNodeId,
         toNode = serverNodeId,
         replications = listOf(
@@ -208,7 +208,7 @@ class DoorRepositoryReplicationClientTest {
         runBlocking {
             mockEventManager.onIncomingMessageReceived(
                 DoorMessage(
-                    what = DoorMessage.WHAT_REPLICATION,
+                    what = DoorMessage.WHAT_REPLICATION_PUSH,
                     fromNode = serverNodeId,
                     toNode = clientNodeId,
                     replications = emptyList()
@@ -357,7 +357,7 @@ class DoorRepositoryReplicationClientTest {
         pendingEntities.addAll(pendingReplicationMessage.replications)
         mockEventManager.emitOutgoingEvents(listOf(
             NodeEvent(
-                what = DoorMessage.WHAT_REPLICATION,
+                what = DoorMessage.WHAT_REPLICATION_PUSH,
                 toNode = serverNodeId,
                 tableId = 1,
                 key1 = 0,

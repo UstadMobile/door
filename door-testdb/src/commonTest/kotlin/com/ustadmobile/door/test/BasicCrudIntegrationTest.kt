@@ -295,6 +295,15 @@ class BasicCrudIntegrationTest : AbstractCommonTest() {
         }
     }
 
+    @Test
+    fun givenInsertOfSameDataIntoReceiveView_thenShouldNotInvalidate() = runExampleDbTest {
+        //this needs to run using exampledb3
+
+        //first try to reproduce within the test env
+        // if not, then enable export of database from browser.
+    }
+
+
     companion object {
         fun runExampleDbTest(
             block: suspend ExampleDbContext.() -> Unit

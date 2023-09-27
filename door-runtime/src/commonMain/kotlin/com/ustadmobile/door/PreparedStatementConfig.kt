@@ -14,7 +14,12 @@ data class PreparedStatementConfig(
      * Where needed, a different query can be specified to run on Postgres. It should still have the same number of
      * parameters in the same order.
      */
-    val postgreSql: String? = null
+    val postgreSql: String? = null,
+    /**
+     * Where a statement is readOnly, this should be indicated. When it is being run on its own, it can use a readOnly
+     * connection.
+     */
+    val readOnly: Boolean = false,
 ) {
     fun sqlToUse(dbType: Int) = if(dbType == DoorDbType.SQLITE) {
         sql

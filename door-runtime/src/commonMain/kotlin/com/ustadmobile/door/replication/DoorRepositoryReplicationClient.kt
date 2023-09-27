@@ -189,14 +189,15 @@ class DoorRepositoryReplicationClient(
         override suspend fun invoke(remoteNodeId: Long, endpointUrl: String) {
             db.withDoorTransactionAsync {
                 db.prepareAndUseStatementAsync(
-                    """
-                    UPDATE OutgoingReplication
-                       SET destNodeId = ?
-                     WHERE destNodeId IN
-                           (SELECT PendingRepositorySession.remoteNodeId
-                              FROM PendingRepositorySession
-                             WHERE endpointUrl = ?)  
-                    """
+                    sql = """
+                        UPDATE OutgoingReplication
+                           SET destNodeId = ?
+                         WHERE destNodeId IN
+                               (SELECT PendingRepositorySession.remoteNodeId
+                                  FROM PendingRepositorySession
+                                 WHERE endpointUrl = ?)  
+                        """,
+                    readOnly = false
                 ) {
                     it.setLong(1, remoteNodeId)
                     it.setString(2, endpointUrl)
@@ -204,11 +205,12 @@ class DoorRepositoryReplicationClient(
                 }
 
                 db.prepareAndUseStatementAsync(
-                    """
+                    sql = """
                         DELETE 
                           FROM PendingRepositorySession
                          WHERE PendingRepositorySession.endpointUrl = ?
-                    """
+                        """,
+                    readOnly = false,
                 ) {
                     it.setString(1, endpointUrl)
                     it.executeUpdateAsyncKmp()
@@ -292,7 +294,7 @@ class DoorRepositoryReplicationClient(
             val remoteNodeIdVal = remoteNodeId.await()
             launch {
                 nodeEventManager.outgoingEvents.collect { events ->
-                    if(events.any { it.toNode == remoteNodeIdVal && it.what == DoorMessage.WHAT_REPLICATION }) {
+                    if(events.any { it.toNode == remoteNodeIdVal && it.what == DoorMessage.WHAT_REPLICATION_PUSH }) {
                         sendNotifyChannel.trySend(Unit)
                     }
                 }
@@ -300,7 +302,7 @@ class DoorRepositoryReplicationClient(
 
             launch {
                 nodeEventManager.incomingMessages.collect { message ->
-                    if(message.fromNode == remoteNodeIdVal && message.what == DoorMessage.WHAT_REPLICATION) {
+                    if(message.fromNode == remoteNodeIdVal && message.what == DoorMessage.WHAT_REPLICATION_PUSH) {
                         fetchNotifyChannel.trySend(Unit)
                     }
                 }
@@ -348,7 +350,7 @@ class DoorRepositoryReplicationClient(
                         doorNodeIdHeader(localNodeId, localNodeAuth)
                         contentType(ContentType.Application.Json)
                         setBody(DoorMessage(
-                            what = DoorMessage.WHAT_REPLICATION,
+                            what = DoorMessage.WHAT_REPLICATION_PUSH,
                             fromNode = localNodeId,
                             toNode = remoteNodeIdVal,
                             replications = outgoingReplications,

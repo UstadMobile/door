@@ -18,7 +18,9 @@ actual suspend fun <T: RoomDatabase, R> T.withDoorTransactionAsync(
     transactionMode: TransactionMode,
     block: suspend (T) -> R
 ): R {
-    return (this.rootDatabase as RoomJdbcImpl).jdbcImplHelper.useConnectionAsync {
+    return (this.rootDatabase as RoomJdbcImpl).jdbcImplHelper.useConnectionAsync(
+        readOnly = transactionMode == TransactionMode.READ_ONLY
+    ) {
         block(this)
     }
 }
@@ -27,7 +29,9 @@ actual fun <T: RoomDatabase, R> T.withDoorTransaction(
     transactionMode: TransactionMode,
     block: (T) -> R
 ): R {
-    return (this.rootDatabase as RoomJdbcImpl).jdbcImplHelper.useConnection {
+    return (this.rootDatabase as RoomJdbcImpl).jdbcImplHelper.useConnection(
+        readOnly = transactionMode == TransactionMode.READ_ONLY
+    ) {
         block(this)
     }
 }
