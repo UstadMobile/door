@@ -38,6 +38,10 @@ android {
 
 }
 
+rootProject.plugins.withType(org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootPlugin) {
+    rootProject.extensions.getByType(org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootExtension).nodeVersion = "16.15.1"
+}
+
 kotlin {
     //This is essential: if this is removed, then expect/actual typealias resolution breaks on Android compilation.
     androidTarget {
