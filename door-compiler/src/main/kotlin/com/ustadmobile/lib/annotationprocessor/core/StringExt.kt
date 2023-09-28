@@ -1,6 +1,8 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
+import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSType
 import com.ustadmobile.door.annotation.ReplicateEtag
 import com.ustadmobile.door.annotation.ReplicateLastModified
 import com.ustadmobile.lib.annotationprocessor.core.ext.entityPrimaryKeyProps
@@ -22,10 +24,23 @@ fun String.isSQLAModifyingQuery() : Boolean {
  * Shorthand to replace all named parameters in a query (e.g. :param) with ? placeholders
  */
 fun String.replaceQueryNamedParamsWithQuestionMarks(
-    queryNamedParams: List<String> = getSqlQueryNamedParameters()
+    queryNamedParams: List<String> = getSqlQueryNamedParameters(),
+    typeMap: Map<String, KSType>? = null,
+    resolver: Resolver? = null,
+    target: DoorTarget? = null,
 ): String {
     var newSql = this
-    queryNamedParams.forEach { newSql = newSql.replace(":$it", "?") }
+    queryNamedParams.forEach {
+
+        if(resolver != null && target == DoorTarget.JS && typeMap?.get(it) == resolver.builtIns.longType) {
+            //Javascript workaround: SQLite.JS binds Long as a String when binding parameters. Casting it here avoids
+            //comparisons not working as expected.
+            newSql = newSql.replace(":$it", "CAST(? AS BIGINT)")
+        }else {
+            newSql = newSql.replace(":$it", "?")
+        }
+
+    }
     return newSql
 }
 
@@ -84,6 +99,8 @@ fun String.replaceColNameWithDefaultValueInSql(fieldName: String, substitution: 
  */
 fun String.expandSqlTemplates(
     entityKSClass: KSClassDeclaration,
+    resolver: Resolver,
+    target: DoorTarget,
 ) : String{
     val entityProps = entityKSClass.entityProps(getAutoIncLast = false)
 
@@ -98,15 +115,22 @@ fun String.expandSqlTemplates(
             append(entityProps.joinToString(separator = ", "))
             append(")")
         },
-        DoorJdbcProcessor.TRIGGER_TEMPLATE_NEW_VALUES to
-            entityProps.joinToString(separator = ", ") { "NEW.${it.simpleName.asString()}" },
+        DoorJdbcProcessor.TRIGGER_TEMPLATE_NEW_VALUES to entityProps.joinToString(separator = ", ") {
+            if(target == DoorTarget.JS && it.type.resolve() == resolver.builtIns.longType) {
+                //Javascript workaround: SQLite.JS binds Long as a String when binding parameters. Casting it here avoids
+                //comparisons not working as expected.
+                "CAST(NEW.${it.simpleName.asString()} AS BIGINT)"
+            }else {
+                "NEW.${it.simpleName.asString()}"
+            }
+        },
         DoorJdbcProcessor.TRIGGER_TEMPLATE_NEW_LAST_MODIFIED_GREATER_THAN_EXISTING to buildString {
             val replicateLastModifiedPropName = entityKSClass.entityProps(false).firstOrNull {
                 it.hasAnnotation(ReplicateLastModified::class)
             }?.simpleName?.asString() ?: "INVALID_TEMPLATE_NO_LAST_MODIFIED_FIELD_ON_ENTITY"
 
             append("""
-                   NEW.$replicateLastModifiedPropName >
+                   CAST(NEW.$replicateLastModifiedPropName AS BIGINT)>
                        COALESCE((SELECT ${entityKSClass.entityTableName}_Existing.$replicateLastModifiedPropName
                                    FROM ${entityKSClass.entityTableName} ${entityKSClass.entityTableName}_Existing
                                   WHERE $selectExistingWhereClause), 0)
@@ -118,7 +142,7 @@ fun String.expandSqlTemplates(
             }?.simpleName?.asString() ?: "INVALID_NO_ETAG"
 
             append("""
-               NEW.$etagFieldPropName != 
+               CAST(NEW.$etagFieldPropName AS BIGINT) != 
                    COALESCE((SELECT ${entityKSClass.entityTableName}_Existing.$etagFieldPropName
                                    FROM ${entityKSClass.entityTableName} ${entityKSClass.entityTableName}_Existing
                                   WHERE $selectExistingWhereClause), 0)

@@ -38,6 +38,13 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
         throw IllegalStateException("useConnection synchronous not supported on JS")
     }
 
+
+    @Suppress("unused") //API to export database for debugging etc.
+    suspend fun exportToFile() {
+        (dataSource as SQLiteDatasourceJs).exportDatabaseToFile()
+    }
+
+
     override fun onClose() {
         super.onClose()
 

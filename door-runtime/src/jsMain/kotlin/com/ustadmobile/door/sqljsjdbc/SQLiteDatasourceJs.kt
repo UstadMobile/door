@@ -9,12 +9,15 @@ import com.ustadmobile.door.sqljsjdbc.IndexedDb.DB_STORE_KEY
 import com.ustadmobile.door.sqljsjdbc.IndexedDb.DB_STORE_NAME
 import com.ustadmobile.door.sqljsjdbc.IndexedDb.indexedDb
 import io.github.aakira.napier.Napier
+import js.typedarrays.Uint8Array
 import kotlinx.browser.document
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.w3c.dom.HTMLAnchorElement
 import org.w3c.dom.Worker
+import org.w3c.dom.url.URL
+import org.w3c.files.Blob
 import kotlin.js.Json
 import kotlin.js.json
 
@@ -204,10 +207,11 @@ class SQLiteDatasourceJs(
     suspend fun exportDatabaseToFile() {
         transactionMutex.withLock {
             val result = sendMessage(json("action" to "export"))
-            val blob = js("new Blob([result.buffer]);")
+            val typedArray: Uint8Array = result.buffer ?: throw IllegalStateException("no result buffer")
+            val blob = Blob(arrayOf(typedArray.buffer))
             val link = document.createElement("a") as HTMLAnchorElement
             document.body?.appendChild(link)
-            link.href = js("window.URL.createObjectURL(blob);")
+            link.href = URL.createObjectURL(blob)
             link.download = "$dbName.db"
             link.click()
         }

@@ -140,7 +140,10 @@ class DoorValidatorProcessor(
         }
     }
 
-    private fun validateTriggers(resolver: Resolver) {
+    private fun validateTriggers(
+        resolver: Resolver,
+        target: DoorTarget
+    ) {
         val dbs = resolver.getDatabaseSymbolsToProcess()
         //After all tables have been created, check that the SQL in all triggers is actually valid
         dbs.flatMap { it.allDbEntities() }.toSet()
@@ -177,7 +180,7 @@ class DoorValidatorProcessor(
 
 
                     stmtsMap.forEach {entry ->
-                        var sqlToRun = trigger.conditionSql.expandSqlTemplates(entity).substituteTriggerPrefixes(entry.key)
+                        var sqlToRun = trigger.conditionSql.expandSqlTemplates(entity, resolver, target).substituteTriggerPrefixes(entry.key)
                         try {
                             if(entry.key == DoorDbType.POSTGRES)
                                 sqlToRun = sqlToRun.sqlToPostgresSql()
@@ -200,7 +203,8 @@ class DoorValidatorProcessor(
                         try {
                             stmtsMap.forEach { stmtEntry ->
                                 dbType = stmtEntry.key
-                                sqlToRun = sql.expandSqlTemplates(entity).substituteTriggerPrefixes(stmtEntry.key)
+                                sqlToRun = sql.expandSqlTemplates(entity, resolver, target)
+                                    .substituteTriggerPrefixes(stmtEntry.key)
                                 if(dbType == DoorDbType.POSTGRES)
                                     sqlToRun = sqlToRun.sqlToPostgresSql()
 
@@ -455,7 +459,7 @@ class DoorValidatorProcessor(
 
         createAllTables(resolver)
         validateReplicateEntities(resolver)
-        validateTriggers(resolver)
+        validateTriggers(resolver, environment.doorTarget(resolver))
         validateDaos(resolver)
 
         return emptyList()
