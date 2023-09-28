@@ -295,14 +295,20 @@ class BasicCrudIntegrationTest : AbstractCommonTest() {
         }
     }
 
+    /**
+     * The Javascript 'Number' type only supports 54bits (not 64bit like Long), and the SQLite.JS system binds bigints
+     * as Strings.
+     */
     @Test
-    fun givenInsertOfSameDataIntoReceiveView_thenShouldNotInvalidate() = runExampleDbTest {
-        //this needs to run using exampledb3
+    fun givenMaxIntVal_whenStoredAsPartOfStatement_thenWillMatch() = runExampleDbTest {
+        val exampleEntity = ExampleEntity2().apply {
+            this.someNumber = (Long.MAX_VALUE - 2)
+            this.uid = exampleDb2.exampleDao2().insertAsyncAndGiveId(this)
+        }
 
-        //first try to reproduce within the test env
-        // if not, then enable export of database from browser.
+        val entityInDb = exampleDb2.exampleDao2().findByMinSomeNumber(exampleEntity.someNumber).firstOrNull()
+        assertEquals(exampleEntity.someNumber, entityInDb?.someNumber)
     }
-
 
     companion object {
         fun runExampleDbTest(

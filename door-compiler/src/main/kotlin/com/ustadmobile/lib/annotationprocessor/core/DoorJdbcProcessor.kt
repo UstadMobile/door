@@ -107,6 +107,8 @@ fun makeInsertAdapterMethodName(
  */
 private fun FileSpec.Builder.addDatabaseMetadataType(
     dbKSClass: KSClassDeclaration,
+    resolver: Resolver,
+    target: DoorTarget,
 ): FileSpec.Builder {
     addType(TypeSpec.classBuilder("${dbKSClass.simpleName.asString()}$SUFFIX_DOOR_METADATA")
         .superclass(DoorDatabaseMetadata::class.asClassName().parameterizedBy(dbKSClass.toClassName()))
@@ -148,7 +150,7 @@ private fun FileSpec.Builder.addDatabaseMetadataType(
                         dbKSClass.allDbEntities()
                             .filter { it.hasAnnotation(ReplicateEntity::class)}.forEach { replicateEntity ->
                                 add("%L to ", replicateEntity.getAnnotation(ReplicateEntity::class)?.tableId ?: -1)
-                                addReplicateEntityMetaDataCode(replicateEntity)
+                                addReplicateEntityMetaDataCode(replicateEntity, resolver, target)
                                 add(",\n")
                             }
                     }
@@ -217,13 +219,15 @@ private fun FileSpec.Builder.addJsImplementationsClassesObject(
 private fun CodeBlock.Builder.addTriggerMetadataCode(
     trigger: Trigger,
     entityKSClass: KSClassDeclaration,
+    resolver: Resolver,
+    target: DoorTarget,
 ) : CodeBlock.Builder {
     fun addStringArrayVal(array: Array<String>) {
         if(array.isNotEmpty()) {
             add("arrayOf(\n")
             indent()
             array.forEach {
-                add("%S,\n", it.expandSqlTemplates(entityKSClass))
+                add("%S,\n", it.expandSqlTemplates(entityKSClass, resolver, target))
             }
             unindent()
             add(")")
@@ -257,9 +261,9 @@ private fun CodeBlock.Builder.addTriggerMetadataCode(
     addStringArrayVal(trigger.postgreSqlStatements)
     add(",\n")
 
-    add("conditionSql = %S,\n", trigger.conditionSql.expandSqlTemplates(entityKSClass))
+    add("conditionSql = %S,\n", trigger.conditionSql.expandSqlTemplates(entityKSClass, resolver, target))
 
-    add("conditionSqlPostgres = %S,\n", trigger.conditionSqlPostgres.expandSqlTemplates(entityKSClass))
+    add("conditionSqlPostgres = %S,\n", trigger.conditionSqlPostgres.expandSqlTemplates(entityKSClass, resolver, target))
 
     unindent()//unindent for end of trigger init
     add(")")
@@ -269,6 +273,8 @@ private fun CodeBlock.Builder.addTriggerMetadataCode(
 
 private fun CodeBlock.Builder.addReplicateEntityMetaDataCode(
     entity: KSClassDeclaration,
+    resolver: Resolver,
+    target: DoorTarget,
 ): CodeBlock.Builder {
 
     fun CodeBlock.Builder.addFieldsCodeBlock(typeEl: KSClassDeclaration) : CodeBlock.Builder{
@@ -296,7 +302,7 @@ private fun CodeBlock.Builder.addReplicateEntityMetaDataCode(
     add("triggers = listOf(\n")
     indent()
     triggersAnnotation?.value?.forEach {
-        addTriggerMetadataCode(it, entity)
+        addTriggerMetadataCode(it, entity, resolver, target)
         add(",")
     }
     unindent()
@@ -895,6 +901,7 @@ fun TypeSpec.Builder.addDaoQueryFunction(
     environment: SymbolProcessorEnvironment,
     logger: KSPLogger,
 ): TypeSpec.Builder {
+    val target = environment.doorTarget(resolver)
     val logName = "${daoDecl.simpleName.asString()}#${daoFunDecl.simpleName.asString()}"
     Napier.d("DbProcessorJdbcKotlin: addDaoQueryFunction: start $logName")
     val daoKSType = daoDecl.asType(emptyList())
@@ -943,7 +950,7 @@ fun TypeSpec.Builder.addDaoQueryFunction(
                                     add("extraParams = arrayOf(_limit, _offset))\n")
                                 }
                                 .add("return ")
-                                .addJdbcQueryCode(daoFunDecl, daoDecl, pagingSourceQueryVarsMap, resolver,
+                                .addJdbcQueryCode(daoFunDecl, daoDecl, pagingSourceQueryVarsMap, resolver, target,
                                     querySql = querySql?.let { "SELECT * FROM ($it) AS _PagingData LIMIT :_limit OFFSET :_offset" })
                                 .build()
                             )
@@ -959,7 +966,7 @@ fun TypeSpec.Builder.addDaoQueryFunction(
                                     add("sql = \"SELECT COUNT(*) FROM (\${$rawQueryParamName.sql})\")\n")
                                 }
                                 .add("return ")
-                                .addJdbcQueryCode(daoFunDecl, daoDecl, queryVarsMap, resolver,
+                                .addJdbcQueryCode(daoFunDecl, daoDecl, queryVarsMap, resolver, target,
                                     resultType = resolver.builtIns.intType,
                                     querySql = querySql?.let { "SELECT COUNT(*) FROM ($querySql) AS _PagingCount" })
                                 .build()
@@ -978,14 +985,14 @@ fun TypeSpec.Builder.addDaoQueryFunction(
                 .beginControlFlow("_db.%M(arrayOf(%L))",
                     MemberName("com.ustadmobile.door.flow", "doorFlow"),
                     daoFunDecl.getQueryTables(environment.logger).joinToString { "\"$it\"" })
-                .addJdbcQueryCode(daoFunDecl, daoDecl, queryVarsMap, resolver)
+                .addJdbcQueryCode(daoFunDecl, daoDecl, queryVarsMap, resolver, target)
                 .endControlFlow()
                 .build())
         }.applyIf(daoFun.returnType?.isPagingSourceOrFlow() != true) {
             if(daoFun.hasReturnType(resolver))
                 addCode("return ")
             addCode(CodeBlock.builder()
-                .addJdbcQueryCode(daoFunDecl, daoDecl, queryVarsMap, resolver)
+                .addJdbcQueryCode(daoFunDecl, daoDecl, queryVarsMap, resolver, target)
                 .build())
         }
         .build())
@@ -997,11 +1004,12 @@ fun CodeBlock.Builder.beginPrepareAndUseStatementFlow(
     daoFunDecl: KSFunctionDeclaration,
     daoClassDecl: KSClassDeclaration,
     resolver: Resolver,
+    target: DoorTarget,
     statementVarName: String = "_stmt",
     querySql: String? = daoFunDecl.getAnnotation(Query::class)?.value,
 ): CodeBlock.Builder {
     add("_db.%M(", AbstractDbProcessor.prepareAndUseStatmentMemberName(daoFunDecl.useSuspendedQuery))
-    addPreparedStatementConfig(daoFunDecl, daoClassDecl, resolver, querySql)
+    addPreparedStatementConfig(daoFunDecl, daoClassDecl, resolver, target, querySql)
     add(") { $statementVarName -> \n")
     indent()
 
@@ -1105,15 +1113,20 @@ fun CodeBlock.Builder.addPreparedStatementConfig(
     daoFunDecl: KSFunctionDeclaration,
     daoClassDecl: KSClassDeclaration,
     resolver: Resolver,
+    target: DoorTarget,
     querySql: String? = daoFunDecl.getAnnotation(Query::class)?.value,
 ): CodeBlock.Builder {
     val daoFun = daoFunDecl.asMemberOf(daoClassDecl.asType(emptyList()))
     val querySqlPostgres = daoFunDecl.getAnnotation(PostgresQuery::class)?.value
-    val queryVars = daoFunDecl.parameters.mapIndexed { index, ksValueParameter ->
+    val queryVars : Map<String, KSType> = daoFunDecl.parameters.mapIndexed { index, ksValueParameter ->
         ksValueParameter.name!!.asString() to daoFun.parameterTypes[index]!!
     }.toMap()
 
-    val preparedStatementSql = querySql?.replaceQueryNamedParamsWithQuestionMarks()
+    val preparedStatementSql = querySql?.replaceQueryNamedParamsWithQuestionMarks(
+        typeMap = queryVars,
+        resolver = resolver,
+        target = target,
+    )
     val rawQueryVarName = daoFunDecl.takeIf { it.hasAnnotation(RawQuery::class) }?.parameters?.first()?.name?.asString()
 
     val preparedStatementSqlPostgres = querySqlPostgres?.replaceQueryNamedParamsWithQuestionMarks()
@@ -1196,10 +1209,11 @@ fun CodeBlock.Builder.addJdbcQueryCode(
     daoClassDecl: KSClassDeclaration,
     queryVarsMap: Map<String, KSType>,
     resolver: Resolver,
+    target: DoorTarget,
     querySql: String? = daoFunDecl.getAnnotation(Query::class)?.value,
     resultType: KSType? = daoFunDecl.asMemberOf(daoClassDecl.asType(emptyList())).returnType,
 ): CodeBlock.Builder {
-    beginPrepareAndUseStatementFlow(daoFunDecl, daoClassDecl, resolver, querySql = querySql)
+    beginPrepareAndUseStatementFlow(daoFunDecl, daoClassDecl, resolver, target, querySql = querySql)
     if(querySql != null)
         addSetPreparedStatementParams(querySql, queryVarsMap, resolver)
     else if(daoFunDecl.hasAnnotation(RawQuery::class)){
@@ -1240,7 +1254,7 @@ class DoorJdbcProcessor(
 
         dbSymbols.forEach {  dbKSClass ->
             FileSpec.builder(dbKSClass.packageName.asString(), dbKSClass.simpleName.asString() + SUFFIX_DOOR_METADATA)
-                .addDatabaseMetadataType(dbKSClass)
+                .addDatabaseMetadataType(dbKSClass, resolver, target)
                 .build()
                 .writeTo(environment.codeGenerator, false)
 

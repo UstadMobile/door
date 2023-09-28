@@ -1,6 +1,9 @@
 package com.ustadmobile.door
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.promise
 import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertEquals

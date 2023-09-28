@@ -182,4 +182,11 @@ expect abstract class ExampleDao2 {
     """)
     abstract suspend fun findAllWithRewardNumberAsListAsync(minNumber: Int): List<ExampleEntity2>
 
+    @Query("""
+        SELECT * 
+          FROM ExampleEntity2
+         WHERE someNumber >= :minNumber 
+    """)
+    abstract suspend fun findByMinSomeNumber(minNumber: Long): List<ExampleEntity2>
+
 }

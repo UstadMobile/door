@@ -134,6 +134,8 @@ kotlin {
         jsMain {
             dependencies {
                 implementation project(":room-annotations")
+                implementation enforcedPlatform("org.jetbrains.kotlin-wrappers:kotlin-wrappers-bom:$version_kotlin_wrappers_bom")
+                implementation "org.jetbrains.kotlin-wrappers:kotlin-js"
             }
         }
 
