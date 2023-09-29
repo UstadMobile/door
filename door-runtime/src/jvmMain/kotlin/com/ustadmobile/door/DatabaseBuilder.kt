@@ -186,8 +186,14 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                         when(nextMigration) {
                             is DoorMigrationSync -> nextMigration.migrateFn(sqlDatabase)
                             is DoorMigrationAsync -> runBlocking { nextMigration.migrateFn(sqlDatabase) }
-                            is DoorMigrationStatementList -> doorDb.execSQLBatch(
-                                *nextMigration.migrateStmts(sqlDatabase).toTypedArray())
+                            is DoorMigrationStatementList -> {
+                                connection.createStatement().use { migrateStmt ->
+                                    nextMigration.migrateStmts(sqlDatabase).forEach {
+                                        migrateStmt.addBatch(it)
+                                    }
+                                    migrateStmt.executeBatch()
+                                }
+                            }
                         }
 
                         currentDbVersion = nextMigration.endVersion
