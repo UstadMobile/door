@@ -7,6 +7,7 @@ import app.cash.paging.PagingState
 import com.ustadmobile.door.DoorDatabaseRepository
 import com.ustadmobile.door.ext.DoorTag
 import io.github.aakira.napier.Napier
+import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.update
 
@@ -39,26 +40,31 @@ class DoorRepositoryReplicatePullPagingSource<Value: Any>(
 
     private val httpLoadCompletable = CompletableDeferred<Unit>()
 
+    private val dbInvalidateCallbackRegistered = atomic(false)
+
+    private val invalidated = atomic(false)
+
     private val onDbInvalidatedCallback: () -> Unit = {
         onDbInvalidated()
     }
 
-    init {
-        dbPagingSource.registerInvalidatedCallback(onDbInvalidatedCallback)
-    }
-
-
     private fun onDbInvalidated() {
+        Napier.v("DoorRepositoryReplicatePullPagingSource: onDbInvalidated")
         dbPagingSource.unregisterInvalidatedCallback(onDbInvalidatedCallback)
-        scope.launch {
-            try {
-                withTimeout(10000) {  httpLoadCompletable.await() }
-            }finally {
-                scope.cancel()
-                invalidate()
+        if(!invalidated.getAndSet(true)) {
+            scope.launch {
+                try {
+                    withTimeout(10000) {  httpLoadCompletable.await() }
+                }catch(e: Exception) {
+                    Napier.w("Exception waiting for httpLoad; $e")
+                } finally {
+                    Napier.v("DoorRepositoryReplicatePullPagingSource: call invalidate")
+                    invalidate()
+                    scope.cancel()
+                }
             }
-
         }
+
     }
 
     override fun getRefreshKey(state: PagingState<Int, Value>): Int? {
@@ -68,6 +74,12 @@ class DoorRepositoryReplicatePullPagingSource<Value: Any>(
     override suspend fun load(
         params: PagingSourceLoadParams<Int>
     ): PagingSourceLoadResult<Int, Value> {
+        Napier.v("DoorRepositoryReplicatePullPagingSource: load key=${params.key}")
+        if(!dbInvalidateCallbackRegistered.getAndSet(true)) {
+            Napier.v("DoorRepositoryReplicatePullPagingSource: register db invalidate callback")
+            dbPagingSource.registerInvalidatedCallback(onDbInvalidatedCallback)
+        }
+
         scope.launch {
             val loadRequest = PagingSourceLoadState.PagingRequest(params.key)
             _loadState.update { prev ->

@@ -3,6 +3,7 @@ package com.ustadmobile.door.paging
 import app.cash.paging.*
 import com.ustadmobile.door.room.InvalidationTrackerObserver
 import com.ustadmobile.door.room.RoomDatabase
+import io.github.aakira.napier.Napier
 import kotlinx.atomicfu.atomic
 import kotlin.math.max
 
@@ -28,8 +29,10 @@ abstract class DoorLimitOffsetPagingSource<Value: Any>(
         }
 
         override fun onInvalidated(tables: Set<String>) {
-            if(!invalidated.getAndSet(true))
+            if(!invalidated.getAndSet(true)) {
+                Napier.d("DoorLimitOffsetPagingSource: invalidated tables=${tables.joinToString()}")
                 invalidate()
+            }
         }
     }
 
@@ -47,6 +50,7 @@ abstract class DoorLimitOffsetPagingSource<Value: Any>(
     override suspend fun load(
         params: PagingSourceLoadParams<Int>
     ): PagingSourceLoadResult<Int, Value> {
+        Napier.d("DoorLimitOffsetPagingSource: Load key=${params.key}")
         invalidationTracker.registerIfNeeded()
 
         val offset = params.key ?: 0
