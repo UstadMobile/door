@@ -191,6 +191,27 @@ class PullIntegrationTest {
         }
     }
 
+    @Test
+    fun givenEntitiesCreatedOnServer_whenClientUsesHttpWithoutFallbackToRequestPrimitive_thenWillReturnResult() {
+        clientServerIntegrationTest {
+            val memberInServerDb = Member().apply {
+                firstName = "Roger"
+                lastName = "Rabbit"
+                memberUid = serverDb.memberDao.insertAsync(this)
+            }
+
+
+            makeClientRepo().use { clientRepo ->
+                val firstNameFromHttp = clientRepo.memberDao.getFirstNameByMemberId(
+                    memberInServerDb.memberUid
+                )
+                assertEquals(memberInServerDb.firstName, firstNameFromHttp,
+                        message = "Requesting string over http function matches")
+            }
+        }
+    }
+
+
     @Test(expected = Exception::class)
     fun givenEntitiesCreatedOnServer_whenClientUsesHttpWithoutFallbackAndServerIsUnreachable_thenWillThrowException(){
         clientServerIntegrationTest {

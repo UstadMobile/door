@@ -406,13 +406,22 @@ fun TypeSpec.Builder.addDaoRepoFun(
                         if(funResolved.returnType?.isPagingSource() == true) {
                             addHttpPagingSource(withFallback = false)
                         }else {
-                            beginControlFlow("_repo.%M(repoPath = %S)",
-                                MemberName("com.ustadmobile.door.http", "repoHttpRequest"),
-                                functionPath)
-                            add("_repo.config.httpClient.")
-                            addRepoHttpClientRequestForFunction(daoKSFun, daoKSClass, resolver)
-                            add(".%M()\n", MemberName("io.ktor.client.call", "body"))
-                            endControlFlow()
+                            add("_repo.config.json.decodeFromString(\n")
+                            withIndent {
+                                add("deserializer = ")
+                                addKotlinxSerializationStrategy(funResolved.returnType ?: resolver.builtIns.unitType,
+                                    resolver)
+                                add(",\n")
+                                add("string =")
+                                beginControlFlow("_repo.%M(repoPath = %S)",
+                                    MemberName("com.ustadmobile.door.http", "repoHttpRequest"),
+                                    functionPath)
+                                add("_repo.config.httpClient.")
+                                addRepoHttpClientRequestForFunction(daoKSFun, daoKSClass, resolver)
+                                add(".%M()\n", MemberName("io.ktor.client.statement", "bodyAsText"))
+                                endControlFlow()
+                            }
+                            add(")\n")
                         }
 
                     }
@@ -429,9 +438,19 @@ fun TypeSpec.Builder.addDaoRepoFun(
                             indent()
                             add("repoPath = %S,\n", functionPath)
                             beginControlFlow("http = ")
-                            add("_repo.config.httpClient.")
-                            addRepoHttpClientRequestForFunction(daoKSFun, daoKSClass, resolver)
-                            add(".%M()\n", MemberName("io.ktor.client.call", "body"))
+                            add("_repo.config.json.decodeFromString(\n")
+                            withIndent {
+                                add("deserializer = ")
+                                addKotlinxSerializationStrategy(
+                                    funResolved.returnType ?: resolver.builtIns.unitType, resolver)
+                                add(",\n")
+                                add("string = ")
+                                add("_repo.config.httpClient.")
+                                addRepoHttpClientRequestForFunction(daoKSFun, daoKSClass, resolver)
+                                add(".%M()\n", MemberName("io.ktor.client.statement", "bodyAsText"))
+                            }
+                            add(")\n")
+
                             nextControlFlow(",\nfallback = ")
                             add("_dao.")
                             addDelegateFunctionCall(daoKSFun)

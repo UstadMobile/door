@@ -3,6 +3,7 @@ package db3
 import androidx.room.Insert
 import androidx.room.Query
 import com.ustadmobile.door.annotation.DoorDao
+import com.ustadmobile.door.annotation.HttpAccessible
 import com.ustadmobile.door.annotation.Repository
 
 @DoorDao
@@ -41,5 +42,14 @@ expect abstract class MemberDao {
                  WHERE DiscussionPost.postUid = :postUid)
     """)
     abstract suspend fun findAuthorByPostUid(postUid: Long): Member?
+
+    @HttpAccessible
+    @Query("""
+        SELECT Member.firstName
+          FROM Member
+         WHERE Member.memberUid = :memberUid 
+    """)
+    abstract suspend fun getFirstNameByMemberId(memberUid: Long): String?
+
 
 }

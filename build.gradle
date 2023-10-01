@@ -26,7 +26,7 @@ plugins {
 
 
 group 'com.github.UstadMobile.door'
-version '0.70b2'
+version '0.70b3'
 
 ext.localProperties = new Properties()
 
@@ -128,6 +128,10 @@ tasks.named("dependencyUpdates").configure {
     }
 }
 
+/**
+ * This was added as per pull request https://github.com/UstadMobile/door/pull/7 to use a version of node that is
+ * compatible with Jitpack's out of date version. This can be removed once we move to mavencentral.
+ */
 rootProject.plugins.withType(org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootPlugin) {
     rootProject.extensions.getByType(org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootExtension).nodeVersion = "16.15.1"
 }
