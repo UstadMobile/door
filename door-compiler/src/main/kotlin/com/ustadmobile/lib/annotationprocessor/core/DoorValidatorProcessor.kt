@@ -311,6 +311,13 @@ class DoorValidatorProcessor(
                                         "type is not int or function itself does not return pagingsource", daoFun)
                             }
                         }
+                        HttpServerFunctionParam.ArgType.MAP_OTHER_PARAM -> {
+                            val fromParamName = annotatedParamValue.getArgumentValueByNameAsString("fromName")
+                            if(!daoFun.parameters.any { it.name?.asString() ==  fromParamName }) {
+                                logger.error("$loggerPrefix function with HttpAccessible function has no parameter $fromParamName",
+                                    daoFun)
+                            }
+                        }
                     }
                 }
             }

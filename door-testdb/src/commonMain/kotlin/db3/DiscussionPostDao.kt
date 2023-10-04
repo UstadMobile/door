@@ -270,4 +270,37 @@ expect abstract class DiscussionPostDao : RepositoryFlowLoadingStatusProvider {
     """)
     abstract suspend fun getDiscussionPostAndAuthorName(postUid: Long): DiscussionPostAndAuthorName?
 
+
+    /**
+     * Test compilation using map_other_param
+     */
+    @Suppress("unused") //This is here to test compilation of door-testdb when using MAP_OTHER_PARAM
+    @HttpAccessible(
+        pullQueriesToReplicate = arrayOf(
+            HttpServerFunctionCall("getDiscussionPostAndAuthorNameById"),
+            HttpServerFunctionCall(
+                functionName = "findAuthorByPostUid",
+                functionDao = MemberDao::class,
+                functionArgs = arrayOf(
+                    HttpServerFunctionParam(
+                        name = "postUid",
+                        argType = HttpServerFunctionParam.ArgType.MAP_OTHER_PARAM,
+                        fromName = "postId"
+                    )
+                )
+            )
+        )
+    )
+    @Query("""
+        SELECT DiscussionPost.*,
+               Member.firstName AS firstName,
+               Member.lastName AS lastName
+          FROM DiscussionPost
+               LEFT JOIN Member
+                         ON Member.memberUid = DiscussionPost.posterMemberUid 
+         WHERE DiscussionPost.postUid = :postId       
+    """)
+    abstract suspend fun getDiscussionPostAndAuthorNameById(postId: Long): DiscussionPostAndAuthorName?
+
+
 }

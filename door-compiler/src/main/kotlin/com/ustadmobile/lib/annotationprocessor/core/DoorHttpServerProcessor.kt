@@ -732,6 +732,10 @@ fun CodeBlock.Builder.addHttpServerFunctionCallCode(
                     HttpServerFunctionParam.ArgType.PAGING_LOAD_SIZE -> {
                         add("$paramNameStr = $pagingLoadParamValName.loadSize,\n")
                     }
+                    HttpServerFunctionParam.ArgType.MAP_OTHER_PARAM -> {
+                        val otherParamName = argParamAnnotation.getArgumentValueByNameAsString("fromName")
+                        add("$paramNameStr = _arg_${otherParamName},\n")
+                    }
                 }
             }else {
                 add("$paramNameStr = _arg_$paramNameStr,\n")
