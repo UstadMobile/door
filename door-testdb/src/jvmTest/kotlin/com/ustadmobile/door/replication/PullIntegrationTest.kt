@@ -675,6 +675,34 @@ class PullIntegrationTest {
         }
     }
 
+    @Test
+    fun givenEntityCreated_whenAccessedOverHttpViaFunctionWithNullableResult_thenWillBeReceived() {
+        clientServerIntegrationTest {
+            val originalPost = DiscussionPost().apply {
+                postTitle = "I like hay"
+                postText = "Mmm... Hay..."
+                posterMemberUid = 0
+                postUid = serverDb.discussionPostDao.insertAsync(this)
+            }
+
+            makeClientRepo().use { clientRepo ->
+                val receivedOverHttp = clientRepo.discussionPostDao.findByUidAsyncOverHttp(originalPost.postUid)
+                assertEquals(originalPost, receivedOverHttp)
+            }
+        }
+    }
+
+    @Test
+    fun givenEntityNotCreated_whenAccessedOverHttpFunctionWithNullableResult_thenWillReturnNull() {
+        clientServerIntegrationTest {
+            makeClientRepo().use { clientRepo ->
+                val receivedOverHttp = clientRepo.discussionPostDao.findByUidAsyncOverHttp(0)
+                assertNull(receivedOverHttp)
+            }
+        }
+    }
+
+
 
 
 

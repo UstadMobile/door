@@ -21,6 +21,16 @@ expect abstract class DiscussionPostDao : RepositoryFlowLoadingStatusProvider {
     """)
     abstract suspend fun findByUid(postUid: Long): DiscussionPost?
 
+    @HttpAccessible(
+        clientStrategy = HttpAccessible.ClientStrategy.HTTP_WITH_FALLBACK
+    )
+    @Query("""
+        SELECT DiscussionPost.*
+          FROM DiscussionPost
+         WHERE DiscussionPost.postUid = :postUid
+    """)
+    abstract suspend fun findByUidAsyncOverHttp(postUid: Long): DiscussionPost?
+
     @HttpAccessible()
     @Query("""
         SELECT DiscussionPost.*, Member.*
