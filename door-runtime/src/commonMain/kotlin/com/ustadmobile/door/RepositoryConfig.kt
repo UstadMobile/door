@@ -1,5 +1,6 @@
 package com.ustadmobile.door
 
+import com.ustadmobile.door.log.DoorLogger
 import io.ktor.client.*
 import kotlinx.serialization.json.Json
 
@@ -27,5 +28,9 @@ expect class RepositoryConfig {
      * Random auth string known only to the repository server and the device
      */
     val auth: String
+
+    val dbName: String
+
+    val logger: DoorLogger
 
 }

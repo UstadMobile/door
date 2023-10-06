@@ -50,7 +50,6 @@ actual class NapierAntilog actual constructor(minLogLevel: LogLevel) : AbstractN
         throwable: Throwable?,
         message: String?,
     ) {
-
         val debugTag = tag ?: performTag(DoorTag.LOG_TAG)
 
         val fullMessage = if (message != null) {

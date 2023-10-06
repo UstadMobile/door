@@ -1,6 +1,7 @@
 package com.ustadmobile.door
 
-import com.ustadmobile.door.replication.ReplicationSubscriptionMode
+import com.ustadmobile.door.log.DoorLogger
+import com.ustadmobile.door.log.NapierDoorLogger
 import io.ktor.client.*
 import kotlinx.serialization.json.Json
 
@@ -15,6 +16,8 @@ actual class RepositoryConfig internal constructor(
     actual val nodeId: Long,
     actual val httpClient: HttpClient,
     actual val json: Json,
+    actual val logger: DoorLogger,
+    actual val dbName: String,
 ){
 
     companion object {
@@ -25,13 +28,13 @@ actual class RepositoryConfig internal constructor(
             val auth: String,
             val nodeId: Long,
             val httpClient: HttpClient,
-            val json: Json
+            val json: Json,
+            val logger: DoorLogger,
+            val dbName: String,
         ) {
 
-            var replicationSubscriptionMode = ReplicationSubscriptionMode.AUTO
-
             fun build() : RepositoryConfig{
-                return RepositoryConfig(context, endpoint, auth, nodeId, httpClient, json)
+                return RepositoryConfig(context, endpoint, auth, nodeId, httpClient, json, logger, dbName)
             }
 
         }
@@ -42,10 +45,12 @@ actual class RepositoryConfig internal constructor(
             auth: String,
             nodeId: Long,
             httpClient: HttpClient,
+            logger: DoorLogger = NapierDoorLogger(),
+            dbName: String = endpoint,
             json: Json = Json { encodeDefaults = true },
             block: Builder.() -> Unit = {}
         ) : RepositoryConfig {
-            val builder = Builder(context, endpoint,auth, nodeId, httpClient, json)
+            val builder = Builder(context, endpoint,auth, nodeId, httpClient, json, logger, dbName)
             block(builder)
             return builder.build()
         }

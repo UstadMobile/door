@@ -3,6 +3,7 @@ package com.ustadmobile.door.nodeevent
 import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.ext.dbType
+import com.ustadmobile.door.log.DoorLogger
 import com.ustadmobile.door.message.DoorMessageCallback
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.room.RoomJdbcImpl
@@ -15,9 +16,11 @@ import kotlinx.coroutines.Dispatchers
 class NodeEventManagerJvm<T: RoomDatabase>(
     db: T,
     messageCallback: DoorMessageCallback<T>,
+    logger: DoorLogger,
+    dbName: String,
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : NodeEventManagerCommon<T>(
-    db, messageCallback, dispatcher,
+    db, messageCallback, logger, dbName, dispatcher,
 ) {
 
     /**
@@ -27,7 +30,9 @@ class NodeEventManagerJvm<T: RoomDatabase>(
         NodeEventJdbcImplListenerSqlite(
             hasOutgoingReplicationTable = hasOutgoingReplicationTable,
             outgoingEvents = _outgoingEvents,
-            createTmpEvtTableAndTriggerOnBeforeTransaction = true
+            createTmpEvtTableAndTriggerOnBeforeTransaction = true,
+            logger = logger,
+            dbName = dbName,
         )
     }else {
         null

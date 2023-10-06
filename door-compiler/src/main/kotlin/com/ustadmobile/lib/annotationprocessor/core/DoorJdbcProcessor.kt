@@ -17,6 +17,7 @@ import com.ustadmobile.door.annotation.*
 import com.ustadmobile.door.ext.DoorDatabaseMetadata
 import com.ustadmobile.door.ext.DoorDatabaseMetadata.Companion.SUFFIX_DOOR_METADATA
 import com.ustadmobile.door.ext.sqlToPostgresSql
+import com.ustadmobile.door.log.DoorLogger
 import com.ustadmobile.door.paging.DoorLimitOffsetPagingSource
 import com.ustadmobile.door.replication.ReplicationEntityMetaData
 import com.ustadmobile.door.replication.ReplicationFieldMetaData
@@ -345,21 +346,35 @@ fun FileSpec.Builder.addJdbcDbImplType(
         .primaryConstructor(FunSpec.constructorBuilder()
             .addParameter("doorJdbcSourceDatabase", RoomDatabase::class.asTypeName().copy(nullable = true))
             .addParameter(ParameterSpec("dataSource", AbstractDbProcessor.CLASSNAME_DATASOURCE))
+            .addParameter("dbUrl", String::class)
             .addParameter("dbName", String::class)
             .addParameter("jdbcQueryTimeout", Int::class)
             .addParameter("jdbcDbType", Int::class)
+            .addParameter("logger", DoorLogger::class)
             .build())
         .addDbVersionProperty(dbKSClass)
         .addProperty(PropertySpec.builder("dataSource", AbstractDbProcessor.CLASSNAME_DATASOURCE, KModifier.OVERRIDE)
             .initializer("dataSource")
             .build())
         .addProperty(PropertySpec.builder("jdbcImplHelper", RoomDatabaseJdbcImplHelper::class, KModifier.OVERRIDE)
-            .initializer("%T(dataSource, this, dbName, this::class.%M().allTables, %T(*this::class.%M().allTables.toTypedArray()), jdbcDbType)\n",
-                RoomDatabaseJdbcImplHelper::class,
-                MemberName("com.ustadmobile.door.ext", "doorDatabaseMetadata"),
-                InvalidationTracker::class,
-                MemberName("com.ustadmobile.door.ext", "doorDatabaseMetadata"),
-                )
+            .initializer(CodeBlock.builder()
+                .add("%T(\n", RoomDatabaseJdbcImplHelper::class)
+                .withIndent {
+                    add("dataSource = dataSource,\n")
+                    add("db = this,\n")
+                    add("dbUrl = dbUrl,\n")
+                    add("dbName = dbName,\n")
+                    add("logger = logger,\n")
+                    add("tableNames = this::class.%M().allTables,\n",
+                        MemberName("com.ustadmobile.door.ext", "doorDatabaseMetadata"))
+                    add("invalidationTracker = %T(*this::class.%M().allTables.toTypedArray()),\n",
+                        InvalidationTracker::class,
+                        MemberName("com.ustadmobile.door.ext", "doorDatabaseMetadata"))
+                    add("dbType = jdbcDbType,\n")
+                }
+                .add(")\n")
+                .build()
+            )
             .build())
         .addProperty(PropertySpec.builder("doorJdbcSourceDatabase",
             RoomDatabase::class.asTypeName().copy(nullable = true), KModifier.OVERRIDE)

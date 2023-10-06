@@ -2,6 +2,8 @@ package com.ustadmobile.door.replication
 
 import app.cash.turbine.test
 import com.ustadmobile.door.DoorConstants
+import com.ustadmobile.door.log.DoorLogger
+import com.ustadmobile.door.log.NapierDoorLogger
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.nodeevent.NodeEvent
 import com.ustadmobile.door.nodeevent.NodeEventManager
@@ -66,6 +68,10 @@ class DoorRepositoryReplicationClientTest {
         private val _incomingMessages = MutableSharedFlow<DoorMessage>()
 
         override val incomingMessages: Flow<DoorMessage> = _incomingMessages.asSharedFlow()
+
+        override val dbName: String = "testeventmanagerdb"
+
+        override val logger: DoorLogger = NapierDoorLogger()
 
         fun emitOutgoingEvents(events: List<NodeEvent>) {
             scope.launch {
@@ -135,6 +141,8 @@ class DoorRepositoryReplicationClientTest {
             onMarkAcknowledgedAndGetNextOutgoingReplications = mock { },
             onStartPendingSession = mock { },
             onPendingSessionResolved = mock { },
+            logger = mock  { },
+            dbName = "testdb",
         )
 
         verifyBlocking(mockEventManager, timeout(5000)) {
@@ -200,6 +208,8 @@ class DoorRepositoryReplicationClientTest {
             onMarkAcknowledgedAndGetNextOutgoingReplications = mock { },
             onStartPendingSession = mock { },
             onPendingSessionResolved = mock { },
+            logger = mock  { },
+            dbName = "testdb",
         )
 
         //wait for the first request
@@ -295,6 +305,8 @@ class DoorRepositoryReplicationClientTest {
             onMarkAcknowledgedAndGetNextOutgoingReplications = onMarkAcknowledgedAndGetNextOutgoingReplications,
             onStartPendingSession = mock { },
             onPendingSessionResolved = mock { },
+            logger = mock  { },
+            dbName = "testdb",
         )
 
         runBlocking {
@@ -348,6 +360,8 @@ class DoorRepositoryReplicationClientTest {
             onMarkAcknowledgedAndGetNextOutgoingReplications = onMarkAcknowledgedAndGetNextOutgoingReplications,
             onStartPendingSession = mock { },
             onPendingSessionResolved = mock { },
+            logger = mock  { },
+            dbName = "testdb",
         )
 
         //Wait for the first check for pending outgoing replications

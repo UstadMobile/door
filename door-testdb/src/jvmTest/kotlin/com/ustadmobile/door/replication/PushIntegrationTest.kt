@@ -8,6 +8,7 @@ import com.ustadmobile.door.ext.asRepository
 import com.ustadmobile.door.ext.withDoorTransactionAsync
 import com.ustadmobile.door.http.DoorHttpServerConfig
 import com.ustadmobile.door.ktor.routes.ReplicationRoute
+import com.ustadmobile.door.log.NapierDoorLogger
 import com.ustadmobile.door.test.initNapierLog
 import com.ustadmobile.door.util.systemTimeInMillis
 import db3.ExampleDb3
@@ -92,6 +93,8 @@ class PushIntegrationTest {
             nodeId = clientNodeId,
             auth = "secret",
             httpClient = httpClient,
+            logger = NapierDoorLogger(),
+            dbName = "clientDb",
             okHttpClient = okHttpClient
         )
     )

@@ -12,6 +12,7 @@ import com.ustadmobile.door.ext.use
 import com.ustadmobile.door.http.DoorHttpServerConfig
 import com.ustadmobile.door.flow.FlowLoadingState
 import com.ustadmobile.door.flow.repoFlowWithLoadingState
+import com.ustadmobile.door.log.NapierDoorLogger
 import com.ustadmobile.door.room.InvalidationTrackerObserver
 import com.ustadmobile.door.test.initNapierLog
 import db3.*
@@ -54,6 +55,8 @@ class PullIntegrationTest {
                 auth = "secret",
                 httpClient = client,
                 okHttpClient = okHttpClient,
+                logger = NapierDoorLogger(),
+                dbName = "clientDb",
                 json = json,
             ))
         }
@@ -66,8 +69,10 @@ class PullIntegrationTest {
         block: suspend ClientServerIntegrationTestContext.() -> Unit
     ) {
         val clientDb = DatabaseBuilder.databaseBuilder(ExampleDb3::class, "jdbc:sqlite::memory:", clientNodeId)
+            .name("clientDb")
             .build()
         val serverDb = DatabaseBuilder.databaseBuilder(ExampleDb3::class, "jdbc:sqlite::memory:", serverNodeId)
+            .name("serverDb")
             .build()
 
         val okHttpClient = OkHttpClient.Builder().build()

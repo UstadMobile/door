@@ -7,6 +7,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.ustadmobile.door.ext.doorDatabaseMetadata
 import com.ustadmobile.door.ext.execSqlBatch
 import com.ustadmobile.door.ext.isWrappable
+import com.ustadmobile.door.log.DoorLogger
+import com.ustadmobile.door.log.NapierDoorLogger
 import com.ustadmobile.door.message.DefaultDoorMessageCallback
 import com.ustadmobile.door.message.DoorMessageCallback
 import com.ustadmobile.door.migration.DoorMigration
@@ -19,6 +21,8 @@ class DatabaseBuilder<T: RoomDatabase>(
     private val dbClass: KClass<T>,
     private val nodeId: Long,
     private var messageCallback: DoorMessageCallback<T> = DefaultDoorMessageCallback(),
+    private var dbName: String = "${dbClass.simpleName}",
+    private var dbLogger: DoorLogger = NapierDoorLogger(),
 ) {
 
     companion object {
@@ -34,13 +38,29 @@ class DatabaseBuilder<T: RoomDatabase>(
         }
     }
 
+    /**
+     * Set the database name that will be used in log messages
+     */
+    fun dbName(name: String) : DatabaseBuilder<T>{
+        dbName = name
+        return this
+    }
+
+    /**
+     * Set the DoorLogger
+     */
+    fun logger(logger: DoorLogger) : DatabaseBuilder<T> {
+        this.dbLogger = logger
+        return this
+    }
 
     fun build(): T {
         val roomDb = roomBuilder.build()
         return if(roomDb.isWrappable(dbClass)) {
             val wrapperClass = Class.forName("${dbClass.java.canonicalName}${DoorDatabaseWrapper.SUFFIX}") as Class<T>
-            return wrapperClass.getConstructor(dbClass.java, Long::class.javaPrimitiveType, DoorMessageCallback::class.java)
-                .newInstance(roomDb, nodeId, messageCallback)
+            return wrapperClass.getConstructor(dbClass.java, Long::class.javaPrimitiveType, DoorMessageCallback::class.java,
+                    DoorLogger::class.java, String::class.java)
+                .newInstance(roomDb, nodeId, messageCallback, dbLogger, dbName)
         }else {
             roomDb
         }
@@ -50,7 +70,6 @@ class DatabaseBuilder<T: RoomDatabase>(
         this.messageCallback = messageCallback
         return this
     }
-
 
     fun addCallback(callback: DoorDatabaseCallback) : DatabaseBuilder<T> {
         roomBuilder.addCallback(object: RoomDatabase.Callback() {

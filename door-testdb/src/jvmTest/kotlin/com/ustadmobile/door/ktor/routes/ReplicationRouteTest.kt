@@ -7,6 +7,7 @@ import com.ustadmobile.door.ext.doorWrapperNodeId
 import com.ustadmobile.door.ext.getOrThrow
 import com.ustadmobile.door.ext.withDoorTransactionAsync
 import com.ustadmobile.door.http.DoorHttpServerConfig
+import com.ustadmobile.door.log.NapierDoorLogger
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.replication.DoorReplicationEntity
 import com.ustadmobile.door.replication.ReplicationReceivedAck
@@ -234,7 +235,7 @@ class ReplicationRouteTest {
         val okHttpClient = OkHttpClient.Builder().build()
         val httpClient = HttpClient {  }
         val repoConfig = RepositoryConfig.repositoryConfig(Any(), "http://localhost:8094", clientNodeId,
-                "secret", httpClient, okHttpClient)
+                "secret", httpClient, okHttpClient, NapierDoorLogger(), "jdbc:sqlite::memory:")
 
         val server = embeddedServer(Netty, 8094) {
             routing {

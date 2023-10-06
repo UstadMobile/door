@@ -1,11 +1,12 @@
 package com.ustadmobile.door.nodeevent
 
-import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.concurrentSafeMapOf
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.ext.*
+import com.ustadmobile.door.log.DoorLogger
+import com.ustadmobile.door.log.d
+import com.ustadmobile.door.log.v
 import com.ustadmobile.door.room.RoomDatabaseJdbcImplHelperCommon
-import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableSharedFlow
 
 /**
@@ -20,7 +21,11 @@ internal class NodeEventJdbcImplListenerSqlite(
     private val hasOutgoingReplicationTable: Boolean,
     private val outgoingEvents: MutableSharedFlow<List<NodeEvent>>,
     private val createTmpEvtTableAndTriggerOnBeforeTransaction: Boolean = true,
+    private val logger: DoorLogger,
+    private val dbName: String,
 ): RoomDatabaseJdbcImplHelperCommon.Listener {
+
+    private val logPrefix = "[NodeEventJdbcImplListenerSqlite - $dbName]"
 
     private val pendingEvents = concurrentSafeMapOf<Int, List<NodeEvent>>()
 
@@ -33,9 +38,7 @@ internal class NodeEventJdbcImplListenerSqlite(
             return
 
         if(createTmpEvtTableAndTriggerOnBeforeTransaction) {
-            Napier.d(tag = DoorTag.LOG_TAG) {
-                "NodeEventJdbcImplListenerSqlite: creating SQLite triggers "
-            }
+            logger.v { "$logPrefix creating SQLite triggers" }
             connection.createNodeEventTableAndTrigger(
                 hasOutgoingReplicationTable = hasOutgoingReplicationTable
             )
@@ -66,10 +69,7 @@ internal class NodeEventJdbcImplListenerSqlite(
             }
         }
 
-        Napier.v(tag = DoorTag.LOG_TAG) {
-            "NodeEventJdbcImplListenerSqlite: found ${events.size} new events = ${events.joinToString()} "
-        }
-
+        logger.v { "$logPrefix found ${events.size} new events = ${events.joinToString()}" }
 
         connection.prepareStatement(
             NodeEventConstants.CLEAR_EVENTS_TMP_TABLE
@@ -78,9 +78,7 @@ internal class NodeEventJdbcImplListenerSqlite(
         }
 
         if(events.isNotEmpty()) {
-            Napier.v(tag = DoorTag.LOG_TAG) {
-                "NodeEventJdbcImplListenerSqlite: emitting ${events.size} events ${events.joinToString()} "
-            }
+            logger.d { "$logPrefix emitting ${events.size} events ${events.joinToString()} "}
             pendingEvents[transactionId] = events
         }
     }

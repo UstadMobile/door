@@ -5,6 +5,7 @@ import com.ustadmobile.door.ext.prepareAndUseStatementAsync
 import com.ustadmobile.door.ext.withDoorTransactionAsync
 import com.ustadmobile.door.jdbc.ext.executeQueryAsyncKmp
 import com.ustadmobile.door.jdbc.ext.mapRows
+import com.ustadmobile.door.log.DoorLogger
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.message.DoorMessageCallback
 import com.ustadmobile.door.room.InvalidationTrackerObserver
@@ -21,9 +22,11 @@ import kotlinx.coroutines.channels.Channel
 class NodeEventManagerAndroid<T: RoomDatabase>(
     db: T,
     messageCallback: DoorMessageCallback<T>,
+    logger: DoorLogger,
+    dbName: String,
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : NodeEventManagerCommon<T>(
-    db, messageCallback, dispatcher
+    db, messageCallback, logger, dbName, dispatcher
 ){
 
     private val scope = CoroutineScope(dispatcher + Job())

@@ -3,10 +3,9 @@ package com.ustadmobile.door.testandroid
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.ustadmobile.door.DatabaseBuilder
-import com.ustadmobile.door.RepositoryConfig
 import com.ustadmobile.door.RepositoryConfig.Companion.repositoryConfig
 import com.ustadmobile.door.ext.asRepository
-import com.ustadmobile.door.replication.ReplicationSubscriptionMode
+import com.ustadmobile.door.log.NapierDoorLogger
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
 import io.ktor.client.*
@@ -72,7 +71,9 @@ class ReplicationTest {
         db = DatabaseBuilder.databaseBuilder(context, RepDb::class, "RepDb",
             temporaryFolder.newFolder()).build()
         repo = db.asRepository(repositoryConfig(context, "http://192.168.1.148:8098/RepDb/",
-            Random.nextLong(), "af", httpClient, okHttpClient)
+            Random.nextLong(), "af", httpClient, okHttpClient, NapierDoorLogger(),
+            dbName = "repdb"
+        )
         {
 
         })

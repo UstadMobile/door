@@ -1,6 +1,7 @@
 import com.ustadmobile.door.*
 import com.ustadmobile.door.ext.asRepository
 import com.ustadmobile.door.ext.rootDatabase
+import com.ustadmobile.door.log.NapierDoorLogger
 import com.ustadmobile.door.util.systemTimeInMillis
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
@@ -55,7 +56,7 @@ private suspend fun openRepoDb() {
     val nodeId = Random.nextLong(0, Long.MAX_VALUE)
     repRepo = repDb.asRepository(
         RepositoryConfig.repositoryConfig(Any(), "http://localhost:8098/RepDb/",
-        "secret", nodeId, httpClient, Json { encodeDefaults = true }) {
+        "secret", nodeId, httpClient, NapierDoorLogger(), json = Json { encodeDefaults = true }) {
     })
     Napier.d("Created repo")
 }

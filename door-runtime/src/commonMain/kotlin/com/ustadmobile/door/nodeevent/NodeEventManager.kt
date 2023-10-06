@@ -1,5 +1,6 @@
 package com.ustadmobile.door.nodeevent
 
+import com.ustadmobile.door.log.DoorLogger
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.room.RoomDatabase
 import kotlinx.coroutines.flow.Flow
@@ -65,5 +66,10 @@ interface NodeEventManager<T : RoomDatabase> {
      * function (if something goes wrong, we must throw an exception)
      */
     suspend fun onIncomingMessageReceived(message: DoorMessage)
+
+    val logger: DoorLogger
+
+    val dbName: String
+
 
 }

@@ -1,14 +1,16 @@
 package com.ustadmobile.door.sqljsjdbc
-import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.jdbc.ResultSet
 import com.ustadmobile.door.jdbc.SQLException
+import com.ustadmobile.door.log.DoorLogger
+import com.ustadmobile.door.log.d
+import com.ustadmobile.door.log.i
+import com.ustadmobile.door.log.v
 import com.ustadmobile.door.sqljsjdbc.IndexedDb.DATABASE_VERSION
 import com.ustadmobile.door.sqljsjdbc.IndexedDb.DB_STORE_KEY
 import com.ustadmobile.door.sqljsjdbc.IndexedDb.DB_STORE_NAME
 import com.ustadmobile.door.sqljsjdbc.IndexedDb.indexedDb
-import io.github.aakira.napier.Napier
 import js.typedarrays.Uint8Array
 import kotlinx.browser.document
 import kotlinx.coroutines.*
@@ -23,10 +25,16 @@ import kotlin.js.json
 
 /**
  * Class responsible to manage all SQLite worker tasks
+ *
+ * @param logger The main DoorLogger
+ * @param logWorkerMessages if true, will log every WebWorker message sent and received. VERY VERBOSE.
+ *
  */
 class SQLiteDatasourceJs(
     private val dbName: String,
-    private val worker: Worker
+    private val worker: Worker,
+    private val logger: DoorLogger,
+    private val logWorkerMessages: Boolean = false,
 ) : DataSource {
 
     private val pendingMessages = mutableMapOf<Int, CompletableDeferred<WorkerResult>>()
@@ -45,7 +53,7 @@ class SQLiteDatasourceJs(
      */
     private val transactionMutex = Mutex()
 
-    private val logPrefix: String = "SQLiteDataSourceJs [$dbName]"
+    private val logPrefix: String = "[SQLiteDataSourceJs - $dbName]"
 
     private var closed = false
 
@@ -97,13 +105,15 @@ class SQLiteDatasourceJs(
 
         val completable = CompletableDeferred<WorkerResult>()
         val actionId = ++idCounter
-        Napier.v("$logPrefix sendMessage #$actionId - sending action=${message["action"]} \n", tag = DoorTag.LOG_TAG)
+        logger.takeIf { logWorkerMessages }?.v {
+            "$logPrefix sendMessage #$actionId - sending action=${message["action"]} \n"
+        }
         pendingMessages[actionId] = completable
         executedSqlQueries[actionId] = message["sql"].toString()
         message["id"] = actionId
         worker.postMessage(message)
         val result = completable.await()
-        Napier.v("$logPrefix sendMessage #$actionId - got result \n", tag = DoorTag.LOG_TAG)
+        logger.takeIf { logWorkerMessages }?.v {"$logPrefix sendMessage #$actionId - got result \n" }
         return result
 
     }
@@ -148,10 +158,12 @@ class SQLiteDatasourceJs(
         sql: String,
         params: Array<Any?>? = null
     ): ResultSet = withTransactionLock(connection) {
-        Napier.v("$logPrefix sending query: $sql params=${params?.joinToString()}", tag = DoorTag.LOG_TAG)
+        logger.takeIf { logWorkerMessages }?.v { "$logPrefix sending query: $sql params=${params?.joinToString()}" }
         val results = sendMessage(makeMessage(sql, params)).results
         val sqliteResultSet = results?.let { SQLiteResultSet(it) } ?: SQLiteResultSet(arrayOf())
-        Napier.v("$logPrefix Got result: Ran: '$sql' params=${params?.joinToString()} result = $sqliteResultSet\n", tag = DoorTag.LOG_TAG)
+        logger.takeIf { logWorkerMessages }?.v {
+            "$logPrefix Got result: Ran: '$sql' params=${params?.joinToString()} result = $sqliteResultSet\n"
+        }
         sqliteResultSet
     }
 
@@ -161,15 +173,16 @@ class SQLiteDatasourceJs(
         params: Array<Any?>?,
         returnGeneratedKey: Boolean = false
     ): UpdateResult = withTransactionLock(connection) {
-        Napier.v("$logPrefix sending update: '$sql', params=${params?.joinToString()}\n",
-            tag = DoorTag.LOG_TAG)
+        logger.takeIf { logWorkerMessages }?.v {
+            "$logPrefix sending update: '$sql', params=${params?.joinToString()}\n"
+        }
         sendMessage(makeMessage(sql, params))
         val generatedKey = if(returnGeneratedKey) {
             sendMessage(makeMessage("SELECT last_insert_rowid()")).results?.let { SQLiteResultSet(it) }
         }else {
             null
         }
-        Napier.v("$logPrefix update done: '$sql'", tag = DoorTag.LOG_TAG)
+        logger.takeIf { logWorkerMessages }?.v {"$logPrefix update done: '$sql'" }
         UpdateResult(1, generatedKey)
     }
 
@@ -203,7 +216,7 @@ class SQLiteDatasourceJs(
     /**
      * Save SQL.JS database to a .db file
      */
-    @Suppress("UNUSED_VARIABLE") // used in js code
+    @Suppress("unused") // used in js code
     suspend fun exportDatabaseToFile() {
         transactionMutex.withLock {
             val result = sendMessage(json("action" to "export"))
@@ -224,7 +237,7 @@ class SQLiteDatasourceJs(
         val exportCompletable = CompletableDeferred<Boolean>()
 
         return transactionMutex.withLock(owner = this) {
-            Napier.d(tag = DoorTag.LOG_TAG) {  "SQLiteDataSource/JS: saving to indexed db" }
+            logger.d { "$logPrefix SQLiteDataSource/JS: saving to indexed db" }
             val result = sendMessage(json("action" to "export"))
             val request = indexedDb.open(dbName, DATABASE_VERSION)
 
@@ -232,7 +245,7 @@ class SQLiteDatasourceJs(
                 val db = event.target.result
                 val transaction = db.transaction(DB_STORE_NAME, "readwrite")
                 transaction.oncomplete = {
-                    Napier.i("Saved to IndexedDb: $dbName", tag = DoorTag.LOG_TAG)
+                    logger.i("$logPrefix Saved to IndexedDb: $dbName")
                     exportCompletable.complete(true)
                 }
                 transaction.onerror = {
@@ -245,7 +258,7 @@ class SQLiteDatasourceJs(
             }
 
             exportCompletable.await().also {
-                Napier.d(tag = DoorTag.LOG_TAG) { "SQLiteDataSource/JS: saving to indexed db complete" }
+                logger.d("$logPrefix SQLiteDataSource/JS: saving to indexed db complete")
             }
 
         }
@@ -258,10 +271,11 @@ class SQLiteDatasourceJs(
     }
 
     fun close() {
-        Napier.d(tag = DoorTag.LOG_TAG) { "SQLiteDataSourceJS: close - terminating worker\n" }
+        logger.d("$logPrefix close - terminating worker\n")
         worker.terminate()
+        scope.cancel()
         closed = true
-        Napier.i(tag = DoorTag.LOG_TAG) { "SQLiteDataSourceJS: close - worker terminated, closed\n" }
+        logger.i("$logPrefix close - worker terminated, closed\n")
     }
 
 

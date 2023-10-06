@@ -15,6 +15,7 @@ import com.squareup.kotlinpoet.ksp.writeTo
 import com.ustadmobile.door.DoorDatabaseWrapper
 import com.ustadmobile.door.annotation.ReplicateEntity
 import com.ustadmobile.door.annotation.ReplicateLastModified
+import com.ustadmobile.door.log.DoorLogger
 import com.ustadmobile.door.message.DoorMessageCallback
 import com.ustadmobile.door.nodeevent.NodeEventManagerCommon
 import com.ustadmobile.door.nodeevent.NodeEventManagerJvm
@@ -204,6 +205,8 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
                 .addParameter("nodeId", LONG)
                 .addParameter("messageCallback",
                     DoorMessageCallback::class.asClassName().parameterizedBy(dbClassDecl.toClassName()))
+                .addParameter("logger", DoorLogger::class)
+                .addParameter("dbName", String::class)
                 .build())
             .addProperty(PropertySpec.builder("_db", dbClassName, KModifier.PRIVATE)
                 .initializer("_db").build())
@@ -245,14 +248,14 @@ fun FileSpec.Builder.addDbWrapperTypeSpec(
                     KModifier.OVERRIDE,
                 )
                 .applyIf(target == DoorTarget.JVM) {
-                    initializer("%T(_db, messageCallback)\n", NodeEventManagerJvm::class)
+                    initializer("%T(_db, messageCallback, logger, dbName)\n", NodeEventManagerJvm::class)
                 }
                 .applyIf(target == DoorTarget.ANDROID) {
-                    initializer("%T(_db, messageCallback)\n",
+                    initializer("%T(_db, messageCallback, logger, dbName)\n",
                         ClassName("com.ustadmobile.door.nodeevent", "NodeEventManagerAndroid"))
                 }
                 .applyIf(target == DoorTarget.JS) {
-                    initializer("%T(_db, messageCallback)\n",
+                    initializer("%T(_db, messageCallback, logger, dbName)\n",
                         ClassName("com.ustadmobile.door.nodeevent", "NodeEventManagerJs"))
                 }
                 .build()

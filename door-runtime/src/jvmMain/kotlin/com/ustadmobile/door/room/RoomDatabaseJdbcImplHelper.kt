@@ -8,6 +8,9 @@ import com.ustadmobile.door.ext.rootDatabase
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.jdbc.ext.mutableLinkedListOf
+import com.ustadmobile.door.log.DoorLogger
+import com.ustadmobile.door.log.d
+import com.ustadmobile.door.log.e
 import com.ustadmobile.door.util.PostgresChangeTracker
 import com.ustadmobile.door.util.systemTimeInMillis
 import com.zaxxer.hikari.HikariDataSource
@@ -20,10 +23,22 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
     dataSource: DataSource,
     db: RoomDatabase,
     private val dbUrl: String,
+    dbName: String,
+    logger: DoorLogger,
     tableNames: List<String>,
     invalidationTracker: InvalidationTracker,
     dbType: Int,
-) : RoomDatabaseJdbcImplHelperCommon(dataSource, db, tableNames, invalidationTracker, dbType) {
+) : RoomDatabaseJdbcImplHelperCommon(
+    dataSource = dataSource,
+    db = db,
+    dbName = dbName,
+    logger = logger,
+    tableNames = tableNames,
+    invalidationTracker = invalidationTracker,
+    dbType = dbType
+) {
+
+
 
     inner class PendingTransaction(val connection: Connection, val readOnly: Boolean)
 
@@ -43,13 +58,13 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
 
     private val pendingTransactionThreadMap = concurrentSafeMapOf<Long, PendingTransaction>()
 
-    @Suppress("UNUSED_PARAMETER") //Reserved for future usage
     private fun <R> useNewConnectionInternal(
         readOnly: Boolean,
         block: (Connection) -> R,
         threadId: Long,
     ): R {
         assertNotClosed()
+        val funLogPrefix = "$logPrefix - newConnectionInternal - Thread #$threadId"
         val startTime = systemTimeInMillis()
         val transaction = PendingTransaction(dataSource.connection, readOnly)
         transaction.connection.takeIf { !readOnly }?.autoCommit = false
@@ -70,7 +85,7 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
                 invalidationTracker.takeIf { changedTables.isNotEmpty() }?.onTablesInvalidated(changedTables.toSet())
             }
         }catch(e: Exception) {
-            Napier.e("useConnection: ERROR", e)
+            logger.e("$funLogPrefix exception", e)
             if(!readOnly) {
                 transaction.connection.rollback()
             }
@@ -80,7 +95,7 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
             transaction.connection.close()
             pendingTransactionThreadMap.remove(threadId)
             if(pendingTransactionThreadMap.isNotEmpty()) {
-                Napier.d("useConnection: close connection for thread #$threadId (took ${systemTimeInMillis() - startTime}ms)" +
+                logger.d("useConnection: close connection for thread #$threadId (took ${systemTimeInMillis() - startTime}ms)" +
                         " There are ${pendingTransactionThreadMap.size} pending non-async transactions still open.")
             }
         }

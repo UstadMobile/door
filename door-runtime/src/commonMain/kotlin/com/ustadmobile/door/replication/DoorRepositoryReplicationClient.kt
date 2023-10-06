@@ -4,15 +4,17 @@ import com.ustadmobile.door.DoorConstants
 import com.ustadmobile.door.RepositoryConfig
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.ext.executeUpdateAsyncKmp
+import com.ustadmobile.door.log.DoorLogger
+import com.ustadmobile.door.log.d
+import com.ustadmobile.door.log.v
+import com.ustadmobile.door.log.w
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.nodeevent.NodeEventManager
 import com.ustadmobile.door.room.RoomDatabase
-import io.github.aakira.napier.Napier
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -57,6 +59,8 @@ class DoorRepositoryReplicationClient(
     private val onMarkAcknowledgedAndGetNextOutgoingReplications: OnMarkAcknowledgedAndGetNextOutgoingReplications,
     private val onStartPendingSession: OnStartPendingSession,
     private val onPendingSessionResolved: OnPendingSessionResolved,
+    private val logger: DoorLogger,
+    private val dbName: String,
     private val retryInterval: Int = 10_000,
 ) {
 
@@ -80,12 +84,12 @@ class DoorRepositoryReplicationClient(
         onMarkAcknowledgedAndGetNextOutgoingReplications = DefaultOnMarkAcknowledgedAndGetNextOutgoingReplications(db),
         onStartPendingSession = DefaultOnStartPendingSession(db),
         onPendingSessionResolved = DefaultOnPendingSessionResolved(db),
+        logger = repositoryConfig.logger,
+        dbName = repositoryConfig.dbName,
         retryInterval = retryInterval,
     )
 
-    private val instanceId = INSTANCE_ID_COUNTER.incrementAndGet()
-
-    private val logPrefix = "[DoorRepositoryReplicationClient #$instanceId localNodeId=$localNodeId endpoint=$repoEndpointUrl]"
+    private val logPrefix = "[DoorRepositoryReplicationClient - $dbName - endpoint=$repoEndpointUrl]"
 
     private val _state = MutableStateFlow(ClientState())
 
@@ -103,10 +107,7 @@ class DoorRepositoryReplicationClient(
     private val fakeRemoteNodeId = Random.nextLong(-10000, -1)
 
     init {
-        Napier.d(
-            tag = DoorTag.LOG_TAG,
-            message = "$logPrefix init"
-        )
+        logger.d("$logPrefix init")
     }
 
     /**
@@ -249,16 +250,14 @@ class DoorRepositoryReplicationClient(
                 try {
                     onStartPendingSession(fakeRemoteNodeId, repoEndpointUrl)
 
-                    Napier.v(tag = DoorTag.LOG_TAG) {
-                        "$logPrefix getRemoteNodeId : requesting node id of server"
-                    }
+                    logger.v { "$logPrefix getRemoteNodeId : requesting node id of server" }
                     val remoteNodeIdResponse = httpClient.get {
                         doorNodeIdHeader(localNodeId, localNodeAuth)
                         setRepoUrl(repoEndpointUrl, "$REPLICATION_PATH/nodeId")
                     }
 
                     val nodeIdHeaderVal = remoteNodeIdResponse.headers[DoorConstants.HEADER_NODE_ID]?.toLong()
-                    Napier.v(tag = DoorTag.LOG_TAG) {
+                    logger.v {
                         "$logPrefix getRemoteNodeId : got server node id: status=${remoteNodeIdResponse.status} $nodeIdHeaderVal"
                     }
                     if(nodeIdHeaderVal != null) {
@@ -273,7 +272,7 @@ class DoorRepositoryReplicationClient(
                     }
                 }catch(e: Exception) {
                     if(e !is CancellationException) {
-                        Napier.w(tag = DoorTag.LOG_TAG, throwable = e) {
+                        logger.w(throwable = e) {
                             "$logPrefix getRemoteNodeId : exception getting remote node id"
                         }
                         delay(retryInterval.toLong())
@@ -324,7 +323,7 @@ class DoorRepositoryReplicationClient(
                     sendNotifyChannel.receive()
                 }
 
-                Napier.v(tag = DoorTag.LOG_TAG) {
+                logger.v {
                     "$logPrefix : runSendLoop : querying db to mark ${outgoingReplicationsToAck.size} entities as " +
                             "acknowledged by server and get next batch of replications to send"
                 }
@@ -335,14 +334,14 @@ class DoorRepositoryReplicationClient(
                     ),
                     batchSize = batchSize
                 )
-                Napier.v(tag = DoorTag.LOG_TAG) {
+                logger.v {
                     "$logPrefix : runSendLoop : found ${outgoingReplications.size} pending outgoing replications " +
                             "to send"
                 }
                 outgoingReplicationsToAck.clear()
 
                 if(outgoingReplications.isNotEmpty()) {
-                    Napier.v(tag = DoorTag.LOG_TAG) {
+                    logger.v {
                         "$logPrefix : runSendLoop : sending ${outgoingReplications.size} to server "
                     }
                     val replicationResponse = httpClient.post {
@@ -359,7 +358,7 @@ class DoorRepositoryReplicationClient(
 
                     val replicationReceivedAck: ReplicationReceivedAck = replicationResponse.body()
 
-                    Napier.v(tag = DoorTag.LOG_TAG) {
+                    logger.v {
                         "$logPrefix : runSendLoop : received reply from server status= ${replicationResponse.status} " +
                                 " acknowledges ${replicationReceivedAck.replicationUids.size} entities"
                     }
@@ -368,8 +367,7 @@ class DoorRepositoryReplicationClient(
                 }
             }catch(e: Exception) {
                 if(e !is CancellationException) {
-                    Napier.d(
-                        tag = DoorTag.LOG_TAG,
+                    logger.d(
                         message =  { "$logPrefix exception sending outgoing replications" },
                         throwable = e
                     )
@@ -388,7 +386,7 @@ class DoorRepositoryReplicationClient(
                     fetchNotifyChannel.receive() //wait for the invalidation signal if there is nothing we need to acknowledge
                 }
 
-                Napier.v(tag = DoorTag.LOG_TAG) {
+                logger.v {
                     "$logPrefix : runFetchLoop: acknowledging ${acknowledgementsToSend.size} entities received and " +
                             "request next batch of pending replications"
                 }
@@ -398,19 +396,19 @@ class DoorRepositoryReplicationClient(
                     contentType(ContentType.Application.Json)
                     setBody(ReplicationReceivedAck(acknowledgementsToSend))
                 }
-                Napier.v(tag = DoorTag.LOG_TAG) {
+                logger.v {
                     "$logPrefix : runFetchLoop: received response status = ${entitiesReceivedResponse.status}"
                 }
                 acknowledgementsToSend.clear()
 
                 if(entitiesReceivedResponse.status == HttpStatusCode.OK) {
                     val entitiesReceivedMessage: DoorMessage = entitiesReceivedResponse.body()
-                    Napier.v(tag = DoorTag.LOG_TAG) {
+                    logger.v {
                         "$logPrefix : runFetchLoop: received ${entitiesReceivedMessage.replications.size} replications incoming"
                     }
                     nodeEventManager.onIncomingMessageReceived(entitiesReceivedMessage)
                     acknowledgementsToSend.addAll(entitiesReceivedMessage.replications.map { it.orUid })
-                    Napier.v(tag = DoorTag.LOG_TAG) {
+                    logger.v {
                         "$logPrefix : runFetchLoop: delivered ${entitiesReceivedMessage.replications.size} replications to node event manager"
                     }
                 }
@@ -420,8 +418,7 @@ class DoorRepositoryReplicationClient(
                 }
             }catch(e: Exception) {
                 if(e !is CancellationException) {
-                    Napier.v(
-                        tag= DoorTag.LOG_TAG,
+                    logger.v(
                         message = { "DoorRepositoryReplicationClient: : runFetchLoop: exception (probably offline): $e"},
                         throwable = e
                     )
@@ -475,7 +472,6 @@ class DoorRepositoryReplicationClient(
          */
         const val REPLICATION_PATH = "replication"
 
-        private val INSTANCE_ID_COUNTER = atomic(0)
     }
 
 }

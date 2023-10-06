@@ -6,12 +6,13 @@ import com.ustadmobile.door.entities.DoorNode
 import com.ustadmobile.door.entities.OutgoingReplication
 import com.ustadmobile.door.ext.*
 import com.ustadmobile.door.jdbc.ext.*
+import com.ustadmobile.door.log.e
+import com.ustadmobile.door.log.v
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.nodeevent.NodeEvent
 import com.ustadmobile.door.nodeevent.NodeEventManager
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.util.TransactionMode
-import io.github.aakira.napier.Napier
 import io.ktor.client.call.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -296,21 +297,27 @@ suspend fun RoomDatabase.onClientRepoDoorMessageHttpResponse(
     httpResponse: HttpResponse
 ) {
     val nodeEventManager: NodeEventManager<*> = doorWrapper.nodeEventManager
+    val logger = nodeEventManager.logger
     when (httpResponse.status) {
         HttpStatusCode.OK -> {
             val message: DoorMessage = httpResponse.body()
-            Napier.v(tag = DoorTag.LOG_TAG) {
-                "$this : onClientRepoDoorMessageHttpResponse : handle message with " +
-                        "${message.replications.size} replications"
+            logger.v {
+                "[onClientRepoDoorMessageHttpResponse - ${nodeEventManager.dbName}] - ${httpResponse.request.url} - " +
+                        "handle message with ${message.replications.size} replications"
             }
             nodeEventManager.onIncomingMessageReceived(message)
         }
         HttpStatusCode.NotModified, HttpStatusCode.NoContent -> {
-            Napier.v(tag = DoorTag.LOG_TAG) {
-                "$this - http response was not modified or no content, no need to do anything"
+            logger.v {
+                "$[onClientRepoDoorMessageHttpResponse - ${nodeEventManager.dbName}] - ${httpResponse.request.url} -" +
+                        " http response was not modified or no content, no need to do anything"
             }
         }
         else -> {
+            logger.e {
+                "$[onClientRepoDoorMessageHttpResponse - ${nodeEventManager.dbName}] - ${httpResponse.request.url} -" +
+                        " unexpected response status = ${httpResponse.status}"
+            }
             throw IllegalStateException("$this - unexpected response status - ${httpResponse.status}")
         }
     }

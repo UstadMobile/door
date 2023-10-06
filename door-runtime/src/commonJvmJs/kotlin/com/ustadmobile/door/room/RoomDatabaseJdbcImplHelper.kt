@@ -2,6 +2,7 @@ package com.ustadmobile.door.room
 
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
+import com.ustadmobile.door.log.DoorLogger
 
 
 /**
@@ -13,6 +14,8 @@ expect class RoomDatabaseJdbcImplHelper(
     dataSource: DataSource,
     db: RoomDatabase,
     dbUrl: String,
+    dbName: String,
+    logger: DoorLogger,
     tableNames: List<String>,
     invalidationTracker: InvalidationTracker,
     dbType: Int,

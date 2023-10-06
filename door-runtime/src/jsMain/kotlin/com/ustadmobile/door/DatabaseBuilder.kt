@@ -40,11 +40,13 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
         val storageLocation = builderOptions.dbUrl.substringAfter(PROTOCOL_SQLITE_PREFIX)
         val dbMetaData = lookupImplementations(builderOptions.dbClass).metadata
 
-        val dataSource = SQLiteDatasourceJs(storageLocation, Worker(builderOptions.webWorkerPath))
+        val dataSource = SQLiteDatasourceJs(storageLocation, Worker(builderOptions.webWorkerPath),
+            builderOptions.logger, builderOptions.logWorkerMessages)
         register(builderOptions.dbImplClasses)
 
         val dbImpl = builderOptions.dbImplClasses.dbImplKClass.js.createInstance(null, dataSource,
-            builderOptions.dbUrl, builderOptions.jdbcQueryTimeout, DoorDbType.SQLITE) as T
+            builderOptions.dbUrl, builderOptions.dbName, builderOptions.jdbcQueryTimeout, DoorDbType.SQLITE,
+            builderOptions.logger) as T
         val loadFromIndexedDb = storageLocation != LOCATION_MEMORY &&
                 IndexedDb.checkIfExists(storageLocation)
         val connection = dataSource.getConnection()
@@ -165,7 +167,7 @@ class DatabaseBuilder<T: RoomDatabase> private constructor(
         connection.close()
 
         val wrapperClass = builderOptions.dbImplClasses.replicateWrapperImplClass?.js?.createInstance(dbImpl,
-            builderOptions.nodeId, builderOptions.messageCallback) as T?
+            builderOptions.nodeId, builderOptions.messageCallback, builderOptions.logger, builderOptions.dbName) as T?
 
         Napier.i("Built database for: ${builderOptions.dbUrl}\n", tag = DoorTag.LOG_TAG)
 

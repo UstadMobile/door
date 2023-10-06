@@ -3,6 +3,7 @@ package com.ustadmobile.door.room
 import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.DataSource
+import com.ustadmobile.door.log.DoorLogger
 import com.ustadmobile.door.sqljsjdbc.SQLiteDatasourceJs
 import io.github.aakira.napier.Napier
 
@@ -15,10 +16,12 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
     dataSource: DataSource,
     db: RoomDatabase,
     dbUrl: String,
+    dbName: String,
+    logger: DoorLogger,
     tableNames: List<String>,
     invalidationTracker: InvalidationTracker,
     dbType: Int,
-) : RoomDatabaseJdbcImplHelperCommon(dataSource, db, tableNames, invalidationTracker, dbType) {
+) : RoomDatabaseJdbcImplHelperCommon(dataSource, db, dbName, logger, tableNames, invalidationTracker, dbType) {
 
     override suspend fun Connection.setupSqliteTriggersAsync() {
         //do nothing - this should already be done by the database builder

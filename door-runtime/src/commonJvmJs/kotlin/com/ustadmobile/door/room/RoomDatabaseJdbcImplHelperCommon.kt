@@ -2,7 +2,6 @@ package com.ustadmobile.door.room
 
 import com.ustadmobile.door.DoorDatabaseJdbc
 import com.ustadmobile.door.DoorDbType
-import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.concurrentSafeListOf
 import com.ustadmobile.door.ext.concurrentSafeMapOf
 import com.ustadmobile.door.ext.rootDatabase
@@ -10,9 +9,10 @@ import com.ustadmobile.door.jdbc.Connection
 import com.ustadmobile.door.jdbc.ConnectionAsync
 import com.ustadmobile.door.jdbc.DataSource
 import com.ustadmobile.door.jdbc.ext.mutableLinkedListOf
+import com.ustadmobile.door.log.*
 import com.ustadmobile.door.util.systemTimeInMillis
-import io.github.aakira.napier.Napier
 import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -25,6 +25,8 @@ import kotlin.coroutines.coroutineContext
 abstract class RoomDatabaseJdbcImplHelperCommon(
     protected val dataSource: DataSource,
     protected val db: RoomDatabase,
+    val dbName: String,
+    val logger: DoorLogger,
     private val tableNames: List<String>,
     val invalidationTracker: InvalidationTracker,
     val dbType: Int = DoorDbType.SQLITE
@@ -40,6 +42,8 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
 
     @Volatile
     private var closed = atomic(false)
+
+    protected val logPrefix: String = "[RoomJdbcImplHelper - $dbName]"
 
     internal interface Listener {
         suspend fun onBeforeTransactionAsync(
@@ -98,12 +102,12 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
         block: suspend (Connection) -> R,
     ): R {
         assertNotClosed()
-        val connection = dataSource.getConnection()
 
+        val connection = dataSource.getConnection()
         val connectionId = transactionIdAtomic.incrementAndGet()
-        Napier.v(tag = DoorTag.LOG_TAG) {
-            "useNewConnectionAsyncInternal: start new connection #$connectionId"
-        }
+
+        val connectionLogPrefix = "$logPrefix - useNewConnectionAsyncInternal connection #$connectionId "
+        logger.v { "$connectionLogPrefix - start readOnly=$readOnly" }
 
         if(!readOnly) {
             if(connection is ConnectionAsync) {
@@ -119,7 +123,7 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
 
         return try {
             if(!readOnly && dbType == DoorDbType.SQLITE) {
-                Napier.d(tag = DoorTag.LOG_TAG) { "useNewConnectionAsyncInternal: creating SQLite change triggers "}
+                logger.v { "$connectionLogPrefix: creating SQLite change triggers "}
                 connection.setupSqliteTriggersAsync()
             }
 
@@ -129,22 +133,13 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
                 it.onBeforeTransactionAsync(readOnly, connection, connectionId)
             }
 
-            Napier.v(tag = DoorTag.LOG_TAG) {
-                "useNewConnectionAsyncInternal: starting block"
-            }
             val result = withContext(transactionElement) {
                 block(transactionElement.connection)
-
-            }
-            Napier.v(tag = DoorTag.LOG_TAG) {
-                "useNewConnectionAsyncInternal: finished block"
             }
 
             if(!readOnly && dbType == DoorDbType.SQLITE) {
                 val changes = invalidationTracker.findChangedTablesOnConnectionAsync(connection)
-                Napier.v(tag = DoorTag.LOG_TAG) {
-                    "useNewConnectionAsyncInternal: SQLite Change Tracker: Changed tables=[${changes.joinToString()}]"
-                }
+                logger.d { "$connectionLogPrefix: SQLite Change Tracker: Changed tables=[${changes.joinToString()}]" }
                 changedTables.addAll(changes)
             }
 
@@ -157,6 +152,7 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
                     connection.commitAsync()
                 else
                     connection.commit()
+                logger.v { "$connectionLogPrefix committed changes" }
             }
 
             invalidationTracker.takeIf { changedTables.isNotEmpty() }?.onTablesInvalidated(changedTables.toSet())
@@ -167,29 +163,30 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
             result
         }catch(t: Throwable) {
             withContext(NonCancellable) {
-                Napier.e("useConnectionAsync: transaction ERROR: useConnectionAsync (transaction #${connectionId}: " +
-                        "Transactions [${openTransactions.keys.joinToString()}] are still open" +
-                        "Exception", t)
+                if(t is CancellationException) {
+                    logger.v { "$connectionLogPrefix : cancelled ${t.message}"}
+                }else {
+                    logger.e("$connectionLogPrefix exception ", t)
+                }
+
                 if(!connection.isClosed() && !readOnly) {
-                    Napier.e(tag = DoorTag.LOG_TAG, message = "  Attempting to rollback transaction #${connectionId}")
+                    logger.i(message = "$connectionLogPrefix Attempting to rollback transaction #${connectionId}")
                     if(connection is ConnectionAsync)
                         connection.rollbackAsync()
                     else
                         connection.rollback()
+                    logger.i(message = "$connectionLogPrefix Rolled back changes")
                 }
             }
-
 
             throw t
         }finally {
             connection.close()
             openTransactions.remove(connectionId)
-            Napier.v(tag = DoorTag.LOG_TAG) {
-                "useNewConnectionAsyncInternal: end transaction #$connectionId"
-            }
+            logger.v { "$connectionLogPrefix: end transaction #$connectionId" }
 
             if(openTransactions.isNotEmpty())
-                Napier.w("useConnectionAsync: close transaction $connectionId (took ${systemTimeInMillis() - transactionStartTime}ms)." +
+                logger.w("useConnectionAsync: close transaction $connectionId (took ${systemTimeInMillis() - transactionStartTime}ms)." +
                     "There are Transactions [${openTransactions.keys.joinToString()}] pending async transactions still open.")
         }
     }
@@ -263,9 +260,7 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
                 try {
                     it.value.connection.close()
                 }catch(e: Exception) {
-                    Napier.w(tag = DoorTag.LOG_TAG) {
-                        "${this.db} : exception closing connection for transaction #${it.key}"
-                    }
+                    logger.w("$logPrefix : exception closing connection for transaction #${it.key}")
                 }
             }
             openTransactions.clear()

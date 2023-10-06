@@ -3,6 +3,9 @@ package com.ustadmobile.door.nodeevent
 import com.ustadmobile.door.entities.OutgoingReplication
 import com.ustadmobile.door.ext.doorDatabaseMetadata
 import com.ustadmobile.door.ext.withDoorTransactionAsync
+import com.ustadmobile.door.log.DoorLogger
+import com.ustadmobile.door.log.d
+import com.ustadmobile.door.log.v
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.message.DoorMessageCallback
 import com.ustadmobile.door.replication.insertEntitiesFromMessage
@@ -22,8 +25,12 @@ import kotlinx.coroutines.flow.asSharedFlow
 abstract class NodeEventManagerCommon<T : RoomDatabase>(
     protected val db: T,
     protected val messageCallback: DoorMessageCallback<T>,
+    override val logger: DoorLogger,
+    final override val dbName: String,
     protected val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ): NodeEventManager<T> {
+
+    protected val logPrefix = "[NodeEventManager - $dbName]"
 
     protected val hasOutgoingReplicationTable = OutgoingReplication::class.simpleName?.let {
         it in db::class.doorDatabaseMetadata().allTables
@@ -64,11 +71,13 @@ abstract class NodeEventManagerCommon<T : RoomDatabase>(
         assertNotClosed()
         try {
             //this should check what is the strategy on the replicate entity
+            logger.v { "$logPrefix receiveMessage with ${message.replications.size} replications: run inserts" }
             db.withDoorTransactionAsync {
                 val messageToProcess = messageCallback.onIncomingMessageReceived(db, message)
                 db.insertEntitiesFromMessage(messageToProcess)
                 messageCallback.onIncomingMessageProcessed(db, messageToProcess)
             }
+            logger.d { "$logPrefix receiveMessage with ${message.replications.size} replications: inserts done/transaction finished" }
 
             _incomingMessages.emit(message)
         }catch(e: Exception){

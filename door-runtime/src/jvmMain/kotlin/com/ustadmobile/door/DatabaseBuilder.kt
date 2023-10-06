@@ -1,10 +1,13 @@
 package com.ustadmobile.door
 
 import com.ustadmobile.door.DoorConstants.DBINFO_TABLENAME
-import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.doorDatabaseMetadata
 import com.ustadmobile.door.jdbc.ext.mapRows
 import com.ustadmobile.door.jdbc.ext.useResults
+import com.ustadmobile.door.log.DoorLogger
+import com.ustadmobile.door.log.NapierDoorLogger
+import com.ustadmobile.door.log.i
+import com.ustadmobile.door.log.v
 import com.ustadmobile.door.message.DefaultDoorMessageCallback
 import com.ustadmobile.door.message.DoorMessageCallback
 import com.ustadmobile.door.migration.DoorMigration
@@ -17,7 +20,6 @@ import com.ustadmobile.door.triggers.createTriggerSetupStatementList
 import com.ustadmobile.door.triggers.dropDoorTriggersAndReceiveViews
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
-import io.github.aakira.napier.Napier
 import kotlinx.coroutines.runBlocking
 import org.sqlite.SQLiteConfig
 import org.sqlite.SQLiteDataSource
@@ -38,6 +40,8 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
     private var dbPassword: String?,
     private var queryTimeout: Int = PreparedStatementConfig.STATEMENT_DEFAULT_TIMEOUT_SECS,
     private var messageCallback: DoorMessageCallback<T> = DefaultDoorMessageCallback(),
+    private var logger: DoorLogger = NapierDoorLogger(),
+    private var dbName: String = dbUrl,
 ){
 
     private val callbacks = mutableListOf<DoorDatabaseCallback>()
@@ -57,6 +61,7 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
 
     @Suppress("UNCHECKED_CAST")
     fun build(): T {
+        val logPrefix = "[DatabaseBuilder.build - $dbName]"
         val dataSource = when {
             dbUrl.startsWith("jdbc:") -> {
                 val jdbcUrlType = dbUrl.substringAfter("jdbc:").substringBefore(":")
@@ -113,9 +118,9 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
             val dbImplClass = Class.forName("${dbClass.java.canonicalName}_JdbcImpl") as Class<T>
 
             val doorDb = dbImplClass.getConstructor(RoomDatabase::class.java, DataSource::class.java,
-                    String::class.java, Int::class.javaPrimitiveType,
-                    Int::class.javaPrimitiveType)
-                .newInstance(null, dataSource, dbUrl, queryTimeout, dbType)
+                    String::class.java, String::class.java, Int::class.javaPrimitiveType,
+                    Int::class.javaPrimitiveType, DoorLogger::class.java)
+                .newInstance(null, dataSource, dbUrl, dbName, queryTimeout, dbType, logger)
 
 
             val sqlDatabase = DoorSqlDatabaseConnectionImpl(connection, dbType)
@@ -140,9 +145,7 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                         stmt.addBatch(triggerSetupSql)
                     }
                     stmt.executeBatch()
-                    Napier.v(tag = DoorTag.LOG_TAG) {
-                        "[DatabaseBuilder $dbUrl]: created tables"
-                    }
+                    logger.v { "$logPrefix : created tables" }
                 }
 
                 callbacks.forEach {
@@ -183,6 +186,7 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
                     val nextMigration = migrationList.filter { it.startVersion == currentDbVersion}
                         .maxByOrNull { it.endVersion }
                     if(nextMigration != null) {
+                        logger.v { "$logPrefix start update from ${nextMigration.startVersion} to ${nextMigration.endVersion}" }
                         when(nextMigration) {
                             is DoorMigrationSync -> nextMigration.migrateFn(sqlDatabase)
                             is DoorMigrationAsync -> runBlocking { nextMigration.migrateFn(sqlDatabase) }
@@ -198,6 +202,7 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
 
                         currentDbVersion = nextMigration.endVersion
                         sqlDatabase.execSQL("UPDATE _doorwayinfo SET dbVersion = $currentDbVersion")
+                        logger.v { "$logPrefix finish update from ${nextMigration.startVersion} to ${nextMigration.endVersion}" }
                     }else {
                         throw IllegalStateException("Need to migrate to version " +
                                 "${doorDb.dbVersion} from $currentDbVersion - could not find next migration")
@@ -225,8 +230,11 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
             (doorDb as RoomJdbcImpl).jdbcImplHelper.onStartChangeTracking()
 
             val wrapperClass = Class.forName("${dbClass.java.canonicalName}${DoorDatabaseWrapper.SUFFIX}") as Class<T>
-            return wrapperClass.getConstructor(dbClass.java, Long::class.javaPrimitiveType, DoorMessageCallback::class.java)
-                .newInstance(doorDb, nodeId, messageCallback)
+            val dbWrapped = wrapperClass.getConstructor(dbClass.java, Long::class.javaPrimitiveType,
+                    DoorMessageCallback::class.java, DoorLogger::class.java, String::class.java)
+                .newInstance(doorDb, nodeId, messageCallback, logger, dbName)
+            logger.i("$logPrefix database build complete")
+            return dbWrapped
         }
     }
 
@@ -243,6 +251,19 @@ class DatabaseBuilder<T: RoomDatabase> internal constructor(
 
     fun messageCallback(messageCallback: DoorMessageCallback<T>): DatabaseBuilder<T> {
         this.messageCallback = messageCallback
+        return this
+    }
+
+    fun logger(logger: DoorLogger) : DatabaseBuilder<T> {
+        this.logger = logger
+        return this
+    }
+
+    /**
+     * Set the name that will be used for logging purposes
+     */
+    fun name(name: String) : DatabaseBuilder<T>{
+        this.dbName = name
         return this
     }
 

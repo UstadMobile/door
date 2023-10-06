@@ -16,6 +16,9 @@ import kotlin.test.*
 /**
  * These tests run basic insert, update, query functions to ensure that generated implementations do what they are
  * supposed to do. This includes testing Flow and PagingSource return types.
+ *
+ * README: JS/ISSUE: if there is a LOT of logging output (e.g. Verbose), then running all tests will probably fail on JS.
+ * A lot of output seems to overwhelm it. Verbose logging will work for one or two tests, but not all
  */
 class BasicCrudIntegrationTest : AbstractCommonTest() {
     data class ExampleDbContext(
