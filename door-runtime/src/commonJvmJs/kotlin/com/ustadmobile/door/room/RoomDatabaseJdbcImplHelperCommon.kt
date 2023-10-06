@@ -12,15 +12,11 @@ import com.ustadmobile.door.jdbc.ext.mutableLinkedListOf
 import com.ustadmobile.door.log.*
 import com.ustadmobile.door.util.systemTimeInMillis
 import kotlinx.atomicfu.atomic
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import kotlin.concurrent.Volatile
 import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.coroutineContext
 
 abstract class RoomDatabaseJdbcImplHelperCommon(
     protected val dataSource: DataSource,
@@ -29,7 +25,8 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
     val logger: DoorLogger,
     private val tableNames: List<String>,
     val invalidationTracker: InvalidationTracker,
-    val dbType: Int = DoorDbType.SQLITE
+    val dbType: Int = DoorDbType.SQLITE,
+    dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
 
     private val transactionIdAtomic = atomic(0)
@@ -44,6 +41,8 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
     private var closed = atomic(false)
 
     protected val logPrefix: String = "[RoomJdbcImplHelper - $dbName]"
+
+    private val scope = CoroutineScope(dispatcher + Job())
 
     internal interface Listener {
         suspend fun onBeforeTransactionAsync(
@@ -121,7 +120,7 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
         val transactionStartTime = systemTimeInMillis()
         val changedTables = mutableLinkedListOf<String>()
 
-        return try {
+        try {
             if(!readOnly && dbType == DoorDbType.SQLITE) {
                 logger.v { "$connectionLogPrefix: creating SQLite change triggers "}
                 connection.setupSqliteTriggersAsync()
@@ -160,11 +159,13 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
                 it.onTransactionCommittedAsync(readOnly, connection, connectionId)
             }
 
-            result
+            return result
         }catch(t: Throwable) {
             withContext(NonCancellable) {
                 if(t is CancellationException) {
-                    logger.v { "$connectionLogPrefix : cancelled ${t.message}"}
+                    logger.v {
+                        "$connectionLogPrefix : cancelled ${t.message} after ${systemTimeInMillis() - transactionStartTime}ms"
+                    }
                 }else {
                     logger.e("$connectionLogPrefix exception ", t)
                 }
@@ -187,8 +188,9 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
 
             if(openTransactions.isNotEmpty())
                 logger.w("useConnectionAsync: close transaction $connectionId (took ${systemTimeInMillis() - transactionStartTime}ms)." +
-                    "There are Transactions [${openTransactions.keys.joinToString()}] pending async transactions still open.")
+                        "There are Transactions [${openTransactions.keys.joinToString()}] pending async transactions still open.")
         }
+
     }
 
     /**
@@ -203,11 +205,11 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
     suspend fun <R> useConnectionAsync(
         readOnly: Boolean,
         block: suspend (Connection) -> R
-    ): R {
+    ): R = withContext(scope.coroutineContext) {
         val transactionContext = coroutineContext[Key]
         val dbQueryTimeoutMs = ((db.rootDatabase as DoorDatabaseJdbc).jdbcQueryTimeout * 1000).toLong()
 
-        return if(transactionContext != null) {
+        if(transactionContext != null) {
             //continue using existing connection for the transaction
             if(transactionContext.readOnly && !readOnly) {
                 //If the current context is readOnly, and a read-write connection is requested, that is not allowed.
@@ -265,6 +267,7 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
             }
             openTransactions.clear()
             onClose()
+            scope.cancel(message = "Database closed")
         }
     }
 
