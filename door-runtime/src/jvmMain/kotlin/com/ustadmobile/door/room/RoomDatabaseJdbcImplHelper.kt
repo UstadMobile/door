@@ -15,6 +15,7 @@ import com.ustadmobile.door.util.PostgresChangeTracker
 import com.ustadmobile.door.util.systemTimeInMillis
 import com.zaxxer.hikari.HikariDataSource
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
@@ -82,7 +83,9 @@ actual class RoomDatabaseJdbcImplHelper actual constructor(
 
                 transaction.connection.takeIf { !readOnly }?.commit()
 
-                invalidationTracker.takeIf { changedTables.isNotEmpty() }?.onTablesInvalidated(changedTables.toSet())
+                scope.takeIf { changedTables.isNotEmpty() }?.launch {
+                    invalidationTracker.onTablesInvalidated(changedTables.toSet())
+                }
             }
         }catch(e: Exception) {
             logger.e("$funLogPrefix exception", e)

@@ -42,7 +42,7 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
 
     protected val logPrefix: String = "[RoomJdbcImplHelper - $dbName]"
 
-    private val scope = CoroutineScope(dispatcher + Job())
+    protected val scope = CoroutineScope(dispatcher + Job())
 
     internal interface Listener {
         suspend fun onBeforeTransactionAsync(
@@ -154,9 +154,21 @@ abstract class RoomDatabaseJdbcImplHelperCommon(
                 logger.v { "$connectionLogPrefix committed changes" }
             }
 
-            invalidationTracker.takeIf { changedTables.isNotEmpty() }?.onTablesInvalidated(changedTables.toSet())
             listeners.forEach {
                 it.onTransactionCommittedAsync(readOnly, connection, connectionId)
+            }
+
+            /**
+             * Launch an async callback to run onTablesInvalidated within the scope. This will avoid other database
+             * work waiting longer for a connection and avoid potential for deadlock if any of those callbacks were to
+             * make a blocking database call. e.g.
+             *  1) Async query makes changes
+             *  2) onInvalidated callback runs a blocking query within it - but can't get a connection because the
+             *     useNewConnectionAsyncInternal block has not completed, and when using SQLite, there is only one
+             *     connection at a time.
+             */
+            scope.takeIf { changedTables.isNotEmpty() }?.launch {
+                invalidationTracker.onTablesInvalidated(changedTables.toSet())
             }
 
             return result
