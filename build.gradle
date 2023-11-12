@@ -55,10 +55,10 @@ if(System.getenv("DOOR_POSTGRES_PASS") != null) {
 
 
 ext {
-    version_kotlin_wrappers_bom = "1.0.0-pre.619"
+    version_kotlin_wrappers_bom = "1.0.0-pre.640"
 
-    version_android_compile_sdk = 33
-    version_android_target_sdk = 33
+    version_android_compile_sdk = 34
+    version_android_target_sdk = 34
 
 
 }

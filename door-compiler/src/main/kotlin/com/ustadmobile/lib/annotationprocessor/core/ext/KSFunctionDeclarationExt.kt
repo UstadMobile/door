@@ -18,6 +18,7 @@ import com.ustadmobile.door.annotation.RepoHttpBodyParam
 import com.ustadmobile.lib.annotationprocessor.core.applyIf
 import com.ustadmobile.lib.annotationprocessor.core.isSQLAModifyingQuery
 import net.sf.jsqlparser.parser.CCJSqlParserUtil
+import net.sf.jsqlparser.statement.Statement
 import net.sf.jsqlparser.statement.select.Select
 import net.sf.jsqlparser.util.TablesNamesFinder
 import net.sf.jsqlparser.statement.insert.Insert as InsertStatement
@@ -87,7 +88,7 @@ fun KSFunctionDeclaration.getQueryTables(
         try {
             val select = CCJSqlParserUtil.parse(querySql ?: "SELECT 0") as Select
             val tablesNamesFinder = TablesNamesFinder()
-            tablesToWatch.addAll(tablesNamesFinder.getTableList(select))
+            tablesToWatch.addAll(tablesNamesFinder.getTableList(select as Statement))
         }catch(e: Exception) {
             logger.error("Sorry: JSQLParser could not parse the query : " +
                     querySql +
