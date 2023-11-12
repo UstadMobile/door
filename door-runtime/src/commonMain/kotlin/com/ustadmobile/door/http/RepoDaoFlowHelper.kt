@@ -29,7 +29,7 @@ class RepoDaoFlowHelper(
 
     /**
      * This is used by generated code to create an offline-first flow where the flow will immediately load from the
-     * local database. Collecting the flow will trigger an http request in the background to pull updates from the
+     * local database. Collecting the flow will trigger a http request in the background to pull updates from the
      * server (if any). This will run an insert, which would trigger the flow to update with the new data automatically.
      *
      * @param dbFlow the flow from the database DAO

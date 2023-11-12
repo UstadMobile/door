@@ -32,34 +32,33 @@ compileTestKotlin {
 dependencies {
     implementation project(":door-runtime")
     implementation project(':room-annotations')
-    implementation "app.cash.paging:paging-common:$version_paging_multiplatform"
+    implementation libs.paging.multiplatform.common
     implementation "org.jetbrains.kotlin:kotlin-stdlib"
-    implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
-    implementation "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
-    implementation "com.squareup:kotlinpoet:$version_kotlinpoet"
-    implementation "com.squareup:kotlinpoet-ksp:$version_kotlinpoet"
-    implementation "com.squareup:kotlinpoet-metadata:$version_kotlinpoet"
-    implementation "com.github.jsqlparser:jsqlparser:$version_jsqlparser"
-    implementation "org.apache.commons:commons-text:$version_apache_commons_text"
-    implementation "com.google.code.gson:gson:$version_gson"
-    implementation "com.github.h-thurow:simple-jndi:$version_simple_jndi"
-    implementation "org.apache.commons:commons-pool2:$version_apache_commons_pool2"
-    implementation "org.xerial:sqlite-jdbc:$version_sqlite_jdbc"
-    implementation "org.postgresql:postgresql:$version_postgres_jdbc"
-    implementation "org.apache.commons:commons-dbcp2:$version_apache_commons_dbcp2"
-    implementation "io.ktor:ktor-server-netty:$version_ktor"
-    implementation "io.ktor:ktor-serialization-gson:$version_ktor"
-    implementation "io.ktor:ktor-client-okhttp:$version_ktor"
-    implementation "io.ktor:ktor-client-gson:$version_ktor"
-    implementation "org.nanohttpd:nanohttpd:$version_nanohttpd"
-    implementation "org.nanohttpd:nanohttpd-nanolets:$version_nanohttpd"
-    implementation "ch.qos.logback:logback-classic:$version_logback"
-    implementation "org.kodein.di:kodein-di:$version_kodein_di"
-    implementation "org.kodein.di:kodein-di-framework-ktor-server-jvm:$version_kodein_di"
-    implementation "io.github.aakira:napier-jvm:$version_napier"
-    implementation "org.jetbrains.kotlinx:kotlinx-metadata-jvm:$version_kotlinx_metadata"
-    implementation "com.google.devtools.ksp:symbol-processing-api:$version_kotlin-$ksp_version"
-    testImplementation "junit:junit:$version_junit"
+    implementation libs.kotlinx.serialization.json
+    implementation libs.kotlin.reflect
+    implementation libs.kotlinpoet
+    implementation libs.kotlinpoet.ksp
+    implementation libs.kotlinpoet.metadata
+    implementation libs.jsqlparser
+    implementation libs.apache.commons.text
+    implementation libs.gson
+    implementation libs.simple.jndi
+    implementation libs.apache.commons.pool2
+    implementation libs.sqlite.jdbc
+    implementation libs.postgres.jdbc
+    implementation libs.apache.commons.dbcp2
+    implementation libs.ktor.server.netty
+    implementation libs.ktor.serialization.gson
+    implementation libs.ktor.client.okhttp
+    implementation libs.ktor.client.gson
+    implementation libs.nanohttpd
+    implementation libs.nanohttpd.nanolets
+    implementation libs.logback.classic
+    implementation libs.kodein.di
+    implementation libs.kodein.di.framework.ktor.server
+    implementation libs.napier.jvm
+    implementation libs.ksp.api
+    testImplementation libs.junit
 }
 
 

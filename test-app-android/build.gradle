@@ -55,41 +55,41 @@ configurations.all {
 dependencies {
     implementation project(":door-runtime")
     implementation project(":door-testdb")
-    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
-    implementation "androidx.core:core-ktx:$version_androidx_core"
-    implementation "androidx.appcompat:appcompat:$version_android_appcompat"
-    implementation "com.google.android.material:material:$version_android_material"
-    implementation "androidx.constraintlayout:constraintlayout:$version_android_constraint_layout"
-    implementation "org.nanohttpd:nanohttpd:$version_nanohttpd"
-    implementation "org.nanohttpd:nanohttpd-nanolets:$version_nanohttpd"
+    //implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    implementation libs.androidx.core.ktx
+    implementation libs.androidx.appcompat
+    implementation libs.android.material
+    implementation libs.androidx.constraintlayout
+    implementation libs.nanohttpd
+    implementation libs.nanohttpd.nanolets
 
-    implementation "io.ktor:ktor-client-core:$version_ktor"
-    implementation "io.ktor:ktor-client-json:$version_ktor"
-    implementation "io.ktor:ktor-client-content-negotiation:$version_ktor"
-    implementation "io.github.aakira:napier:$version_napier"
-    implementation "org.kodein.di:kodein-di:$version_kodein_di"
-    implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
-    implementation "org.jetbrains.kotlinx:atomicfu:$version_atomicfu"
+    implementation libs.ktor.client.core
+    implementation libs.ktor.client.json
+    implementation libs.ktor.client.content.negotiation
+    implementation libs.napier
+    implementation libs.kodein.di
+    implementation libs.kotlinx.serialization.json
+    implementation libs.kotlinx.atomicfu
 
-    implementation "io.ktor:ktor-serialization-gson:$version_ktor"
-    implementation "io.ktor:ktor-client-okhttp:$version_ktor"
-    implementation "io.ktor:ktor-client-gson:$version_ktor"
-
-
-    implementation "androidx.room:room-runtime:$version_android_room"
-    implementation "androidx.room:room-ktx:$version_android_room"
-    implementation "androidx.paging:paging-runtime:$version_androidx_paging"
-    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
-    implementation "androidx.lifecycle:lifecycle-viewmodel:$version_androidx_lifecycle"
-    implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:$version_androidx_lifecycle"
-    implementation "androidx.lifecycle:lifecycle-livedata-ktx:$version_androidx_lifecycle"
+    implementation libs.ktor.serialization.gson
+    implementation libs.ktor.client.okhttp
+    implementation libs.ktor.client.gson
 
 
-    testImplementation "junit:junit:$version_junit"
-    androidTestImplementation "androidx.test.ext:junit:$version_androidx_test_junit_ext"
-    androidTestImplementation "androidx.test:runner:$version_androidx_test_runner"
-    androidTestUtil "androidx.test:orchestrator:$version_androidx_test_orchestrator"
-    androidTestImplementation "androidx.test:rules:$version_androidx_test_rules"
+    implementation libs.androidx.room.runtime
+    implementation libs.androidx.room.ktx
+    implementation libs.androidx.paging.runtime
+    //implementation "org.jetbrains.kotlin:kotlin-stdlib"
+    implementation libs.androidx.lifecycle.viewmodel
+    implementation libs.androidx.lifecycle.viewmodel.ktx
+    implementation libs.androidx.lifecycle.livedata.ktx
 
-    androidTestImplementation "androidx.test.espresso:espresso-core:$version_espresso"
+
+    testImplementation libs.junit
+    androidTestImplementation libs.androidx.test.ext.junit
+    androidTestImplementation libs.androidx.test.runner
+    androidTestUtil libs.androidx.test.orchestrator
+    androidTestImplementation libs.androidx.test.rules
+
+    androidTestImplementation libs.androidx.test.espresso.core
 }

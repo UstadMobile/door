@@ -40,32 +40,32 @@ dependencies {
     implementation project(":door-testdb")
     implementation project(":door-runtime")
 
-    implementation "io.ktor:ktor-client-core:$version_ktor"
-    implementation "io.ktor:ktor-client-json:$version_ktor"
-    implementation "io.ktor:ktor-io:$version_ktor"
+    implementation libs.ktor.client.core
+    implementation libs.ktor.client.json
+    implementation libs.ktor.io
 
-    implementation "io.ktor:ktor-server-netty:$version_ktor"
-    implementation "io.ktor:ktor-server-servlet:$version_ktor"
-    implementation "io.ktor:ktor-server-content-negotiation:$version_ktor"
-    implementation "io.ktor:ktor-serialization-gson:$version_ktor"
-    implementation "io.ktor:ktor-server-call-logging:$version_ktor"
-    implementation "io.ktor:ktor-server-cors:$version_ktor"
+    implementation libs.ktor.server.netty
+    implementation libs.ktor.server.servlet
+    implementation libs.ktor.server.content.negotiation
+    implementation libs.ktor.serialization.gson
+    implementation libs.ktor.server.call.logging
+    implementation libs.ktor.server.cors
 
-    implementation "io.ktor:ktor-client-core:$version_ktor"
-    implementation "io.ktor:ktor-client-okhttp:$version_ktor"
-    implementation "org.kodein.di:kodein-di-framework-ktor-server-jvm:$version_kodein_di"
-    implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
-    implementation "io.github.aakira:napier:$version_napier"
-    implementation "ch.qos.logback:logback-classic:$version_logback"
+    implementation libs.ktor.client.core
+    implementation libs.ktor.client.okhttp
+    implementation libs.kodein.di.framework.ktor.server
+    implementation libs.kotlinx.serialization.json
+    implementation libs.napier
+    implementation libs.logback.classic
 
-    implementation "com.github.h-thurow:simple-jndi:$version_simple_jndi"
-    implementation "org.apache.commons:commons-pool2:$version_apache_commons_pool2"
-    implementation "org.apache.commons:commons-dbcp2:$version_apache_commons_dbcp2"
-    implementation "org.xerial:sqlite-jdbc:$version_sqlite_jdbc"
-    implementation "org.postgresql:postgresql:$version_postgres_jdbc"
+    implementation libs.simple.jndi
+    implementation libs.apache.commons.pool2
+    implementation libs.apache.commons.dbcp2
+    implementation libs.sqlite.jdbc
+    implementation libs.postgres.jdbc
 
-    testImplementation "org.junit.jupiter:junit-jupiter-api:$version_junit_jupiter"
-    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:$version_junit_jupiter"
+    testImplementation libs.junit.jupiter
+    testRuntimeOnly libs.junit.jupiter.engine
 }
 
 test {

@@ -6,6 +6,144 @@ pluginManagement {
     }
 }
 
+//As per https://docs.gradle.org/current/userguide/platforms.html
+dependencyResolutionManagement {
+    versionCatalogs {
+        libs {
+            version("version_kotlin", "1.9.0")
+            version("version_ksp", "1.9.0-1.0.13")
+            version("version_paging_multiplatform", "3.2.0-alpha05-0.2.3")
+            version("version_coroutines", "1.7.3")
+            version("version_ktor", "2.2.3")
+            version("version_nanohttpd", "2.3.1")
+            version("version_napier", "2.6.1")
+            version("version_atomicfu", "0.22.0")
+            version("version_sqlite_jdbc", "3.42.0.0")
+            version("version_kodein_di", "7.20.2")
+            version("version_kotlin_mockito", "5.1.0")
+            version("version_mockwebserver", "4.11.0")
+            version("version_android_room", "2.5.2")
+            version("version_androidx_lifecycle", "2.6.1")
+            version("version_androidx_paging", "3.2.0-alpha05")
+            version("version_androidx_core", "1.9.0")
+            version("version_kotlinpoet", "1.14.2")
+            version("version_jsqlparser", "4.6")
+            version("version_apache_commons_text", "1.10.0")
+            version("version_gson", "2.10.1")
+            version("version_simple_jndi", "0.23.0")
+            version("version_apache_commons_pool2", "2.11.1")
+            version("version_postgres_jdbc", "42.6.0")
+            version("version_apache_commons_dbcp2", "2.9.0")
+            version("version_logback", "1.4.11")
+            version("version_okhttp", "4.11.0")
+            version("version_kotlinx_serialization", "1.6.0")
+            version("version_kotlinx_metadata", "0.4.2")
+            version("version_hikaricp", "5.0.1")
+            version("version_junit", "4.13.2")
+            version("version_junit_jupiter", "5.10.0")
+            version("version_turbine", "0.13.0")
+
+            version("version_androidx_test", "1.4.2")
+            version("version_androidx_test_orchestrator", "1.4.2")
+            version("version_androidx_test_runner", "1.5.2")
+            version("version_androidx_test_rules", "1.5.0")
+            version("version_androidx_test_junit_ext", "1.1.5")
+            version("version_espresso", "3.5.1")
+            version("version_android_junit_runner", "1.4.0")
+            version("version_android_appcompat", "1.6.1")
+            version("version_android_material", "1.9.0")
+            version("version_android_constraint_layout", "2.1.4")
+            version("version_android_roboelectric", "4.10.3")
+
+            version("version_kotlin_wrappers_bom", "1.0.0-pre.619")
+            version("version_kotlin_extensions", "1.0.1-pre.619")
+
+
+            library("paging-multiplatform-common", "app.cash.paging", "paging-common").versionRef("version_paging_multiplatform")
+            library("kotlinx-serialization-json", "org.jetbrains.kotlinx", "kotlinx-serialization-json").versionRef("version_kotlinx_serialization")
+            library("kotlin-reflect", "org.jetbrains.kotlin", "kotlin-reflect").versionRef("version_kotlin")
+            library("kotlinpoet", "com.squareup", "kotlinpoet").versionRef("version_kotlinpoet")
+            library("kotlinpoet-ksp", "com.squareup", "kotlinpoet-ksp").versionRef("version_kotlinpoet")
+            library("kotlinpoet-metadata", "com.squareup", "kotlinpoet-metadata").versionRef("version_kotlinpoet")
+            library("jsqlparser", "com.github.jsqlparser", "jsqlparser").versionRef("version_jsqlparser")
+            library("apache-commons-text", "org.apache.commons", "commons-text").versionRef("version_apache_commons_text")
+            library("gson", "com.google.code.gson", "gson").versionRef("version_gson")
+            library("simple-jndi", "com.github.h-thurow", "simple-jndi").versionRef("version_simple_jndi")
+            library("apache-commons-pool2", "org.apache.commons", "commons-pool2").versionRef("version_apache_commons_pool2")
+            library("sqlite-jdbc", "org.xerial", "sqlite-jdbc").versionRef("version_sqlite_jdbc")
+            library("postgres-jdbc", "org.postgresql", "postgresql").versionRef("version_postgres_jdbc")
+            library("apache-commons-dbcp2", "org.apache.commons", "commons-dbcp2").versionRef("version_apache_commons_dbcp2")
+
+            library("ktor-server-netty", "io.ktor", "ktor-server-netty").versionRef("version_ktor")
+            library("ktor-serialization-gson", "io.ktor", "ktor-serialization-gson").versionRef("version_ktor")
+            library("kotlinx-atomicfu", "org.jetbrains.kotlinx", "atomicfu").versionRef("version_atomicfu")
+            library("ktor-client-okhttp", "io.ktor", "ktor-client-okhttp").versionRef("version_ktor")
+            library("ktor-client-gson", "io.ktor", "ktor-client-gson").versionRef("version_ktor")
+            library("ktor-client-core", "io.ktor", "ktor-client-core").versionRef("version_ktor")
+            library("ktor-client-json", "io.ktor", "ktor-client-json").versionRef("version_ktor")
+            library("ktor-server-core", "io.ktor", "ktor-server-core").versionRef("version_ktor")
+            library("ktor-server", "io.ktor", "ktor-server").versionRef("version_ktor")
+            library("ktor-server-content-negotiation", "io.ktor", "ktor-server-content-negotiation").versionRef("version_ktor")
+            library("ktor-client-content-negotiation", "io.ktor", "ktor-client-content-negotiation").versionRef("version_ktor")
+            library("ktor-serialization-kotlinx-json", "io.ktor", "ktor-serialization-kotlinx-json").versionRef("version_ktor")
+            library('ktor-server-test-host', "io.ktor", "ktor-server-test-host").versionRef("version_ktor")
+            library("ktor-io", "io.ktor", "ktor-io").versionRef("version_ktor")
+            library("ktor-server-servlet", "io.ktor", "ktor-server-servlet").versionRef("version_ktor")
+            library("ktor-server-call-logging", "io.ktor", "ktor-server-call-logging").versionRef("version_ktor")
+            library("ktor-server-cors", "io.ktor", "ktor-server-cors").versionRef("version_ktor")
+            library("ktor-client-js", "io.ktor", "ktor-client-js").versionRef("version_ktor")
+
+            library("nanohttpd", "org.nanohttpd", "nanohttpd").versionRef("version_nanohttpd")
+            library("nanohttpd-nanolets", "org.nanohttpd", "nanohttpd-nanolets").versionRef("version_nanohttpd")
+            library("logback-classic", "ch.qos.logback", "logback-classic").versionRef("version_logback")
+            library("kodein-di", "org.kodein.di", "kodein-di").versionRef("version_kodein_di")
+            library("kodein-di-framework-ktor-server", "org.kodein.di", "kodein-di-framework-ktor-server-jvm").versionRef("version_kodein_di")
+            library("napier-jvm", "io.github.aakira", "napier-jvm").versionRef("version_napier")
+            library("napier", "io.github.aakira", "napier").versionRef("version_napier")
+            library("kotlinx-metadata-jvm", "org.jetbrains.kotlinx", "kotlinx-metadata-jvm").versionRef("version_kotlinx_metadata")
+            library("ksp-api", "com.google.devtools.ksp", "symbol-processing-api").versionRef("version_ksp")
+            library("junit", "junit", "junit").versionRef("version_junit")
+            library("hikaricp", "com.zaxxer", "HikariCP").versionRef("version_hikaricp")
+            library("mockito-kotlin", "org.mockito.kotlin", "mockito-kotlin").versionRef("version_kotlin_mockito")
+            library("mockwebserver", "com.squareup.okhttp3", "mockwebserver").versionRef("version_mockwebserver")
+            library("turbine", "app.cash.turbine", "turbine").versionRef("version_turbine")
+            library("kotlinx-coroutines-core", "org.jetbrains.kotlinx", "kotlinx-coroutines-core").versionRef("version_coroutines")
+            library("kotlinx-coroutines-test", "org.jetbrains.kotlinx", "kotlinx-coroutines-test").versionRef("version_coroutines")
+            library("junit-jupiter", "org.junit.jupiter", "junit-jupiter-api").versionRef("version_junit_jupiter")
+            library("junit-jupiter-engine", "org.junit.jupiter", "junit-jupiter-engine").versionRef("version_junit_jupiter")
+
+
+            library("okhttp", "com.squareup.okhttp3", "okhttp").versionRef("version_okhttp")
+            library("okhttp-sse", "com.squareup.okhttp3", "okhttp-sse").versionRef("version_okhttp")
+
+            library("androidx-room-runtime", "androidx.room", "room-runtime").versionRef("version_android_room")
+            library("androidx-room-ktx", "androidx.room", "room-ktx").versionRef("version_android_room")
+            library('androidx-room-paging', "androidx.room", "room-paging").versionRef("version_android_room")
+            library("androidx-room-compiler", "androidx.room", "room-compiler").versionRef("version_android_room")
+            library("androidx-paging-runtime", "androidx.paging", "paging-runtime").versionRef("version_androidx_paging")
+            library("androidx-core-ktx", "androidx.core", "core-ktx").versionRef("version_androidx_core")
+            library("robolectric", "org.robolectric", "robolectric").versionRef("version_android_roboelectric")
+            library("androidx-test-ext-junit", "androidx.test.ext", "junit").versionRef("version_androidx_test_junit_ext")
+            library("androidx-test-runner", "androidx.test", "runner").versionRef("version_androidx_test_runner")
+            library("androidx-test-rules", "androidx.test", "rules").versionRef("version_androidx_test_rules")
+            library("androidx-appcompat", "androidx.appcompat", "appcompat").versionRef("version_android_appcompat")
+            library("android-material", "com.google.android.material", "material").versionRef("version_android_material")
+            library("androidx-constraintlayout", "androidx.constraintlayout", "constraintlayout").versionRef("version_android_constraint_layout")
+            library("androidx-lifecycle-viewmodel", "androidx.lifecycle", "lifecycle-viewmodel").versionRef("version_androidx_lifecycle")
+            library("androidx-lifecycle-viewmodel-ktx", "androidx.lifecycle", "lifecycle-viewmodel-ktx").versionRef("version_androidx_lifecycle")
+            library("androidx-lifecycle-livedata-ktx", "androidx.lifecycle", "lifecycle-livedata-ktx").versionRef("version_androidx_lifecycle")
+            library("androidx-test-orchestrator", "androidx.test", "orchestrator").versionRef("version_androidx_test_orchestrator")
+            library("androidx-test-espresso-core", "androidx.test.espresso", "espresso-core").versionRef("version_espresso")
+
+
+            library("kotlin-wrappers-kotlin-extensions", "org.jetbrains.kotlin-wrappers", "kotlin-extensions").versionRef("version_kotlin_extensions")
+
+        }
+
+    }
+}
+
+
 rootProject.name = 'door'
 include 'door-runtime'
 include 'door-compiler'

@@ -82,13 +82,13 @@ kotlin {
                 implementation project(":door-runtime")
                 implementation project(":room-annotations")
 
-                implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
-                implementation "io.ktor:ktor-client-content-negotiation:$version_ktor"
-                implementation "io.ktor:ktor-client-core:$version_ktor"
-                implementation "io.ktor:ktor-client-json:$version_ktor"
-                implementation "io.github.aakira:napier:$version_napier"
-                implementation "org.kodein.di:kodein-di:$version_kodein_di"
-                implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$version_kotlinx_coroutines"
+                implementation libs.kotlinx.serialization.json
+                implementation libs.ktor.client.content.negotiation
+                implementation libs.ktor.client.core
+                implementation libs.ktor.client.json
+                implementation libs.napier
+                implementation libs.kodein.di
+                implementation libs.kotlinx.coroutines.core
 
             }
         }
@@ -96,38 +96,38 @@ kotlin {
             dependencies {
                 implementation kotlin('test-common')
                 implementation kotlin('test-annotations-common')
-                implementation "app.cash.turbine:turbine:$version_turbine"
-                implementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:$version_kotlinx_coroutines"
+                implementation libs.turbine
+                implementation libs.kotlinx.coroutines.test
             }
         }
 
         jvmMain {
             dependencies {
-                implementation "io.ktor:ktor-serialization-gson:$version_ktor"
-                implementation "org.kodein.di:kodein-di-framework-ktor-server-jvm:$version_kodein_di"
-                implementation "org.xerial:sqlite-jdbc:$version_sqlite_jdbc"
-                implementation "io.ktor:ktor-server-content-negotiation:$version_ktor"
-                implementation "io.ktor:ktor-server-core:$version_ktor"
-                implementation "org.jetbrains.kotlin:kotlin-reflect:$version_kotlin"
+                implementation libs.ktor.serialization.gson
+                implementation libs.kodein.di.framework.ktor.server
+                implementation libs.sqlite.jdbc
+                implementation libs.ktor.server.content.negotiation
+                implementation libs.ktor.server.core
+                implementation libs.kotlin.reflect
             }
         }
 
         jvmTest {
             dependencies {
                 implementation kotlin('test-junit')
-                implementation "io.ktor:ktor-server-netty:$version_ktor"
-                implementation "com.squareup.okhttp3:mockwebserver:$version_mockwebserver"
-                implementation "org.mockito.kotlin:mockito-kotlin:$version_kotlin_mockito"
-                implementation "io.ktor:ktor-client-okhttp:$version_ktor"
-                implementation "io.ktor:ktor-client-gson:$version_ktor"
-                implementation "io.ktor:ktor-serialization-kotlinx-json:$version_ktor"
-                implementation "com.github.h-thurow:simple-jndi:$version_simple_jndi"
-                implementation "org.apache.commons:commons-pool2:$version_apache_commons_pool2"
-                implementation "org.apache.commons:commons-dbcp2:$version_apache_commons_dbcp2"
-                implementation "org.xerial:sqlite-jdbc:$version_sqlite_jdbc"
-                implementation "org.postgresql:postgresql:$version_postgres_jdbc"
+                implementation libs.ktor.server.netty
+                implementation libs.mockwebserver
+                implementation libs.mockito.kotlin
+                implementation libs.ktor.client.okhttp
+                implementation libs.ktor.client.gson
+                implementation libs.ktor.serialization.kotlinx.json
+                implementation libs.simple.jndi
+                implementation libs.apache.commons.pool2
+                implementation libs.apache.commons.dbcp2
+                implementation libs.sqlite.jdbc
+                implementation libs.postgres.jdbc
 
-                implementation "io.ktor:ktor-server-test-host:$version_ktor"
+                implementation libs.ktor.server.test.host
             }
         }
 
@@ -147,16 +147,16 @@ kotlin {
 
         androidMain {
             dependencies {
-                implementation "androidx.room:room-runtime:$version_android_room"
-                implementation "androidx.room:room-ktx:$version_android_room"
-                implementation "androidx.paging:paging-runtime:$version_androidx_paging"
-                implementation "androidx.room:room-paging:$version_android_room"
-                implementation "androidx.core:core-ktx:$version_androidx_core"
-                implementation "com.squareup.okhttp3:okhttp:$version_okhttp"
-                implementation "com.squareup.okhttp3:okhttp-sse:$version_okhttp"
-                implementation "com.google.code.gson:gson:$version_gson"
-                implementation "org.nanohttpd:nanohttpd:$version_nanohttpd"
-                implementation "org.nanohttpd:nanohttpd-nanolets:$version_nanohttpd"
+                implementation libs.androidx.room.runtime
+                implementation libs.androidx.room.ktx
+                implementation libs.androidx.paging.runtime
+                implementation libs.androidx.room.paging
+                implementation libs.androidx.core.ktx
+                implementation libs.okhttp
+                implementation libs.okhttp.sse
+                implementation libs.gson
+                implementation libs.nanohttpd
+                implementation libs.nanohttpd.nanolets
             }
         }
 
@@ -172,10 +172,10 @@ kotlin {
 
             dependencies {
                 implementation kotlin('test-junit')
-                implementation "org.robolectric:robolectric:$version_android_roboelectric"
-                implementation "androidx.test.ext:junit:$version_androidx_test_junit_ext"
-                implementation "androidx.test:runner:$version_androidx_test_runner"
-                implementation "androidx.test:rules:$version_androidx_test_rules"
+                implementation libs.robolectric
+                implementation libs.androidx.test.ext.junit
+                implementation libs.androidx.test.runner
+                implementation libs.androidx.test.rules
             }
         }
     }
@@ -218,11 +218,11 @@ dependencies {
     kspJs project(":door-compiler")
     kspJs project(":door-shallowcopy")
     kspAndroid project(":door-compiler")
-    kspAndroid "androidx.room:room-compiler:$version_android_room"
+    kspAndroid libs.androidx.room.compiler
     kspAndroid project(":door-shallowcopy")
 
-    androidTestUtil "androidx.test:orchestrator:$version_androidx_test_orchestrator"
-    androidTestImplementation "androidx.test.ext:junit:$version_androidx_test_junit_ext"
-    androidTestImplementation "androidx.test:runner:$version_androidx_test_runner"
-    androidTestImplementation "androidx.test:rules:$version_androidx_test_rules"
+    androidTestUtil libs.androidx.test.orchestrator
+    androidTestImplementation libs.androidx.test.ext.junit
+    androidTestImplementation libs.androidx.test.runner
+    androidTestImplementation libs.androidx.test.rules
 }

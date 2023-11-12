@@ -26,19 +26,19 @@ kotlin {
                 implementation "org.jetbrains.kotlin-wrappers:kotlin-react-dom"
                 implementation "org.jetbrains.kotlin-wrappers:kotlin-styled"
                 implementation "org.jetbrains.kotlin-wrappers:kotlin-react-router-dom"
-                implementation "io.github.aakira:napier:$version_napier"
-                implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
+                implementation libs.napier
+                implementation libs.kotlinx.serialization.json
 
                 implementation project(":door-runtime")
                 implementation project(":door-testdb")
 
-                implementation "io.ktor:ktor-client-js:$version_ktor"
+                implementation libs.ktor.client.js
             }
         }
 
         jsTest {
             dependencies {
-                implementation "org.jetbrains.kotlin:kotlin-test:$version_kotlin"
+                implementation kotlin("test-js")
             }
         }
     }
