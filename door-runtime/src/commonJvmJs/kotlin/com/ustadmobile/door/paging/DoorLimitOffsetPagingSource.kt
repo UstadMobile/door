@@ -1,27 +1,33 @@
 package com.ustadmobile.door.paging
 
 import app.cash.paging.*
+import com.ustadmobile.door.ext.withDoorTransactionAsync
 import com.ustadmobile.door.room.InvalidationTrackerObserver
 import com.ustadmobile.door.room.RoomDatabase
+import com.ustadmobile.door.util.TransactionMode
 import io.github.aakira.napier.Napier
 import kotlinx.atomicfu.atomic
-import kotlin.math.max
-
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
- * Implementation of an offset-limit PagingSource for JVM and JS.
+ * Implementation of an offset-limit PagingSource for JVM and JS. Based on
+ * Room's LimitOffsetPagingSource.kt
  */
+//Cast never succeed errors are caused by failure to IDE failure to understand expect-actual
 @Suppress("CAST_NEVER_SUCCEEDS")
 abstract class DoorLimitOffsetPagingSource<Value: Any>(
     private val db: RoomDatabase,
     private val tableNames: Array<String>,
 ): PagingSource<Int, Value>() {
 
-    private inner class InvalidationTracker(): InvalidationTrackerObserver(tableNames) {
+    private val itemCount = atomic(INITIAL_ITEM_COUNT)
+
+    private val invalidated = atomic(false)
+
+    private inner class InvalidationTracker: InvalidationTrackerObserver(tableNames) {
 
         private val registered = atomic(false)
-
-        private val invalidated = atomic(false)
 
         fun registerIfNeeded() {
             if(!registered.getAndSet(true))
@@ -49,24 +55,51 @@ abstract class DoorLimitOffsetPagingSource<Value: Any>(
      */
     override suspend fun load(
         params: PagingSourceLoadParams<Int>
-    ): PagingSourceLoadResult<Int, Value> {
-        Napier.d("DoorLimitOffsetPagingSource: Load key=${params.key}")
+    ): PagingSourceLoadResult<Int, Value> = withContext(Dispatchers.Default) {
         invalidationTracker.registerIfNeeded()
-
-        val offset = params.key ?: 0
-
-        val items = loadRows(params.loadSize, offset)
-        val count = countRows()
-
-        return PagingSourceLoadResultPage(
-            data = items,
-            prevKey = if(offset > 0) max(0, offset - params.loadSize) else null,
-            nextKey = if(offset + params.loadSize < count) offset + params.loadSize else null,
-        ) as PagingSourceLoadResult<Int, Value>
+        val tmpCount = itemCount.value
+        if(tmpCount == INITIAL_ITEM_COUNT) {
+            initialLoad(params)
+        }else {
+            nonInitialLoad(params, tmpCount)
+        }
     }
 
-    override fun getRefreshKey(state: PagingState<Int, Value>): Int {
-        return state.anchorPosition ?: 0
+    private suspend fun initialLoad(
+        params: PagingSourceLoadParams<Int>
+    ): PagingSourceLoadResult<Int, Value> = db.withDoorTransactionAsync(
+        TransactionMode.READ_ONLY
+    ) {
+        val tempCount = countRows()
+        itemCount.value = tempCount
+        queryDatabase(
+            params = params,
+            loadRows = { limit, offset ->
+                loadRows(limit, offset)
+            },
+            itemCount = tempCount
+        )
+    }
+
+    private suspend fun nonInitialLoad(
+        params: PagingSourceLoadParams<Int>,
+        tempCount: Int
+    ): PagingSourceLoadResult<Int, Value> {
+        return if(invalidated.value) {
+            INVALID as PagingSourceLoadResult<Int, Value>
+        }else {
+            queryDatabase(
+                params = params,
+                loadRows = { limit, offset ->
+                    loadRows(limit, offset)
+                },
+                itemCount = tempCount,
+            )
+        }
+    }
+
+    override fun getRefreshKey(state: PagingState<Int, Value>): Int? {
+        return state.getClippedRefreshKey()
     }
 
 }
