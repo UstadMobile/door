@@ -129,7 +129,7 @@ suspend fun RoomDatabase.acknowledgeReceivedReplications(
 ) {
     prepareAndUseStatementAsync(
         sql = """
-        DELETE FROM ${OutgoingReplication::class.simpleName}
+        DELETE FROM OutgoingReplication
               WHERE orUid = ?
                 AND destNodeId = ?
         """,
