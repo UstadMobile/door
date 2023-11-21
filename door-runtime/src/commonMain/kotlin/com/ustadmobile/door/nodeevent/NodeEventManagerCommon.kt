@@ -1,6 +1,5 @@
 package com.ustadmobile.door.nodeevent
 
-import com.ustadmobile.door.entities.OutgoingReplication
 import com.ustadmobile.door.ext.doorDatabaseMetadata
 import com.ustadmobile.door.ext.withDoorTransactionAsync
 import com.ustadmobile.door.log.DoorLogger
@@ -32,9 +31,7 @@ abstract class NodeEventManagerCommon<T : RoomDatabase>(
 
     protected val logPrefix = "[NodeEventManager - $dbName]"
 
-    protected val hasOutgoingReplicationTable = OutgoingReplication::class.simpleName?.let {
-        it in db::class.doorDatabaseMetadata().allTables
-    } ?: false
+    protected val hasOutgoingReplicationTable = "OutgoingReplication" in db::class.doorDatabaseMetadata().allTables
 
     protected val _outgoingEvents = MutableSharedFlow<List<NodeEvent>>()
 
