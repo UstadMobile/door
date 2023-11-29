@@ -28,7 +28,7 @@ actual class PreparedStatementArrayProxy actual constructor(
     }
 
     override fun getGeneratedKeys(): ResultSet {
-        throw SQLException("PreparedStatementArrayProxy does not support getting generated keys")
+        throw SQLException("PreparedStatementArrayProxy does not support getting generated keys", null)
     }
 
     override fun close() {

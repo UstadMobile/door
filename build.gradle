@@ -3,10 +3,10 @@ import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootPlugin
 
 buildscript {
 
-    ext.kotlin_version = "1.9.0"
-    ext.atomicfu_version = '0.22.0'
+    ext.kotlin_version = "1.9.21"
+    ext.atomicfu_version = '0.23.1'
     ext.version_shadow = "8.1.1"
-    ext.ksp_version = "1.0.13"
+    ext.ksp_version = "1.0.15"
 
     repositories {
         google()
@@ -28,7 +28,7 @@ plugins {
 
 
 group 'com.github.UstadMobile.door'
-version '0.70b27'
+version '0.70b28'
 
 ext.localProperties = new Properties()
 

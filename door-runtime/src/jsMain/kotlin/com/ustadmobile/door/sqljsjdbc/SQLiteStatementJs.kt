@@ -20,7 +20,7 @@ open class SQLiteStatementJs(
     protected var queryTimeoutSecs: Int = 0
 
     override fun executeUpdate(sql: String): Int {
-        throw SQLException("Synchronous SQL not supported!")
+        throw SQLException("Synchronous SQL not supported!", null)
     }
 
     override suspend fun executeUpdateAsyncJs(sql: String): Int {

@@ -98,7 +98,7 @@ class SQLiteConnectionJs(
     override fun isClosed() = closed
 
     override fun createArrayOf(arrayType: String, objects: Array<out Any?>): com.ustadmobile.door.jdbc.Array {
-        throw SQLException("Array not supported on SQLite")
+        throw SQLException("Array not supported on SQLite", null)
     }
 
     override fun getMetaData(): DatabaseMetadata {

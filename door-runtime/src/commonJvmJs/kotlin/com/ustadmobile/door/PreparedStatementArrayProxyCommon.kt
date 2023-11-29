@@ -1,7 +1,9 @@
 package com.ustadmobile.door
 import com.ustadmobile.door.jdbc.*
-import com.ustadmobile.door.jdbc.types.*
 import com.ustadmobile.door.jdbc.ext.useStatement
+import com.ustadmobile.door.jdbc.types.BigDecimal
+import com.ustadmobile.door.jdbc.types.Date
+import com.ustadmobile.door.jdbc.types.Time
 import kotlin.math.max
 
 abstract class PreparedStatementArrayProxyCommon(
@@ -94,17 +96,17 @@ abstract class PreparedStatementArrayProxyCommon(
 
     @Throws(SQLException::class)
     override fun setBigDecimal(index: Int, value: BigDecimal) {
-        throw SQLException("PreparedStatementArrayProxy unsupported type: BigDecimal")
+        throw SQLException("PreparedStatementArrayProxy unsupported type: BigDecimal", null as Throwable?)
     }
 
     @Throws(SQLException::class)
     override fun setBytes(index: Int, value: ByteArray) {
-        throw SQLException("PreparedStatementArrayProxy unsupported type: Bytes")
+        throw SQLException("PreparedStatementArrayProxy unsupported type: Bytes", null as Throwable?)
     }
 
     @Throws(SQLException::class)
     override fun setDate(index: Int, value: Date) {
-        throw SQLException("PreparedStatementArrayProxy unsupported type: Date")
+        throw SQLException("PreparedStatementArrayProxy unsupported type: Date", null as Throwable?)
     }
 
 

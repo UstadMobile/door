@@ -35,7 +35,7 @@ actual fun <T: RoomDatabase, R> T.withDoorTransaction(
     transactionMode: TransactionMode,
     block: (T) -> R
 ) : R {
-    throw SQLException("withDoorTransaction non-async not support on Javascript!")
+    throw SQLException("withDoorTransaction non-async not support on Javascript!", null)
 }
 
 

@@ -40,11 +40,11 @@ class SQLitePreparedStatementJs(
     }
 
     override fun setDate(index: Int, value: Date) {
-        throw SQLException("This is currently not supported")
+        throw SQLException("This is currently not supported", null)
     }
 
     override fun setTime(index: Int, value: Any) {
-        throw SQLException("This is currently not supported")
+        throw SQLException("This is currently not supported", null)
     }
 
     /**
@@ -73,7 +73,7 @@ class SQLitePreparedStatementJs(
     }
 
     override fun setArray(index: Int, array: com.ustadmobile.door.jdbc.Array) {
-        throw SQLException("SQLite does not support arrays")
+        throw SQLException("SQLite does not support arrays", null)
     }
 
     override fun setInt(index: Int, value: Int) {
@@ -99,7 +99,7 @@ class SQLitePreparedStatementJs(
     }
 
     override fun setBigDecimal(index: Int, value: Any) {
-        throw SQLException("This is currently not supported")
+        throw SQLException("This is currently not supported", null)
     }
 
     override fun executeUpdate(): Int {
