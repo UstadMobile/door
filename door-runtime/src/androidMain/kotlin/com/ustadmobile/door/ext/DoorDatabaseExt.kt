@@ -31,11 +31,12 @@ actual fun <T: RoomDatabase, R> T.withDoorTransaction(
     transactionMode: TransactionMode,
     block: (T) -> R
 ) : R {
-    return runInTransaction(Callable {
-        block(this)
-    })
+    return rootDatabase.runInTransaction(
+        Callable {
+            block(this)
+        }
+    )
 }
-
 
 private val metadataCache = mutableMapOf<KClass<*>, DoorDatabaseMetadata<*>>()
 

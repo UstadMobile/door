@@ -253,6 +253,11 @@ fun CodeBlock.Builder.addRepoHttpClientRequestForFunction(
         "${daoKSClass.simpleName.asString()}/${daoKSFun.simpleName.asString()}")
     add("%M($repoValName)\n",
         MemberName("com.ustadmobile.door.ext", "doorNodeIdHeader"))
+    add("%M(%S, %S)\n",
+        MemberName("io.ktor.client.request", "header"),
+        "cache-control",
+        "no-store")
+
     daoKSFun.parameters.forEachIndexed { index, ksValueParameter ->
         if(ksValueParameter.hasAnnotation(RepoHttpBodyParam::class)) {
             add("%M(%T.Application.Json)\n",
