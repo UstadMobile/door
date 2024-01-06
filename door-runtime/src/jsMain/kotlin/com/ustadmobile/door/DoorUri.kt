@@ -17,6 +17,15 @@ actual class DoorUri(val uri: URL)  {
 
     override fun toString() = uri.toString()
 
+
+    override fun equals(other: Any?): Boolean {
+        return (other as? DoorUri)?.uri == uri
+    }
+
+    override fun hashCode(): Int {
+        return uri.toString().hashCode()
+    }
+
     actual companion object {
         actual fun parse(uriString: String) = DoorUri(URL(uriString))
 
