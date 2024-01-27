@@ -320,7 +320,7 @@ fun CodeBlock.Builder.addMakeHttpRequestAndInsertReplicationsCode(
     )
     add("\n")
 
-    add("$dbValName.%M(_response)\n",
+    add("$dbValName.%M(_response, _repo.config.json)\n",
         MemberName("com.ustadmobile.door.replication","onClientRepoDoorMessageHttpResponse"))
     endControlFlow()
 }

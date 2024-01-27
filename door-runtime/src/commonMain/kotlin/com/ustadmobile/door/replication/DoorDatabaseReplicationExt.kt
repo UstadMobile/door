@@ -13,9 +13,9 @@ import com.ustadmobile.door.nodeevent.NodeEvent
 import com.ustadmobile.door.nodeevent.NodeEventManager
 import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.door.util.TransactionMode
-import io.ktor.client.call.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.serialization.json.Json
 import kotlin.math.absoluteValue
 
 private data class ReplicateEntityPrimaryKeys(
@@ -291,16 +291,19 @@ internal suspend fun RoomDatabase.selectDoorNodeExists(nodeId: Long): Boolean {
 
 /**
  * Handle a pull replication response received. This function is used by generated repositories.
+ *
+ * Note: this uses json directly instead of .body due to KTOR bug when used with JVM and Proguard
  */
 @Suppress("unused")
 suspend fun RoomDatabase.onClientRepoDoorMessageHttpResponse(
-    httpResponse: HttpResponse
+    httpResponse: HttpResponse,
+    json: Json
 ) {
     val nodeEventManager: NodeEventManager<*> = doorWrapper.nodeEventManager
     val logger = nodeEventManager.logger
     when (httpResponse.status) {
         HttpStatusCode.OK -> {
-            val message: DoorMessage = httpResponse.body()
+            val message: DoorMessage = json.decodeFromString(DoorMessage.serializer(), httpResponse.bodyAsText())
             logger.v {
                 "[onClientRepoDoorMessageHttpResponse - ${nodeEventManager.dbName}] - ${httpResponse.request.url} - " +
                         "handle message with ${message.replications.size} replications"

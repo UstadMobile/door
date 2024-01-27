@@ -12,8 +12,8 @@ import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.nodeevent.NodeEventManager
 import com.ustadmobile.door.room.RoomDatabase
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.serialization.json.Json
 import kotlin.concurrent.Volatile
 import kotlin.random.Random
 
@@ -42,6 +43,7 @@ import kotlin.random.Random
  * @param localNodeId - the Id of this node (the node we are running on) - not the id of the remote node on the other side
  * @param localNodeAuth - the auth string for this node that is required for requests to the remote node.
  * @param httpClient Ktor HTTP Client (MUST be using Kotlinx Json serializer)
+ * @param json kotlinx serialization Json
  * @param repoEndpointUrl the url of the other node as per RepositoryConfig.endpoint
  * @param scope CoroutineScope for the repository
  * @param nodeEventManager the NodeEventManager for the local database that we will use to watch for pending
@@ -53,6 +55,7 @@ class DoorRepositoryReplicationClient(
     private val localNodeId: Long,
     private val localNodeAuth: String,
     private val httpClient: HttpClient,
+    private val json: Json,
     private val repoEndpointUrl: String,
     scope: CoroutineScope,
     private val nodeEventManager: NodeEventManager<*>,
@@ -78,6 +81,7 @@ class DoorRepositoryReplicationClient(
         localNodeId = db.doorWrapperNodeId,
         localNodeAuth = repositoryConfig.auth,
         httpClient = repositoryConfig.httpClient,
+        json = repositoryConfig.json,
         repoEndpointUrl = repositoryConfig.endpoint,
         scope = scope,
         nodeEventManager = nodeEventManager,
@@ -356,7 +360,9 @@ class DoorRepositoryReplicationClient(
                         ))
                     }
 
-                    val replicationReceivedAck: ReplicationReceivedAck = replicationResponse.body()
+                    val replicationReceivedAck: ReplicationReceivedAck = json.decodeFromString(
+                        ReplicationReceivedAck.serializer(), replicationResponse.bodyAsText()
+                    )
 
                     logger.v {
                         "$logPrefix : runSendLoop : received reply from server status= ${replicationResponse.status} " +
@@ -402,7 +408,8 @@ class DoorRepositoryReplicationClient(
                 acknowledgementsToSend.clear()
 
                 if(entitiesReceivedResponse.status == HttpStatusCode.OK) {
-                    val entitiesReceivedMessage: DoorMessage = entitiesReceivedResponse.body()
+                    val entitiesReceivedMessage: DoorMessage = json.decodeFromString(
+                        DoorMessage.serializer(), entitiesReceivedResponse.bodyAsText())
                     logger.v {
                         "$logPrefix : runFetchLoop: received ${entitiesReceivedMessage.replications.size} replications incoming"
                     }
