@@ -17,8 +17,8 @@ buildscript {
 }
 
 plugins {
-    id 'com.android.application' version '8.1.0' apply false
-    id 'com.android.library' version '8.1.0' apply false
+    id 'com.android.application' version '8.2.0' apply false
+    id 'com.android.library' version '8.2.0' apply false
     id 'org.jetbrains.kotlin.android' version "$kotlin_version" apply false
     id 'org.jetbrains.kotlin.plugin.serialization' version "$kotlin_version" apply false
     id 'org.jetbrains.kotlin.plugin.atomicfu' version "$kotlin_version" apply false
@@ -28,7 +28,7 @@ plugins {
 
 
 group 'com.github.UstadMobile.door'
-version '0.70b33'
+version '0.70b34'
 
 ext.localProperties = new Properties()
 

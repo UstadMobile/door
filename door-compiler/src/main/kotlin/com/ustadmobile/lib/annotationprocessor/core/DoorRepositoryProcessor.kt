@@ -264,10 +264,17 @@ fun CodeBlock.Builder.addRepoHttpClientRequestForFunction(
                 MemberName("io.ktor.http", "contentType"),
                 ContentType::class
             )
-            add("%M(%L)\n",
-                MemberName("io.ktor.client.request", "setBody"),
-                ksValueParameter.name?.asString()
+
+            add("%M(\n",
+                MemberName("com.ustadmobile.door.ext", "setBodyJson"),
             )
+            withIndent {
+                add("json = _repo.config.json,\n")
+                add("serializer = ")
+                addKotlinxSerializationStrategy(funAsMemberOfDao.parameterTypes[index]!!, resolver).add(",\n")
+                add("value = %L,\n", ksValueParameter.name?.asString())
+            }
+            add(")\n")
         }else {
             add("%M(%S, _repo.config.json.encodeToString(",
                 MemberName("io.ktor.client.request", "parameter"),

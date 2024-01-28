@@ -352,12 +352,16 @@ class DoorRepositoryReplicationClient(
                         setRepoUrl(repoEndpointUrl, "$REPLICATION_PATH/message")
                         doorNodeIdHeader(localNodeId, localNodeAuth)
                         contentType(ContentType.Application.Json)
-                        setBody(DoorMessage(
-                            what = DoorMessage.WHAT_REPLICATION_PUSH,
-                            fromNode = localNodeId,
-                            toNode = remoteNodeIdVal,
-                            replications = outgoingReplications,
-                        ))
+                        setBodyJson(
+                            json = json,
+                            serializer = DoorMessage.serializer(),
+                            value = DoorMessage(
+                                what = DoorMessage.WHAT_REPLICATION_PUSH,
+                                fromNode = localNodeId,
+                                toNode = remoteNodeIdVal,
+                                replications = outgoingReplications,
+                            )
+                        )
                     }
 
                     val replicationReceivedAck: ReplicationReceivedAck = json.decodeFromString(
@@ -400,7 +404,7 @@ class DoorRepositoryReplicationClient(
                     doorNodeIdHeader(localNodeId, localNodeAuth)
                     setRepoUrl(repoEndpointUrl, "$REPLICATION_PATH/ackAndGetPendingReplications")
                     contentType(ContentType.Application.Json)
-                    setBody(ReplicationReceivedAck(acknowledgementsToSend))
+                    setBodyJson(json, ReplicationReceivedAck.serializer(), ReplicationReceivedAck(acknowledgementsToSend))
                 }
                 logger.v {
                     "$logPrefix : runFetchLoop: received response status = ${entitiesReceivedResponse.status}"

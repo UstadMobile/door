@@ -21,6 +21,7 @@ import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 import org.junit.Test
 import org.mockito.kotlin.*
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.BeforeTest
 import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.seconds
@@ -171,7 +172,7 @@ class DoorRepositoryReplicationClientTest {
      */
     @Test(timeout = 10000)
     fun givenNoIncomingEntitiesPending_whenClientReceivesInvalidation_thenShouldRequestPendingEntities() {
-        var ackAndGetPendingRequestCount = 0
+        val ackAndGetPendingRequestCount = AtomicInteger()
         val ackRequests = MutableSharedFlow<RecordedRequest>(replay = 10)
         mockServer.dispatcher = object: Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
@@ -182,9 +183,9 @@ class DoorRepositoryReplicationClientTest {
                     }
 
                     "/replication/ackAndGetPendingReplications" -> {
-                        ackAndGetPendingRequestCount++
+                        val requestCount = ackAndGetPendingRequestCount.incrementAndGet()
                         ackRequests.tryEmit(request)
-                        if(ackAndGetPendingRequestCount == 2) {
+                        if(requestCount == 2) {
                             MockResponse()
                                 .setHeader("content-type", "application/json")
                                 .setBody(json.encodeToString(DoorMessage.serializer(), pendingReplicationMessage))
@@ -207,15 +208,25 @@ class DoorRepositoryReplicationClientTest {
             repoEndpointUrl = mockServer.url("/").toString(),
             scope = scope,
             nodeEventManager = mockEventManager,
-            onMarkAcknowledgedAndGetNextOutgoingReplications = mock { },
+            onMarkAcknowledgedAndGetNextOutgoingReplications = mock {
+               onBlocking {
+                   invoke(any(),any(), any())
+               }.thenReturn(emptyList())
+            },
             onStartPendingSession = mock { },
             onPendingSessionResolved = mock { },
-            logger = mock  { },
+            logger = NapierDoorLogger(),
             dbName = "testdb",
         )
 
-        //wait for the first request
-        runBlocking { ackRequests.filter { it.path == "/replication/ackAndGetPendingReplications" }.first() }
+        //wait for the first request when it has initialized
+        runBlocking {
+            ackRequests.filter { it.path == "/replication/ackAndGetPendingReplications" }.first()
+
+            //This shouldn't really be needed.
+            delay(100)
+        }
+
 
         runBlocking {
             mockEventManager.onIncomingMessageReceived(
@@ -227,7 +238,6 @@ class DoorRepositoryReplicationClientTest {
                 )
             )
         }
-
 
         verifyBlocking(mockEventManager, timeout(5000)) {
             onIncomingMessageReceived(eq(pendingReplicationMessage))
@@ -396,6 +406,8 @@ class DoorRepositoryReplicationClientTest {
                 assertNotNull(awaitItem())
             }
         }
+
+        repoClient.close()
     }
 
 

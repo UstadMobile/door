@@ -13,6 +13,8 @@ import com.ustadmobile.door.paging.DoorRepositoryReplicatePullPagingSource.Compa
 import com.ustadmobile.door.room.RoomDatabase
 import io.ktor.client.request.*
 import io.ktor.http.*
+import io.ktor.http.content.*
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.json.Json
 import kotlin.reflect.KClass
@@ -86,4 +88,28 @@ fun <K: Any> HttpRequestBuilder.pagingSourceLoadParameters(
     parameter(PARAM_LOAD_PARAM_TYPE, loadParamType.name)
     parameter(PARAM_KEY, json.encodeToString(keySerializer, loadParams.key))
     parameter(PARAM_BATCHSIZE, loadParams.loadSize)
+}
+
+/**
+ * We can't use the normal setBody and serialization due to KTOR bug when using Proguard on JVM:
+ *  https://youtrack.jetbrains.com/issue/KTOR-6703/Ktor-Client-body-serialization-fails-on-JVM-when-using-Proguard
+ *
+ * This is a shorthand to use the Kotlinx Serialization json to 'manually' encode to Json, and thne using TextContent
+ * for the body. Strings would be "serialized" e.g. quotes etc would be added.
+ */
+fun <T> HttpRequestBuilder.setBodyJson(
+    json: Json,
+    serializer: KSerializer<T>,
+    value: T,
+    contentType: ContentType = ContentType.Application.Json,
+) {
+    setBody(
+        TextContent(
+            text = json.encodeToString(
+                serializer = serializer,
+                value = value,
+            ),
+            contentType = contentType,
+        )
+    )
 }
