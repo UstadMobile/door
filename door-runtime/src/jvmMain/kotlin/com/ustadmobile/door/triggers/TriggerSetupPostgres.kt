@@ -26,14 +26,12 @@ fun DoorDatabaseMetadata<*>.createPostgresTriggerSetupStatementList() : List<Str
                         append("""
                        DECLARE
                          whereVar boolean;
-                         curs1 CURSOR FOR ${trigger.conditionSqlPostgres.useAsPostgresSqlIfNotBlankOrFallback(trigger.conditionSql)} ;
                          """)
                     }
                     append("BEGIN \n")
                     if(trigger.conditionSql != "") {
                         append("""
-                        OPEN curs1;
-                        FETCH curs1 INTO whereVar;
+                        ${trigger.conditionSqlPostgres.useAsPostgresSqlIfNotBlankOrFallback(trigger.conditionSql)} INTO whereVar;    
                         IF whereVar = true THEN """)
                     }
 
@@ -41,7 +39,7 @@ fun DoorDatabaseMetadata<*>.createPostgresTriggerSetupStatementList() : List<Str
                         .joinToString(separator = ";", postfix = ";"))
 
                     if(trigger.conditionSql != "") {
-                        append("END IF; CLOSE curs1;")
+                        append("END IF;")
                     }
 
                     append("""
