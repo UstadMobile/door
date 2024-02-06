@@ -50,7 +50,7 @@ fun DoorDatabaseMetadata<*>.createPostgresTriggerSetupStatementList() : List<Str
                     ELSE
                         RETURN OLD;
                     END IF;
-                """)
+                    """)
 
                     append("END $$ LANGUAGE plpgsql")
                 }

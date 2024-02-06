@@ -54,7 +54,8 @@ class ReplicationEntityMetaData(
     internal val createReceiveViewSql: String
         get() = """
                 CREATE VIEW $receiveViewName AS 
-                       SELECT $entityTableName.*, 0 AS fromNodeId
+                       SELECT $entityTableName.*, 
+                              CAST(0 AS BIGINT) AS fromNodeId
                          FROM $entityTableName
             """
 
