@@ -19,16 +19,7 @@ import kotlinx.serialization.Serializable
             order = Trigger.Order.INSTEAD_OF,
             events = arrayOf(Trigger.Event.INSERT),
             on = Trigger.On.RECEIVEVIEW,
-            sqlStatements = arrayOf(
-                """
-                REPLACE INTO Member(memberUid, firstName, lastName, memberLastModified)
-                      SELECT NEW.memberUid, NEW.firstName, NEW.lastName, NEW.memberLastModified
-                       WHERE NEW.memberLastModified !=
-                             COALESCE((SELECT Member_Internal.memberLastModified
-                                         FROM Member Member_Internal
-                                        WHERE Member_internal.memberUid = NEW.memberUid), 0)
-                """
-            )
+            sqlStatements = arrayOf("%UPSERT%")
         )
     )
 )

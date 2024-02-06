@@ -17,17 +17,9 @@ import kotlinx.serialization.Serializable
             name = "discussion_post_remote_insert",
             order = Trigger.Order.INSTEAD_OF,
             events = arrayOf(Trigger.Event.INSERT),
+            conditionSql = "SELECT %NEW_LAST_MODIFIED_GREATER_THAN_EXISTING%",
             on = Trigger.On.RECEIVEVIEW,
-            sqlStatements = arrayOf(
-                """
-                REPLACE INTO DiscussionPost(postUid, postReplyToPostUid, postTitle, postText, postLastModified, posterMemberUid)
-                      SELECT NEW.postUid, NEW.postReplyToPostUid, NEW.postTitle, NEW.postText, NEW.postLastModified, NEW.posterMemberUid
-                       WHERE NEW.postLastModified >
-                             COALESCE((SELECT DiscussionPost_Internal.postLastModified
-                                         FROM DiscussionPost DiscussionPost_Internal
-                                        WHERE DiscussionPost_Internal.postUid = NEW.postUid), 0)
-                """
-            )
+            sqlStatements = arrayOf("%UPSERT%"),
         )
     )
 )

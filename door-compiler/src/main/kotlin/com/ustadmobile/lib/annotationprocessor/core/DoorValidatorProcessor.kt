@@ -158,7 +158,11 @@ class DoorValidatorProcessor(
                     //test the validity of the SQL statement here. Therefor NEW.(fieldname) and OLD.(fieldname) will be
                     //replaced with 0, null, or false based on the column type.
                     fun String.substituteTriggerPrefixes(dbProductType: Int) : String {
-                        var sqlFormatted = this
+                        //Add space on both sides: replaceColNameWithDefaultValue will only match if next to
+                        //whitespace, brackets, or a comma e.g. to avoid matching substrings by accident. The regex does
+                        //not have an end of line, so the easiest workaround here is to simply add additional whitespace
+                        //at the start and end.
+                        var sqlFormatted = " $this "
 
                         val availablePrefixes = mutableListOf<String>()
                         if(!trigger.events.any { it == Trigger.Event.DELETE })
@@ -180,14 +184,19 @@ class DoorValidatorProcessor(
 
 
                     stmtsMap.forEach {entry ->
-                        var sqlToRun = trigger.conditionSql.expandSqlTemplates(entity, resolver, target).substituteTriggerPrefixes(entry.key)
+                        var sqlToRun = trigger.conditionSql.expandSqlTemplates(
+                            entity, resolver, target, dbType = entry.key,
+                        ).substituteTriggerPrefixes(entry.key)
                         try {
                             if(entry.key == DoorDbType.POSTGRES)
                                 sqlToRun = sqlToRun.sqlToPostgresSql()
 
                             entry.value.takeIf { trigger.conditionSql != "" }?.executeQuery(sqlToRun)
                         }catch(e: SQLException) {
-                            logger.error("Trigger ${trigger.name} condition SQL using ${productNameForDbType(entry.key)} error on: ${e.message}",
+                            logger.error("Trigger ${trigger.name} condition SQL " +
+                                    "using ${productNameForDbType(entry.key)} " +
+                                    "running SQL '${sqlToRun.trim()}' " +
+                                    "error on: ${e.message}",
                                 entity)
                         }
                     }
@@ -198,20 +207,21 @@ class DoorValidatorProcessor(
 
 
                     var dbType = 0
-                    var sqlToRun: String
+                    var sqlToRun: String? = null
                     trigger.sqlStatements.forEach { sql ->
                         try {
                             stmtsMap.forEach { stmtEntry ->
                                 dbType = stmtEntry.key
-                                sqlToRun = sql.expandSqlTemplates(entity, resolver, target)
+                                sqlToRun = sql.expandSqlTemplates(entity, resolver, target, dbType)
                                     .substituteTriggerPrefixes(stmtEntry.key)
                                 if(dbType == DoorDbType.POSTGRES)
-                                    sqlToRun = sqlToRun.sqlToPostgresSql()
+                                    sqlToRun = sqlToRun?.sqlToPostgresSql()
 
-                                stmtEntry.value?.executeUpdate(sqlToRun)
+                                stmtEntry.value?.takeIf { sqlToRun != null }?.executeUpdate(sqlToRun)
                             }
                         }catch(e: SQLException) {
-                            logger.error("Trigger ${trigger.name} ${productNameForDbType(dbType)} exception running ${e.message} running '$sql'}",
+                            logger.error("Trigger ${trigger.name} (${productNameForDbType(dbType)}) exception: ${e.message} " +
+                                    "running SQL '$sqlToRun'",
                                 entity)
                         }
                     }

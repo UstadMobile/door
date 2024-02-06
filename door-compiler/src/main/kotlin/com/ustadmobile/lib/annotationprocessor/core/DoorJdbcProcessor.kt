@@ -223,12 +223,12 @@ private fun CodeBlock.Builder.addTriggerMetadataCode(
     resolver: Resolver,
     target: DoorTarget,
 ) : CodeBlock.Builder {
-    fun addStringArrayVal(array: Array<String>) {
+    fun addStringArrayVal(array: Array<String>, dbType: Int) {
         if(array.isNotEmpty()) {
             add("arrayOf(\n")
             indent()
             array.forEach {
-                add("%S,\n", it.expandSqlTemplates(entityKSClass, resolver, target))
+                add("%S,\n", it.expandSqlTemplates(entityKSClass, resolver, target, dbType))
             }
             unindent()
             add(")")
@@ -255,16 +255,20 @@ private fun CodeBlock.Builder.addTriggerMetadataCode(
     add("on = %T.%L,\n", Trigger.On::class, trigger.on.name)
 
     add("sqlStatements = ")
-    addStringArrayVal(trigger.sqlStatements)
+    addStringArrayVal(trigger.sqlStatements, DoorDbType.SQLITE)
     add(",\n")
 
     add("postgreSqlStatements = ")
-    addStringArrayVal(trigger.postgreSqlStatements)
+    addStringArrayVal(trigger.postgreSqlStatements.ifEmpty { trigger.sqlStatements }, DoorDbType.POSTGRES)
     add(",\n")
 
-    add("conditionSql = %S,\n", trigger.conditionSql.expandSqlTemplates(entityKSClass, resolver, target))
+    add("conditionSql = %S,\n",
+        trigger.conditionSql.expandSqlTemplates(entityKSClass, resolver, target, DoorDbType.SQLITE)
+    )
 
-    add("conditionSqlPostgres = %S,\n", trigger.conditionSqlPostgres.expandSqlTemplates(entityKSClass, resolver, target))
+    val effectiveConditionStmtsPostgres = trigger.conditionSqlPostgres.ifEmpty { trigger.conditionSql }
+    add("conditionSqlPostgres = %S,\n", effectiveConditionStmtsPostgres.expandSqlTemplates(entityKSClass, resolver,
+        target, DoorDbType.POSTGRES))
 
     unindent()//unindent for end of trigger init
     add(")")
@@ -1315,6 +1319,21 @@ class DoorJdbcProcessor(
         const val TRIGGER_TEMPLATE_NEW_LAST_MODIFIED_GREATER_THAN_EXISTING = "%NEW_LAST_MODIFIED_GREATER_THAN_EXISTING%"
 
         const val TRIGGER_TEMPLATE_NEW_ETAG_NOT_EQUAL_TO_EXISTING = "%NEW_ETAG_NOT_EQUAL_TO_EXISTING%"
+
+        /**
+         * When used in a trigger sqlStatements or postgreSqlStatements, and the entity uses
+         * RemoteInsertStrategy.INSERT_INTO_RECEIVE_VIEW, then this template will generate the correct
+         * upsert SQL
+         *
+         * For SQLITE:
+         * REPLACE INTO TableName ( columnNames ) VALUES(NEW.colNames...)
+         *
+         * For Postgres
+         * INSERT INTO TableName ( columnNames ) VALUES(NEW.colNames)
+         * ON CONFLICT ( primaryKeyFields )
+         * DO UPDATE SET columnName = NEW.columnName ...
+         */
+        const val TRIGGER_TEMPLATE_UPSERT = "%UPSERT%"
 
     }
 

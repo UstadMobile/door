@@ -2,6 +2,7 @@ package db3
 
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Update
 import app.cash.paging.PagingSource
 import com.ustadmobile.door.RepositoryFlowLoadingStatusProvider
 import com.ustadmobile.door.annotation.*
@@ -312,5 +313,8 @@ expect abstract class DiscussionPostDao : RepositoryFlowLoadingStatusProvider {
     """)
     abstract suspend fun getDiscussionPostAndAuthorNameById(postId: Long): DiscussionPostAndAuthorName?
 
+
+    @Update
+    abstract suspend fun update(post: DiscussionPost)
 
 }

@@ -18,11 +18,7 @@ import kotlinx.serialization.Serializable
             on = Trigger.On.RECEIVEVIEW,
             events = [Trigger.Event.INSERT],
             sqlStatements = [
-                """
-                    REPLACE INTO %TABLE_AND_FIELD_NAMES%
-                      SELECT %NEW_VALUES%
-                       WHERE %NEW_ETAG_NOT_EQUAL_TO_EXISTING%
-                """
+                "%UPSERT%"
             ]
         )
     )

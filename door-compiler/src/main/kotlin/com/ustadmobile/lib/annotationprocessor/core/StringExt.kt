@@ -3,6 +3,7 @@ package com.ustadmobile.lib.annotationprocessor.core
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSType
+import com.ustadmobile.door.DoorDbType
 import com.ustadmobile.door.annotation.ReplicateEtag
 import com.ustadmobile.door.annotation.ReplicateLastModified
 import com.ustadmobile.lib.annotationprocessor.core.ext.entityPrimaryKeyProps
@@ -101,6 +102,7 @@ fun String.expandSqlTemplates(
     entityKSClass: KSClassDeclaration,
     resolver: Resolver,
     target: DoorTarget,
+    dbType: Int,
 ) : String{
     val entityProps = entityKSClass.entityProps(getAutoIncLast = false)
 
@@ -109,46 +111,72 @@ fun String.expandSqlTemplates(
         "${entityKSClass.entityTableName}_Existing.${it.simpleName.asString()} = NEW.${it.simpleName.asString()}"
     }
 
-    val triggerTemplateReplacements = mapOf(
-        DoorJdbcProcessor.TRIGGER_TEMPLATE_TABLE_AND_FIELD_NAMES to buildString {
+    val triggerTemplateReplacements = buildMap {
+        put(DoorJdbcProcessor.TRIGGER_TEMPLATE_TABLE_AND_FIELD_NAMES, buildString {
             append("${entityKSClass.entityTableName} (")
             append(entityProps.joinToString(separator = ", "))
             append(")")
-        },
-        DoorJdbcProcessor.TRIGGER_TEMPLATE_NEW_VALUES to entityProps.joinToString(separator = ", ") {
-            if(target == DoorTarget.JS && it.type.resolve() == resolver.builtIns.longType) {
+        })
+        put(DoorJdbcProcessor.TRIGGER_TEMPLATE_NEW_VALUES, entityProps.joinToString(separator = ", ") {
+            if (target == DoorTarget.JS && it.type.resolve() == resolver.builtIns.longType) {
                 //Javascript workaround: SQLite.JS binds Long as a String when binding parameters. Casting it here avoids
                 //comparisons not working as expected.
                 "CAST(NEW.${it.simpleName.asString()} AS BIGINT)"
-            }else {
+            } else {
                 "NEW.${it.simpleName.asString()}"
             }
-        },
-        DoorJdbcProcessor.TRIGGER_TEMPLATE_NEW_LAST_MODIFIED_GREATER_THAN_EXISTING to buildString {
+        })
+        put(DoorJdbcProcessor.TRIGGER_TEMPLATE_NEW_LAST_MODIFIED_GREATER_THAN_EXISTING, buildString {
             val replicateLastModifiedPropName = entityKSClass.entityProps(false).firstOrNull {
                 it.hasAnnotation(ReplicateLastModified::class)
             }?.simpleName?.asString() ?: "INVALID_TEMPLATE_NO_LAST_MODIFIED_FIELD_ON_ENTITY"
 
-            append("""
-                   CAST(NEW.$replicateLastModifiedPropName AS BIGINT)>
+            append(
+                """
+                   CAST(NEW.$replicateLastModifiedPropName AS BIGINT) >
                        COALESCE((SELECT ${entityKSClass.entityTableName}_Existing.$replicateLastModifiedPropName
                                    FROM ${entityKSClass.entityTableName} ${entityKSClass.entityTableName}_Existing
                                   WHERE $selectExistingWhereClause), 0)
-                   """)
-        },
-        DoorJdbcProcessor.TRIGGER_TEMPLATE_NEW_ETAG_NOT_EQUAL_TO_EXISTING to buildString {
+                   """
+            )
+        })
+        put(DoorJdbcProcessor.TRIGGER_TEMPLATE_NEW_ETAG_NOT_EQUAL_TO_EXISTING, buildString {
             val etagFieldPropName = entityKSClass.entityProps(false).firstOrNull {
                 it.hasAnnotation(ReplicateEtag::class)
             }?.simpleName?.asString() ?: "INVALID_NO_ETAG"
 
-            append("""
+            append(
+                """
                CAST(NEW.$etagFieldPropName AS BIGINT) != 
                    COALESCE((SELECT ${entityKSClass.entityTableName}_Existing.$etagFieldPropName
                                    FROM ${entityKSClass.entityTableName} ${entityKSClass.entityTableName}_Existing
                                   WHERE $selectExistingWhereClause), 0)
-            """)
-        }
-    )
+            """
+            )
+        })
+
+        put(DoorJdbcProcessor.TRIGGER_TEMPLATE_UPSERT, buildString {
+            when(dbType) {
+                DoorDbType.SQLITE -> append("REPLACE")
+                else -> append("INSERT")
+            }
+            append(" INTO ${get(DoorJdbcProcessor.TRIGGER_TEMPLATE_TABLE_AND_FIELD_NAMES)} ")
+
+            append("VALUES( ")
+            append(get(DoorJdbcProcessor.TRIGGER_TEMPLATE_NEW_VALUES) ?: "")
+            append(") ")
+
+            if(dbType == DoorDbType.POSTGRES) {
+                val primaryKeyFieldNames = entityKSClass.entityPrimaryKeyProps.map { it.simpleName.asString() }
+                append(" ON CONFLICT(${primaryKeyFieldNames.joinToString()}) ")
+                append(" DO UPDATE SET ")
+                append(entityProps.filter { it.simpleName.asString() !in primaryKeyFieldNames }.joinToString {
+                    "${it.simpleName.asString()} = NEW.${it.simpleName.asString()}"
+                })
+                append(" ")
+            }
+        })
+    }
 
     var expanded = this
     triggerTemplateReplacements.forEach {

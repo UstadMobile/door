@@ -9,9 +9,10 @@ import com.ustadmobile.door.RepositoryConfig
 import com.ustadmobile.door.ext.asRepository
 import com.ustadmobile.door.ext.doorWrapperNodeId
 import com.ustadmobile.door.ext.use
-import com.ustadmobile.door.http.DoorHttpServerConfig
 import com.ustadmobile.door.flow.FlowLoadingState
+import com.ustadmobile.door.flow.doorFlow
 import com.ustadmobile.door.flow.repoFlowWithLoadingState
+import com.ustadmobile.door.http.DoorHttpServerConfig
 import com.ustadmobile.door.log.NapierDoorLogger
 import com.ustadmobile.door.room.InvalidationTrackerObserver
 import com.ustadmobile.door.test.initNapierLog
@@ -707,6 +708,46 @@ class PullIntegrationTest {
         }
     }
 
+
+
+    @Test
+    fun givenEntityCreatedLocally_whenUpdatedAfterSentToServer_thenNowValueWillBeSentToServer() {
+        initNapierLog()
+        clientServerIntegrationTest {
+            makeClientRepo().use { clientRepo ->
+                val originalPost = DiscussionPost().apply {
+                    postTitle = "I like hay"
+                    postText = "Mmm... Hay..."
+                    posterMemberUid = 0
+                    postUid = clientRepo.discussionPostDao.insertAsync(this)
+                }
+
+                //wait for value to reach server
+                serverDb.doorFlow(arrayOf("DiscussionPost")) {
+                    serverDb.discussionPostDao.findByUid(originalPost.postUid)
+                }.filter {
+                    it != null
+                }.test(timeout = 5.seconds, name = "first post will reach server") {
+                    assertEquals(originalPost, awaitItem())
+                    cancelAndIgnoreRemainingEvents()
+                }
+
+                val updatedPost = originalPost.copy(
+                    postText = "Mmm... More Hay..."
+                )
+                clientRepo.discussionPostDao.update(updatedPost)
+
+                serverDb.doorFlow(arrayOf("DiscussionPost")) {
+                    serverDb.discussionPostDao.findByUid(originalPost.postUid)
+                }.filter {
+                    it?.postText  == updatedPost.postText
+                }.test(timeout = 5.seconds, name = "Updated post will reach server") {
+                    assertEquals(updatedPost, awaitItem())
+                    cancelAndIgnoreRemainingEvents()
+                }
+            }
+        }
+    }
 
 
 

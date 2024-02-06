@@ -18,13 +18,7 @@ import kotlinx.serialization.Serializable
             order = Trigger.Order.INSTEAD_OF,
             events = arrayOf(Trigger.Event.INSERT),
             on = Trigger.On.RECEIVEVIEW,
-            sqlStatements = arrayOf(
-                """
-                REPLACE INTO %TABLE_AND_FIELD_NAMES%
-                      SELECT %NEW_VALUES%
-                       WHERE %NEW_ETAG_NOT_EQUAL_TO_EXISTING%
-                """
-            )
+            sqlStatements = arrayOf("%UPSERT%"),
         )
     )
 )
