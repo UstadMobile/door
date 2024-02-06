@@ -22,8 +22,16 @@ fun DoorDatabaseMetadata<*>.createTriggerSetupStatementList(dbType: Int) :List<S
  *
  * This is done before migration (to avoid errors when a migration drops table e.g. a table would not be dropped if there
  * were still triggers associated with it).
+ *
+ * @param triggerFilter - normally we only want to drop functions created by door. However this can e changed so it can
+ *        be used to drop all triggers etc.
+ * @param functionFilter normally we only want to drop functions created by door. However this can be changed to drop
+ *        all functions or filter another way.
  */
-suspend fun Connection.dropDoorTriggersAndReceiveViews() {
+suspend fun Connection.dropDoorTriggersAndReceiveViews(
+    triggerFilter: String? = "trigger_name LIKE '${Trigger.NAME_PREFIX}%'",
+    functionFilter: String? = "routine_name LIKE '${Trigger.NAME_PREFIX}%'",
+) {
     when(dbType()) {
         DoorDbType.SQLITE -> {
             dropDoorTriggersAndReceiveViewsSqlite()
@@ -32,35 +40,44 @@ suspend fun Connection.dropDoorTriggersAndReceiveViews() {
         DoorDbType.POSTGRES -> {
             createStatement().use { stmt ->
                 //Drop any door-generated triggers
-                val doorTriggerAndTableNames = stmt.executeQuery("""
+                val doorTriggerAndTableNames = stmt.executeQuery(buildString {
+                    append("""
                     SELECT trigger_name, event_object_table
                       FROM information_schema.triggers
-                     WHERE trigger_name LIKE '${Trigger.NAME_PREFIX}%'
-                """).use {  results ->
+                    """)
+                    if(triggerFilter != null)
+                        append("WHERE $triggerFilter")
+                }).use { results ->
                     results.mapRows {resultSet ->
                         resultSet.getString(1) to resultSet.getString(2)
                     }
                 }
 
-                doorTriggerAndTableNames.forEach {
+                doorTriggerAndTableNames.distinct().forEach {
                     stmt.addBatch("DROP TRIGGER ${it.first} ON ${it.second}")
                 }
                 stmt.executeBatch()
 
                 //Drop any door-generated functions
-                val doorFunctionNames = stmt.executeQuery(""""
-                    SELECT routine_name
-                      FROM information_schema.routines
-                     WHERE routine_type = 'FUNCTION'
-                       AND routine_schema = 'public'
-                       AND routine_name LIKE '${Trigger.NAME_PREFIX}%'
-                """).use { results ->
+                val doorFunctionNames = stmt.executeQuery(
+                    buildString {
+                        append("""
+                            SELECT routine_name
+                              FROM information_schema.routines
+                             WHERE routine_type = 'FUNCTION'
+                               AND routine_schema = 'public'
+                        """)
+
+                        if(functionFilter != null)
+                            append(" AND $functionFilter")
+                    }
+                ).use { results ->
                     results.mapRows { resultSet ->
                         resultSet.getString(1)
                     }
                 }
 
-                doorFunctionNames.forEach {
+                doorFunctionNames.distinct().forEach {
                     stmt.addBatch("DROP FUNCTION $it")
                 }
                 stmt.executeBatch()
