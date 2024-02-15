@@ -1,9 +1,10 @@
 package com.ustadmobile.door.ktor.routes
 
 import com.ustadmobile.door.DoorConstants.HEADER_NODE_ID
-import com.ustadmobile.door.ext.*
+import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.doorWrapper
 import com.ustadmobile.door.ext.doorWrapperNodeId
+import com.ustadmobile.door.ext.requireRemoteNodeIdAndAuth
 import com.ustadmobile.door.http.DoorHttpServerConfig
 import com.ustadmobile.door.ktor.KtorCallDbAdapter
 import com.ustadmobile.door.message.DoorMessage
@@ -42,7 +43,7 @@ fun Route.ReplicationRoute(
 
         val db = adapter(call)
         try {
-            call.response.cacheControl(CacheControl.NoCache(null))
+            call.response.cacheControl(CacheControl.NoStore(null))
             call.respondTextWriter(contentType = ContentType.Text.EventStream) {
                 writeDoorEvent(DoorServerSentEvent("0", EVT_INIT, db.doorWrapperNodeId.toString()))
 
