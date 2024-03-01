@@ -401,64 +401,67 @@ class DoorValidatorProcessor(
     ) {
         val daos = resolver.getDaoSymbolsToProcess()
         daos.forEach { dao ->
-
             dao.getAllFunctions().filter { it.hasAnnotation(Query::class) }.forEach { queryFunDecl ->
-                val queryAnnotation = queryFunDecl.getAnnotation(Query::class)!!
-                val queryFun = queryFunDecl.asMemberOf(dao.asType(emptyList()))
-            //dao.enclosedElementsWithAnnotation(Query::class.java).map { it as ExecutableElement }.forEach { queryFun ->
+                try {
+                    val queryAnnotation = queryFunDecl.getAnnotation(Query::class)!!
+                    val queryFun = queryFunDecl.asMemberOf(dao.asType(emptyList()))
 
-                //check that the query parameters on both versions match
-                val sqliteQueryParams = queryAnnotation.value.getSqlQueryNamedParameters()
-                val postgresQueryParams = (queryFunDecl.getAnnotation(PostgresQuery::class)?.value ?:
+                    //check that the query parameters on both versions match
+                    val sqliteQueryParams = queryAnnotation.value.getSqlQueryNamedParameters()
+                    val postgresQueryParams = (queryFunDecl.getAnnotation(PostgresQuery::class)?.value ?:
                     queryAnnotation.value.sqlToPostgresSql()).getSqlQueryNamedParameters()
 
-                if(sqliteQueryParams != postgresQueryParams) {
-                    logger.error("Query parameters don't match: " +
+                    if(sqliteQueryParams != postgresQueryParams) {
+                        logger.error("Query parameters don't match: " +
                                 "Query parameters must feature the same names in the same order on both platforms " +
                                 "SQLite params=${sqliteQueryParams.joinToString()} " +
                                 "Postgres params=${postgresQueryParams.joinToString()}", queryFunDecl)
-                }
-
-
-                connectionMap.filter {
-                    it.value != null && !(it.key == DoorDbType.POSTGRES && queryFunDecl.hasAnnotation(SqliteOnly::class))
-                }.forEach { connectionEntry ->
-                    val query = queryAnnotation.value.let {
-                        if(connectionEntry.key == DoorDbType.POSTGRES) {
-                            queryFunDecl.getAnnotation(PostgresQuery::class)?.value ?: it.sqlToPostgresSql()
-                        }else {
-                            it
-                        }
                     }
 
-                    val queryNamedParams = query.getSqlQueryNamedParameters()
-                    val queryWithQuestionPlaceholders = query.replaceQueryNamedParamsWithQuestionMarks(queryNamedParams)
-                    val connectionEntryCon = connectionEntry.value!! //This is OK because of the filter above.
-
-                    try {
-                        val preparedStatementConfig = PreparedStatementConfig(queryWithQuestionPlaceholders,
-                            hasListParams = queryFunDecl.hasAnyListOrArrayParams(resolver))
-                        connectionEntryCon.prepareStatement(preparedStatementConfig, connectionEntry.key).use { statement ->
-                            queryNamedParams.forEachIndexed { index, paramName ->
-                                val paramIndex = queryFunDecl.parameters.indexOfFirst { it.name?.asString() == paramName }
-                                val paramType = queryFun.parameterTypes[paramIndex]
-                                    ?: throw IllegalArgumentException("Could not find type for $paramName")
-                                statement.setDefaultParamValue(resolver, index + 1, paramName,
-                                    paramType, connectionEntry.key)
-                            }
-
-                            if(!query.isSQLAModifyingQuery()) {
-                                statement.executeQuery()
+                    connectionMap.filter {
+                        it.value != null && !(it.key == DoorDbType.POSTGRES && queryFunDecl.hasAnnotation(SqliteOnly::class))
+                    }.forEach { connectionEntry ->
+                        val query = queryAnnotation.value.let {
+                            if(connectionEntry.key == DoorDbType.POSTGRES) {
+                                queryFunDecl.getAnnotation(PostgresQuery::class)?.value ?: it.sqlToPostgresSql()
                             }else {
-                                statement.executeUpdate()
+                                it
                             }
                         }
-                    }catch(e: Exception) {
-                        logger.error("Error running query for DAO function: $e", queryFunDecl)
-                        if(e !is SQLException) {
-                            e.printStackTrace()
+
+                        val queryNamedParams = query.getSqlQueryNamedParameters()
+                        val queryWithQuestionPlaceholders = query.replaceQueryNamedParamsWithQuestionMarks(queryNamedParams)
+                        val connectionEntryCon = connectionEntry.value!! //This is OK because of the filter above.
+
+                        try {
+                            val preparedStatementConfig = PreparedStatementConfig(queryWithQuestionPlaceholders,
+                                hasListParams = queryFunDecl.hasAnyListOrArrayParams(resolver))
+                            connectionEntryCon.prepareStatement(preparedStatementConfig, connectionEntry.key).use { statement ->
+                                queryNamedParams.forEachIndexed { index, paramName ->
+                                    val paramIndex = queryFunDecl.parameters.indexOfFirst {
+                                        it.name?.asString() == paramName
+                                    }
+                                    val paramType = queryFun.parameterTypes[paramIndex]
+                                        ?: throw IllegalArgumentException("Could not find type for $paramName")
+                                    statement.setDefaultParamValue(resolver, index + 1, paramName,
+                                        paramType, connectionEntry.key)
+                                }
+
+                                if(!query.isSQLAModifyingQuery()) {
+                                    statement.executeQuery()
+                                }else {
+                                    statement.executeUpdate()
+                                }
+                            }
+                        }catch(e: Exception) {
+                            logger.error("Error running query for DAO function: $e", queryFunDecl)
+                            if(e !is SQLException) {
+                                e.printStackTrace()
+                            }
                         }
                     }
+                }catch(e: Throwable) {
+                    logger.error("Exception validating : $e", queryFunDecl)
                 }
             }
 
