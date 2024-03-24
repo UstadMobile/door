@@ -313,8 +313,15 @@ fun CodeBlock.Builder.addMakeHttpRequestAndInsertReplicationsCode(
     dbValName: String = "_db",
     pagingParamsValName: String? = null,
 ) {
+    //When using a paging source, we need to return end of pagination reached
+    val fnName = if(pagingParamsValName != null) {
+        "replicateHttpRequestOrThrow"
+    }else {
+        "replicateHttpRequestCatchAndLog"
+    }
+
     beginControlFlow("_repo.%M(repoPath = %S)",
-        MemberName("com.ustadmobile.door.http", "repoReplicateHttpRequest"),
+        MemberName("com.ustadmobile.door.http", fnName),
         "${daoKSClass.simpleName.asString()}/${daoKSFun.simpleName.asString()}"
     )
     add("val _response = _httpClient.")
@@ -329,6 +336,11 @@ fun CodeBlock.Builder.addMakeHttpRequestAndInsertReplicationsCode(
 
     add("$dbValName.%M(_response, _repo.config.json)\n",
         MemberName("com.ustadmobile.door.replication","onClientRepoDoorMessageHttpResponse"))
+
+    if(pagingParamsValName != null) {
+        add("_response.%M()\n", MemberName("com.ustadmobile.door.paging", "endOfPaginationReached"))
+    }
+
     endControlFlow()
 }
 

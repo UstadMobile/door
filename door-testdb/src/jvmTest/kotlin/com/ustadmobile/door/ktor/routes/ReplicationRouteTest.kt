@@ -70,7 +70,7 @@ class ReplicationRouteTest {
             encodeDefaults = true
         }
 
-        val serverConfig = DoorHttpServerConfig(json)
+        val serverConfig = DoorHttpServerConfig(json, NapierDoorLogger())
 
         testApplication {
             environment {
@@ -230,7 +230,7 @@ class ReplicationRouteTest {
         val json = Json {
             encodeDefaults = true
         }
-        val serverConfig = DoorHttpServerConfig(json)
+        val serverConfig = DoorHttpServerConfig(json, NapierDoorLogger())
 
         val okHttpClient = OkHttpClient.Builder().build()
         val httpClient = HttpClient {  }

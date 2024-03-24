@@ -28,4 +28,10 @@ object DoorConstants {
 
     const val RECEIVE_VIEW_SUFFIX = "_ReceiveView"
 
+    /**
+     * Header used on http responses for PagingSource using PULL_REPLICATE_ENTITIES to provide
+     * endOfPaginationReached for DoorRepositoryRemoteMediator
+     */
+    const val HEADER_PAGING_END_REACHED = "door-paging-end-reached"
+
 }

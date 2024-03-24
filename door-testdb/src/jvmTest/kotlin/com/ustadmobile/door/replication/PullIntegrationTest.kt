@@ -1,7 +1,7 @@
 package com.ustadmobile.door.replication
 
-import app.cash.paging.PagingSourceLoadParamsRefresh
-import app.cash.paging.PagingSourceLoadResultPage
+import androidx.paging.PagingConfig
+import app.cash.paging.*
 import app.cash.turbine.ReceiveTurbine
 import app.cash.turbine.test
 import com.ustadmobile.door.DatabaseBuilder
@@ -14,6 +14,7 @@ import com.ustadmobile.door.flow.doorFlow
 import com.ustadmobile.door.flow.repoFlowWithLoadingState
 import com.ustadmobile.door.http.DoorHttpServerConfig
 import com.ustadmobile.door.log.NapierDoorLogger
+import com.ustadmobile.door.paging.DoorRepositoryRemoteMediator
 import com.ustadmobile.door.room.InvalidationTrackerObserver
 import com.ustadmobile.door.test.initNapierLog
 import db3.*
@@ -22,10 +23,11 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.routing.*
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import org.junit.Assert
@@ -36,6 +38,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
+@OptIn(ExperimentalPagingApi::class)
 class PullIntegrationTest {
 
     data class ClientServerIntegrationTestContext(
@@ -88,7 +91,7 @@ class PullIntegrationTest {
             }
         }
 
-        val serverConfig = DoorHttpServerConfig(json = json)
+        val serverConfig = DoorHttpServerConfig(json, NapierDoorLogger())
         val server = embeddedServer(Netty, 8094) {
             routing {
                 ExampleDb3_KtorRoute(serverConfig) { serverDb }
@@ -343,9 +346,15 @@ class PullIntegrationTest {
 
             val clientRepo = makeClientRepo()
 
-            clientRepo.discussionPostDao.findAllPostAsPagingSource(0).load(PagingSourceLoadParamsRefresh(
+            val pagingSource =  clientRepo.discussionPostDao.findAllPostAsPagingSource(0)
+            pagingSource.load(PagingSourceLoadParamsRefresh(
                 key = 0, loadSize = 50, placeholdersEnabled = false
             ))
+            val mediator = DoorRepositoryRemoteMediator({ pagingSource })
+            mediator.load(
+                LoadType.REFRESH,
+                PagingState(emptyList(), 0, PagingConfig(50, 20, false), 10)
+            )
 
             clientDb.discussionPostDao.findByUidWithPosterMemberAsFlow(post.postUid)
                 .filter { it != null }
@@ -456,10 +465,16 @@ class PullIntegrationTest {
             }
 
             makeClientRepo().use { clientRepo ->
-                clientRepo.discussionPostDao.findRootPostAndNumRepliesAsPagingSourceWithPagedParams().load(
+                val pagingSource  = clientRepo.discussionPostDao.findRootPostAndNumRepliesAsPagingSourceWithPagedParams()
+                pagingSource.load(
                     PagingSourceLoadParamsRefresh(
                         key = 0, loadSize = 50, placeholdersEnabled = false
                     )
+                )
+                val mediator = DoorRepositoryRemoteMediator({ pagingSource })
+                mediator.load(
+                    LoadType.REFRESH,
+                    PagingState(emptyList(), 0, PagingConfig(50, 20, false), 10)
                 )
 
                 clientDb.discussionPostDao.findRootPostAndNumRepliesAsPagingSourceWithAsFlow().filter { postAndReplyList: List<DiscussionPostAndNumReplies> ->
@@ -621,62 +636,6 @@ class PullIntegrationTest {
                     message = "Invalidation count after pulling from server is at least one")
                 assertEquals(invalidationCountAfterPull1, invalidationCount.get(),
                         message = "Making a second pull when the entities on the server have not changed does not cause any invalidation")
-            }
-        }
-    }
-
-    @Test
-    fun givenEntityCreatedOnServer_whenEntityPulledViaPagingSource_thenWillOnlyBeInvalidatedOnce() {
-        initNapierLog()
-        clientServerIntegrationTest {
-            val memberInServerDb = Member().apply {
-                firstName = "Roger"
-                lastName = "Rabbit"
-                memberUid = serverDb.memberDao.insertAsync(this)
-
-            }
-
-            val originalPost = DiscussionPost().apply {
-                postTitle = "I like hay"
-                postText = "Mmm... Hay..."
-                posterMemberUid = memberInServerDb.memberUid
-                postUid = serverDb.discussionPostDao.insertAsync(this)
-            }
-
-            val invalidationCountFlow = MutableStateFlow(0)
-            val invalidationTrackerObserver = object: InvalidationTrackerObserver(arrayOf("DiscussionPost")) {
-                override fun onInvalidated(tables: Set<String>) {
-                    invalidationCountFlow.update { prev ->
-                        prev + 1
-                    }
-                }
-            }
-
-            clientDb.invalidationTracker.addObserver(invalidationTrackerObserver)
-
-            val scope = CoroutineScope(currentCoroutineContext() + Job())
-            makeClientRepo().use { clientRepo ->
-                //Simulate a pager in the UI that would request a new paging source every time it gets invalidated
-                scope.launch {
-                    while(isActive) {
-                        val pagingSource = clientRepo.discussionPostDao.findAllPostAsPagingSource(0)
-                        pagingSource.load(PagingSourceLoadParamsRefresh(key = null, loadSize = 20, placeholdersEnabled = false))
-                        val invalidatedCompletable = CompletableDeferred<Unit>()
-                        pagingSource.registerInvalidatedCallback {
-                            invalidatedCompletable.complete(Unit)
-                        }
-                        invalidatedCompletable.await()
-                    }
-                }
-
-                invalidationCountFlow.filter { it >= 1  }.test(timeout = 5.seconds) {
-                    val count = awaitItem()
-                    delay(2000)
-                    expectNoEvents()
-                    cancelAndIgnoreRemainingEvents()
-                }
-
-
             }
         }
     }

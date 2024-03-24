@@ -27,6 +27,7 @@ import com.ustadmobile.door.http.DoorJsonRequest
 import com.ustadmobile.door.http.DoorJsonResponse
 import com.ustadmobile.door.ktor.KtorCallDaoAdapter
 import com.ustadmobile.door.ktor.KtorCallDbAdapter
+import com.ustadmobile.door.log.DoorLogLevel
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.replication.DoorReplicationEntity
 import com.ustadmobile.door.replication.DoorRepositoryReplicationClient
@@ -37,6 +38,7 @@ import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Comp
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.DI_INSTANCE_MEMBER
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.DI_INSTANCE_TYPETOKEN_MEMBER
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.DI_ON_MEMBER
+import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.END_OF_PAGINATION_REACHED_VALNAME
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.GET_MEMBER
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.POST_MEMBER
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.RESPOND_MEMBER
@@ -568,6 +570,22 @@ fun CodeBlock.Builder.addGetRequestPagingSourceLoadParams(
     return this
 }
 
+/**
+ * Where the receiver KSFunctionDeclaration that represents a DAO function, return the function that will determine
+ * if the end of pagination has been reached.
+ *
+ *
+ * @return null if this function does not return a PagingSource or otherwise have a function that determines if the end
+ *         of pagination has been reached.
+ */
+fun KSFunctionDeclaration.daoEndOfPaginationReachedFunction(): KSFunctionDeclaration? {
+    if(returnType?.resolve()?.isPagingSource() != true)
+        return null
+
+    return this
+}
+
+
 fun FileSpec.Builder.addHttpServerExtensionFun(
     resolver: Resolver,
     daoKSClassDeclaration: KSClassDeclaration,
@@ -625,8 +643,10 @@ fun FileSpec.Builder.addHttpServerExtensionFun(
                     }
 
                     if(effectiveStrategy == HttpAccessible.ClientStrategy.PULL_REPLICATE_ENTITIES) {
-                        addHttpReplicationEntityServerExtension(resolver, daoFunDecl, daoKSClassDeclaration,
-                                requestValName = "request", pagingLoadParamValName = "_pagingLoadParams")
+                        addHttpReplicationEntityServerExtension(
+                            resolver, daoFunDecl, daoKSClassDeclaration,
+                            requestValName = "request", pagingLoadParamValName = "_pagingLoadParams"
+                        )
                     }else {
                         //Run the query and return JSON
                         add("val _thisNodeId = request.db.%M\n",
@@ -690,6 +710,7 @@ fun CodeBlock.Builder.addHttpServerFunctionCallCode(
     requestValName: String,
     pagingLoadParamValName: String,
     resolver: Resolver,
+    convertPagingSourceToList: Boolean = true,
 ) : CodeBlock.Builder {
     val returnType = funDeclaration.returnType?.resolve()
 
@@ -746,8 +767,10 @@ fun CodeBlock.Builder.addHttpServerFunctionCallCode(
     if(returnType?.isFlow() == true) {
         add(".%M()", MemberName("kotlinx.coroutines.flow", "first"))
     }else if(returnType?.isPagingSource() == true) {
-        add(".%M(_pagingLoadParams)",
-            MemberName("com.ustadmobile.door.paging", "loadPageDataOrEmptyList"))
+        if(convertPagingSourceToList) {
+            add(".%M(_pagingLoadParams)",
+                MemberName("com.ustadmobile.door.paging", "loadPageDataOrEmptyList"))
+        }
     }
 
     return this
@@ -760,13 +783,6 @@ fun CodeBlock.Builder.addHttpReplicationEntityServerExtension(
     requestValName: String,
     pagingLoadParamValName: String,
 ) : CodeBlock.Builder {
-    beginControlFlow("val replicationEntities = %M<%T>",
-        MemberName("kotlin.collections", "buildList"),
-        DoorReplicationEntity::class
-    )
-
-    //Next: we can add list of functions e.g. replicateData = ["selectAllSalesPeople", "selectAllSalesByType"]
-    // that are going to generate data to replicate
     val httpAccessibleKSAnnotation = daoFunDecl.getKSAnnotationByType(HttpAccessible::class)
         ?: throw IllegalArgumentException("addHttpReplicationEntityServerExtension: can only be used for function with @HttpAccessible annotation")
     val queriesToReplicate = httpAccessibleKSAnnotation.getArgumentValueByNameAsAnnotationList("pullQueriesToReplicate")
@@ -781,10 +797,15 @@ fun CodeBlock.Builder.addHttpReplicationEntityServerExtension(
     }
 
     functionsToReplicate.forEach { funDeclaration ->
-        val returnType = funDeclaration.returnType?.resolve()
-        val resultType = returnType?.unwrapResultType(resolver)
-        val resultComponentType = resultType?.unwrapComponentTypeIfListOrArray(resolver)
-        val resultValName = "_result_${funDeclaration.simpleName.asString()}"
+        val isPagingSource = funDeclaration.returnType?.resolve()?.isPagingSource() ?: false
+        val resultBaseName = "_result_${funDeclaration.simpleName.asString()}"
+        val resultSuffix = if(isPagingSource) {
+            "_pagingSource"
+        }else {
+            ""
+        }
+        val resultValName = "$resultBaseName$resultSuffix"
+
 
         add("val $resultValName = ")
         addHttpServerFunctionCallCode(
@@ -795,7 +816,35 @@ fun CodeBlock.Builder.addHttpReplicationEntityServerExtension(
             requestValName = requestValName,
             pagingLoadParamValName = pagingLoadParamValName,
             resolver = resolver,
-        ).add("\n")
+            convertPagingSourceToList = false
+        )
+
+        if(isPagingSource) {
+            add(".%M($pagingLoadParamValName)\n", MemberName("com.ustadmobile.door.paging", "loadPageDataForHttp"))
+            add("val $resultBaseName = $resultValName.data\n")
+
+            if(
+                funDeclaration == daoFunDecl.daoEndOfPaginationReachedFunction()
+            ) {
+                add("serverConfig.logger.log(%T.VERBOSE, \"%L\")\n", DoorLogLevel::class,
+                    "DoorPaging:·loaded·from:·\${_pagingLoadParams.key}·endOfPaginationReached=\${$resultValName.endOfPaginationReached}")
+                add("val $END_OF_PAGINATION_REACHED_VALNAME = $resultValName.endOfPaginationReached\n")
+            }
+        }
+        add("\n")
+    }
+
+
+    beginControlFlow("val replicationEntities = %M<%T>",
+        MemberName("kotlin.collections", "buildList"),
+        DoorReplicationEntity::class
+    )
+
+    functionsToReplicate.forEach { funDeclaration ->
+        val returnType = funDeclaration.returnType?.resolve()
+        val resultType = returnType?.unwrapResultType(resolver)
+        val resultComponentType = resultType?.unwrapComponentTypeIfListOrArray(resolver)
+        val resultValName = "_result_${funDeclaration.simpleName.asString()}"
 
         val replicationEntitiesOnResult = (resultComponentType?.declaration as? KSClassDeclaration)
             ?.getDoorReplicateEntityComponents()
@@ -857,7 +906,14 @@ fun CodeBlock.Builder.addHttpReplicationEntityServerExtension(
         MemberName("com.ustadmobile.door.ext", "doorWrapperNodeId"))
     add("return %T(\n", DoorJsonResponse::class)
     indent()
-    add("headers = listOf(%T.HEADER_NODE_ID to _thisNodeId.toString()),\n", DoorConstants::class)
+    beginControlFlow("headers = buildList")
+    add("add(Pair(%T.HEADER_NODE_ID, _thisNodeId.toString()))\n", DoorConstants::class)
+    if(daoFunDecl.daoEndOfPaginationReachedFunction() != null) {
+        add("add(Pair(%T.HEADER_PAGING_END_REACHED, $END_OF_PAGINATION_REACHED_VALNAME.toString()))\n",
+            DoorConstants::class)
+    }
+    endControlFlow()
+    add(",\n")
     add("bodyText = json.encodeToString(\n")
     indent()
     add("%T.serializer(),\n", DoorMessage::class)
@@ -984,6 +1040,8 @@ class DoorHttpServerProcessor(
         const val SUFFIX_NANOHTTPD_ADDURIMAPPING = "_AddUriMapping"
 
         const val SUFFIX_HTTP_SERVER_EXTENSION_FUNS = "_HttpServerExt"
+
+        const val END_OF_PAGINATION_REACHED_VALNAME = "_endOfPaginationReached"
 
         val GET_MEMBER = MemberName("io.ktor.server.routing", "get")
 

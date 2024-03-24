@@ -1,5 +1,6 @@
 package com.ustadmobile.door.http
 
+import com.ustadmobile.door.log.DoorLogger
 import kotlinx.serialization.json.Json
 
 /**
@@ -7,6 +8,7 @@ import kotlinx.serialization.json.Json
  * accept/reject etc.
  */
 data class DoorHttpServerConfig(
-    val json: Json
+    val json: Json,
+    val logger: DoorLogger,
 ) {
 }

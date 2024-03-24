@@ -7,6 +7,7 @@ import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.ext.nodeIdAuthCache
 import com.ustadmobile.door.ext.sanitizeDbName
 import com.ustadmobile.door.http.DoorHttpServerConfig
+import com.ustadmobile.door.log.NapierDoorLogger
 import com.ustadmobile.door.util.NodeIdAuthCache
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
@@ -74,7 +75,7 @@ fun Application.doorTestDbApplication() {
 
     routing {
         route("RepDb") {
-            RepDb_KtorRoute(DoorHttpServerConfig(json = json)) {
+            RepDb_KtorRoute(DoorHttpServerConfig(json = json, logger = NapierDoorLogger())) {
                 val di : DI by  it.closestDI()
                 di.on(it).direct.instance<RepDb>(tag = DoorTag.TAG_DB)
             }

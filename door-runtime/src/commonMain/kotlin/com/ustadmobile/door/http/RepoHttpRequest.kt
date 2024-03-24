@@ -34,7 +34,7 @@ inline fun <R> DoorDatabaseRepository.repoHttpRequestWithFallback(
     }
 }
 
-inline fun DoorDatabaseRepository.repoReplicateHttpRequest(
+inline fun DoorDatabaseRepository.replicateHttpRequestCatchAndLog(
     repoPath: String,
     block: () -> Unit
 ) {
@@ -44,5 +44,19 @@ inline fun DoorDatabaseRepository.repoReplicateHttpRequest(
         Napier.v(tag = DoorTag.LOG_TAG, throwable = e) {
             "$this: repoHttpRequestWithFallback: exception for $repoPath"
         }
+    }
+}
+
+inline fun <R> DoorDatabaseRepository.replicateHttpRequestOrThrow(
+    repoPath: String,
+    block: () -> R,
+) : R {
+    try {
+        return block()
+    }catch(e: Exception) {
+        Napier.v(tag = DoorTag.LOG_TAG, throwable = e) {
+            "$this: repoHttpRequestWithFallback: exception for $repoPath"
+        }
+        throw e
     }
 }

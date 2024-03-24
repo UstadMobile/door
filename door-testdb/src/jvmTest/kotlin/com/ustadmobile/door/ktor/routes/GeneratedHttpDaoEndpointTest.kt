@@ -4,6 +4,7 @@ import com.ustadmobile.door.DatabaseBuilder
 import com.ustadmobile.door.DoorConstants
 import com.ustadmobile.door.http.DbAndDao
 import com.ustadmobile.door.http.DoorHttpServerConfig
+import com.ustadmobile.door.log.NapierDoorLogger
 import com.ustadmobile.door.message.DoorMessage
 import db3.DiscussionPost
 import db3.DiscussionPostDao_KtorRoute
@@ -57,7 +58,8 @@ class GeneratedHttpDaoEndpointTest {
 
             routing {
                 val serverConfig = DoorHttpServerConfig(
-                    json = json
+                    json = json,
+                    logger = NapierDoorLogger()
                 )
 
                 DiscussionPostDao_KtorRoute(serverConfig) {

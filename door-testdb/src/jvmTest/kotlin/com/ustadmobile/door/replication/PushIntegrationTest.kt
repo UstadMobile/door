@@ -69,7 +69,7 @@ class PushIntegrationTest {
             }
         }
 
-        val serverConfig = DoorHttpServerConfig(json)
+        val serverConfig = DoorHttpServerConfig(json, NapierDoorLogger())
         server = embeddedServer(Netty, 8094) {
             routing {
                 route(DoorRepositoryReplicationClient.REPLICATION_PATH) {
