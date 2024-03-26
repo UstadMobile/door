@@ -44,7 +44,7 @@ android-appcompat =  "1.6.1"
 android-material =  "1.11.0"
 android-constraint-layout =  "2.1.4"
 android-roboelectric =  "4.11.1"
-kotlin-wrappers-kotlin-extensions = "1.0.1-pre.651"
+kotlin-wrappers-kotlin-extensions = "1.0.1-pre.721"
 
 [plugins]
 

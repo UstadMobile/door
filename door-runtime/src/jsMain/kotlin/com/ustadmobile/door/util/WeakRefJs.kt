@@ -1,6 +1,6 @@
 package com.ustadmobile.door.util
 
-import js.core.WeakRef
+import js.memory.WeakRef
 
 class WeakRefJs<T: Any>(target: T) : IWeakRef<T> {
 

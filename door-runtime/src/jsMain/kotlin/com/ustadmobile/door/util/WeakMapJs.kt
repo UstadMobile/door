@@ -9,7 +9,7 @@ import js.collections.WeakMap
  */
 class WeakMapJs<K: Any, V> : IWeakMap<K, V> {
 
-    private val mWeakMap = WeakMap<K, V>()
+    private val mWeakMap = WeakMap<K, V>(emptyArray())
 
     override fun get(key: K): V? {
         return mWeakMap[key]
