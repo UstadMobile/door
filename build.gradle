@@ -3,10 +3,10 @@ import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootPlugin
 
 buildscript {
 
-    ext.kotlin_version = "1.9.21"
-    ext.atomicfu_version = '0.23.1'
+    ext.kotlin_version = "1.9.23"
+    ext.atomicfu_version = '0.23.2'
     ext.version_shadow = "8.1.1"
-    ext.ksp_version = "1.0.15"
+    ext.ksp_version = "1.0.19"
 
     repositories {
         google()
@@ -28,7 +28,7 @@ plugins {
 
 
 group 'com.github.UstadMobile.door'
-version '0.70b43h'
+version '0.70b43i'
 
 ext.localProperties = new Properties()
 
@@ -55,7 +55,7 @@ if(System.getenv("DOOR_POSTGRES_PASS") != null) {
 
 
 ext {
-    version_kotlin_wrappers_bom = "1.0.0-pre.640"
+    version_kotlin_wrappers_bom = "1.0.0-pre.721"
 
     version_android_compile_sdk = 34
     version_android_target_sdk = 34

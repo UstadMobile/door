@@ -24,7 +24,6 @@ kotlin {
                 implementation enforcedPlatform("org.jetbrains.kotlin-wrappers:kotlin-wrappers-bom:$version_kotlin_wrappers_bom")
                 implementation "org.jetbrains.kotlin-wrappers:kotlin-react"
                 implementation "org.jetbrains.kotlin-wrappers:kotlin-react-dom"
-                implementation "org.jetbrains.kotlin-wrappers:kotlin-styled"
                 implementation "org.jetbrains.kotlin-wrappers:kotlin-react-router-dom"
                 implementation libs.napier
                 implementation libs.kotlinx.serialization.json

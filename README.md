@@ -318,3 +318,6 @@ databases are compiled by the annotation processor, so tests can verify function
 
 * door-testdb:jsBrowserTest on a limited Internet connection may fail. The test has to download SQLite.js
 from the Internet due to issues with asset loading. It can be skipped if building locally.
+
+* When updating dependencies: Wrong kotlin lock upgrade message: use kotlinUpgradeYarnLock not kotlinUpgradePackageLock as per  https://youtrack.jetbrains.com/issue/KT-66714
+
