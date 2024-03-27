@@ -5,6 +5,7 @@ import app.cash.paging.PagingSourceLoadParams
 import app.cash.paging.PagingSourceLoadResult
 import app.cash.paging.PagingState
 import com.ustadmobile.door.DoorDatabaseRepository
+import com.ustadmobile.door.log.DoorLogLevel
 import io.github.aakira.napier.Napier
 import kotlinx.atomicfu.atomic
 
@@ -40,6 +41,8 @@ class DoorRepositoryReplicatePullPagingSource<Value: Any>(
 
     private val invalidated = atomic(false)
 
+    private var lastLoadParams: PagingSourceLoadParams<Int>? = null
+
     private val onDbInvalidatedCallback: () -> Unit = {
         onDbInvalidated()
     }
@@ -55,13 +58,16 @@ class DoorRepositoryReplicatePullPagingSource<Value: Any>(
     }
 
     override fun getRefreshKey(state: PagingState<Int, Value>): Int? {
-        return dbPagingSource.getRefreshKey(state)
+        return dbPagingSource.getRefreshKey(state).also {
+            repo.config.logger.log(DoorLogLevel.VERBOSE, "DoorRepositoryReplicatePullPagingSource: getRefreshKey: $it")
+        }
     }
 
     override suspend fun load(
         params: PagingSourceLoadParams<Int>
     ): PagingSourceLoadResult<Int, Value> {
         Napier.v("DoorRepositoryReplicatePullPagingSource: load key=${params.key}")
+        lastLoadParams = params
         if(!dbInvalidateCallbackRegistered.getAndSet(true)) {
             Napier.v("DoorRepositoryReplicatePullPagingSource: register db invalidate callback")
             dbPagingSource.registerInvalidatedCallback(onDbInvalidatedCallback)
