@@ -1,7 +1,8 @@
 package com.ustadmobile.door.replication
 
-import androidx.paging.PagingConfig
-import app.cash.paging.*
+import app.cash.paging.ExperimentalPagingApi
+import app.cash.paging.PagingSourceLoadParamsRefresh
+import app.cash.paging.PagingSourceLoadResultPage
 import app.cash.turbine.ReceiveTurbine
 import app.cash.turbine.test
 import com.ustadmobile.door.DatabaseBuilder
@@ -14,7 +15,7 @@ import com.ustadmobile.door.flow.doorFlow
 import com.ustadmobile.door.flow.repoFlowWithLoadingState
 import com.ustadmobile.door.http.DoorHttpServerConfig
 import com.ustadmobile.door.log.NapierDoorLogger
-import com.ustadmobile.door.paging.DoorRepositoryRemoteMediator
+import com.ustadmobile.door.paging.DoorRepositoryReplicatePullPagingSource
 import com.ustadmobile.door.room.InvalidationTrackerObserver
 import com.ustadmobile.door.test.initNapierLog
 import db3.*
@@ -347,14 +348,10 @@ class PullIntegrationTest {
             val clientRepo = makeClientRepo()
 
             val pagingSource =  clientRepo.discussionPostDao.findAllPostAsPagingSource(0)
-            pagingSource.load(PagingSourceLoadParamsRefresh(
+            val loadParams = PagingSourceLoadParamsRefresh(
                 key = 0, loadSize = 50, placeholdersEnabled = false
-            ))
-            val mediator = DoorRepositoryRemoteMediator({ pagingSource })
-            mediator.load(
-                LoadType.REFRESH,
-                PagingState(emptyList(), 0, PagingConfig(50, 20, false), 10)
             )
+            (pagingSource as DoorRepositoryReplicatePullPagingSource<*>).loadHttp(loadParams)
 
             clientDb.discussionPostDao.findByUidWithPosterMemberAsFlow(post.postUid)
                 .filter { it != null }
@@ -440,6 +437,7 @@ class PullIntegrationTest {
         }
     }
 
+    @Suppress("CAST_NEVER_SUCCEEDS")
     @Test
     fun givenEntitiesCreatedOnServer_whenExtraPullQueriesToReplicateAreSpecifiedForPagingSource_thenWillLoadExtraData() {
         clientServerIntegrationTest {
@@ -466,16 +464,11 @@ class PullIntegrationTest {
 
             makeClientRepo().use { clientRepo ->
                 val pagingSource  = clientRepo.discussionPostDao.findRootPostAndNumRepliesAsPagingSourceWithPagedParams()
-                pagingSource.load(
-                    PagingSourceLoadParamsRefresh(
-                        key = 0, loadSize = 50, placeholdersEnabled = false
-                    )
+                val loadParams = PagingSourceLoadParamsRefresh(
+                    key = 0, loadSize = 50, placeholdersEnabled = false
                 )
-                val mediator = DoorRepositoryRemoteMediator({ pagingSource })
-                mediator.load(
-                    LoadType.REFRESH,
-                    PagingState(emptyList(), 0, PagingConfig(50, 20, false), 10)
-                )
+                pagingSource.load(loadParams)
+                (pagingSource as DoorRepositoryReplicatePullPagingSource<*>).loadHttp(loadParams)
 
                 clientDb.discussionPostDao.findRootPostAndNumRepliesAsPagingSourceWithAsFlow().filter { postAndReplyList: List<DiscussionPostAndNumReplies> ->
                     postAndReplyList.any { it.discussionPost?.postUid ==  originalPost.postUid && it.numReplies == 1 }
