@@ -28,12 +28,25 @@ fun PreparedStatement.setJsonPrimitive(
     }
 }
 
+private fun defaultJsonPrimitive(type: Int) : JsonPrimitive{
+    return when(type) {
+        TypesKmp.VARCHAR, TypesKmp.LONGVARCHAR -> JsonNull
+        TypesKmp.BOOLEAN -> JsonPrimitive(false)
+        else -> JsonPrimitive(0)
+    }
+}
+
+
 fun PreparedStatement.setAllFromJsonObject(
     jsonObject: JsonObject,
     entityFieldsMetaData: List<ReplicationFieldMetaData>,
     startIndex: Int = 1
 ) {
     entityFieldsMetaData.forEachIndexed { index, field ->
-        setJsonPrimitive(index + startIndex, field.fieldType, jsonObject.getOrThrow(field.fieldName).jsonPrimitive)
+        val fieldType = field.fieldType
+        setJsonPrimitive(
+            index + startIndex, field.fieldType,
+            jsonObject.getOrElse(field.fieldName) { defaultJsonPrimitive(fieldType) }.jsonPrimitive
+        )
     }
 }
