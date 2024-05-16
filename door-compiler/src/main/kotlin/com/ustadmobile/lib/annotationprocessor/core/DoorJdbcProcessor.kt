@@ -298,7 +298,11 @@ private fun CodeBlock.Builder.addReplicateEntityMetaDataCode(
     add("tableId = %L, \n", repEntityAnnotation?.tableId)
     add("entityTableName = %S, \n", entity.entityTableName)
     add("receiveViewName = %S, \n", entity.replicationEntityReceiveViewName)
-    add("entityPrimaryKeyFieldName = %S, \n", entity.entityPrimaryKeyProps.first().simpleName.asString())
+    add("entityPrimaryKeyFieldNames = listOf(")
+    entity.entityPrimaryKeyProps.forEach {
+        add("%S,", it)
+    }
+    add("),\n")
     add("entityVersionIdFieldName = %S, \n", entity.firstPropWithAnnotation(ReplicateEtag::class).simpleName.asString())
     addFieldsCodeBlock(entity).add(",\n")
     add("batchSize = ").add("%L", repEntityAnnotation?.batchSize ?: 1000).add(",\n")

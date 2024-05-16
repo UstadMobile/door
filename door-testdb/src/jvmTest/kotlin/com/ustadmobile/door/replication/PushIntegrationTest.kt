@@ -13,6 +13,7 @@ import com.ustadmobile.door.test.initNapierLog
 import com.ustadmobile.door.util.systemTimeInMillis
 import db3.ExampleDb3
 import db3.ExampleEntity3
+import db3.StatementEntity
 import io.ktor.client.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.engine.*
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
+import java.util.*
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -169,6 +171,43 @@ class PushIntegrationTest {
             }
 
             serverDb.exampleEntity3Dao.findByUidAsFlow(insertedEntity.eeUid).filter {
+                it != null
+            }.test(timeout = 5.seconds, name = "Entity created after connection is replicated from client to server as expected") {
+                assertNotNull(awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+        clientRepo.close()
+    }
+
+    /**
+     * Test pushing an entity that has two primary keys
+     */
+    @Test(timeout = 10000)
+    fun givenBlankClientDatabase_whenEntityWithDualPrimaryKeysCreatedOnClientAfterConnection_thenShouldReplicateToServer() {
+        server.start()
+        val clientRepo = clientDb.asClientNodeRepository()
+        val clientRepoClientState = (clientRepo as DoorDatabaseRepository).clientState
+        runBlocking {
+            clientRepoClientState.filter { it.initialized }.first()
+
+            //This is not ideal, but we want to be sure that the first connection has been made. That isn't something that
+            // any normal use case would need to know
+            delay(500)
+
+            val uuid = UUID.randomUUID()
+            val insertedEntity = StatementEntity(
+                uidHi = uuid.mostSignificantBits,
+                uidLo = uuid.leastSignificantBits,
+                lct = systemTimeInMillis(),
+                name = "Statement"
+            )
+
+            clientRepo.withDoorTransactionAsync {
+                clientRepo.statementEntityDao.insertAsync(insertedEntity)
+            }
+
+            serverDb.statementEntityDao.findByUidAsFlow(insertedEntity.uidHi, insertedEntity.uidLo).filter {
                 it != null
             }.test(timeout = 5.seconds, name = "Entity created after connection is replicated from client to server as expected") {
                 assertNotNull(awaitItem())

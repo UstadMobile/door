@@ -12,5 +12,4 @@ data class PendingRepositorySession(
     var rsUid: Long = 0,
     var remoteNodeId: Long = 0,
     var endpointUrl: String? = null
-) {
-}
+)

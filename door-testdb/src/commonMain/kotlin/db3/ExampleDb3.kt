@@ -16,6 +16,7 @@ import com.ustadmobile.door.room.RoomDatabase
         ReplicationOperation::class,
         PendingRepositorySession::class,
         Badge::class,
+        StatementEntity::class,
     )
 )
 expect abstract class ExampleDb3: RoomDatabase {
@@ -27,5 +28,7 @@ expect abstract class ExampleDb3: RoomDatabase {
     abstract val memberDao: MemberDao
 
     abstract val badgeDao: BadgeDao
+
+    abstract val statementEntityDao: StatementEntityDao
 
 }

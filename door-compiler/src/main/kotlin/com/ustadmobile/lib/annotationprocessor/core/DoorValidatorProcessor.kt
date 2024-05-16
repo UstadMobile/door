@@ -133,6 +133,18 @@ class DoorValidatorProcessor(
                         entity
                     )
                 }
+
+                val primaryKeys = entity.entityPrimaryKeyProps
+                if(primaryKeys.size > 2) {
+                    logger.error("@ReplicateEntity ${entity.qualifiedName?.asString()} must have 1 or 2 primary keys", entity)
+                }
+
+                primaryKeys.forEach {
+                    if(it.type.resolve() != resolver.builtIns.longType) {
+                        logger.error("@ReplicateEntity ${entity.qualifiedName?.asString()} primary key field must be Long", it)
+                    }
+                }
+
             }catch(e: IllegalArgumentException){
                 logger.error("ReplicateEntity ${entity.qualifiedName?.asString()} must have a tracker entity specified",
                     entity)

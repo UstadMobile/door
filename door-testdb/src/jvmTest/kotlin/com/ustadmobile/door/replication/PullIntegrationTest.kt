@@ -18,6 +18,7 @@ import com.ustadmobile.door.log.NapierDoorLogger
 import com.ustadmobile.door.paging.DoorRepositoryReplicatePullPagingSource
 import com.ustadmobile.door.room.InvalidationTrackerObserver
 import com.ustadmobile.door.test.initNapierLog
+import com.ustadmobile.door.util.systemTimeInMillis
 import db3.*
 import io.ktor.client.*
 import io.ktor.serialization.kotlinx.json.*
@@ -33,6 +34,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import org.junit.Assert
 import org.junit.Test
+import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -145,6 +147,28 @@ class PullIntegrationTest {
 
             Assert.assertEquals(memberInServerDb, discussionAndMemberInClientDb?.posterMember)
             Assert.assertEquals(discussionPostInServerDb, discussionAndMemberInClientDb?.discussionPost)
+            clientRepo.close()
+        }
+    }
+
+    @Test
+    fun givenEntityWithTwoPrimaryKeysOnServer_whenClientMakesPullRequest_repoFunctionReturnsValuesAndEntitiesAreStoredInClientLocalDb() {
+        initNapierLog()
+        clientServerIntegrationTest {
+            val uuid = UUID.randomUUID()
+            val insertedEntity = StatementEntity(
+                uidHi = uuid.mostSignificantBits,
+                uidLo = uuid.leastSignificantBits,
+                lct = systemTimeInMillis(),
+                name = "Statement"
+            )
+            serverDb.statementEntityDao.insertAsync(insertedEntity)
+
+            val clientRepo = makeClientRepo()
+
+            val statementInLocalDb = clientRepo.statementEntityDao.findByUidAsync(insertedEntity.uidHi, insertedEntity.uidLo)
+
+            Assert.assertEquals(statementInLocalDb, insertedEntity)
             clientRepo.close()
         }
     }

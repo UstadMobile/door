@@ -9,21 +9,13 @@ class ReplicationEntityMetaData(
     val tableId: Int,
     val entityTableName: String,
     val receiveViewName: String,
-    val entityPrimaryKeyFieldName: String,
+    val entityPrimaryKeyFieldNames: List<String>,
     val entityVersionIdFieldName: String,
     val entityFields: List<ReplicationFieldMetaData>,
     val batchSize: Int = 1000,
     val remoteInsertStrategy: ReplicateEntity.RemoteInsertStrategy,
     val triggers: List<Trigger>,
 ) {
-
-    val entityPrimaryKeyFieldType: Int by lazy(LazyThreadSafetyMode.NONE) {
-        entityFields.first { it.fieldName == entityPrimaryKeyFieldName }.fieldType
-    }
-
-    val versionIdFieldType: Int by lazy(LazyThreadSafetyMode.NONE) {
-        entityFields.first { it.fieldName == entityVersionIdFieldName }.fieldType
-    }
 
     /**
      * Map of column name to column type for all fields.
@@ -36,7 +28,7 @@ class ReplicationEntityMetaData(
         get() = """
             SELECT $entityTableName.* 
               FROM $entityTableName
-             WHERE $entityTableName.$entityPrimaryKeyFieldName = ?
+             WHERE ${entityPrimaryKeyFieldNames.joinToString(separator = " AND ") { "$it = ?" } }
         """.trimIndent()
 
 

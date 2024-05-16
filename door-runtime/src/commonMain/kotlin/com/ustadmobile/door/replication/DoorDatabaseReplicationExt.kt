@@ -40,6 +40,9 @@ private suspend fun RoomDatabase.selectDoorReplicateEntitiesByTableIdAndPrimaryK
     ) { stmt ->
         primaryKeysList.mapNotNull { primaryKeys ->
             stmt.setLong(1, primaryKeys.pk1)
+            if(primaryKeys.pk2 != 0L)
+                stmt.setLong(2, primaryKeys.pk2)
+
             stmt.executeQueryAsyncKmp().useResults { result ->
                 result.mapNextRow(null) { mapResult ->
                     DoorReplicationEntity(
@@ -55,7 +58,7 @@ private suspend fun RoomDatabase.selectDoorReplicateEntitiesByTableIdAndPrimaryK
 
 /**
  * Select the DoorReplicateEntity (e.g. including the full Json of the entity data) for a list of NodeEvent(s) that
- * represent replication events (e.g. something new was inserted into the OutgoingRelpication table). This is
+ * represent replication events (e.g. something new was inserted into the OutgoingReplication table). This is
  * used as part of converting the NodeEvent into a DoorMessage that can be transmitted to another node. This is done
  * lazily because the NodeEvent will only be transmitted if there is a sender which wants to transmit this event (e.g.
  * probably only when the other node is connected to this node).
@@ -334,13 +337,20 @@ private fun createChangeMonitorTriggerSql(
 ): String {
     val triggerName =  "_d_ch_monitor_${entityMetaData.tableId}_${remoteNodeId.absoluteValue}" +
             "_${operation.substring(0, 2).lowercase()}"
+
+    //A ReplicateEntity entity may have one or two primary keys (each a 64 bit long).
+    val orPk2 = if(entityMetaData.entityPrimaryKeyFieldNames.size > 1)
+        "NEW.${entityMetaData.entityPrimaryKeyFieldNames[1]}"
+    else
+        0
+
     return """
             CREATE TEMP TRIGGER IF NOT EXISTS $triggerName 
             AFTER $operation ON ${entityMetaData.entityTableName}
             FOR EACH ROW
             BEGIN
                 INSERT INTO OutgoingReplication(destNodeId, orTableId, orPk1, orPk2)
-                VALUES ($remoteNodeId, ${entityMetaData.tableId}, NEW.${entityMetaData.entityPrimaryKeyFieldName}, 0);
+                VALUES ($remoteNodeId, ${entityMetaData.tableId}, NEW.${entityMetaData.entityPrimaryKeyFieldNames.first()}, $orPk2);
             END
             """
 }
