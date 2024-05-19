@@ -4,19 +4,23 @@ import app.cash.paging.PagingSource
 import com.squareup.kotlinpoet.*
 import com.ustadmobile.door.jdbc.TypesKmp
 import kotlinx.coroutines.flow.Flow
+
+fun TypeName.equalsIgnoreNullable(other: TypeName) : Boolean {
+    return this == other || this.copy(nullable = !isNullable) == other
+}
+
 /**
  * Map a Kotlin Type to JDBC Types constant
  */
 fun TypeName.toSqlTypesInt() = when {
-    this == BOOLEAN -> TypesKmp.BOOLEAN
-    this == BYTE -> TypesKmp.SMALLINT
-    this == SHORT -> TypesKmp.SMALLINT
-    this == INT -> TypesKmp.INTEGER
-    this == LONG -> TypesKmp.BIGINT
-    this == FLOAT -> TypesKmp.FLOAT
-    this == DOUBLE -> TypesKmp.DOUBLE
-    this == String::class.asClassName() -> TypesKmp.LONGVARCHAR
-    this == String::class.asClassName().copy(nullable = true) -> TypesKmp.LONGVARCHAR
+    this.equalsIgnoreNullable(BOOLEAN) -> TypesKmp.BOOLEAN
+    this.equalsIgnoreNullable(BYTE) -> TypesKmp.SMALLINT
+    this.equalsIgnoreNullable(SHORT) -> TypesKmp.SMALLINT
+    this.equalsIgnoreNullable(INT) -> TypesKmp.INTEGER
+    this.equalsIgnoreNullable(LONG) -> TypesKmp.BIGINT
+    this.equalsIgnoreNullable(FLOAT) -> TypesKmp.FLOAT
+    this.equalsIgnoreNullable(DOUBLE) -> TypesKmp.DOUBLE
+    this.equalsIgnoreNullable(String::class.asClassName()) -> TypesKmp.LONGVARCHAR
     else -> throw IllegalArgumentException("Could not get sqlTypeInt for: $this")
 }
 

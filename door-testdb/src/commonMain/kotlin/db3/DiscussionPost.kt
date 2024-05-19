@@ -40,6 +40,8 @@ data class DiscussionPost(
     var postLastModified: Long = 0,
 
     var posterMemberUid: Long = 0,
+
+    var isBanned: Boolean? = null,
 ) {
 
     companion object {
