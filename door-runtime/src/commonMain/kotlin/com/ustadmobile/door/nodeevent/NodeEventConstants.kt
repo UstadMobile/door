@@ -14,7 +14,9 @@ object NodeEventConstants {
                    toNode BIGINT NOT NULL,
                    tableId INTEGER NOT NULL,
                    key1 BIGINT NOT NULL,
-                   key2 BIGINT NOT NULL
+                   key2 BIGINT NOT NULL,
+                   key3 BIGINT NOT NULL,
+                   key4 BIGINT NOT NULL
             )
     """
 
@@ -30,12 +32,14 @@ object NodeEventConstants {
         TRIGGER IF NOT EXISTS _door_event_trig
              AFTER INSERT
                 ON $OUTGOING_REPLICATION_TABLE_NAME
-             BEGIN INSERT INTO NodeEvent(what, toNode, tableId, key1, key2)
+             BEGIN INSERT INTO NodeEvent(what, toNode, tableId, key1, key2, key3, key4)
                    VALUES (${DoorMessage.WHAT_REPLICATION_PUSH}, 
                            NEW.destNodeId, 
                            NEW.orTableId,
                            NEW.orPk1,
-                           NEW.orPk2
+                           NEW.orPk2,
+                           NEW.orPK3,
+                           NEW.orPk4
                           );
                    END      
     """
@@ -53,7 +57,9 @@ object NodeEventConstants {
                NodeEvent.toNode AS toNode,
                NodeEvent.tableId AS tableId,
                NodeEvent.key1 AS key1,
-               NodeEvent.key2  AS key2
+               NodeEvent.key2 AS key2,
+               NodeEvent.key3 AS key3,
+               NodeEvent.key4 AS key4
           FROM NodeEvent
     """
 

@@ -135,8 +135,8 @@ class DoorValidatorProcessor(
                 }
 
                 val primaryKeys = entity.entityPrimaryKeyProps
-                if(primaryKeys.size > 2) {
-                    logger.error("@ReplicateEntity ${entity.qualifiedName?.asString()} must have 1 or 2 primary keys", entity)
+                if(primaryKeys.size > 4) {
+                    logger.error("@ReplicateEntity ${entity.qualifiedName?.asString()} must have 1 - 4 primary keys", entity)
                 }
 
                 primaryKeys.forEach {

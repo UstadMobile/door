@@ -71,6 +71,8 @@ class NodeEventManagerAndroid<T: RoomDatabase>(
                                 orTableId = resultSet.getInt("orTableId"),
                                 orPk1 = resultSet.getLong("orPk1"),
                                 orPk2 = resultSet.getLong("orPk2"),
+                                orPk3 = resultSet.getLong("orPk3"),
+                                orPk4 = resultSet.getLong("orPk4")
                             )
                         }
                     }
@@ -88,6 +90,8 @@ class NodeEventManagerAndroid<T: RoomDatabase>(
                     tableId = it.orTableId,
                     key1 = it.orPk1,
                     key2 = it.orPk2,
+                    key3 = it.orPk3,
+                    key4 = it.orPk4,
                 )
             })
         }

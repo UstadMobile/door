@@ -3,8 +3,8 @@ package db3
 import androidx.room.Insert
 import androidx.room.Query
 import com.ustadmobile.door.annotation.DoorDao
-import com.ustadmobile.door.annotation.HttpServerFunctionCall
 import com.ustadmobile.door.annotation.HttpAccessible
+import com.ustadmobile.door.annotation.HttpServerFunctionCall
 import com.ustadmobile.door.annotation.Repository
 import kotlinx.coroutines.flow.Flow
 
@@ -19,11 +19,13 @@ expect abstract class ExampleEntity3Dao {
     abstract fun insert(exampleEntity3: ExampleEntity3): Long
 
     @Query("""
-        INSERT INTO OutgoingReplication(destNodeId, orTableId, orPk1, orPk2)
+        INSERT INTO OutgoingReplication(destNodeId, orTableId, orPk1, orPk2, orPk3, orPk4)
                SELECT :destination AS destNodeId, 
                       ${ExampleEntity3.TABLE_ID} AS orTableId,
                       :entityUid AS orPk1,
-                      0 AS orPk2  
+                      0 AS orPk2,
+                      0 AS orPk3,
+                      0 AS orPk4
     """)
     abstract suspend fun insertOutgoingReplication(entityUid: Long, destination: Long)
 

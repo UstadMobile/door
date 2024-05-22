@@ -198,7 +198,7 @@ class BasicCrudIntegrationTest : AbstractCommonTest() {
 
     @Test
     fun givenQueryPrimitiveReturnTypeNullableAsync_whenNoRowsReturned_thenShouldReturnNull() = runExampleDbTest {
-        assertNull(exampleDb2.exampleDao2().findSingleNullablePrimitiveAsync(Int.MAX_VALUE),
+        assertNull(exampleDb2.exampleDao2().findSingleNullablePrimitiveAsync(Long.MAX_VALUE),
             "Primitive nullable type query will return null when no rows match")
     }
 

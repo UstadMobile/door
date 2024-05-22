@@ -21,6 +21,8 @@ import kotlin.math.absoluteValue
 private data class ReplicateEntityPrimaryKeys(
     val pk1: Long,
     val pk2: Long,
+    var pk3: Long,
+    var pk4: Long,
     val orUid: Long,
 )
 
@@ -40,8 +42,12 @@ private suspend fun RoomDatabase.selectDoorReplicateEntitiesByTableIdAndPrimaryK
     ) { stmt ->
         primaryKeysList.mapNotNull { primaryKeys ->
             stmt.setLong(1, primaryKeys.pk1)
-            if(primaryKeys.pk2 != 0L)
+            if(entityMetaData.entityPrimaryKeyFieldNames.size >= 2)
                 stmt.setLong(2, primaryKeys.pk2)
+            if(entityMetaData.entityPrimaryKeyFieldNames.size >= 3)
+                stmt.setLong(3, primaryKeys.pk3)
+            if(entityMetaData.entityPrimaryKeyFieldNames.size >= 4)
+                stmt.setLong(3, primaryKeys.pk4)
 
             stmt.executeQueryAsyncKmp().useResults { result ->
                 result.mapNextRow(null) { mapResult ->
@@ -70,7 +76,9 @@ suspend fun RoomDatabase.selectDoorReplicationEntitiesForEvents(
     return events.runningSplitBy { it.tableId }.map { tableEvents ->
         val tableId = tableEvents.first().tableId
         selectDoorReplicateEntitiesByTableIdAndPrimaryKeys(tableId,
-            tableEvents.map { ReplicateEntityPrimaryKeys(it.key1, it.key2, 0) }
+            tableEvents.map {
+                ReplicateEntityPrimaryKeys(pk1 = it.key1, pk2 = it.key2, pk3 = it.key3, pk4 = it.key4, orUid = 0)
+            }
         )
     }.flatten()
 }
@@ -114,8 +122,12 @@ suspend fun RoomDatabase.selectPendingOutgoingReplicationsByDestNodeId(
     return pendingReplications.runningSplitBy { it.orTableId }.map { tableIdPendingList ->
         val tableId = tableIdPendingList.first().orTableId
 
-        selectDoorReplicateEntitiesByTableIdAndPrimaryKeys(tableId,
-            pendingReplications.map { ReplicateEntityPrimaryKeys(it.orPk1, it.orPk2, it.orUid) })
+        selectDoorReplicateEntitiesByTableIdAndPrimaryKeys(
+            tableId,
+            pendingReplications.map {
+                ReplicateEntityPrimaryKeys(pk1 = it.orPk1, pk2 = it.orPk2, pk3 = it.orPk3, pk4 = it.orPk4, orUid = it.orUid)
+            }
+        )
     }.flatten()
 }
 
@@ -338,19 +350,22 @@ private fun createChangeMonitorTriggerSql(
     val triggerName =  "_d_ch_monitor_${entityMetaData.tableId}_${remoteNodeId.absoluteValue}" +
             "_${operation.substring(0, 2).lowercase()}"
 
-    //A ReplicateEntity entity may have one or two primary keys (each a 64 bit long).
-    val orPk2 = if(entityMetaData.entityPrimaryKeyFieldNames.size > 1)
-        "NEW.${entityMetaData.entityPrimaryKeyFieldNames[1]}"
-    else
-        0
+    //A ReplicateEntity entity may have between 1 and 4 primary keys
+    val primaryKeys = (0 until 4).map { index ->
+        if(entityMetaData.entityPrimaryKeyFieldNames.size > index) {
+            "NEW.${entityMetaData.entityPrimaryKeyFieldNames[index]}"
+        }else {
+            "0"
+        }
+    }
 
     return """
             CREATE TEMP TRIGGER IF NOT EXISTS $triggerName 
             AFTER $operation ON ${entityMetaData.entityTableName}
             FOR EACH ROW
             BEGIN
-                INSERT INTO OutgoingReplication(destNodeId, orTableId, orPk1, orPk2)
-                VALUES ($remoteNodeId, ${entityMetaData.tableId}, NEW.${entityMetaData.entityPrimaryKeyFieldNames.first()}, $orPk2);
+                INSERT INTO OutgoingReplication(destNodeId, orTableId, orPk1, orPk2, orPk3, orPk4)
+                VALUES ($remoteNodeId, ${entityMetaData.tableId}, ${primaryKeys.joinToString()});
             END
             """
 }

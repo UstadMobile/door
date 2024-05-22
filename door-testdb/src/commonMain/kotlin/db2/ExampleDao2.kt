@@ -153,7 +153,7 @@ expect abstract class ExampleDao2 {
     abstract fun findSingleNullablePrimitive(greaterThan: Int): Int?
 
     @Query("SELECT someNumber FROM ExampleEntity2 WHERE someNumber > :greaterThan LIMIT 1")
-    abstract suspend fun findSingleNullablePrimitiveAsync(greaterThan: Int): Int?
+    abstract suspend fun findSingleNullablePrimitiveAsync(greaterThan: Long): Long?
 
     @Query("""
         SELECT ExampleEntity2.* FROM ExampleEntity2

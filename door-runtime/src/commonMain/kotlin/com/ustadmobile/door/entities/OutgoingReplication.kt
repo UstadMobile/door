@@ -14,6 +14,8 @@ import androidx.room.PrimaryKey
  * @param orTableId the tableId for this entity as per the tableId on the ReplicateEntity annotation on the Entity class
  * @param orPk1 the Primary Key of the entity to replicate
  * @param orPk2 the second primary key of the entity to replicate (if used, otherwise 0)
+ * @param orPk3 the third primary key of the entity to replicate (if used, otherwise 0)
+ * @param orPk4 the fourth primary key of the entity to replicate (if used, otherwise 0)
  */
 @Entity
 class OutgoingReplication(
@@ -23,5 +25,6 @@ class OutgoingReplication(
     var orTableId: Int = 0,
     var orPk1: Long = 0,
     var orPk2: Long = 0,
-) {
-}
+    var orPk3: Long = 0,
+    var orPk4: Long = 0,
+)

@@ -390,6 +390,8 @@ class DoorRepositoryReplicationClientTest {
                 tableId = 1,
                 key1 = 0,
                 key2 = 0,
+                key3 = 0,
+                key4 = 0,
             )
         ))
 

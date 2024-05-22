@@ -64,6 +64,8 @@ internal class NodeEventJdbcImplListenerSqlite(
                         tableId = it.getInt("tableId"),
                         key1 = it.getLong("key1"),
                         key2 = it.getLong("key2"),
+                        key3 = it.getLong("key3"),
+                        key4 = it.getLong("key4"),
                     )
                 }
             }

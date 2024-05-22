@@ -9,5 +9,6 @@ class NodeEvent(
     val tableId: Int,
     val key1: Long,
     val key2: Long,
-) {
-}
+    val key3: Long,
+    val key4: Long,
+)
