@@ -1,5 +1,6 @@
 package com.ustadmobile.door.entities
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -24,7 +25,10 @@ class OutgoingReplication(
     var destNodeId: Long = 0,
     var orTableId: Int = 0,
     var orPk1: Long = 0,
+    @ColumnInfo(defaultValue = "0")
     var orPk2: Long = 0,
+    @ColumnInfo(defaultValue = "0")
     var orPk3: Long = 0,
+    @ColumnInfo(defaultValue = "0")
     var orPk4: Long = 0,
 )
