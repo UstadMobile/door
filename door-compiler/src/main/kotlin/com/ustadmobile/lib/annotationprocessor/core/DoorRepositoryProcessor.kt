@@ -418,7 +418,7 @@ fun TypeSpec.Builder.addDaoRepoFun(
                             add("\n)")
                         } else {
                             addMakeHttpRequestAndInsertReplicationsCode(daoKSFun, daoKSClass, resolver)
-                            addRepoDelegateToDaoCode(daoKSFun, daoKSClass, resolver)
+                            addRepoDelegateToDaoCode(daoKSFun, daoKSClass, resolver, environment)
                         }
 
 
@@ -486,7 +486,7 @@ fun TypeSpec.Builder.addDaoRepoFun(
                     }
 
                     else -> {
-                        addRepoDelegateToDaoCode(daoKSFun, daoKSClass, resolver)
+                        addRepoDelegateToDaoCode(daoKSFun, daoKSClass, resolver, environment)
                     }
                 }
             }
@@ -521,8 +521,9 @@ fun CodeBlock.Builder.addRepoDelegateToDaoCode(
     daoFun: KSFunctionDeclaration,
     daoKSClass: KSClassDeclaration,
     resolver: Resolver,
+    environment: SymbolProcessorEnvironment,
 ) : CodeBlock.Builder{
-    val modifiedTableName = daoFun.getDaoFunctionModifiedTableName(daoKSClass, resolver)
+    val modifiedTableName = daoFun.getDaoFunctionModifiedTableName(daoKSClass, resolver, environment)
 
     if(daoFun.hasReturnType(resolver))
         add("val _result = ")

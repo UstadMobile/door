@@ -5,6 +5,7 @@ import androidx.room.Query
 import androidx.room.Update
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
+import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.ParameterSpec
@@ -14,9 +15,9 @@ import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.toTypeParameterResolver
 import com.ustadmobile.door.annotation.HttpAccessible
 import com.ustadmobile.door.annotation.QueryLiveTables
+import com.ustadmobile.door.annotation.QueryTableModified
 import com.ustadmobile.door.annotation.RepoHttpBodyParam
 import com.ustadmobile.lib.annotationprocessor.core.applyIf
-import com.ustadmobile.lib.annotationprocessor.core.isSQLAModifyingQuery
 import net.sf.jsqlparser.parser.CCJSqlParserUtil
 import net.sf.jsqlparser.statement.Statement
 import net.sf.jsqlparser.statement.select.Select
@@ -184,19 +185,41 @@ fun KSFunctionDeclaration.isOverridden(
 fun KSFunctionDeclaration.getDaoFunctionModifiedTableName(
     daoDeclaration: KSClassDeclaration,
     resolver: Resolver,
+    environment: SymbolProcessorEnvironment,
 ): String? {
     val thisResolved = this.asMemberOf(daoDeclaration.asType(emptyList()))
     val queryAnnotation = getAnnotation(Query::class)
-    return if(hasAnyAnnotation(Update::class, Insert::class)) {
-        return (thisResolved.firstParamEntityType(resolver).declaration as KSClassDeclaration).entityTableName
-    }else if(queryAnnotation != null && queryAnnotation.value.isSQLAModifyingQuery()){
-        val parsed = CCJSqlParserUtil.parse(queryAnnotation.value)
-        when(parsed) {
-            is UpdateStatement ->  parsed.table.name
-            is InsertStatement -> parsed.table.name
-            else -> null
+    val specifiedTable = getAnnotation(QueryTableModified::class)?.value
+
+    return when {
+        hasAnyAnnotation(Update::class, Insert::class) -> {
+            (thisResolved.firstParamEntityType(resolver).declaration as KSClassDeclaration).entityTableName
         }
-    }else {
-        null
+        specifiedTable != null -> {
+            specifiedTable
+        }
+        else -> {
+            try {
+                when(val parsed = CCJSqlParserUtil.parse(queryAnnotation?.value)) {
+                    is UpdateStatement ->  parsed.table.name
+                    is InsertStatement -> parsed.table.name
+                    else -> null
+                }
+            }catch(e: Throwable) {
+                if(
+                    queryAnnotation?.value?.trimStart()?.uppercase()?.let {
+                        it.startsWith("INSERT") || it.startsWith("UPDATE")  || it.startsWith("DELETE")
+                    } == true
+                ) {
+                    environment.logger.error(
+                        message = "JSQLParser cannot parse INSERT/UPDATE/DELETE QUERY: ${queryAnnotation.value}: ${e.message}\n" +
+                                "Please add @QueryTableModified annotation to specify the table modified",
+                        symbol = this
+                    )
+                }
+
+                null
+            }
+        }
     }
 }

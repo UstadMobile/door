@@ -53,8 +53,11 @@ class DoorValidatorProcessor(
         pgConnection = postgresDbUrl?.takeIf { it.isNotBlank() }?.let { dbUrl ->
             try {
                 Class.forName("org.postgresql.Driver")
-                DriverManager.getConnection(dbUrl, environment.options[AnnotationProcessorWrapper.OPTION_POSTGRES_TESTUSER],
-                    environment.options[AnnotationProcessorWrapper.OPTION_POSTGRES_TESTPASS])
+                DriverManager.getConnection(
+                    dbUrl,
+                    environment.options[AnnotationProcessorWrapper.OPTION_POSTGRES_TESTUSER],
+                    environment.options[AnnotationProcessorWrapper.OPTION_POSTGRES_TESTPASS]
+                )
             } catch(e: SQLException) {
                 logger.error("Door: Postgres check database supplied using doordb_postgres_url, but could not connect: ${e.message}")
                 null
@@ -416,12 +419,13 @@ class DoorValidatorProcessor(
             dao.getAllFunctions().filter { it.hasAnnotation(Query::class) }.forEach { queryFunDecl ->
                 try {
                     val queryAnnotation = queryFunDecl.getAnnotation(Query::class)!!
+                    val postgresQuery = queryFunDecl.getAnnotation(PostgresQuery::class)
                     val queryFun = queryFunDecl.asMemberOf(dao.asType(emptyList()))
 
                     //check that the query parameters on both versions match
                     val sqliteQueryParams = queryAnnotation.value.getSqlQueryNamedParameters()
-                    val postgresQueryParams = (queryFunDecl.getAnnotation(PostgresQuery::class)?.value ?:
-                    queryAnnotation.value.sqlToPostgresSql()).getSqlQueryNamedParameters()
+                    val postgresQueryParams =
+                        (postgresQuery?.value ?: queryAnnotation.value.sqlToPostgresSql()).getSqlQueryNamedParameters()
 
                     if(sqliteQueryParams != postgresQueryParams) {
                         logger.error("Query parameters don't match: " +
@@ -435,7 +439,7 @@ class DoorValidatorProcessor(
                     }.forEach { connectionEntry ->
                         val query = queryAnnotation.value.let {
                             if(connectionEntry.key == DoorDbType.POSTGRES) {
-                                queryFunDecl.getAnnotation(PostgresQuery::class)?.value ?: it.sqlToPostgresSql()
+                                postgresQuery?.value ?: it.sqlToPostgresSql()
                             }else {
                                 it
                             }
@@ -466,7 +470,11 @@ class DoorValidatorProcessor(
                                 }
                             }
                         }catch(e: Exception) {
-                            logger.error("Error running query for DAO function: $e", queryFunDecl)
+                            logger.error(
+                                "Error running query for DAO function \nquery='$query'," +
+                                        "\nran='$queryWithQuestionPlaceholders'\n ",
+                                queryFunDecl
+                            )
                             if(e !is SQLException) {
                                 e.printStackTrace()
                             }

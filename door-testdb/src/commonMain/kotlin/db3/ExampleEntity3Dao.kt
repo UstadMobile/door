@@ -2,10 +2,7 @@ package db3
 
 import androidx.room.Insert
 import androidx.room.Query
-import com.ustadmobile.door.annotation.DoorDao
-import com.ustadmobile.door.annotation.HttpAccessible
-import com.ustadmobile.door.annotation.HttpServerFunctionCall
-import com.ustadmobile.door.annotation.Repository
+import com.ustadmobile.door.annotation.*
 import kotlinx.coroutines.flow.Flow
 
 @DoorDao
@@ -17,6 +14,25 @@ expect abstract class ExampleEntity3Dao {
 
     @Insert
     abstract fun insert(exampleEntity3: ExampleEntity3): Long
+
+    @Query("""
+        INSERT OR IGNORE INTO ExampleEntity3(cardNumber, name, lastUpdatedTime)
+        SELECT :cardNumber AS cardNumber,
+               :name AS name,
+               :time AS time
+    """)
+    @PostgresQuery("""
+        INSERT INTO ExampleEntity3(cardNumber, name, lastUpdatedTime)
+        SELECT :cardNumber AS cardNumber,
+               :name AS name,
+               :time AS time
+        ON CONFLICT(eeUid) DO NOTHING       
+    """)
+    @QueryTableModified("ExampleEntity3")
+    //This is a test of the symbol processor e.g. to ensure that differentiated queries are validated against the
+    // correct DB type
+    @Suppress("unused")
+    abstract suspend fun insertDifferently(cardNumber: Int, name: String, time: Long)
 
     @Query("""
         INSERT INTO OutgoingReplication(destNodeId, orTableId, orPk1, orPk2, orPk3, orPk4)

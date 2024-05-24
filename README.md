@@ -235,10 +235,15 @@ Limitations:
 * No support for TypeConverter
 
 ## Debugging
-Use Gradle in debug mode e.g.:
+
+Use the procedure as per the [KSP documentation](https://github.com/google/ksp/blob/main/DEVELOPMENT.md#debug-a-processor-andor-ksp)
+e.g.
+1) Kill the Gradle daemon and Kotlin compile daemon
 ```
-./gradlew --no-daemon -Dorg.gradle.debug=true build
+$ ./gradlew --stop; pkill -f KotlinCompileDaemon
+$ ./gradlew door-testdb:jvmJar --rerun-tasks -Dkotlin.daemon.jvm.options="-Xdebug,-Xrunjdwp:transport=dt_socket\,address=8765\,server=y\,suspend=n"
 ```
+2) Attach the IDE's remote debugger to the port as per the argument (e.g. 8765 as above)
 
 ## Automatic REST endpoint generation
 
