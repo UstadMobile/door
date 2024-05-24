@@ -19,6 +19,9 @@ expect abstract class ExampleDao2 {
     @Insert
     abstract suspend fun insertAsyncAndGiveId(entity: ExampleEntity2) : Long
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    abstract suspend fun insertOrIgnore(entity: ExampleEntity2)
+
     @Insert
     abstract fun insertList(entityList: List<ExampleEntity2>)
 

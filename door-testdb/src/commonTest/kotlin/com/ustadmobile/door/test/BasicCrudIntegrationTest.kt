@@ -46,6 +46,19 @@ class BasicCrudIntegrationTest : AbstractCommonTest() {
             message = "Entity retrieved from database is the same as entity inserted")
     }
 
+    @Test
+    fun givenEntryInsertedTwice_whenOnConflictIsIgnore_thenFirstEntityIsRetrieved() = runExampleDbTest {
+        val uid = 42L
+        (1..2).forEach { index ->
+            exampleDb2.exampleDao2().insertOrIgnore(ExampleEntity2(uid, "Bob", someNumber = index.toLong()))
+        }
+
+        val entityFromQuery = exampleDb2.exampleDao2().findByUidAsync(uid)
+
+        assertEquals(1, entityFromQuery?.someNumber,
+            message = "Entity retrieved from database is the same as entity inserted")
+    }
+
 
     @Test
     fun givenEntryInserted_whenSingleValueQueried_shouldBeEqual() = runExampleDbTest {

@@ -554,11 +554,23 @@ fun CodeBlock.Builder.addDaoJdbcInsertCodeBlock(
     val entityKSClass = daoFunction.firstParamEntityType(resolver).declaration as KSClassDeclaration
     val pgOnConflict = daoKSFun.getAnnotation(PgOnConflict::class)?.value
     val pgOnConflictHash = pgOnConflict?.hashCode()?.let { abs(it) }?.toString() ?: ""
-    val upsertMode = daoKSFun.getAnnotation(Insert::class)?.onConflict == OnConflictStrategy.REPLACE
-    val entityInserterPropName = "_insertAdapter${entityKSClass.simpleName.asString()}_${if(upsertMode) "upsert" else ""}$pgOnConflictHash"
+    val conflictModeStr = when(daoKSFun.getAnnotation(Insert::class)?.onConflict) {
+        OnConflictStrategy.REPLACE -> "upsert"
+        OnConflictStrategy.IGNORE -> "ignore"
+        OnConflictStrategy.ABORT -> "abort"
+        else -> "abort"
+    }
+
+    val entityInserterPropName = "_insertAdapter${entityKSClass.simpleName.asString()}_${conflictModeStr}$pgOnConflictHash"
     if(!daoTypeBuilder.propertySpecs.any { it.name == entityInserterPropName }) {
-        daoTypeBuilder.addDaoJdbcEntityInsertAdapter(entityKSClass, entityInserterPropName, upsertMode, target,
-            pgOnConflict, resolver)
+        daoTypeBuilder.addDaoJdbcEntityInsertAdapter(
+            entityKSClass = entityKSClass,
+            propertyName = entityInserterPropName,
+            onConflictStrategy = daoKSFun.getAnnotation(Insert::class)?.onConflict ?: OnConflictStrategy.ABORT,
+            target = target,
+            pgOnConflict = pgOnConflict,
+            resolver = resolver
+        )
     }
 
     if(daoFunction.hasReturnType(resolver)) {
@@ -603,7 +615,7 @@ fun CodeBlock.Builder.addDaoJdbcInsertCodeBlock(
 fun TypeSpec.Builder.addDaoJdbcEntityInsertAdapter(
     entityKSClass: KSClassDeclaration,
     propertyName: String,
-    upsertMode: Boolean,
+    onConflictStrategy: Int,
     target: DoorTarget,
     pgOnConflict: String? = null,
     resolver: Resolver,
@@ -631,8 +643,11 @@ fun TypeSpec.Builder.addDaoJdbcEntityInsertAdapter(
                 }
                 .applyIf(DoorDbType.SQLITE in target.supportedDbs) {
                     var insertSql = "INSERT "
-                    if(upsertMode)
+                    if(onConflictStrategy == OnConflictStrategy.IGNORE)
+                        insertSql += " OR IGNORE "
+                    if(onConflictStrategy == OnConflictStrategy.REPLACE)
                         insertSql += "OR REPLACE "
+
                     insertSql += "INTO ${entityKSClass.entityTableName} (${entityFields.joinToString { it.entityPropColumnName }}) "
                     insertSql += "VALUES(${entityFields.joinToString { "?" }})"
                     add("%S", insertSql)
@@ -661,12 +676,15 @@ fun TypeSpec.Builder.addDaoJdbcEntityInsertAdapter(
                         pgOnConflict != null -> {
                             insertSql += pgOnConflict.replace(" ", " ")
                         }
-                        upsertMode -> {
+                        onConflictStrategy == OnConflictStrategy.REPLACE -> {
                             insertSql += " ON CONFLICT (${pkFields.joinToString {it.entityPropColumnName } }) DO UPDATE SET "
                             insertSql += entityFields.filter { it !in pkFields }
                                 .joinToString(separator = ",") {
                                     "${it.entityPropColumnName} = excluded.${it.entityPropColumnName}"
                                 }
+                        }
+                        onConflictStrategy == OnConflictStrategy.IGNORE -> {
+                            insertSql += " ON CONFLICT (${pkFields.joinToString {it.entityPropColumnName } }) DO NOTHING"
                         }
                     }
                     add("%S·+·if(returnsId)·{·%S·}·else·\"\"·", insertSql, " RETURNING ${pkFields.first().entityPropColumnName}")
