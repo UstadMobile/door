@@ -471,8 +471,9 @@ class DoorValidatorProcessor(
                             }
                         }catch(e: Exception) {
                             logger.error(
-                                "Error running query for DAO function \nquery='$query'," +
-                                        "\nran='$queryWithQuestionPlaceholders'\n ",
+                                "Error running query for DAO function: ${e.message ?: ""}\n" +
+                                        "Query='$query',\n" +
+                                        "\nRan='$queryWithQuestionPlaceholders'\n ",
                                 queryFunDecl
                             )
                             if(e !is SQLException) {
