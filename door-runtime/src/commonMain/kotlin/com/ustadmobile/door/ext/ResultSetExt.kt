@@ -2,8 +2,8 @@ package com.ustadmobile.door.ext
 
 import com.ustadmobile.door.jdbc.ResultSet
 import com.ustadmobile.door.jdbc.TypesKmp
-import com.ustadmobile.door.jdbc.ext.mapRows
-import kotlinx.serialization.json.JsonArray
+import com.ustadmobile.door.jdbc.ext.*
+import com.ustadmobile.door.replication.JsonDbFieldInfo
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -11,36 +11,41 @@ import kotlinx.serialization.json.JsonPrimitive
 /**
  * Get a column value from the ResultSet as a JsonPrimitive
  *
- * @param colName column name
- * @param colType Int representing the column type expected as per TypesKmp
+ * @param fieldInfo
  *
  * @return JsonPrimitive representing the column value
  */
-fun ResultSet.getJsonPrimitive(colName: String, colType: Int) : JsonPrimitive{
-    return when(colType) {
-        TypesKmp.SMALLINT -> JsonPrimitive(getShort(colName))
-        TypesKmp.INTEGER -> JsonPrimitive(getInt(colName))
-        TypesKmp.BIGINT -> JsonPrimitive(getLong(colName))
-        TypesKmp.REAL -> JsonPrimitive(getFloat(colName))
-        TypesKmp.FLOAT -> JsonPrimitive(getFloat(colName))
-        TypesKmp.DOUBLE -> JsonPrimitive(getDouble(colName))
-        TypesKmp.VARCHAR -> JsonPrimitive(getString(colName))
-        TypesKmp.LONGVARCHAR -> JsonPrimitive(getString(colName))
-        TypesKmp.BOOLEAN -> JsonPrimitive(getBoolean(colName))
-        else -> throw IllegalArgumentException("Unsupported type: $colType")
+fun ResultSet.getJsonPrimitive(
+    fieldInfo: JsonDbFieldInfo,
+) : JsonPrimitive{
+    val colName = fieldInfo.fieldName
+    return if(fieldInfo.nullable) {
+        when(fieldInfo.dbFieldType) {
+            TypesKmp.SMALLINT -> JsonPrimitive(getShortNullable(colName))
+            TypesKmp.INTEGER -> JsonPrimitive(getIntNullable(colName))
+            TypesKmp.BIGINT -> JsonPrimitive(getLongNullable(colName))
+            TypesKmp.REAL -> JsonPrimitive(getFloatNullable(colName))
+            TypesKmp.FLOAT -> JsonPrimitive(getFloatNullable(colName))
+            TypesKmp.DOUBLE -> JsonPrimitive(getDoubleNullable(colName))
+            TypesKmp.VARCHAR -> JsonPrimitive(getString(colName))
+            TypesKmp.LONGVARCHAR -> JsonPrimitive(getString(colName))
+            TypesKmp.BOOLEAN -> JsonPrimitive(getBooleanNullable(colName))
+            else -> throw IllegalArgumentException("Unsupported type: ${fieldInfo.dbFieldType}")
+        }
+    }else {
+        when(fieldInfo.dbFieldType) {
+            TypesKmp.SMALLINT -> JsonPrimitive(getShort(colName))
+            TypesKmp.INTEGER -> JsonPrimitive(getInt(colName))
+            TypesKmp.BIGINT -> JsonPrimitive(getLong(colName))
+            TypesKmp.REAL -> JsonPrimitive(getFloat(colName))
+            TypesKmp.FLOAT -> JsonPrimitive(getFloat(colName))
+            TypesKmp.DOUBLE -> JsonPrimitive(getDouble(colName))
+            TypesKmp.VARCHAR -> JsonPrimitive(getString(colName))
+            TypesKmp.LONGVARCHAR -> JsonPrimitive(getString(colName))
+            TypesKmp.BOOLEAN -> JsonPrimitive(getBoolean(colName))
+            else -> throw IllegalArgumentException("Unsupported type: ${fieldInfo.dbFieldType}")
+        }
     }
-}
-
-/**
- * @param colTypeMap column types that should be found on each row
- * as a map of the column name to the type as per TypesKmp
- *
- * @return JsonArray of JsonObject where each row is converted to a JSON object
- */
-fun ResultSet.rowsToJsonArray(colTypeMap: Map<String, Int>): JsonArray {
-    return JsonArray(mapRows {
-        rowToJsonObject(colTypeMap)
-    })
 }
 
 /**
@@ -49,8 +54,12 @@ fun ResultSet.rowsToJsonArray(colTypeMap: Map<String, Int>): JsonArray {
  * @param colTypeMap column types that should be found on each row
  * as a map of the column name to the type as per TypesKmp
  */
-fun ResultSet.rowToJsonObject(colTypeMap: Map<String, Int>): JsonObject {
-    return JsonObject(colTypeMap.entries.map { it.key to getJsonPrimitive(it.key, it.value)}.toMap())
+fun ResultSet.rowToJsonObject(columns: List<JsonDbFieldInfo>): JsonObject {
+    return JsonObject(
+        columns.associate {
+            it.fieldName to getJsonPrimitive(it)
+        }
+    )
 }
 
 /**

@@ -34,7 +34,9 @@ data class ExampleEntity3(
 
     @ReplicateLastModified
     @ReplicateEtag
-    var lastUpdatedTime: Long = 0
+    var lastUpdatedTime: Long = 0,
+
+    var nullableNumber: Int? = null,
 
 ) {
 

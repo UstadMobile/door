@@ -28,10 +28,14 @@ fun PreparedStatement.setJsonPrimitive(
     }
 }
 
-private fun defaultJsonPrimitive(type: Int) : JsonPrimitive{
-    return when(type) {
-        TypesKmp.VARCHAR, TypesKmp.LONGVARCHAR -> JsonNull
-        TypesKmp.BOOLEAN -> JsonPrimitive(false)
+private fun defaultJsonPrimitive(
+    type: Int,
+    nullable: Boolean,
+) : JsonPrimitive{
+    return when {
+        nullable -> JsonNull
+        type == TypesKmp.VARCHAR || type == TypesKmp.LONGVARCHAR -> JsonNull
+        type == TypesKmp.BOOLEAN -> JsonPrimitive(false)
         else -> JsonPrimitive(0)
     }
 }
@@ -43,10 +47,12 @@ fun PreparedStatement.setAllFromJsonObject(
     startIndex: Int = 1
 ) {
     entityFieldsMetaData.forEachIndexed { index, field ->
-        val fieldType = field.fieldType
+        val fieldType = field.dbFieldType
         setJsonPrimitive(
-            index + startIndex, field.fieldType,
-            jsonObject.getOrElse(field.fieldName) { defaultJsonPrimitive(fieldType) }.jsonPrimitive
+            index + startIndex, field.dbFieldType,
+            jsonObject.getOrElse(field.fieldName) {
+                defaultJsonPrimitive(type = fieldType, nullable = field.nullable)
+            }.jsonPrimitive
         )
     }
 }

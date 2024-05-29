@@ -26,10 +26,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import java.util.*
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
-import kotlin.test.Test
-import kotlin.test.assertNotNull
+import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
 
 class PushIntegrationTest {
@@ -128,7 +125,38 @@ class PushIntegrationTest {
     }
 
     @Test
-    fun givenEntityWithOutgoingReplicationCreatedOnClientBeforeClientConnects_whenClientCnonects_thenShouldReplicateToServer() {
+    fun givenEntityWithNullableNumberOutgoingReplicationCreatedOnServerBeforeClientConnects_whenClientConnects_thenShouldReplicateToClient() {
+        server.start()
+        val insertedEntity = ExampleEntity3(
+            lastUpdatedTime = systemTimeInMillis(),
+            cardNumber = 123,
+            nullableNumber = null,
+        )
+        runBlocking {
+            serverDb.withDoorTransactionAsync {
+                insertedEntity.eeUid = serverDb.exampleEntity3Dao.insertAsync(insertedEntity)
+                serverDb.exampleEntity3Dao.insertOutgoingReplication(insertedEntity.eeUid, clientNodeId)
+            }
+        }
+
+        val clientRepo = clientDb.asClientNodeRepository()
+
+        runBlocking {
+            clientRepo.exampleEntity3Dao.findByUidAsFlow(insertedEntity.eeUid).filter {
+                it != null
+            }.test(timeout = 5.seconds, name = "Entity is replicated from server to client as expected") {
+                val itemOnClient = awaitItem()
+                assertNotNull(itemOnClient)
+                assertNull(itemOnClient.nullableNumber,
+                    "When nullable primitive was null and then replicated, it remains null after replication")
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+        clientRepo.close()
+    }
+
+    @Test
+    fun givenEntityWithOutgoingReplicationCreatedOnClientBeforeClientConnects_whenClientConnects_thenShouldReplicateToServer() {
         server.start()
         val insertedEntity = ExampleEntity3(lastUpdatedTime = systemTimeInMillis(), cardNumber = 123)
         runBlocking {

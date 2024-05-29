@@ -1,9 +1,11 @@
 package com.ustadmobile.door.replication
 
-import kotlin.reflect.KClass
-
+/**
+ * @param dbFieldType constant as per TypesKmp
+ * @param nullable
+ */
 data class ReplicationFieldMetaData(
-    val fieldName: String,
-    val fieldType: Int //as per TypesKmp
-) {
-}
+    override val fieldName: String,
+    override val dbFieldType: Int,
+    override val nullable: Boolean,
+): JsonDbFieldInfo

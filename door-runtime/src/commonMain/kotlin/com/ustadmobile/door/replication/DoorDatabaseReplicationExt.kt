@@ -34,7 +34,6 @@ private suspend fun RoomDatabase.selectDoorReplicateEntitiesByTableIdAndPrimaryK
     primaryKeysList: List<ReplicateEntityPrimaryKeys>,
 ): List<DoorReplicationEntity> {
     val entityMetaData = this::class.doorDatabaseMetadata().requireReplicateEntityMetaData(tableId)
-    val entityFieldsTypeMap = entityMetaData.entityFieldsTypeMap
 
     return prepareAndUseStatementAsync(
         sql = entityMetaData.selectEntityByPrimaryKeysSql,
@@ -54,7 +53,7 @@ private suspend fun RoomDatabase.selectDoorReplicateEntitiesByTableIdAndPrimaryK
                     DoorReplicationEntity(
                         tableId = tableId,
                         orUid = primaryKeys.orUid,
-                        entity = mapResult.rowToJsonObject(entityFieldsTypeMap),
+                        entity = mapResult.rowToJsonObject(entityMetaData.entityFields),
                     )
                 }
             }

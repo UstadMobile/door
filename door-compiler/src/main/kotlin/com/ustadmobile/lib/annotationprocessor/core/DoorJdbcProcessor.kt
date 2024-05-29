@@ -283,10 +283,17 @@ private fun CodeBlock.Builder.addReplicateEntityMetaDataCode(
 ): CodeBlock.Builder {
 
     fun CodeBlock.Builder.addFieldsCodeBlock(typeEl: KSClassDeclaration) : CodeBlock.Builder{
-        add("entityFields = listOf(")
-        typeEl.entityProps().forEach {
-            add("%T(%S, %L),", ReplicationFieldMetaData::class, it.simpleName.asString(),
-                it.type.resolve().toTypeName().toSqlTypesInt())
+        add("entityFields = listOf(\n")
+        withIndent {
+            typeEl.entityProps().forEach {
+                add("%T(\n", ReplicationFieldMetaData::class)
+                withIndent {
+                    add("fieldName = %S,\n",  it.simpleName.asString())
+                    add("dbFieldType = %L,\n", it.type.resolve().toTypeName().toSqlTypesInt())
+                    add("nullable = %L,\n", it.type.resolve().isMarkedNullable,)
+                }
+                add("),\n")
+            }
         }
         add(")\n")
         return this

@@ -17,12 +17,6 @@ class ReplicationEntityMetaData(
     val triggers: List<Trigger>,
 ) {
 
-    /**
-     * Map of column name to column type for all fields.
-     */
-    internal val entityFieldsTypeMap: Map<String, Int>
-        get() = entityFields.map { it.fieldName to it.fieldType }.toMap()
-
 
     val selectEntityByPrimaryKeysSql: String
         get() = """
