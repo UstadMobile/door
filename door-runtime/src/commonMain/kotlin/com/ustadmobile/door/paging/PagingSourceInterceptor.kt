@@ -5,7 +5,9 @@ import app.cash.paging.PagingSourceLoadParams
 import app.cash.paging.PagingSourceLoadResult
 
 /**
- * Used to receive onLoad callback (e.g. by DoorOffsetLimitRemoteMediator) to trigger http
+ * This is used to trigger DoorOffsetLimitRemoteMediator by effects and hooks used in Compose and React. It allows
+ * transparent interception of onLoad events by the underlying paging mechanism (eg. Compose Pager or Tanstack) and
+ * triggers a callback (e.g. to the DoorOffsetLimitRemoteMediator).
  */
 @Suppress("unused")
 class PagingSourceInterceptor<Key: Any, Value: Any>(

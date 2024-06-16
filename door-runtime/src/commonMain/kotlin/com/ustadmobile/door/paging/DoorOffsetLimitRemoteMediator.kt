@@ -37,11 +37,14 @@ import kotlinx.coroutines.*
  *  Finally, the RemoteMediator will normally run three requests : an initial refresh, a prepend,
  *  and then an append. Those can be handled using just one request.
  *
- *  Efficiency can be further improved using the threshold e.g. if the prefetchDistance is 100,
+ *  Efficiency is further improved using the threshold e.g. if the prefetchDistance is 100,
  *  items 1-100 have already been fetched from the remote, and the pagingsource just loaded items
  *  10-20, then normally a request for items 101-120 would be sent. If a threshold is set (e.g. to
  *  wait until the prefetch exceeds the known range by 50), this could further reduce the number of
  *  requests made.
+ *
+ *  DoorOffsetLimitRemoteMediator is used by Compose and React functions (e.g. rememberDoorRepositoryPager
+ *  and useDoorRemoteMediator in the main UstadMobile project).
  *
  * @param prefetchDistance the distance by which to prefetch before and after each page load
  * @param prefetchThreshold when all the data required by a PagingSource load itself has already
