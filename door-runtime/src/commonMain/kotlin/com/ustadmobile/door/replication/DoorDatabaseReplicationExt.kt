@@ -388,9 +388,9 @@ suspend fun <R> DoorDatabaseRepository.withRepoChangeMonitorAsync(
     tableName: String,
     block: suspend () -> R,
 ): R {
-    val entityMetaData = db::class.doorDatabaseMetadata().replicateEntities.values.first {
+    val entityMetaData = db::class.doorDatabaseMetadata().replicateEntities.values.firstOrNull() {
         it.entityTableName == tableName
-    }
+    } ?: throw IllegalArgumentException("Could not find replication metadata for table: $tableName")
 
     val remoteNodeId = remoteNodeIdOrFake()
     return db.withDoorTransactionAsync(transactionMode = TransactionMode.READ_WRITE) {
