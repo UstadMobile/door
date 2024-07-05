@@ -757,6 +757,14 @@ fun CodeBlock.Builder.addHttpServerFunctionCallCode(
                         val otherParamName = argParamAnnotation.getArgumentValueByNameAsString("fromName")
                         add("$paramNameStr = _arg_${otherParamName},\n")
                     }
+                    HttpServerFunctionParam.ArgType.PAGING_OFFSET ->{
+                        add("$paramNameStr = %M($pagingLoadParamValName, ($pagingLoadParamValName.key ?: 0), Int.MAX_VALUE),\n",
+                            MemberName("com.ustadmobile.door.paging", "getOffset"))
+                    }
+                    HttpServerFunctionParam.ArgType.PAGING_LIMIT -> {
+                        add("$paramNameStr = %M($pagingLoadParamValName, ($pagingLoadParamValName.key ?: 0)),\n",
+                            MemberName("com.ustadmobile.door.paging", "getLimit"))
+                    }
                 }
             }else {
                 add("$paramNameStr = _arg_$paramNameStr,\n")

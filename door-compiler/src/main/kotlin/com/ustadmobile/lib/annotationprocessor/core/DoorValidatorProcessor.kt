@@ -329,7 +329,9 @@ class DoorValidatorProcessor(
                                         "type is not long.", daoFun)
                         }
                         HttpServerFunctionParam.ArgType.PAGING_KEY,
-                        HttpServerFunctionParam.ArgType.PAGING_LOAD_SIZE-> {
+                        HttpServerFunctionParam.ArgType.PAGING_LOAD_SIZE,
+                        HttpServerFunctionParam.ArgType.PAGING_OFFSET,
+                        HttpServerFunctionParam.ArgType.PAGING_LIMIT -> {
                             if(matchingFunParam.type.resolve() != resolver.builtIns.intType ||
                                 daoFun.returnType?.resolve()?.isPagingSource() != true) {
                                 logger.error("$loggerPrefix - type is paging key/loadsize - but param " +

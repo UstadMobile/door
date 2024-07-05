@@ -24,8 +24,45 @@ annotation class HttpServerFunctionParam(
          */
         LITERAL,
         REQUESTER_NODE_ID,
+
+        /**
+         * Where this annotation is used on a function that returns a PagingSource, then this can be used to get the
+         * paging key parameter that was sent.
+         */
         PAGING_KEY,
+
+        /**
+         * Where this annotation is used on a function that returns a PagingSource, then this can be used to get the
+         * paging source load size that was sent
+         */
         PAGING_LOAD_SIZE,
+
+        /**
+         * Where this annotation is used on a function that returns a PagingSource, then this can be used to determine
+         * the offset that is used for an offset/limit query. This uses DoorPagingUtil#getLimit.
+         *
+         * e.g. where a PagingSource returns certain rows, there might be a need to fetch data related to those rows.
+         * The objective of using a PagingSource is to load data incrementally, so if one wants to load the related data
+         * incrementally one might need to use SQL such as:
+         *
+         * SELECT RelatedData.*
+         *  WHERE RelatedData.someKey IN
+         *        (SELECT PagingData.someKey
+         *           FROM PagingData
+         *          WHERE condition
+         *         OFFSET pagingOffset
+         *          LIMIT pagingLimit)
+         *
+         * The number of rows of RelatedData to fetch like won't match the number of rows of PagingData.
+         */
+        PAGING_OFFSET,
+
+        /**
+         * Where this annotation is used on a function that returns a PagingSource, then this can be used to determine
+         * the limit that is used for an offset/limit query. This uses DoorPagingUtil#getOffset. Useful as per
+         * PAGING_OFFSET.
+         */
+        PAGING_LIMIT,
 
         /**
          * Where the target function uses a different name for the same parameter, the fromName can be specified
