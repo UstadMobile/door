@@ -576,7 +576,8 @@ fun CodeBlock.Builder.addDaoJdbcInsertCodeBlock(
             onConflictStrategy = daoKSFun.getAnnotation(Insert::class)?.onConflict ?: OnConflictStrategy.ABORT,
             target = target,
             pgOnConflict = pgOnConflict,
-            resolver = resolver
+            resolver = resolver,
+            message = "daoKSClass = ${daoKSClass.simpleName.asString()} daoKSFun =${daoKSFun.simpleName.asString()}"
         )
     }
 
@@ -626,9 +627,16 @@ fun TypeSpec.Builder.addDaoJdbcEntityInsertAdapter(
     target: DoorTarget,
     pgOnConflict: String? = null,
     resolver: Resolver,
+    message: String? = null,
 ) : TypeSpec.Builder {
     val entityFields = entityKSClass.entityProps(false)
-    val entityClassName = entityKSClass.toClassName()
+    val entityClassName = try {
+        entityKSClass.toClassName()
+    } catch(e: Exception) {
+        throw IllegalStateException("Could not find class for entity: ${entityKSClass.qualifiedName?.asString()} in file" +
+                "${entityKSClass.containingFile?.fileName} / path=${entityKSClass.containingFile?.filePath} property " +
+                "$message")
+    }
     val pkFields = entityKSClass.entityPrimaryKeyProps
     val insertAdapterSpec = TypeSpec.anonymousClassBuilder()
         .superclass(EntityInsertionAdapter::class.asClassName().parameterizedBy(entityKSClass.toClassName()))
