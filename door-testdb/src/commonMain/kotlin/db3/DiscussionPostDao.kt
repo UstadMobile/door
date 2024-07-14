@@ -317,4 +317,17 @@ expect abstract class DiscussionPostDao : RepositoryFlowLoadingStatusProvider {
     @Update
     abstract suspend fun update(post: DiscussionPost)
 
+    @HttpAccessible
+    @Query("""
+        SELECT DiscussionPost.*,
+               Member.firstName AS firstName,
+               Member.lastName AS lastName
+          FROM DiscussionPost
+               LEFT JOIN Member
+                         ON Member.memberUid = DiscussionPost.posterMemberUid 
+         WHERE Member.firstName = :firstName       
+    """)
+    abstract suspend fun findByName(firstName: String?): List<DiscussionPost>
+
+
 }

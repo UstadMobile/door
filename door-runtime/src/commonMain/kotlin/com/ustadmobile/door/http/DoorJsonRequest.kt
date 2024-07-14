@@ -9,9 +9,13 @@ interface DoorJsonRequest {
      */
     val db: RoomDatabase
 
+    fun queryParam(paramName: String): String?
+
     fun requireParam(paramName: String): String
 
     suspend fun requireBodyAsString(): String
+
+    suspend fun bodyAsStringOrNull(): String?
 
     fun requireHeader(header: String): String
 

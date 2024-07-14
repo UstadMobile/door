@@ -11,6 +11,10 @@ class KtorDoorJsonRequestAdapter(
     override val db: RoomDatabase,
 ) : DoorJsonRequest {
 
+    override fun queryParam(paramName: String): String? {
+        return call.request.queryParameters[paramName]
+    }
+
     override fun requireParam(paramName: String): String {
         return call.request.queryParameters[paramName]
             ?: throw IllegalStateException("requireStringParam: $paramName not found")
@@ -18,6 +22,11 @@ class KtorDoorJsonRequestAdapter(
 
     override suspend fun requireBodyAsString(): String {
         return call.receiveText()
+    }
+
+    @Suppress("RedundantNullableReturnType")
+    override suspend fun bodyAsStringOrNull(): String? {
+        return requireBodyAsString()
     }
 
     override fun requireHeader(header: String): String {

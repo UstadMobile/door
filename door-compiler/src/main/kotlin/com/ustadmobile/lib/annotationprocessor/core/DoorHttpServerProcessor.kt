@@ -612,13 +612,24 @@ fun FileSpec.Builder.addHttpServerExtensionFun(
                 .apply {
                     daoFunDecl.parameters.forEachIndexed { index, param ->
                         add("val _arg_${param.name?.asString()} : %T = ", funAsMemberOfDao.parameterTypes[index]?.toTypeName())
+
+                        if(param.hasAnnotation(RepoHttpBodyParam::class)) {
+                            add("request.bodyAsStringOrNull()")
+                        }else {
+                            add("request.queryParam(%S)", param.name?.asString())
+                        }
+                        beginControlFlow("?.let")
                         add("json.decodeFromString(")
                         addKotlinxSerializationStrategy(funAsMemberOfDao.parameterTypes[index]!!, resolver)
-                        if(param.hasAnnotation(RepoHttpBodyParam::class)) {
-                            add(", request.requireBodyAsString())\n")
-                        }else {
-                            add(", request.requireParam(%S))\n", param.name?.asString())
+                        add(", it)\n")
+                        unindent().add("}")
+
+                        val paramTypeResolved = param.type.resolve()
+                        if(!paramTypeResolved.isMarkedNullable) {
+                            add(" ?: ")
+                            add(param.type.resolve().defaultTypeValueCode(resolver))
                         }
+                        add("\n")
                     }
 
                     if(daoFunDecl.returnType?.resolve()?.isPagingSource() == true) {
