@@ -5,6 +5,10 @@ import com.ustadmobile.door.ext.concurrentSafeListOf
 import com.ustadmobile.door.util.systemTimeInMillis
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 /**
  * A "normal" RemoteMediator doesn't work in the following situations:
@@ -65,13 +69,33 @@ class DoorOffsetLimitRemoteMediator(
 
     }
 
-    data class LoadedRange(
+    data class OffsetLimitRange(
         val offset: Int,
         val limit: Int,
         val time: Long,
     )
 
-    private val loadedRanges = concurrentSafeListOf<LoadedRange>()
+    /**
+     * State of the mediator
+     *
+     * @param loadingRangesInProgress a list of ranges that are currently being loaded by this mediator
+     * @param loadingStarted true if any load has ever been started. This can be useful in the UI to avoid flashing an
+     * empty state before loading is attempted.
+     */
+    data class OffsetLimitMediatorState(
+        val loadingRangesInProgress: List<OffsetLimitRange> = emptyList(),
+        val loadingStarted: Boolean = false,
+    )
+
+    private val loadedRanges = concurrentSafeListOf<OffsetLimitRange>()
+
+    private val _state = MutableStateFlow(OffsetLimitMediatorState())
+
+    /**
+     * Flow providing the state of the mediator
+     */
+    @Suppress("unused")
+    val state: Flow<OffsetLimitMediatorState> = _state.asStateFlow()
 
     /**
      * Must be invoked when the underlying PagingSource is invoked
@@ -142,16 +166,30 @@ class DoorOffsetLimitRemoteMediator(
         // b) the number of items to prefetch exceeds the prefetch threshold
         if(loadPagingOverlap > 0 || prefetchSize > prefetchThreshold) {
             scope.launch {
+                val range = OffsetLimitRange(loadOffset, loadLimit, systemTimeInMillis())
                 try {
+                    _state.update { prev ->
+                        prev.copy(
+                            loadingRangesInProgress = prev.loadingRangesInProgress + range,
+                            loadingStarted = true,
+                        )
+                    }
                     onRemoteLoad(loadOffset, loadLimit)
-                    loadedRanges.add(LoadedRange(loadOffset, loadLimit, systemTimeInMillis()))
+                    loadedRanges.add(range.copy(time = systemTimeInMillis()))
                 }catch(e: Throwable) {
                     Napier.w("Attempted to load from offset=$loadOffset limit=$loadLimit faled ", e)
+                }finally {
+                    _state.update { prev ->
+                        prev.copy(
+                            loadingRangesInProgress = prev.loadingRangesInProgress - range,
+                        )
+                    }
                 }
             }
         }
     }
 
+    @Suppress("unused")
     fun invalidate() {
         loadedRanges.clear()
     }
