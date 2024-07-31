@@ -81,3 +81,14 @@ fun ResultSet.getBooleanNullable(columnIndex: Int) = getOrNull { getBoolean(colu
 
 @Suppress("unused") //Used by generated code
 fun ResultSet.getBooleanNullable(columnName: String) = getOrNull { getBoolean(columnName) }
+
+@Suppress("unused") //Used by generated code
+fun ResultSet.getStringNonNull(columnName: String): String {
+    return getString(columnName) ?: throw IllegalStateException("Column $columnName was supposed to be non-null, got null")
+}
+
+@Suppress("unused") //Used by generated code
+fun ResultSet.getStringNonNull(columnIndex: Int): String {
+    return getString(columnIndex) ?: throw IllegalStateException("Column $columnIndex was supposed to be non-null, got null")
+}
+

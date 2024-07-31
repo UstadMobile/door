@@ -130,10 +130,22 @@ fun CodeBlock.Builder.addGetResultOrSetQueryParamCall(
         type == builtIns.booleanType -> add("${operation}Boolean")
         type == builtIns.booleanType.makeNullable() -> add("%M",
             MemberName(extPkgName, "${operation}BooleanNullable"))
-        type.equalsIgnoreNullable(builtIns.stringType) -> add("${operation}String")
+        (type == builtIns.stringType.makeNullable() ||
+            (operation == PreparedStatementOp.SET && type == builtIns.stringType.makeNotNullable())
+        ) -> {
+            //If a string is nullable, we can use the normal JDBC for both get and set
+            //If a string is not nullable, we can use the normal JDBC setString but we cant use getString for a
+            //non-nullable string value
+            add("${operation}String")
+        }
+
+        type == builtIns.stringType && operation == PreparedStatementOp.GET -> {
+            add("%M", MemberName(extPkgName, "getStringNonNull"))
+        }
+
         type == builtIns.arrayType -> add("${operation}Array")
         (type.declaration as? KSClassDeclaration)?.isListDeclaration() == true -> add("${operation}Array")
-        else -> add("ERR_UNKNOWN_TYPE /* $type */")
+        else -> add("ERR_UNKNOWN_TYPE /* $type*/")
     }
 
     return this
