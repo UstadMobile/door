@@ -41,16 +41,14 @@ dependencies {
     implementation libs.kotlinpoet.metadata
     implementation libs.jsqlparser
     implementation libs.apache.commons.text
-    implementation libs.gson
     implementation libs.simple.jndi
     implementation libs.apache.commons.pool2
     implementation libs.sqlite.jdbc
     implementation libs.postgres.jdbc
     implementation libs.apache.commons.dbcp2
     implementation libs.ktor.server.netty
-    implementation libs.ktor.serialization.gson
     implementation libs.ktor.client.okhttp
-    implementation libs.ktor.client.gson
+    implementation libs.ktor.client.json
     implementation libs.nanohttpd
     implementation libs.nanohttpd.nanolets
     implementation libs.logback.classic

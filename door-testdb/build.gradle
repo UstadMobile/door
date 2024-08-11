@@ -103,7 +103,6 @@ kotlin {
 
         jvmMain {
             dependencies {
-                implementation libs.ktor.serialization.gson
                 implementation libs.kodein.di.framework.ktor.server
                 implementation libs.sqlite.jdbc
                 implementation libs.ktor.server.content.negotiation
@@ -119,7 +118,6 @@ kotlin {
                 implementation libs.mockwebserver
                 implementation libs.mockito.kotlin
                 implementation libs.ktor.client.okhttp
-                implementation libs.ktor.client.gson
                 implementation libs.ktor.serialization.kotlinx.json
                 implementation libs.simple.jndi
                 implementation libs.apache.commons.pool2
@@ -154,7 +152,6 @@ kotlin {
                 implementation libs.androidx.core.ktx
                 implementation libs.okhttp
                 implementation libs.okhttp.sse
-                implementation libs.gson
                 implementation libs.nanohttpd
                 implementation libs.nanohttpd.nanolets
             }

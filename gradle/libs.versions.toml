@@ -19,7 +19,6 @@ androidx-core =  "1.12.0"
 kotlinpoet =  "1.14.2"
 jsqlparser =  "4.7"
 apache-commons-text =  "1.10.0"
-gson =  "2.10.1"
 simple-jndi =  "0.23.0"
 apache-commons-pool2 =  "2.12.0"
 postgres-jdbc =  "42.6.0"
@@ -60,7 +59,6 @@ kotlinpoet-ksp = { module = "com.squareup:kotlinpoet-ksp", version.ref = "kotlin
 kotlinpoet-metadata = { module = "com.squareup:kotlinpoet-metadata", version.ref = "kotlinpoet"}
 jsqlparser = { module = "com.github.jsqlparser:jsqlparser", version.ref = "jsqlparser"}
 apache-commons-text = { module = "org.apache.commons:commons-text", version.ref = "apache-commons-text"}
-gson = { module = "com.google.code.gson:gson", version.ref = "gson"}
 simple-jndi = { module = "com.github.h-thurow:simple-jndi", version.ref = "simple-jndi"}
 apache-commons-pool2 = { module = "org.apache.commons:commons-pool2", version.ref = "apache-commons-pool2"}
 sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc"}
@@ -68,10 +66,8 @@ postgres-jdbc = { module = "org.postgresql:postgresql", version.ref = "postgres-
 apache-commons-dbcp2 = { module = "org.apache.commons:commons-dbcp2", version.ref = "apache-commons-dbcp2"}
 
 ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor"}
-ktor-serialization-gson = { module = "io.ktor:ktor-serialization-gson", version.ref = "ktor"}
 kotlinx-atomicfu = { module = "org.jetbrains.kotlinx:atomicfu", version.ref = "atomicfu"}
 ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor"}
-ktor-client-gson = { module = "io.ktor:ktor-client-gson", version.ref = "ktor"}
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor"}
 ktor-client-json = { module = "io.ktor:ktor-client-json", version.ref = "ktor"}
 ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor"}

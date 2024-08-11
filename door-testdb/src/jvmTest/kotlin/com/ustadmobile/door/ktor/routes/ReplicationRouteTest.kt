@@ -26,7 +26,6 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.serialization.gson.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.config.*
 import io.ktor.server.engine.*
@@ -80,10 +79,10 @@ class ReplicationRouteTest {
 
             @Suppress("RemoveRedundantQualifierName", "RedundantSuppression") //Ensure clarity between client and server
             install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) {
-                gson {
-                    register(ContentType.Application.Json, GsonConverter())
-                    register(ContentType.Any, GsonConverter())
-                }
+                json(
+                    json = json,
+                    contentType = ContentType.Application.Json
+                )
             }
 
             routing {

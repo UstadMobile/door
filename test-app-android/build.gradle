@@ -71,10 +71,7 @@ dependencies {
     implementation libs.kotlinx.serialization.json
     implementation libs.kotlinx.atomicfu
 
-    implementation libs.ktor.serialization.gson
     implementation libs.ktor.client.okhttp
-    implementation libs.ktor.client.gson
-
 
     implementation libs.androidx.room.runtime
     implementation libs.androidx.room.ktx

@@ -1,6 +1,5 @@
 package com.ustadmobile.lib.annotationprocessor.core
 
-import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
@@ -8,19 +7,13 @@ import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.writeTo
-import com.ustadmobile.door.AbstractDoorUriResponder
 import com.ustadmobile.door.DoorConstants
-import com.ustadmobile.door.DoorDaoProvider
-import com.ustadmobile.door.NanoHttpdCall
 import com.ustadmobile.door.annotation.*
-import com.ustadmobile.door.ext.DoorTag
 import com.ustadmobile.door.http.DbAndDao
 import com.ustadmobile.door.http.DoorHttpServerConfig
 import com.ustadmobile.door.http.DoorJsonRequest
@@ -31,48 +24,13 @@ import com.ustadmobile.door.log.DoorLogLevel
 import com.ustadmobile.door.message.DoorMessage
 import com.ustadmobile.door.replication.DoorReplicationEntity
 import com.ustadmobile.door.replication.DoorRepositoryReplicationClient
-import com.ustadmobile.door.room.RoomDatabase
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.CALL_MEMBER
-import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.CODEBLOCK_KTOR_NO_CONTENT_RESPOND
-import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.CODEBLOCK_NANOHTTPD_NO_CONTENT_RESPONSE
-import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.DI_INSTANCE_MEMBER
-import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.DI_INSTANCE_TYPETOKEN_MEMBER
-import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.DI_ON_MEMBER
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.END_OF_PAGINATION_REACHED_VALNAME
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.GET_MEMBER
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.POST_MEMBER
-import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.RESPOND_MEMBER
-import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.SERVER_TYPE_KTOR
-import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.SERVER_TYPE_NANOHTTPD
 import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.SUFFIX_KTOR_ROUTE
-import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.SUFFIX_NANOHTTPD_ADDURIMAPPING
-import com.ustadmobile.lib.annotationprocessor.core.DoorHttpServerProcessor.Companion.SUFFIX_NANOHTTPD_URIRESPONDER
 import com.ustadmobile.lib.annotationprocessor.core.ext.*
-import fi.iki.elonen.NanoHTTPD
-import fi.iki.elonen.router.RouterNanoHTTPD
-import io.ktor.http.*
 import io.ktor.server.routing.*
-import org.kodein.di.DI
-
-fun CodeBlock.Builder.addNanoHttpdResponse(varName: String, addNonNullOperator: Boolean = false,
-                                           applyToResponseCodeBlock: CodeBlock? = null)
-        = add("return %T.newFixedLengthResponse(%T.Status.OK, %T.MIME_TYPE_JSON, _gson.toJson($varName${if(addNonNullOperator) "!!" else ""}))\n",
-            NanoHTTPD::class, NanoHTTPD.Response::class, DoorConstants::class)
-        .takeIf { applyToResponseCodeBlock != null }
-            ?.beginControlFlow(".apply ")
-            ?.add(applyToResponseCodeBlock!!)
-            ?.endControlFlow()
-
-fun CodeBlock.Builder.addKtorResponse(varName: String)
-        = add("%M.%M($varName)\n", CALL_MEMBER, RESPOND_MEMBER)
-
-
-fun FunSpec.Builder.addParametersForHttpDb(isPrimaryDefaultVal: Boolean): FunSpec.Builder {
-    addParameter(ParameterSpec.builder("_isPrimary", BOOLEAN)
-                    .defaultValue(isPrimaryDefaultVal.toString())
-                    .build())
-    return this
-}
 
 
 /**
@@ -136,318 +94,7 @@ fun FileSpec.Builder.addDaoKtorRouteFun(
     return this
 }
 
-fun FileSpec.Builder.addNanoHttpdResponder(
-    daoKSClassDeclaration: KSClassDeclaration,
-    resolver: Resolver,
-    logger: KSPLogger,
-): FileSpec.Builder {
 
-    addType(TypeSpec.classBuilder(daoKSClassDeclaration.toClassNameWithSuffix(SUFFIX_NANOHTTPD_URIRESPONDER))
-        .addOriginatingKSClass(daoKSClassDeclaration)
-        .superclass(AbstractDoorUriResponder::class)
-        .apply {
-            daoKSClassDeclaration.getAllFunctions()
-                .filter { it.hasAnnotation(HttpAccessible::class) }
-                .forEach { daoFun ->
-                    addNanoHttpDaoFun(daoFun, daoKSClassDeclaration, resolver, logger)
-                }
-        }
-        .addNanoHttpdResponderFun("get", daoKSClassDeclaration.toClassName(), daoKSClassDeclaration)
-        .addNanoHttpdResponderFun("post", daoKSClassDeclaration.toClassName(), daoKSClassDeclaration)
-        .build())
-    return this
-}
-
-/**
- *
- */
-fun TypeSpec.Builder.addNanoHttpDaoFun(
-    daoFunDecl: KSFunctionDeclaration,
-    daoClassDecl: KSClassDeclaration,
-    resolver: Resolver,
-    logger: KSPLogger,
-): TypeSpec.Builder {
-    val daoFunSpec = daoFunDecl.toFunSpecBuilder(resolver, daoClassDecl.asType(emptyList()), logger).build()
-
-    addFunction(FunSpec.builder(daoFunDecl.simpleName.asString())
-        .returns(NanoHTTPD.Response::class)
-        .addNanoHttpdUriResponderParams()
-        .addParameter("_dao", daoClassDecl.toClassName())
-        .addParameter("_gson", Gson::class)
-        .addCode(CodeBlock.builder()
-            .addHttpServerPassToDaoCodeBlock(daoFunSpec,
-                serverType = SERVER_TYPE_NANOHTTPD)
-            .build())
-        .build())
-
-    return this
-}
-
-/**
- * Add the parameters that are required for all nanohttpd uri responder functions
- */
-private fun FunSpec.Builder.addNanoHttpdUriResponderParams() =
-        addParameter("_uriResource", RouterNanoHTTPD.UriResource::class)
-        .addParameter("_urlParams",
-                Map::class.parameterizedBy(String::class, String::class))
-        .addParameter("_session", NanoHTTPD.IHTTPSession::class)
-
-
-/**
- * Add a function that overrides the get or post function of the NanoHTTPD
- * responder which will route the query to the appropriate function with
- * the required parameters (database, dao, gson, etc)
- */
-fun TypeSpec.Builder.addNanoHttpdResponderFun(
-    methodName: String,
-    daoClassName: ClassName,
-    daoClassDecl: KSClassDeclaration,
-) : TypeSpec.Builder {
-
-    val isPostFn = methodName.lowercase() == "post"
-
-    val daoFunsToRespond = daoClassDecl.getAllFunctions().filter { daoFun ->
-        daoFun.hasAnnotation(HttpAccessible::class)
-    }.filter { daoFun ->
-        val funResolved = daoFun.asMemberOf(daoClassDecl.asType(emptyList()))
-        funResolved.parameterTypes.any { it?.toTypeName()?.isHttpQueryQueryParam() == false } == isPostFn
-    }.toList()
-
-    fun CodeBlock.Builder.addNanoHttpdReturnNotFound() : CodeBlock.Builder {
-        add("%T.newFixedLengthResponse(%T.Status.NOT_FOUND, " +
-                "%T.MIME_TYPE_PLAIN, %S)", NanoHTTPD::class, NanoHTTPD.Response::class,
-                DoorConstants::class, "")
-        return this
-    }
-
-    val daoParamNames = "_uriResource, _urlParams, _session, _dao, _gson"
-
-    addFunction(FunSpec.builder(methodName)
-            .addModifiers(KModifier.OVERRIDE)
-            .returns(NanoHTTPD.Response::class)
-            .addNanoHttpdUriResponderParams()
-            .addCode(CodeBlock.builder()
-                    .add("val _fnName = _session.uri.%M('/')\n", MemberName("kotlin.text", "substringAfterLast"))
-                    .add("val _di = _uriResource.initParameter(0, %T::class.java)\n", DI::class)
-                    .add("val _daoProvider = _uriResource.initParameter(1, %T::class.java) as %T\n",
-                            DoorDaoProvider::class,
-                            DoorDaoProvider::class.asClassName().parameterizedBy(
-                                RoomDatabase::class.asClassName(), daoClassName))
-                    .add("val _typeToken = _uriResource.initParameter(2, %T::class.java) as %T\n",
-                        org.kodein.type.TypeToken::class.java,
-                            org.kodein.type.TypeToken::class.parameterizedBy(RoomDatabase::class))
-                    .add("val _call = %T(_uriResource, _urlParams, _session)\n", NanoHttpdCall::class)
-                    .add("val _db: %T by _di.%M(_call).%M(_typeToken, tag = %T.TAG_DB)\n", RoomDatabase::class,
-                            DI_ON_MEMBER, DI_INSTANCE_TYPETOKEN_MEMBER, DoorTag::class)
-                    .add("val _repo: %T by _di.%M(_call).%M(_typeToken, tag = %T.TAG_REPO)\n", RoomDatabase::class,
-                            DI_ON_MEMBER, DI_INSTANCE_TYPETOKEN_MEMBER, DoorTag::class)
-                    .add("val _dao = _daoProvider.getDao(_db)\n")
-                    .add("val _gson : %T by _di.%M()\n", Gson::class, DI_INSTANCE_MEMBER)
-                    .apply {
-                        if(daoFunsToRespond.isEmpty()) {
-                            add("return ").addNanoHttpdReturnNotFound().add("\n")
-                        }else {
-                            beginControlFlow("return when(_fnName)")
-                            daoFunsToRespond.forEach {
-                                add("%S -> ${it.simpleName.asString()}($daoParamNames)\n", it.simpleName.asString())
-                            }
-                            add("else -> ").addNanoHttpdReturnNotFound().add("\n")
-                            endControlFlow()
-                        }
-                    }
-                    .build())
-            .build()
-    )
-
-
-    return this
-}
-
-
-/**
- * Generates a Codeblock that will call the DAO method, and then call.respond with the result
- *
- * e.g.
- * val paramName = request.queryParameters['paramName']?.toLong()
- * val _result = _dao.methodName(paramName)
- * call.respond(_result)
- *
- * @param daoMethod FunSpec representing the method that is being delegated
- * @param preexistingVarNames a list of variable names that already exist in the scope being
- * generated. The name created in scope must be the variable name prefixed with __ e.g.
- * __paramName.
- *
- * This will skip generation of getting the parameter name from the call (e.g.
- * no val __paramName = request.queryParameters["paramName"] will be generated
- */
-fun CodeBlock.Builder.addHttpServerPassToDaoCodeBlock(
-    daoMethod: FunSpec,
-    mutlipartHelperVarName: String? = null,
-    beforeDaoCallCode: CodeBlock = CodeBlock.of(""),
-    afterDaoCallCode: CodeBlock = CodeBlock.of(""),
-    daoVarName: String = "_dao",
-    preexistingVarNames: List<String> = listOf(),
-    serverType: Int = SERVER_TYPE_KTOR,
-    addRespondCall: Boolean = true
-): CodeBlock.Builder {
-    val getVarsCodeBlock = CodeBlock.builder()
-    val callCodeBlock = CodeBlock.builder()
-
-    val returnType = daoMethod.returnType
-    if(returnType != UNIT) {
-        callCodeBlock.add("val _result = ")
-    }
-
-    val useRunBlocking = serverType == SERVER_TYPE_NANOHTTPD
-            && (KModifier.SUSPEND in daoMethod.modifiers)
-
-    callCodeBlock.takeIf { useRunBlocking }?.beginControlFlow("%M",
-            MemberName("kotlinx.coroutines", "runBlocking"))
-
-    callCodeBlock.add("$daoVarName.${daoMethod.name}(")
-    var paramOutCount = 0
-    daoMethod.parameters.forEachIndexed { _, param ->
-        val paramTypeName = param.type.javaToKotlinType()
-
-
-        if(paramOutCount > 0)
-            callCodeBlock.add(",")
-
-        callCodeBlock.add("__${param.name}")
-
-        if(param.name !in preexistingVarNames) {
-            getVarsCodeBlock.add("val __${param.name} : %T = ", param.type)
-                .addGetParamFromHttpRequest(paramTypeName, param.name,
-                            multipartHelperVarName = mutlipartHelperVarName,
-                            serverType = serverType)
-                    .add("\n")
-        }
-
-
-        paramOutCount++
-    }
-
-
-
-    callCodeBlock.add(")\n")
-
-    callCodeBlock.takeIf { useRunBlocking }?.endControlFlow()
-
-    var respondResultType = returnType
-    respondResultType = respondResultType.copy(nullable = respondResultType.isNullableAsSelectReturnResult)
-
-    add(getVarsCodeBlock.build())
-    add(beforeDaoCallCode)
-    add(callCodeBlock.build())
-
-    add(afterDaoCallCode)
-    if(addRespondCall) {
-        addRespondCall(respondResultType, "_result", serverType)
-    }
-
-    return this
-}
-
-fun CodeBlock.Builder.addGetParamFromHttpRequest(typeName: TypeName, paramName: String,
-                                         declareVariableName: String? = null,
-                                         declareVariableType: String = "val",
-                                         gsonVarName: String = "_gson",
-                                         multipartHelperVarName: String? = null,
-                                         serverType: Int = SERVER_TYPE_KTOR): CodeBlock.Builder {
-
-    if(declareVariableName != null) {
-        add("%L %L =", declareVariableType, declareVariableName)
-    }
-
-    if(typeName.isHttpQueryQueryParam()) {
-        if(typeName in QUERY_SINGULAR_TYPES) {
-            if(serverType == SERVER_TYPE_KTOR) {
-                add("%M.request.queryParameters[%S]", CALL_MEMBER, paramName)
-            }else {
-                add("_session.parameters.get(%S)?.get(0)", paramName)
-            }
-            if(typeName == String::class.asTypeName()) {
-                add(" ?: \"\"")
-            }else {
-                add("?.to${(typeName as ClassName).simpleName}() ?: ${typeName.defaultTypeValueCode()}")
-            }
-        }else {
-            if(serverType == SERVER_TYPE_KTOR) {
-                add("%M.request.queryParameters.getAll(%S)", CALL_MEMBER,
-                        paramName)
-            }else {
-                add("_session.parameters[%S]", paramName)
-            }
-
-            val parameterizedTypeName = typeName as ParameterizedTypeName
-            if(parameterizedTypeName.typeArguments[0] != String::class.asClassName()) {
-                add("·?.map·{·it.to${(parameterizedTypeName.typeArguments[0] as ClassName).simpleName}()·}")
-            }
-            add("·?:·listOf()\n")
-        }
-    }else {
-        val getJsonStrCodeBlock = if(multipartHelperVarName != null) {
-            CodeBlock.of("$multipartHelperVarName.receiveJsonStr()")
-        }else if(serverType == SERVER_TYPE_KTOR){
-            CodeBlock.of("%M.%M<String>()", CALL_MEMBER,
-                    MemberName("io.ktor.server.request", "receiveOrNull"))
-        }else {
-            CodeBlock.of("mutableMapOf<String,String>().also{_session.parseBody(it)}.get(%S)",
-                    "postData")
-        }
-        add("$gsonVarName.fromJson(")
-        add(getJsonStrCodeBlock)
-        add(", object: %T() {}.type)",
-                TypeToken::class.asClassName().parameterizedBy(removeTypeProjection(typeName)))
-    }
-
-    if(declareVariableName != null){
-        add("\n")
-    }
-
-    return this
-}
-
-fun CodeBlock.Builder.addRespondCall(returnType: TypeName, varName: String, serverType: Int = SERVER_TYPE_KTOR,
-                        ktorBeforeRespondCodeBlock: CodeBlock? = null,
-                        nanoHttpdApplyCodeBlock: CodeBlock? = null): CodeBlock.Builder {
-
-    if(ktorBeforeRespondCodeBlock != null && serverType == SERVER_TYPE_KTOR)
-        add(ktorBeforeRespondCodeBlock)
-
-    when{
-        returnType == UNIT && serverType == SERVER_TYPE_KTOR->
-            add(CODEBLOCK_KTOR_NO_CONTENT_RESPOND)
-
-        returnType == UNIT && serverType == SERVER_TYPE_NANOHTTPD ->
-            add(CODEBLOCK_NANOHTTPD_NO_CONTENT_RESPONSE)
-
-        !returnType.isNullableAsSelectReturnResult && serverType == SERVER_TYPE_KTOR->
-            addKtorResponse(varName)
-
-        !returnType.isNullableAsSelectReturnResult && serverType == SERVER_TYPE_NANOHTTPD ->
-            addNanoHttpdResponse(varName, applyToResponseCodeBlock = nanoHttpdApplyCodeBlock)
-
-
-        else -> beginControlFlow("if($varName != null)")
-                .apply {
-                    takeIf { serverType == SERVER_TYPE_KTOR }?.addKtorResponse(varName
-                    )
-                    takeIf { serverType == SERVER_TYPE_NANOHTTPD }?.addNanoHttpdResponse(varName,
-                            addNonNullOperator = true, applyToResponseCodeBlock = nanoHttpdApplyCodeBlock)
-                }
-                .nextControlFlow("else")
-                .apply {
-                    takeIf { serverType == SERVER_TYPE_KTOR }
-                            ?.add(CODEBLOCK_KTOR_NO_CONTENT_RESPOND)
-                    takeIf { serverType == SERVER_TYPE_NANOHTTPD }
-                            ?.add(CODEBLOCK_NANOHTTPD_NO_CONTENT_RESPONSE)
-                }
-                .endControlFlow()
-    }
-
-    return this
-}
 
 
 /**
@@ -513,44 +160,6 @@ fun FileSpec.Builder.addDbKtorRouteFunction(
             }
             .build())
         .build())
-
-    return this
-}
-
-/**
- * Add a NanoHTTPD mapper function for the database (maps all DAOs for this database to RouterNanoHTTPD)
- * to this FileSpec.
- */
-fun FileSpec.Builder.addDbNanoHttpdMapperFunction(
-    dbClassDeclaration: KSClassDeclaration,
-) : FileSpec.Builder {
-    val dbTypeClassName = dbClassDeclaration.toClassName()
-    addFunction(FunSpec.builder("${dbTypeClassName.simpleName}$SUFFIX_NANOHTTPD_ADDURIMAPPING")
-        .addOriginatingKSClass(dbClassDeclaration)
-        .addParametersForHttpDb(false)
-        .addParameter("_mappingPrefix", String::class)
-        .addParameter("_di", DI::class)
-        .receiver(RouterNanoHTTPD::class)
-        .addCode(CodeBlock.builder()
-            .add("val _typeToken : %T = %M()\n",
-                org.kodein.type.TypeToken::class.asClassName().parameterizedBy(dbTypeClassName),
-                MemberName("org.kodein.type", "erased"))
-            .apply {
-                dbClassDeclaration.dbEnclosedDaos().filter {
-                    it.hasAnnotation(Repository::class)
-                }.forEach { daoClassDecl ->
-                    val daoPropOrGetter = dbClassDeclaration.findDbGetterForDao(daoClassDecl)
-                    add("addRoute(\"\$_mappingPrefix/${daoClassDecl.simpleName.asString()}/.*\",\n " +
-                            "%T::class.java, _di,\n %T(){ it.${daoPropOrGetter?.toPropertyOrEmptyFunctionCaller()} }, _typeToken",
-                        daoClassDecl.toClassNameWithSuffix(SUFFIX_NANOHTTPD_URIRESPONDER),
-                        DoorDaoProvider::class.asTypeName().parameterizedBy(
-                            dbTypeClassName, daoClassDecl.toClassName()))
-                    add(")\n")
-                }
-            }
-            .build())
-        .build())
-
 
     return this
 }
@@ -1008,25 +617,6 @@ class DoorHttpServerProcessor(
                 }
             }
 
-            DoorTarget.ANDROID -> {
-                dbSymbols.forEach { dbClassDecl ->
-                    if (dbClassDecl.dbEnclosedDaos().any { it.hasAnnotation(Repository::class) }) {
-                        FileSpec.builder(dbClassDecl.packageName.asString(),
-                            "${dbClassDecl.simpleName.asString()}$SUFFIX_NANOHTTPD_ADDURIMAPPING")
-                            .addDbNanoHttpdMapperFunction(dbClassDecl)
-                            .build()
-                            .writeTo(environment.codeGenerator, false)
-                    }
-                }
-
-                daoSymbols.forEach { daoClassDecl ->
-                    FileSpec.builder(daoClassDecl.packageName.asString(), "${daoClassDecl.simpleName.asString()}$SUFFIX_NANOHTTPD_URIRESPONDER")
-                        .addNanoHttpdResponder(daoClassDecl, resolver, environment.logger)
-                        .build()
-                        .writeTo(environment.codeGenerator, false)
-                }
-            }
-
             else -> {
                 // do nothing
             }
@@ -1054,10 +644,6 @@ class DoorHttpServerProcessor(
 
         const val SUFFIX_KTOR_ROUTE = "_KtorRoute"
 
-        const val SUFFIX_NANOHTTPD_URIRESPONDER = "_UriResponder"
-
-        const val SUFFIX_NANOHTTPD_ADDURIMAPPING = "_AddUriMapping"
-
         const val SUFFIX_HTTP_SERVER_EXTENSION_FUNS = "_HttpServerExt"
 
         const val END_OF_PAGINATION_REACHED_VALNAME = "_endOfPaginationReached"
@@ -1067,25 +653,6 @@ class DoorHttpServerProcessor(
         val POST_MEMBER = MemberName("io.ktor.server.routing", "post")
 
         val CALL_MEMBER = MemberName("io.ktor.server.application", "call")
-
-        val RESPOND_MEMBER = MemberName("io.ktor.server.response", "respond")
-
-        val DI_ON_MEMBER = MemberName("org.kodein.di", "on")
-
-        val DI_INSTANCE_MEMBER = MemberName("org.kodein.di", "instance")
-
-        val DI_INSTANCE_TYPETOKEN_MEMBER = MemberName("org.kodein.di", "Instance")
-
-        const val SERVER_TYPE_KTOR = 1
-
-        const val SERVER_TYPE_NANOHTTPD = 2
-
-        internal val CODEBLOCK_NANOHTTPD_NO_CONTENT_RESPONSE = CodeBlock.of(
-            "return %T.newFixedLengthResponse(%T.Status.NO_CONTENT, %T.MIME_TYPE_PLAIN, %S)\n",
-            NanoHTTPD::class, NanoHTTPD.Response::class, DoorConstants::class, "")
-
-        internal val CODEBLOCK_KTOR_NO_CONTENT_RESPOND = CodeBlock.of("%M.%M(%T.NoContent, %S)\n",
-            CALL_MEMBER, RESPOND_MEMBER, HttpStatusCode::class, "")
 
     }
 }
